@@ -22,7 +22,7 @@ export interface LinkedInTool {
  * The app's entire navigation: exactly these 8 LinkedIn tools, in sidebar order.
  */
 export const LINKEDIN_TOOLS: LinkedInTool[] = [
-  { id: "trending-topics", title: "Trending Topics", description: "Latest IT & AI buzz", icon: Flame, href: "/trending-topics" },
+  { id: "trending-topics", title: "Trending Topics", description: "Web, AI & SaaS buzz", icon: Flame, href: "/trending-topics" },
   { id: "connection-note", title: "Connection Note", description: "Personalized connection requests", icon: UserPlus, href: "/connection-note" },
   { id: "comment-writer", title: "Comment Writer", description: "Thoughtful LinkedIn comments", icon: MessageSquareText, href: "/comment-writer" },
   { id: "post-comment-replies", title: "Post Comment Replies", description: "Reply to post comments", icon: Reply, href: "/post-comment-replies" },

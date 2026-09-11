@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
 import { NO_SENDER_PROFILE_TEXT, generateWithoutSenderClaims } from "@/services/senderGuard"
+import { humanizeTexts } from "@/services/humanizer"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
 import { LINKEDIN_MESSAGE_MAX_CHARS, getTuneLabel, type FirstMessageTuneId } from "@/constants/firstMessage"
 import type { GeneratedFirstMessage } from "@/types/firstMessage"
@@ -44,7 +45,8 @@ function findUnusableReason(output: FirstMessageOutput): string | null {
 
 /**
  * Generates one first message using the latest saved prompt for the tune and the
- * shared sender profile. Profile text is untrusted data inside its own delimiter tags.
+ * shared sender profile, then rewrites it with the Humanization prompt. Profile text is
+ * untrusted data inside its own delimiter tags.
  */
 export async function generateFirstMessage({ profileData, tune, signal }: GenerateOptions): Promise<GeneratedFirstMessage> {
   const { tunePrompt, senderProfile } = await getGenerationInputs(tune)
@@ -76,7 +78,18 @@ export async function generateFirstMessage({ profileData, tune, signal }: Genera
     claimText: (output) => output.message,
     describeDraft: (output) => cleanGeneratedText(output.message),
   })
-  const message = cleanGeneratedText(data.message)
+  const humanization = await humanizeTexts({
+    fields: [
+      {
+        id: "message",
+        kind: "LinkedIn first message (DM) to someone new",
+        text: cleanGeneratedText(data.message),
+        maxChars: LINKEDIN_MESSAGE_MAX_CHARS,
+      },
+    ],
+    signal,
+  })
+  const message = humanization.texts.message
 
   const warnings = [
     unsupportedSenderClaim &&
@@ -94,6 +107,7 @@ export async function generateFirstMessage({ profileData, tune, signal }: Genera
       usedSenderProfile: senderProfile !== null,
       senderClaimRewrite,
       unsupportedSenderClaim,
+      humanized: humanization.humanized,
       characters: message.length,
     })
   )

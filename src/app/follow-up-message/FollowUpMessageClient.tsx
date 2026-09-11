@@ -8,7 +8,11 @@ import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
 import { FollowUpResult } from "@/components/follow-up-message/FollowUpResult"
 import { FollowUpPromptsModal } from "@/components/follow-up-message/FollowUpPromptsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
-import { useGenerationRequest } from "@/hooks/useGenerationRequest"
+import { ResetButton } from "@/components/ui/ResetButton"
+import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
+import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
+import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
+import { createToolStore, useToolStore } from "@/lib/toolStore"
 import {
   CONVERSATION_MAX_LENGTH,
   FOLLOW_UP_MESSAGES,
@@ -29,24 +33,33 @@ interface GeneratePayload {
   followUpType: FollowUpTypeId
 }
 
+// Inputs and the result outlive the page, so they're still here after visiting another tool
+const formStore = createToolStore(
+  "follow-up-message:form",
+  { conversation: "", profileData: "", followUpType: null as FollowUpTypeId | null },
+  { version: 1 }
+)
+const generation = createGenerationRequest<GeneratePayload, GeneratedFollowUp>(
+  "follow-up-message",
+  GENERATE_ENDPOINT,
+  FOLLOW_UP_MESSAGES.generationFailed
+)
+
 const labelClass = "text-[10px] font-bold text-outline uppercase tracking-wider"
 const textareaClass =
   "w-full resize-none rounded-xl border bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
 
 export default function FollowUpMessageClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   const [isPromptsOpen, setIsPromptsOpen] = useState(false)
-  const [conversation, setConversation] = useState("")
-  const [profileData, setProfileData] = useState("")
-  const [followUpType, setFollowUpType] = useState<FollowUpTypeId | null>(null)
+  const { conversation, profileData, followUpType } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
-  const { status, result, error, generate } = useGenerationRequest<GeneratePayload, GeneratedFollowUp>(
-    GENERATE_ENDPOINT,
-    FOLLOW_UP_MESSAGES.generationFailed
-  )
+  const { status, result, error, generate, reset } = useGenerationRequest(generation)
   const isGenerating = status === "loading"
+  const canReset = conversation !== "" || profileData !== "" || status !== "idle"
   const isConversationMissing = formError === FOLLOW_UP_MESSAGES.missingConversation
   const isTypeMissing = formError === FOLLOW_UP_MESSAGES.missingType
 
@@ -62,6 +75,21 @@ export default function FollowUpMessageClient() {
     }
     setFormError(null)
     generate({ conversation, profileData, followUpType })
+  }
+
+  // A dummy conversation fills the conversation and profile; the follow-up for the previous one goes with it
+  const loadDummyConversation = ({ conversation, profile }: Record<string, string>) => {
+    formStore.update({ conversation: conversation ?? "", profileData: profile ?? "" })
+    reset()
+    setFormError(null)
+  }
+
+  // Clears the conversation, profile and result; the chosen follow-up type stays
+  const resetTool = () => {
+    formStore.update({ conversation: "", profileData: "" })
+    reset()
+    setFormError(null)
+    conversationInputRef.current?.focus()
   }
 
   return (
@@ -88,14 +116,18 @@ export default function FollowUpMessageClient() {
                   Generate natural follow-ups from your previous conversation.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsPromptsOpen(true)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors sm:shrink-0"
-              >
-                <FilePenLine size={16} aria-hidden="true" />
-                Update Prompt
-              </button>
+              <div className="flex flex-wrap gap-2 sm:shrink-0">
+                <ResetButton onReset={resetTool} disabled={!canReset} />
+                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
+                <button
+                  type="button"
+                  onClick={() => setIsPromptsOpen(true)}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                >
+                  <FilePenLine size={16} aria-hidden="true" />
+                  Update Prompt
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0">
@@ -122,7 +154,7 @@ export default function FollowUpMessageClient() {
                     id={CONVERSATION_INPUT_ID}
                     value={conversation}
                     onChange={(event) => {
-                      setConversation(event.target.value)
+                      formStore.update({ conversation: event.target.value })
                       if (isConversationMissing) setFormError(null)
                     }}
                     maxLength={CONVERSATION_MAX_LENGTH}
@@ -147,7 +179,7 @@ export default function FollowUpMessageClient() {
                   <textarea
                     id={PROFILE_INPUT_ID}
                     value={profileData}
-                    onChange={(event) => setProfileData(event.target.value)}
+                    onChange={(event) => formStore.update({ profileData: event.target.value })}
                     maxLength={FOLLOW_UP_PROFILE_MAX_LENGTH}
                     placeholder="Paste their LinkedIn profile information to personalize the follow-up..."
                     className={`${textareaClass} flex-1 min-h-[120px] lg:min-h-[90px] border-outline-variant`}
@@ -160,7 +192,7 @@ export default function FollowUpMessageClient() {
                   options={FOLLOW_UP_TYPES}
                   value={followUpType}
                   onChange={(nextType) => {
-                    setFollowUpType(nextType)
+                    formStore.update({ followUpType: nextType })
                     if (isTypeMissing) setFormError(null)
                   }}
                   disabled={isGenerating}
@@ -197,6 +229,9 @@ export default function FollowUpMessageClient() {
       </div>
 
       {isPromptsOpen && <FollowUpPromptsModal initialType={followUpType} onClose={() => setIsPromptsOpen(false)} />}
+      {isDummyDataOpen && (
+        <DummyDataModal kind="follow-up-conversations" onUse={loadDummyConversation} onClose={() => setIsDummyDataOpen(false)} />
+      )}
     </div>
   )
 }

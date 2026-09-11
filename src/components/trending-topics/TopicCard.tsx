@@ -1,15 +1,11 @@
 "use client"
 
 import React from "react"
-import { ChevronDown, Clock, ExternalLink, Camera, ShieldCheck, MessageCircle } from "lucide-react"
+import { ChevronDown, Clock, ExternalLink, Camera, ShieldCheck } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { LINKEDIN_CONTENT_SEARCH_URL } from "@/constants/trending"
 import type { TrendingReference, TrendingTopic } from "@/services/trending/schema"
-
-interface TopicCardProps {
-  topic: TrendingTopic
-  className?: string
-}
+import { TopicPost } from "./TopicPost"
 
 const SectionLabel: React.FC<{ children: React.ReactNode; action?: React.ReactNode }> = ({ children, action }) => (
   <div className="flex items-center justify-between gap-2 mb-1.5 min-h-[22px]">
@@ -53,12 +49,12 @@ function linkedInSearchUrl(query: string): string {
   return `${LINKEDIN_CONTENT_SEARCH_URL}?keywords=${encodeURIComponent(query)}`
 }
 
-export const TopicCard: React.FC<TopicCardProps> = ({ topic, className = "" }) => {
+export const TopicCard: React.FC<{ topic: TrendingTopic }> = ({ topic }) => {
   const isToday = topic.freshness === "Today"
   const eventDate = formatEventDate(topic.event_date)
 
   return (
-    <article className={`bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-w-0 ${className}`}>
+    <article className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-w-0">
       {/* Freshness & category */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span
@@ -115,58 +111,7 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, className = "" }) =
         </ul>
       </section>
 
-      {(topic.keywords.length > 0 || topic.suggested_hashtags.length > 0) && (
-        <section className="space-y-2">
-          {topic.keywords.length > 0 && (
-            <div>
-              <SectionLabel action={<CopyButton text={topic.keywords.join(", ")} label="Copy keywords" />}>
-                Keywords
-              </SectionLabel>
-              <p className="text-[12px] text-on-surface-variant leading-relaxed">{topic.keywords.join(" · ")}</p>
-            </div>
-          )}
-          {topic.suggested_hashtags.length > 0 && (
-            <div>
-              <SectionLabel
-                action={<CopyButton text={topic.suggested_hashtags.join(" ")} label="Copy suggested hashtags" />}
-              >
-                Suggested hashtags
-              </SectionLabel>
-              <div className="flex flex-wrap gap-1">
-                {topic.suggested_hashtags.map((tag) => (
-                  <span key={tag} className="text-[11px] font-semibold text-primary bg-primary/5 px-2 py-0.5 rounded-full">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      <section>
-        <SectionLabel action={<CopyButton text={topic.short_post} label="Copy post" showLabel />}>
-          Short post
-        </SectionLabel>
-        <blockquote className="text-[13px] text-on-surface leading-relaxed border-l-2 border-primary bg-surface-container-lowest pl-3 py-1">
-          {topic.short_post}
-        </blockquote>
-      </section>
-
-      <section>
-        <SectionLabel action={<CopyButton text={topic.conversation_angle} label="Copy conversation angle" />}>
-          Conversation angle
-        </SectionLabel>
-        <p className="text-[13px] text-on-surface-variant leading-relaxed flex gap-2">
-          <MessageCircle size={14} className="shrink-0 mt-0.5 text-primary" aria-hidden="true" />
-          <span>{topic.conversation_angle}</span>
-        </p>
-      </section>
-
-      <section>
-        <SectionLabel>Reference</SectionLabel>
-        <ReferenceLink reference={topic.primary_reference} />
-      </section>
+      <TopicPost topic={topic} />
 
       {/* Secondary research details */}
       <details className="group border-t border-outline-variant/60 pt-3 mt-auto">
@@ -176,6 +121,15 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, className = "" }) =
         </summary>
 
         <div className="mt-3 space-y-4">
+          {topic.keywords.length > 0 && (
+            <div>
+              <SectionLabel action={<CopyButton text={topic.keywords.join(", ")} label="Copy keywords" />}>
+                Keywords
+              </SectionLabel>
+              <p className="text-[12px] text-on-surface-variant leading-relaxed">{topic.keywords.join(" · ")}</p>
+            </div>
+          )}
+
           <div>
             <SectionLabel>Trend assessment</SectionLabel>
             <p className="text-[13px] text-on-surface font-semibold">{topic.discussion_potential} discussion potential</p>
@@ -208,6 +162,11 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, className = "" }) =
               Open screenshot source <ExternalLink size={12} aria-hidden="true" />
               <span className="sr-only">(opens in a new tab)</span>
             </a>
+          </div>
+
+          <div>
+            <SectionLabel>Main source</SectionLabel>
+            <ReferenceLink reference={topic.primary_reference} />
           </div>
 
           {topic.secondary_references.length > 0 && (

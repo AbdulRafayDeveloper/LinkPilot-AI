@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
 import { readSSEStream } from "@/lib/sse"
+import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { POST_COMMENT_REPLY_MESSAGES, type ReplyStage } from "@/constants/postCommentReplies"
 import type { ApiEnvelope } from "@/types/api"
 import type { GenerateReplyRequest, GeneratedReply, ReplyStreamEvent } from "@/types/postCommentReplies"
@@ -9,6 +9,23 @@ import type { GenerateReplyRequest, GeneratedReply, ReplyStreamEvent } from "@/t
 const GENERATE_ENDPOINT = "/api/post-comment-replies/generate"
 
 export type ReplyGenerationStatus = "idle" | "loading" | "success" | "error"
+
+interface ReplyGenerationState {
+  status: ReplyGenerationStatus
+  stage: ReplyStage
+  result: GeneratedReply | null
+  error: string | null
+}
+
+const IDLE: ReplyGenerationState = { status: "idle", stage: "WRITING", result: null, error: null }
+
+// Lives outside the page, so a reply (or one still being written) is there when the user comes back
+const store = createToolStore<ReplyGenerationState>("post-comment-replies:result", IDLE, {
+  version: 1,
+  // Only a finished reply survives a refresh; a running request can't resume after one
+  toStored: (state) => (state.status === "success" ? state : IDLE),
+})
+let controller: AbortController | null = null
 
 // Only the selected post mode's value is sent; an empty post is simply left out
 function toFormData(request: GenerateReplyRequest): FormData {
@@ -28,61 +45,56 @@ function toFormData(request: GenerateReplyRequest): FormData {
  * Starting a generation cancels the previous one and clears its reply immediately, so
  * an old reply is never shown alongside a new one.
  */
-export function usePostCommentReplyGenerator() {
-  const [status, setStatus] = useState<ReplyGenerationStatus>("idle")
-  const [stage, setStage] = useState<ReplyStage>("WRITING")
-  const [result, setResult] = useState<GeneratedReply | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const controllerRef = useRef<AbortController | null>(null)
+async function generate(request: GenerateReplyRequest) {
+  controller?.abort()
+  const current = new AbortController()
+  controller = current
+  const fail = (message: string) => store.update({ status: "error", error: message })
+  store.update({
+    status: "loading",
+    stage: request.postMode === "image" && request.postImage ? "READING_POST" : "WRITING",
+    result: null,
+    error: null,
+  })
 
-  useEffect(() => () => controllerRef.current?.abort(), [])
-
-  const generate = useCallback(async (request: GenerateReplyRequest) => {
-    controllerRef.current?.abort()
-    const controller = new AbortController()
-    controllerRef.current = controller
-
-    setResult(null)
-    setError(null)
-    setStage(request.postMode === "image" && request.postImage ? "READING_POST" : "WRITING")
-    setStatus("loading")
-
-    try {
-      const response = await fetch(GENERATE_ENDPOINT, {
-        method: "POST",
-        body: toFormData(request),
-        signal: controller.signal,
-      })
-      if (!response.ok || !response.body) {
-        // Validation failures come back as the standard JSON envelope with a user-safe message
-        const body = (await response.json().catch(() => null)) as ApiEnvelope<never> | null
-        setError(body?.message || POST_COMMENT_REPLY_MESSAGES.generationFailed)
-        setStatus("error")
-        return
-      }
-
-      let isFinished = false
-      await readSSEStream<ReplyStreamEvent>(response.body, (event) => {
-        if (event.status === "COMPLETE") {
-          isFinished = true
-          setResult(event.result)
-          setStatus("success")
-        } else if (event.status === "ERROR") {
-          isFinished = true
-          setError(event.message)
-          setStatus("error")
-        } else {
-          setStage(event.status)
-        }
-      })
-      if (!isFinished) throw new Error("Reply stream ended without a result")
-    } catch (err: unknown) {
-      if (controller.signal.aborted) return
-      console.error("Post comment reply generation failed:", err)
-      setError(POST_COMMENT_REPLY_MESSAGES.generationFailed)
-      setStatus("error")
+  try {
+    const response = await fetch(GENERATE_ENDPOINT, { method: "POST", body: toFormData(request), signal: current.signal })
+    if (!response.ok || !response.body) {
+      // Validation failures come back as the standard JSON envelope with a user-safe message
+      const body = (await response.json().catch(() => null)) as ApiEnvelope<never> | null
+      if (!current.signal.aborted) fail(body?.message || POST_COMMENT_REPLY_MESSAGES.generationFailed)
+      return
     }
-  }, [])
 
-  return { status, stage, result, error, generate }
+    let isFinished = false
+    await readSSEStream<ReplyStreamEvent>(response.body, (event) => {
+      if (current.signal.aborted) return
+      if (event.status === "COMPLETE") {
+        isFinished = true
+        store.update({ status: "success", result: event.result })
+      } else if (event.status === "ERROR") {
+        isFinished = true
+        fail(event.message)
+      } else {
+        store.update({ stage: event.status })
+      }
+    })
+    if (!isFinished && !current.signal.aborted) throw new Error("Reply stream ended without a result")
+  } catch (err: unknown) {
+    if (current.signal.aborted) return
+    console.error("Post comment reply generation failed:", err)
+    fail(POST_COMMENT_REPLY_MESSAGES.generationFailed)
+  }
+}
+
+// Cancels any running request and clears the reply
+function reset() {
+  controller?.abort()
+  controller = null
+  store.reset()
+}
+
+export function usePostCommentReplyGenerator() {
+  const { status, stage, result, error } = useToolStore(store)
+  return { status, stage, result, error, generate, reset }
 }

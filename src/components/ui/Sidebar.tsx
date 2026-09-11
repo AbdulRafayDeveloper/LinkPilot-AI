@@ -4,9 +4,10 @@ import React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { X } from "lucide-react"
+import { SquareArrowOutUpRight, X } from "lucide-react"
 import { SITE_NAME } from "@/config/site"
-import { LINKEDIN_TOOLS } from "@/constants/linkedinTools"
+import { LINKEDIN_TOOLS, type LinkedInTool } from "@/constants/linkedinTools"
+import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 
 interface SidebarProps {
   isOpen: boolean
@@ -14,9 +15,54 @@ interface SidebarProps {
   isCollapsed?: boolean
 }
 
+interface SidebarLinkProps {
+  link: Pick<LinkedInTool, "title" | "description" | "icon" | "href">
+  isActive: boolean
+  onNavigate: () => void
+}
+
+// One navigation row: the page link, plus a separate "open in new tab" link beside it
+const SidebarLink: React.FC<SidebarLinkProps> = ({ link: { title, description, icon: Icon, href }, isActive, onNavigate }) => (
+  <li className="relative">
+    <Link
+      href={href}
+      onClick={onNavigate}
+      aria-current={isActive ? "page" : undefined}
+      className={`w-full flex items-center gap-3 pl-2.5 pr-10 py-2 rounded-lg transition-colors duration-200 ${
+        isActive ? "bg-primary-container text-on-primary-container" : "text-on-surface-variant hover:bg-surface-container-high"
+      }`}
+    >
+      <Icon size={18} className="shrink-0" aria-hidden="true" />
+      <span className="min-w-0">
+        <span className={`block text-sm leading-tight truncate ${isActive ? "font-semibold" : "font-medium"}`}>{title}</span>
+        <span
+          className={`block text-[11px] leading-tight mt-0.5 truncate ${isActive ? "text-on-primary-container/80" : "text-outline"}`}
+        >
+          {description}
+        </span>
+      </span>
+    </Link>
+    {/* A real link, so Ctrl/⌘+click and middle-click open the page in a background tab */}
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Open ${title} in a new tab`}
+      title="Open in a new tab (Ctrl/⌘+click or middle-click to stay on this page)"
+      className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+        isActive
+          ? "text-on-primary-container/70 hover:text-on-primary-container hover:bg-white/15"
+          : "text-outline hover:text-primary hover:bg-surface-container"
+      }`}
+    >
+      <SquareArrowOutUpRight size={14} aria-hidden="true" />
+    </a>
+  </li>
+)
+
 /**
- * App navigation: the logo and the 8 LinkedIn tools. A drawer on small screens, a
- * collapsible column on desktop. Sized so all 8 tools fit without scrolling on laptop screens.
+ * App navigation: the logo, the 8 LinkedIn tools and the Global AI Prompts module. A drawer
+ * on small screens, a collapsible column on desktop. The list scrolls if a screen is too short.
  */
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed = false }) => {
   const pathname = usePathname()
@@ -27,13 +73,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
       {isOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-45 lg:hidden transition-opacity duration-300"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[45] lg:hidden transition-opacity duration-300"
           aria-hidden="true"
         />
       )}
 
       <aside
-        className={`h-screen flex-shrink-0 bg-surface-container-lowest border-r border-outline-variant flex flex-col transition-all duration-300 ease-in-out z-45 ${
+        className={`h-screen flex-shrink-0 bg-surface-container-lowest border-r border-outline-variant flex flex-col transition-all duration-300 ease-in-out z-[45] ${
           isOpen
             ? "translate-x-0 fixed inset-y-0 left-0 w-[280px] p-stack-md"
             : isCollapsed
@@ -64,41 +110,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
             </button>
           </div>
 
-          {/* LinkedIn Tools */}
-          <nav aria-label="LinkedIn tools" className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+          <nav aria-label="Main" className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+            {/* LinkedIn Tools */}
             <p className="text-[10px] font-bold text-outline uppercase tracking-wider mb-2.5 px-2.5">LinkedIn Tools</p>
             <ul className="space-y-1.5">
-              {LINKEDIN_TOOLS.map(({ id, title, description, icon: Icon, href }) => {
-                const isActive = pathname === href
-                return (
-                  <li key={id}>
-                    <Link
-                      href={href}
-                      onClick={onClose}
-                      aria-current={isActive ? "page" : undefined}
-                      className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg transition-colors duration-200 ${
-                        isActive
-                          ? "bg-primary-container text-on-primary-container"
-                          : "text-on-surface-variant hover:bg-surface-container-high"
-                      }`}
-                    >
-                      <Icon size={18} className="shrink-0" aria-hidden="true" />
-                      <span className="min-w-0">
-                        <span className={`block text-sm leading-tight truncate ${isActive ? "font-semibold" : "font-medium"}`}>
-                          {title}
-                        </span>
-                        <span
-                          className={`block text-[11px] leading-tight mt-0.5 truncate ${
-                            isActive ? "text-on-primary-container/80" : "text-outline"
-                          }`}
-                        >
-                          {description}
-                        </span>
-                      </span>
-                    </Link>
-                  </li>
-                )
-              })}
+              {LINKEDIN_TOOLS.map((tool) => (
+                <SidebarLink key={tool.id} link={tool} isActive={pathname === tool.href} onNavigate={onClose} />
+              ))}
+            </ul>
+
+            {/* Global AI Prompts: shared prompts, not a LinkedIn tool */}
+            <ul className="mt-3 pt-3 border-t border-outline-variant/60">
+              <SidebarLink link={GLOBAL_PROMPTS_LINK} isActive={pathname === GLOBAL_PROMPTS_LINK.href} onNavigate={onClose} />
             </ul>
           </nav>
         </div>

@@ -8,49 +8,70 @@ import { PostInput } from "@/components/post-input/PostInput"
 import { TuneSelector } from "@/components/comment-writer/TuneSelector"
 import { CommentResult } from "@/components/comment-writer/CommentResult"
 import { TunePromptsModal } from "@/components/comment-writer/TunePromptsModal"
+import { ResetButton } from "@/components/ui/ResetButton"
+import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
+import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useCommentGenerator } from "@/hooks/useCommentGenerator"
-import { COMMENT_WRITER_MESSAGES, type CommentTuneId } from "@/constants/commentWriter"
+import { createToolStore, useToolStore } from "@/lib/toolStore"
+import { COMMENT_WRITER_MESSAGES, DEFAULT_COMMENT_TUNE, type CommentTuneId } from "@/constants/commentWriter"
 import type { PostInputMode } from "@/constants/postInput"
 
 const FORM_ERROR_ID = "comment-writer-form-error"
-const { missingPost, missingTune } = COMMENT_WRITER_MESSAGES
+const { missingPost } = COMMENT_WRITER_MESSAGES
+
+// Inputs outlive the page, so they're still here after visiting another tool. A screenshot
+// stays in memory only: it survives switching tools but not a refresh.
+const formStore = createToolStore(
+  "comment-writer:form",
+  { mode: "text" as PostInputMode, postText: "", image: null as File | null, tune: DEFAULT_COMMENT_TUNE as CommentTuneId },
+  { version: 2, toStored: ({ mode, postText, tune }) => ({ mode, postText, tune }) }
+)
 
 export default function CommentWriterClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isPromptsOpen, setIsPromptsOpen] = useState(false)
-  const [mode, setMode] = useState<PostInputMode>("text")
-  const [postText, setPostText] = useState("")
-  const [image, setImage] = useState<File | null>(null)
-  const [tune, setTune] = useState<CommentTuneId | null>(null)
+  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
+  const { mode, postText, image, tune } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const resultRef = useRef<HTMLElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
-  const { status, result, stages, error, generate } = useCommentGenerator()
+  const { status, result, stages, error, generate, reset } = useCommentGenerator()
   const isGenerating = status === "loading"
-  const isPostError = formError !== null && formError !== missingTune
+  const canReset = postText !== "" || image !== null || status !== "idle"
+  const isPostError = formError !== null
 
-  const clearPostError = useCallback(() => setFormError((current) => (current === missingTune ? current : null)), [])
+  const clearPostError = useCallback(() => setFormError(null), [])
 
   const handleImageSelect = useCallback(
     (file: File) => {
-      setImage(file)
+      formStore.update({ image: file })
       clearPostError()
     },
     [clearPostError]
   )
-  const handleImageRemove = useCallback(() => setImage(null), [])
+  const handleImageRemove = useCallback(() => formStore.update({ image: null }), [])
+
+  // A dummy post goes into the text input, and the comment written for the previous post goes with it
+  const loadDummyPost = ({ post }: Record<string, string>) => {
+    formStore.update({ mode: "text", postText: post ?? "", image: null })
+    reset()
+    setFormError(null)
+  }
+
+  // Clears the post (text and screenshot) and the comment; the chosen tune stays
+  const resetTool = () => {
+    formStore.update({ postText: "", image: null })
+    reset()
+    setFormError(null)
+  }
 
   const submit = () => {
     const hasPost = mode === "text" ? postText.trim().length > 0 : image !== null
     if (!hasPost) {
       setFormError(missingPost)
       if (mode === "text") textareaRef.current?.focus()
-      return
-    }
-    if (!tune) {
-      setFormError(missingTune)
       return
     }
     setFormError(null)
@@ -83,14 +104,18 @@ export default function CommentWriterClient() {
                   Write thoughtful, relevant comments for LinkedIn posts.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsPromptsOpen(true)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors sm:shrink-0"
-              >
-                <FilePenLine size={16} aria-hidden="true" />
-                Update Prompt
-              </button>
+              <div className="flex flex-wrap gap-2 sm:shrink-0">
+                <ResetButton onReset={resetTool} disabled={!canReset} />
+                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
+                <button
+                  type="button"
+                  onClick={() => setIsPromptsOpen(true)}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                >
+                  <FilePenLine size={16} aria-hidden="true" />
+                  Update Prompt
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0">
@@ -107,12 +132,12 @@ export default function CommentWriterClient() {
                   idPrefix="comment-writer"
                   mode={mode}
                   onModeChange={(nextMode) => {
-                    setMode(nextMode)
+                    formStore.update({ mode: nextMode })
                     clearPostError()
                   }}
                   text={postText}
                   onTextChange={(text) => {
-                    setPostText(text)
+                    formStore.update({ postText: text })
                     clearPostError()
                   }}
                   image={image}
@@ -128,11 +153,9 @@ export default function CommentWriterClient() {
                 <TuneSelector
                   value={tune}
                   onChange={(nextTune) => {
-                    setTune(nextTune)
-                    if (formError === missingTune) setFormError(null)
+                    formStore.update({ tune: nextTune })
                   }}
                   disabled={isGenerating}
-                  invalid={formError === missingTune}
                 />
 
                 {formError && (
@@ -172,6 +195,7 @@ export default function CommentWriterClient() {
       </div>
 
       {isPromptsOpen && <TunePromptsModal initialTune={tune} onClose={() => setIsPromptsOpen(false)} />}
+      {isDummyDataOpen && <DummyDataModal kind="posts" onUse={loadDummyPost} onClose={() => setIsDummyDataOpen(false)} />}
     </div>
   )
 }

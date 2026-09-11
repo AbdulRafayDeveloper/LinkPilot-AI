@@ -5,6 +5,7 @@ import { runLiveResearch } from "@/services/liveResearch"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { getSenderProfile } from "@/services/senderProfile"
 import { extractPostFromImage } from "@/services/postImage"
+import { humanizeTexts } from "@/services/humanizer"
 import { UserFacingError } from "@/lib/errors"
 import { createTagSanitizer } from "@/lib/sanitize"
 import type { PostSource } from "@/lib/validation/postInput"
@@ -138,7 +139,7 @@ async function researchConversation(conversation: Conversation, stylePrompt: str
 
   try {
     const research = await runLiveResearch({
-      geminiMessages: messages,
+      geminiPasses: [messages],
       openAIPasses: [messages],
       minSources: MIN_RESEARCH_SOURCES,
       signal,
@@ -216,7 +217,8 @@ function lengthWarning(length: number): string | null {
  * Writes one reply with the latest saved prompt for the exact context + style pair
  * (Gemini first, OpenAI only as a fallback). A post screenshot is read first. A draft that
  * claims first-person experience gets one controlled rewrite that keeps only claims the
- * sources support. Throws a user-facing error when the comments contain nothing to reply to.
+ * sources support. The final reply is rewritten with the Humanization prompt. Throws a
+ * user-facing error when the comments contain nothing to reply to.
  */
 export async function generatePostCommentReply({ input, signal, onStage }: GenerateOptions): Promise<GeneratedReply> {
   const stylePrompt = await getActiveReplyPrompt(input.context, input.style)
@@ -286,16 +288,38 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
     }
   }
 
-  console.info("Post comment reply generated:", {
-    context: input.context,
-    style: input.style,
-    provider,
-    post: input.post?.type ?? "none",
-    characters: reply.length,
-    senderProfile: needsSenderProfile,
-    webResearch: needsResearch,
-    claimRewrite: claim ?? null,
+  onStage("HUMANIZING")
+  const draftHasClaim = EXPERIENCE_CLAIM.test(reply)
+  const humanization = await humanizeTexts({
+    fields: [
+      {
+        id: "reply",
+        kind: input.context === "my-post" ? "LinkedIn reply to a comment on my own post" : "LinkedIn reply in someone else's comment thread",
+        text: reply,
+        maxChars: REPLY_MAX_CHARS,
+      },
+    ],
+    providers: providers.slice(providers.indexOf(provider)),
+    signal,
+    validate: (_id, text) => (!draftHasClaim && EXPERIENCE_CLAIM.test(text) ? "adds a first-person experience claim" : null),
   })
+  reply = cleanReply(humanization.texts.reply)
+
+  // Serialized so the details also survive Next's dev file log, which drops object arguments
+  console.info(
+    "Post comment reply generated:",
+    JSON.stringify({
+      context: input.context,
+      style: input.style,
+      provider,
+      humanized: humanization.humanized,
+      post: input.post?.type ?? "none",
+      characters: reply.length,
+      senderProfile: needsSenderProfile,
+      webResearch: needsResearch,
+      claimRewrite: claim ?? null,
+    })
+  )
 
   return {
     reply,

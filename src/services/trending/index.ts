@@ -3,6 +3,7 @@ import { getActiveTrendingPrompt } from "./prompt"
 import { runTrendingResearch } from "./research"
 import { synthesizeTopics } from "./synthesize"
 import { finalizeTopics } from "./finalize"
+import { humanizeTopicPosts } from "./humanize"
 import { TrendingResultSchema, type TrendingResult, type TrendingStage } from "./schema"
 
 interface FindTrendingOptions {
@@ -29,7 +30,8 @@ function buildNotice(topicCount: number, rejectedCount: number, shortfallReason:
 /**
  * Fresh end-to-end Trending Topics run: latest saved prompt → live web research
  * (Gemini with Google Search, OpenAI web search fallback) → structured ranking (Gemini,
- * OpenAI fallback) → source verification. Nothing is cached between runs.
+ * OpenAI fallback) → source verification → the Humanization prompt on every post.
+ * Nothing is cached between runs.
  */
 export async function findTrendingTopics({ signal, onStage }: FindTrendingOptions): Promise<TrendingResult> {
   const now = new Date()
@@ -47,14 +49,24 @@ export async function findTrendingTopics({ signal, onStage }: FindTrendingOption
   const output = await synthesizeTopics({ brief: prompt, research, now, signal })
 
   onStage("VERIFYING", "Verifying references and freshness")
-  const { topics, rejected } = finalizeTopics(output.topics, research, now)
-  console.info("Trending Topics run:", {
-    provider: research.provider,
-    sources: research.sources.length,
-    candidates: output.candidates_evaluated,
-    accepted: topics.length,
-    rejected,
-  })
+  const finalized = finalizeTopics(output.topics, research, now)
+  const { rejected } = finalized
+
+  onStage("HUMANIZING", "Making the posts sound natural")
+  const { topics, humanized } = await humanizeTopicPosts(finalized.topics, signal)
+  // A JSON string, so the dev log file keeps the details (it flattens objects to {})
+  console.info(
+    "Trending Topics run:",
+    JSON.stringify({
+      provider: research.provider,
+      sources: research.sources.length,
+      candidates: output.candidates_evaluated,
+      proposed: output.topics.length,
+      accepted: topics.length,
+      rejected,
+      humanized,
+    })
+  )
 
   const parsed = TrendingResultSchema.safeParse({
     topics,

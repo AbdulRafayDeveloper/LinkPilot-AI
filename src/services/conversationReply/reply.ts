@@ -4,6 +4,7 @@ import { generateStructuredWithFallback, type ModelProvider } from "@/services/a
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage, type PromptDataBlock } from "@/services/promptComposer"
 import { containsSenderClaim } from "@/services/senderGuard"
+import { humanizeTexts } from "@/services/humanizer"
 import { findUnsupportedUserClaims } from "./claims"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
 import { LINKEDIN_MESSAGE_MAX_CHARS } from "@/constants/linkedinLimits"
@@ -69,6 +70,7 @@ export interface WrittenReply extends ReplyProblems {
   reply: string
   strategyNote: string
   provider: ModelProvider
+  humanized: boolean
 }
 
 function findUnusableReason(output: ReplyOutput): string | null {
@@ -83,6 +85,16 @@ function findUnsupportedSpecifics(reply: string, sourceText: string): string[] {
   const sources = sourceText.toLowerCase()
   const matches = [...reply.matchAll(SPECIFIC_COMMITMENT)].map((match) => match[0].trim())
   return [...new Set(matches.filter((match) => !sources.includes(match.toLowerCase())))]
+}
+
+// True when the rewrite has a problem the draft didn't have
+function addsProblems(draft: ReplyProblems, rewrite: ReplyProblems): boolean {
+  return (
+    rewrite.unsupportedSpecifics.some((specific) => !draft.unsupportedSpecifics.includes(specific)) ||
+    rewrite.unsupportedClaims.length > draft.unsupportedClaims.length ||
+    (rewrite.unsupportedSenderClaim && !draft.unsupportedSenderClaim) ||
+    (rewrite.underminingPhrase !== null && draft.underminingPhrase === null)
+  )
 }
 
 function describeProblems({
@@ -107,7 +119,8 @@ function describeProblems({
  * Writes the reply with the latest saved prompt for the reply type. The objective
  * analysis is passed in as guidance through {{conversation_analysis}}; {{reply_type}}
  * inserts the type name. A reply with unsupported durations or prices, or with claims
- * about the user that no quoted source supports, gets one controlled rewrite.
+ * about the user that no quoted source supports, gets one controlled rewrite. The final
+ * reply is rewritten with the Humanization prompt, which may not add any such problem.
  */
 export async function writeReply({
   typePrompt,
@@ -175,5 +188,22 @@ export async function writeReply({
     }
   }
 
-  return { reply, strategyNote: data.strategy_note.trim(), provider, ...problems }
+  const draftProblems = problems
+  const humanization = await humanizeTexts({
+    fields: [
+      {
+        id: "reply",
+        kind: "LinkedIn message reply in an ongoing conversation",
+        text: reply,
+        maxChars: LINKEDIN_MESSAGE_MAX_CHARS,
+      },
+    ],
+    signal,
+    validate: (_id, text) =>
+      addsProblems(draftProblems, findProblems(text)) ? "adds unsupported specifics or claims about the user" : null,
+  })
+  reply = humanization.texts.reply
+  problems = findProblems(reply)
+
+  return { reply, strategyNote: data.strategy_note.trim(), provider, humanized: humanization.humanized, ...problems }
 }

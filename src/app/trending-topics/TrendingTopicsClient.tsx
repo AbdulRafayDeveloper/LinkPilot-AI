@@ -8,6 +8,7 @@ import { TrendingPromptModal } from "@/components/trending-topics/TrendingPrompt
 import { ResearchProgress } from "@/components/trending-topics/ResearchProgress"
 import { TrendingEmptyState, TrendingErrorState } from "@/components/trending-topics/StatusPanels"
 import { TrendingResults } from "@/components/trending-topics/TrendingResults"
+import { ResetButton } from "@/components/ui/ResetButton"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useTrendingTopicsSearch } from "@/hooks/useTrendingTopicsSearch"
 import { TRENDING_ERROR_MESSAGE } from "@/constants/trending"
@@ -16,7 +17,7 @@ export default function TrendingTopicsClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isPromptEditorOpen, setIsPromptEditorOpen] = useState(false)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
-  const { status, result, stages, error, search } = useTrendingTopicsSearch()
+  const { status, result, stages, error, search, reset } = useTrendingTopicsSearch()
   const isLoading = status === "loading"
 
   return (
@@ -45,6 +46,7 @@ export default function TrendingTopicsClient() {
               </div>
 
               <div className="flex gap-2 sm:shrink-0">
+                <ResetButton onReset={reset} disabled={status === "idle"} />
                 <button
                   type="button"
                   onClick={() => setIsPromptEditorOpen(true)}

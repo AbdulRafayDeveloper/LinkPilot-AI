@@ -47,7 +47,7 @@ export async function analyzeAndReply({
   ]
 
   const { analysis, brief, userHasSpoken } = await analyzeConversation({ dataBlocks, signal })
-  const { reply, strategyNote, provider, unsupportedSpecifics, unsupportedClaims, unsupportedSenderClaim } = await writeReply({
+  const { reply, strategyNote, provider, humanized, unsupportedSpecifics, unsupportedClaims, unsupportedSenderClaim } = await writeReply({
     typePrompt,
     replyType,
     dataBlocks,
@@ -71,6 +71,7 @@ export async function analyzeAndReply({
     JSON.stringify({
       replyType,
       replyProvider: provider,
+      humanized,
       state: analysis.parties.state,
       usedProfile: profileData !== null,
       usedSenderProfile: experience.hasProfile,

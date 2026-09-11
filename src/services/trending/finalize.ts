@@ -2,11 +2,12 @@ import { TRENDING_TOPIC_COUNT } from "@/constants/trending"
 import type { ResearchResult, ResearchSource } from "@/services/liveResearch"
 import { hostnameOf, normalizeUrl } from "@/lib/url"
 import { daysSince, verifyEventDate } from "@/lib/eventDate"
+import { containsPlaceholder } from "@/lib/generatedText"
 import type { SynthesisTopic, TrendingReference, TrendingTopic } from "./schema"
 
 const MAX_SEARCH_QUERIES = 6
 const MAX_KEYWORDS = 8
-const MAX_HASHTAGS = 6
+const MAX_HASHTAGS = 5
 const MAX_SECONDARY_REFERENCES = 3
 // Hard ceiling for anything presented as "trending"; the configured prompt sets the tighter window
 const MAX_TOPIC_AGE_DAYS = 30
@@ -100,7 +101,10 @@ export function finalizeTopics(modelTopics: SynthesisTopic[], research: Research
       reject("unverified_date")
       continue
     }
-    if (!title || queries.length === 0 || !topic.short_post.trim()) {
+    const hook = topic.post_hook.trim()
+    const body = topic.post_body.trim()
+    // A [bracket] means a hook pattern was copied instead of filled in
+    if (!title || queries.length === 0 || !hook || !body || containsPlaceholder(hook) || containsPlaceholder(body)) {
       reject("incomplete")
       continue
     }
@@ -128,8 +132,8 @@ export function finalizeTopics(modelTopics: SynthesisTopic[], research: Research
       linkedin_search_queries: queries,
       keywords: cleanList(topic.keywords, MAX_KEYWORDS),
       suggested_hashtags: cleanList(topic.suggested_hashtags, MAX_HASHTAGS, toHashtag),
-      conversation_angle: topic.conversation_angle.trim(),
-      short_post: topic.short_post.trim(),
+      post_hook: hook,
+      post_body: body,
       primary_reference: primary,
       secondary_references: secondary.slice(0, MAX_SECONDARY_REFERENCES),
       screenshot_reference: {

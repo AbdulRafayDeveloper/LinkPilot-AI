@@ -1,8 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { readSSEStream } from "@/lib/sse"
-import { readStoredTrendingResult, saveTrendingResult, subscribeToStoredTrendingResult } from "@/lib/trendingResultStore"
+import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { TRENDING_ERROR_MESSAGE, TRENDING_TOPIC_COUNT } from "@/constants/trending"
 import type { TrendingResult, TrendingStage, TrendingStreamEvent } from "@/services/trending/schema"
 
@@ -13,66 +12,74 @@ export interface TrendingStageEntry {
   text: string
 }
 
-const statusFor = (result: TrendingResult): TrendingSearchStatus =>
-  result.topics.length >= TRENDING_TOPIC_COUNT ? "success" : "partial_success"
+interface TrendingSearchState {
+  status: TrendingSearchStatus
+  result: TrendingResult | null
+  stages: TrendingStageEntry[]
+  error: string | null
+}
+
+const IDLE: TrendingSearchState = { status: "idle", result: null, stages: [], error: null }
+
+const isFinished = (status: TrendingSearchStatus) => status === "success" || status === "partial_success"
 
 /**
- * Drives one fresh Trending Topics search at a time. Starting a search clears the
- * previous results immediately, so old topics never stay on screen under new ones.
- * The last successful results are kept in the browser for 24 hours: until a new search
- * replaces them, they come back after navigating away or refreshing.
+ * The last search lives outside the page: its topics (or a search still running) are
+ * there after visiting another tool, and finished topics survive refreshes for 24 hours
+ * until a new search replaces them. Bump the version when TrendingResult changes shape.
  */
-export function useTrendingTopicsSearch() {
-  const [status, setStatus] = useState<TrendingSearchStatus>("idle")
-  const [result, setResult] = useState<TrendingResult | null>(null)
-  const [stages, setStages] = useState<TrendingStageEntry[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const controllerRef = useRef<AbortController | null>(null)
-  const stored = useSyncExternalStore(subscribeToStoredTrendingResult, readStoredTrendingResult, () => null)
+const store = createToolStore<TrendingSearchState>("trending-topics:result", IDLE, {
+  version: 1,
+  toStored: (state) => (isFinished(state.status) ? { ...state, stages: [] } : IDLE),
+})
+let controller: AbortController | null = null
 
-  useEffect(() => () => controllerRef.current?.abort(), [])
+/**
+ * Runs one fresh search at a time. Starting a search clears the previous results
+ * immediately, so old topics never stay on screen under new ones.
+ */
+async function search() {
+  controller?.abort()
+  const current = new AbortController()
+  controller = current
+  store.update({ status: "loading", result: null, stages: [], error: null })
 
-  const search = useCallback(async () => {
-    controllerRef.current?.abort()
-    const controller = new AbortController()
-    controllerRef.current = controller
+  try {
+    const response = await fetch("/api/trending-topics/search", { method: "POST", signal: current.signal })
+    if (!response.ok || !response.body) throw new Error(`Search request failed with status ${response.status}`)
 
-    setResult(null)
-    setStages([])
-    setError(null)
-    setStatus("loading")
-
-    try {
-      const response = await fetch("/api/trending-topics/search", { method: "POST", signal: controller.signal })
-      if (!response.ok || !response.body) throw new Error(`Search request failed with status ${response.status}`)
-
-      let isFinished = false
-      await readSSEStream<TrendingStreamEvent>(response.body, (event) => {
-        if (event.status === "COMPLETE") {
-          isFinished = true
-          saveTrendingResult(event.result)
-          setResult(event.result)
-          setStatus(statusFor(event.result))
-        } else if (event.status === "ERROR") {
-          isFinished = true
-          setError(event.message)
-          setStatus("error")
-        } else {
-          setStages((previous) => [...previous, { status: event.status, text: event.text }])
-        }
-      })
-      if (!isFinished) throw new Error("Search stream ended without a result")
-    } catch (err: unknown) {
-      if (controller.signal.aborted) return
-      console.error("Trending topics search failed:", err)
-      setError(TRENDING_ERROR_MESSAGE)
-      setStatus("error")
-    }
-  }, [])
-
-  // Before any search on this visit, show the results kept from the last one
-  if (status === "idle" && stored) {
-    return { status: statusFor(stored.result), result: stored.result, stages, error, search }
+    let hasResult = false
+    await readSSEStream<TrendingStreamEvent>(response.body, (event) => {
+      if (current.signal.aborted) return
+      if (event.status === "COMPLETE") {
+        hasResult = true
+        store.update({
+          status: event.result.topics.length >= TRENDING_TOPIC_COUNT ? "success" : "partial_success",
+          result: event.result,
+        })
+      } else if (event.status === "ERROR") {
+        hasResult = true
+        store.update({ status: "error", error: event.message })
+      } else {
+        store.update(({ stages }) => ({ stages: [...stages, { status: event.status, text: event.text }] }))
+      }
+    })
+    if (!hasResult && !current.signal.aborted) throw new Error("Search stream ended without a result")
+  } catch (err: unknown) {
+    if (current.signal.aborted) return
+    console.error("Trending topics search failed:", err)
+    store.update({ status: "error", error: TRENDING_ERROR_MESSAGE })
   }
-  return { status, result, stages, error, search }
+}
+
+// Cancels a running search and clears the topics
+function reset() {
+  controller?.abort()
+  controller = null
+  store.reset()
+}
+
+export function useTrendingTopicsSearch() {
+  const { status, result, stages, error } = useToolStore(store)
+  return { status, result, stages, error, search, reset }
 }

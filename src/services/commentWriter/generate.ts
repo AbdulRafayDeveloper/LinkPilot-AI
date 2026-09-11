@@ -5,6 +5,7 @@ import { composePromptMessage } from "@/services/promptComposer"
 import type { ResearchResult } from "@/services/liveResearch"
 import { findRelevantExperience, type UserExperience } from "@/services/senderContext"
 import { extractPostFromImage } from "@/services/postImage"
+import { humanizeTexts } from "@/services/humanizer"
 import type { PostSource } from "@/lib/validation/postInput"
 import {
   COMMENT_MAX_CHARS,
@@ -79,7 +80,8 @@ function collectNotices(reference: CommentReference | null, experienceQuote: str
 /**
  * One end-to-end comment: latest saved tune prompt → post text (read from the screenshot
  * when needed) → web research and/or the About Me profile when the prompt asks for them
- * → one structured writing call (Gemini, OpenAI fallback) → output verification.
+ * → one structured writing call (Gemini, OpenAI fallback) → output verification → the
+ * Humanization prompt, whose rewrite must pass the same comment checks.
  */
 export async function generateComment({ tune, post, signal, onStage }: GenerateOptions): Promise<GeneratedComment> {
   const now = new Date()
@@ -152,19 +154,41 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
   }
 
   const { data, provider } = written
-  const comment = cleanComment(data.comment)
   const reference = findReference(data, messageData.research ?? null)
 
-  console.info("Comment Writer generated:", {
-    tune,
-    provider,
-    input: post.type,
-    characters: comment.length,
-    researchSources: research === undefined ? "off" : (research?.sources.length ?? 0),
-    experience: experience === undefined ? "off" : experience.hasProfile ? "profile" : "no profile",
-    usedExperience: Boolean(data.experience_quote.trim()),
-    cited: reference !== null,
+  onStage("HUMANIZING", "Making the comment sound natural")
+  const humanization = await humanizeTexts({
+    fields: [
+      {
+        id: "comment",
+        kind: "LinkedIn comment under someone else's post",
+        text: cleanComment(data.comment),
+        maxChars: COMMENT_MAX_CHARS,
+      },
+    ],
+    providers: providers.slice(providers.indexOf(provider)),
+    signal,
+    onFallback: announceModelFallback,
+    validate: (_id, text) =>
+      findUnusableReason({ ...data, comment: text }, { postText, systemPrompt, experience: experience?.text ?? null }),
   })
+  const comment = cleanComment(humanization.texts.comment)
+
+  // Serialized so the details also survive Next's dev file log, which drops object arguments
+  console.info(
+    "Comment Writer generated:",
+    JSON.stringify({
+      tune,
+      provider,
+      humanized: humanization.humanized,
+      input: post.type,
+      characters: comment.length,
+      researchSources: research === undefined ? "off" : (research?.sources.length ?? 0),
+      experience: experience === undefined ? "off" : experience.hasProfile ? "profile" : "no profile",
+      usedExperience: Boolean(data.experience_quote.trim()),
+      cited: reference !== null,
+    })
+  )
 
   return {
     comment,

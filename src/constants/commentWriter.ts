@@ -14,6 +14,9 @@ export const COMMENT_TUNES = [
 
 export type CommentTuneId = (typeof COMMENT_TUNES)[number]["id"]
 
+// Preselected so a comment can be generated right away; the user can pick another style
+export const DEFAULT_COMMENT_TUNE: CommentTuneId = COMMENT_TUNES[0].id
+
 export const COMMENT_TUNE_IDS = COMMENT_TUNES.map((tune) => tune.id) as [CommentTuneId, ...CommentTuneId[]]
 
 export function getTuneLabel(tune: CommentTuneId): string {

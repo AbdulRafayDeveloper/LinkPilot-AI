@@ -2,6 +2,7 @@
 
 import React from "react"
 import { AlertTriangle, Flame, RefreshCw } from "lucide-react"
+import { TRENDING_TOPIC_COUNT } from "@/constants/trending"
 
 const panelClass =
   "flex flex-col items-center justify-center text-center gap-3 p-8 bg-white border border-outline-variant rounded-2xl shadow-sm min-h-[260px]"
@@ -13,7 +14,7 @@ export const TrendingEmptyState: React.FC<{ onSearch: () => void }> = ({ onSearc
     </div>
     <h2 className="text-lg font-bold text-on-surface">Find what&apos;s worth talking about today.</h2>
     <p className="text-sm text-on-surface-variant max-w-md leading-relaxed">
-      Search the latest AI and technology discussions and get 3 LinkedIn-ready conversation opportunities.
+      Search the latest web, AI and SaaS developments and get {TRENDING_TOPIC_COUNT} ready-to-post LinkedIn topics.
     </p>
     <button
       type="button"

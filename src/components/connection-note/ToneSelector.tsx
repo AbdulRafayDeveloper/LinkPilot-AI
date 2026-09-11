@@ -5,7 +5,7 @@ import { CheckCircle2 } from "lucide-react"
 import { CONNECTION_NOTE_TONES, type ConnectionNoteToneId } from "@/constants/connectionNote"
 
 interface ToneSelectorProps {
-  value: ConnectionNoteToneId | null
+  value: ConnectionNoteToneId
   onChange: (tone: ConnectionNoteToneId) => void
   disabled?: boolean
 }

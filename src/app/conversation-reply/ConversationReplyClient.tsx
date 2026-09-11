@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { AlertTriangle, FilePenLine, Info, Loader2, MessagesSquare, ScanSearch, X } from "lucide-react"
+import { AlertTriangle, FilePenLine, Info, Loader2, MessagesSquare, ScanSearch } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
@@ -9,7 +9,11 @@ import { GeneratedResultPanel } from "@/components/ui/GeneratedResultPanel"
 import { ConversationAnalysisCard } from "@/components/conversation-reply/ConversationAnalysisCard"
 import { ConversationReplyPromptsModal } from "@/components/conversation-reply/ConversationReplyPromptsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
-import { useGenerationRequest } from "@/hooks/useGenerationRequest"
+import { ResetButton } from "@/components/ui/ResetButton"
+import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
+import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
+import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
+import { createToolStore, useToolStore } from "@/lib/toolStore"
 import {
   ABOUT_ME_TAB_ID,
   CONVERSATION_REPLY_CONVERSATION_MAX_LENGTH,
@@ -35,25 +39,34 @@ interface GeneratePayload {
   replyType: ConversationReplyTypeId
 }
 
+// Inputs and the result outlive the page, so they're still here after visiting another tool
+const formStore = createToolStore(
+  "conversation-reply:form",
+  { conversation: "", profileData: "", replyType: DEFAULT_CONVERSATION_REPLY_TYPE as ConversationReplyTypeId },
+  { version: 1 }
+)
+const generation = createGenerationRequest<GeneratePayload, ConversationReplyResult>(
+  "conversation-reply",
+  GENERATE_ENDPOINT,
+  CONVERSATION_REPLY_MESSAGES.generationFailed
+)
+
 const labelClass = "text-[10px] font-bold text-outline uppercase tracking-wider"
 const textareaClass =
   "flex-1 w-full resize-none rounded-xl border bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
 
 export default function ConversationReplyClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   // The tab the prompts modal opens on; null means the modal is closed
   const [promptsTab, setPromptsTab] = useState<ConversationReplyPromptId | null>(null)
-  const [conversation, setConversation] = useState("")
-  const [profileData, setProfileData] = useState("")
-  const [replyType, setReplyType] = useState<ConversationReplyTypeId>(DEFAULT_CONVERSATION_REPLY_TYPE)
+  const { conversation, profileData, replyType } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
-  const { status, result, error, generate, reset } = useGenerationRequest<GeneratePayload, ConversationReplyResult>(
-    GENERATE_ENDPOINT,
-    CONVERSATION_REPLY_MESSAGES.generationFailed
-  )
+  const { status, result, error, generate, reset } = useGenerationRequest(generation)
   const isGenerating = status === "loading"
+  const canReset = conversation !== "" || profileData !== "" || status !== "idle"
   const isConversationMissing = formError === CONVERSATION_REPLY_MESSAGES.missingConversation
   const showAnalysis = isGenerating || (status === "success" && result !== null)
 
@@ -68,9 +81,16 @@ export default function ConversationReplyClient() {
     generate({ conversation, profileData, replyType })
   }
 
-  const clearForm = () => {
-    setConversation("")
-    setProfileData("")
+  // A dummy conversation fills the conversation and profile; the reply for the previous one goes with it
+  const loadDummyConversation = ({ conversation, profile }: Record<string, string>) => {
+    formStore.update({ conversation: conversation ?? "", profileData: profile ?? "" })
+    reset()
+    setFormError(null)
+  }
+
+  // Clears the conversation, profile and result; the chosen reply type stays
+  const resetTool = () => {
+    formStore.update({ conversation: "", profileData: "" })
     setFormError(null)
     reset()
     conversationInputRef.current?.focus()
@@ -100,14 +120,18 @@ export default function ConversationReplyClient() {
                   Decide what to reply next and see how valuable the conversation really is.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setPromptsTab(replyType)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors sm:shrink-0"
-              >
-                <FilePenLine size={16} aria-hidden="true" />
-                Update Prompt
-              </button>
+              <div className="flex flex-wrap gap-2 sm:shrink-0">
+                <ResetButton onReset={resetTool} disabled={!canReset} />
+                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
+                <button
+                  type="button"
+                  onClick={() => setPromptsTab(replyType)}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                >
+                  <FilePenLine size={16} aria-hidden="true" />
+                  Update Prompt
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-5 lg:flex-1 lg:min-h-0">
@@ -125,29 +149,16 @@ export default function ConversationReplyClient() {
                     <label htmlFor={CONVERSATION_INPUT_ID} className={labelClass}>
                       Previous Conversation
                     </label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-outline">
-                        {conversation.length.toLocaleString()} / {CONVERSATION_REPLY_CONVERSATION_MAX_LENGTH.toLocaleString()}
-                      </span>
-                      {(conversation || profileData || status !== "idle") && (
-                        <button
-                          type="button"
-                          onClick={clearForm}
-                          disabled={isGenerating}
-                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-outline hover:text-primary hover:bg-surface-container transition-colors disabled:opacity-40"
-                        >
-                          <X size={12} aria-hidden="true" />
-                          Clear
-                        </button>
-                      )}
-                    </div>
+                    <span className="text-[11px] text-outline">
+                      {conversation.length.toLocaleString()} / {CONVERSATION_REPLY_CONVERSATION_MAX_LENGTH.toLocaleString()}
+                    </span>
                   </div>
                   <textarea
                     ref={conversationInputRef}
                     id={CONVERSATION_INPUT_ID}
                     value={conversation}
                     onChange={(event) => {
-                      setConversation(event.target.value)
+                      formStore.update({ conversation: event.target.value })
                       if (isConversationMissing) setFormError(null)
                     }}
                     maxLength={CONVERSATION_REPLY_CONVERSATION_MAX_LENGTH}
@@ -172,7 +183,7 @@ export default function ConversationReplyClient() {
                   <textarea
                     id={PROFILE_INPUT_ID}
                     value={profileData}
-                    onChange={(event) => setProfileData(event.target.value)}
+                    onChange={(event) => formStore.update({ profileData: event.target.value })}
                     maxLength={CONVERSATION_REPLY_PROFILE_MAX_LENGTH}
                     placeholder="Paste the person's LinkedIn profile information here if available..."
                     className={`${textareaClass} min-h-[110px] lg:min-h-[80px] border-outline-variant`}
@@ -184,7 +195,7 @@ export default function ConversationReplyClient() {
                   legend="Reply Type"
                   options={CONVERSATION_REPLY_TYPES}
                   value={replyType}
-                  onChange={setReplyType}
+                  onChange={(nextType) => formStore.update({ replyType: nextType })}
                   disabled={isGenerating}
                 />
 
@@ -268,6 +279,9 @@ export default function ConversationReplyClient() {
       </div>
 
       {promptsTab && <ConversationReplyPromptsModal initialTab={promptsTab} onClose={() => setPromptsTab(null)} />}
+      {isDummyDataOpen && (
+        <DummyDataModal kind="reply-conversations" onUse={loadDummyConversation} onClose={() => setIsDummyDataOpen(false)} />
+      )}
     </div>
   )
 }

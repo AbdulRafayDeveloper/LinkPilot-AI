@@ -41,12 +41,12 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({ stages }) =>
       )}
     </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5" aria-hidden="true">
+    <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 md:gap-5" aria-hidden="true">
       {[0, 1, 2].map((index) => (
         <div
           key={index}
           className={`bg-white border border-outline-variant rounded-2xl p-5 space-y-4 animate-pulse ${
-            index === 2 ? "md:col-span-2 xl:col-span-1" : ""
+            index === 2 ? "md:col-span-2 2xl:col-span-1" : ""
           }`}
         >
           <div className="flex justify-between">

@@ -6,10 +6,11 @@ import { SynthesisOutputSchema, type SynthesisOutput } from "./schema"
 import type { ResearchResult } from "@/services/liveResearch"
 import { sanitizeForTag } from "./sanitize"
 
-const SYNTHESIS_TIMEOUT_MS = 60_000
-// Slightly above the project default so the three posts don't read alike
+// Six topics with posts is a long structured answer
+const SYNTHESIS_TIMEOUT_MS = 90_000
+// Slightly above the project default so the posts don't read alike
 const SYNTHESIS_TEMPERATURE = 0.4
-const MAX_RESEARCH_CHARS = 24_000
+const MAX_RESEARCH_CHARS = 40_000
 const MAX_LISTED_SOURCES = 60
 
 interface SynthesisOptions {

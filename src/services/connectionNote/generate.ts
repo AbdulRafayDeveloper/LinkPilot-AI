@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/m
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
+import { humanizeTexts } from "@/services/humanizer"
 import { cleanGeneratedText as cleanNote, containsPlaceholder } from "@/lib/generatedText"
 import {
   CONNECTION_NOTE_MAX_CHARS,
@@ -57,6 +58,7 @@ function lengthWarning(length: number): string | null {
 /**
  * Generates one note with the latest saved prompt for the tone. If the note exceeds
  * LinkedIn's limit, one controlled rewrite is attempted instead of truncating the text.
+ * The final note is rewritten with the Humanization prompt.
  */
 export async function generateConnectionNote({ profileData, tone, signal }: GenerateOptions): Promise<GeneratedConnectionNote> {
   const tonePrompt = await getActiveTonePrompt(tone)
@@ -99,7 +101,16 @@ export async function generateConnectionNote({ profileData, tone, signal }: Gene
     }
   }
 
-  console.info("Connection note generated:", { tone, provider, characters: note.length })
+  const humanization = await humanizeTexts({
+    fields: [{ id: "note", kind: "LinkedIn connection request note", text: note, maxChars: CONNECTION_NOTE_MAX_CHARS }],
+    signal,
+  })
+  note = humanization.texts.note
+
+  console.info(
+    "Connection note generated:",
+    JSON.stringify({ tone, provider, humanized: humanization.humanized, characters: note.length })
+  )
   return {
     note,
     tone,

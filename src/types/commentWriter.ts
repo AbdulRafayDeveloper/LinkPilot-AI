@@ -23,7 +23,7 @@ export interface GeneratedComment {
   extractedPost: string | null
 }
 
-export type CommentStage = "READING_IMAGE" | "RESEARCHING" | "WRITING" | "FALLBACK"
+export type CommentStage = "READING_IMAGE" | "RESEARCHING" | "WRITING" | "HUMANIZING" | "FALLBACK"
 
 export type CommentStreamEvent =
   | { status: CommentStage; text: string }

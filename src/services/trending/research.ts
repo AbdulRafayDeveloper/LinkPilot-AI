@@ -1,11 +1,10 @@
 import { HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
-import { describeAllLenses, loadSearchLenses, runLiveResearch, type ResearchResult } from "@/services/liveResearch"
+import { loadSearchLenses, runLiveResearch, type ResearchResult } from "@/services/liveResearch"
 import { sanitizeForTag } from "./sanitize"
 
-// Gemini covers every lens in one grounded call; each fallback OpenAI pass covers one lens
-const GEMINI_CANDIDATE_TARGET = "8–15"
-const OPENAI_PASS_CANDIDATE_TARGET = "4–6"
+// One parallel research pass per lens, with either provider; merged they give enough candidates for every topic slot
+const PASS_CANDIDATE_TARGET = "6–10"
 const MIN_RESEARCH_SOURCES = 3
 
 interface ResearchOptions {
@@ -15,10 +14,10 @@ interface ResearchOptions {
   onFallback: () => void
 }
 
-function buildResearchMessages(brief: string, now: Date, searchFocus: string, candidateTarget: string): BaseMessage[] {
+function buildResearchMessages(brief: string, now: Date, searchFocus: string): BaseMessage[] {
   const system = renderPrompt(loadPrompt("trending-research"), {
     CURRENT_DATETIME: now.toISOString(),
-    CANDIDATE_TARGET: candidateTarget,
+    CANDIDATE_TARGET: PASS_CANDIDATE_TARGET,
     SEARCH_FOCUS: searchFocus,
   })
   return [
@@ -34,10 +33,10 @@ function buildResearchMessages(brief: string, now: Date, searchFocus: string, ca
  * The configured brief still decides the subject area.
  */
 export async function runTrendingResearch({ brief, now, signal, onFallback }: ResearchOptions): Promise<ResearchResult> {
-  const lenses = loadSearchLenses("trending-search-lenses")
+  const passes = loadSearchLenses("trending-search-lenses").map((lens) => buildResearchMessages(brief, now, lens))
   return runLiveResearch({
-    geminiMessages: buildResearchMessages(brief, now, describeAllLenses(lenses), GEMINI_CANDIDATE_TARGET),
-    openAIPasses: lenses.map((lens) => buildResearchMessages(brief, now, lens, OPENAI_PASS_CANDIDATE_TARGET)),
+    geminiPasses: passes,
+    openAIPasses: passes,
     minSources: MIN_RESEARCH_SOURCES,
     signal,
     onFallback,

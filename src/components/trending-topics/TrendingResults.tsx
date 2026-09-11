@@ -2,7 +2,6 @@
 
 import React from "react"
 import { Info } from "lucide-react"
-import { TRENDING_TOPIC_COUNT } from "@/constants/trending"
 import type { SearchProvider, TrendingResult } from "@/services/trending/schema"
 import { TopicCard } from "./TopicCard"
 
@@ -13,7 +12,6 @@ const PROVIDER_LABELS: Record<SearchProvider, string> = {
 
 export const TrendingResults: React.FC<{ result: TrendingResult }> = ({ result }) => {
   const { topics, notice, research_metadata: metadata } = result
-  const isFullSet = topics.length === TRENDING_TOPIC_COUNT
 
   return (
     <div className="space-y-4">
@@ -28,13 +26,9 @@ export const TrendingResults: React.FC<{ result: TrendingResult }> = ({ result }
       )}
 
       {topics.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 md:gap-5">
           {topics.map((topic, index) => (
-            <TopicCard
-              key={`${topic.primary_reference.url}-${index}`}
-              topic={topic}
-              className={isFullSet && index === TRENDING_TOPIC_COUNT - 1 ? "md:col-span-2 xl:col-span-1" : ""}
-            />
+            <TopicCard key={`${topic.primary_reference.url}-${index}`} topic={topic} />
           ))}
         </div>
       )}

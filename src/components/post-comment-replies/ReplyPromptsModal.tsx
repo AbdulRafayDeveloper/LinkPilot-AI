@@ -12,6 +12,7 @@ import {
   type PromptFeedback,
 } from "@/components/prompts/PromptModalParts"
 import { requestApi } from "@/lib/apiClient"
+import { useCloseAfterSave } from "@/hooks/useCloseAfterSave"
 import {
   REPLY_CONTEXTS,
   REPLY_STYLES,
@@ -67,6 +68,8 @@ const ReplyPromptsEditor: React.FC<ReplyPromptsModalProps> = ({ initialContext, 
   const [activeStyle, setActiveStyle] = useState<ReplyStyleId>(initialStyle ?? REPLY_STYLES[0].id)
   const [isSaving, setIsSaving] = useState(false)
   const [feedback, setFeedback] = useState<PromptFeedback | null>(null)
+  const { isClosing, closeAfterSave } = useCloseAfterSave(onClose)
+  const isBusy = isSaving || isClosing
 
   const contextPanelId = `${idPrefix}-context-panel`
   const stylePanelId = `${idPrefix}-style-panel`
@@ -122,6 +125,7 @@ const ReplyPromptsEditor: React.FC<ReplyPromptsModalProps> = ({ initialContext, 
       setSaved((current) => (current ? { ...current, [key]: data } : current))
       setDrafts((current) => ({ ...current, [key]: data.prompt }))
       setFeedback({ type: "success", message: message || "Prompt saved." })
+      closeAfterSave()
     } catch (error: unknown) {
       setFeedback({ type: "error", message: error instanceof Error ? error.message : "Couldn't save the prompt." })
     } finally {
@@ -141,7 +145,7 @@ const ReplyPromptsEditor: React.FC<ReplyPromptsModalProps> = ({ initialContext, 
           feedback={feedback}
           hasUnsavedChanges={unsavedCount > 0}
           isSaving={isSaving}
-          canSave={isDirty(activeKey) && activeDraft.trim().length > 0 && !isSaving}
+          canSave={isDirty(activeKey) && activeDraft.trim().length > 0 && !isBusy}
           onCancel={onClose}
           onSave={handleSave}
         />
@@ -166,7 +170,7 @@ const ReplyPromptsEditor: React.FC<ReplyPromptsModalProps> = ({ initialContext, 
             ariaLabel="Post context"
             tabId={contextTabId}
             panelId={contextPanelId}
-            disabled={isSaving}
+            disabled={isBusy}
           />
 
           <div
@@ -183,7 +187,7 @@ const ReplyPromptsEditor: React.FC<ReplyPromptsModalProps> = ({ initialContext, 
               ariaLabel={`${getReplyContextLabel(activeContext)} reply styles`}
               tabId={styleTabId}
               panelId={stylePanelId}
-              disabled={isSaving}
+              disabled={isBusy}
             />
 
             <div
@@ -201,7 +205,7 @@ const ReplyPromptsEditor: React.FC<ReplyPromptsModalProps> = ({ initialContext, 
                 }}
                 saved={saved[activeKey]}
                 label={`${getReplyContextLabel(activeContext)} ${getReplyStyleLabel(activeStyle)} prompt`}
-                disabled={isSaving}
+                disabled={isBusy}
                 hint={<VariablesHint />}
               />
             </div>

@@ -4,11 +4,11 @@ import React from "react"
 import { AlertTriangle, Info, Loader2, RefreshCw, UserPlus } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { getToneLabel } from "@/constants/connectionNote"
-import type { ConnectionNoteStatus } from "@/hooks/useConnectionNoteGenerator"
+import type { GenerationStatus } from "@/hooks/useGenerationRequest"
 import type { GeneratedConnectionNote } from "@/types/connectionNote"
 
 interface NoteResultProps {
-  status: ConnectionNoteStatus
+  status: GenerationStatus
   result: GeneratedConnectionNote | null
   error: string | null
   onRetry: () => void

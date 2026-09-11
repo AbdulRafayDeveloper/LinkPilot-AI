@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { AlertTriangle, Loader2, X, type LucideIcon } from "lucide-react"
+import { AlertTriangle, Loader2, type LucideIcon } from "lucide-react"
 import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
 import { OUTREACH_TUNES, type OutreachTuneId } from "@/constants/outreachTunes"
 
@@ -17,8 +17,6 @@ interface ProfileTuneFormProps {
   profileInvalid: boolean
   tuneInvalid: boolean
   isGenerating: boolean
-  canClear: boolean
-  onClear: () => void
   onSubmit: () => void
   submitLabel: string
   generatingLabel: string
@@ -41,8 +39,6 @@ export const ProfileTuneForm: React.FC<ProfileTuneFormProps> = ({
   profileInvalid,
   tuneInvalid,
   isGenerating,
-  canClear,
-  onClear,
   onSubmit,
   submitLabel,
   generatingLabel,
@@ -65,22 +61,9 @@ export const ProfileTuneForm: React.FC<ProfileTuneFormProps> = ({
           <label htmlFor={inputId} className="text-[10px] font-bold text-outline uppercase tracking-wider">
             Profile Information
           </label>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-outline">
-              {profileData.length.toLocaleString()} / {profileMaxLength.toLocaleString()}
-            </span>
-            {canClear && (
-              <button
-                type="button"
-                onClick={onClear}
-                disabled={isGenerating}
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-outline hover:text-primary hover:bg-surface-container transition-colors disabled:opacity-40"
-              >
-                <X size={12} aria-hidden="true" />
-                Clear
-              </button>
-            )}
-          </div>
+          <span className="text-[11px] text-outline">
+            {profileData.length.toLocaleString()} / {profileMaxLength.toLocaleString()}
+          </span>
         </div>
         <textarea
           ref={profileInputRef}

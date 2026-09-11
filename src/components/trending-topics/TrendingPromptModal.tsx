@@ -3,6 +3,7 @@
 import React from "react"
 import { PromptTabsModal } from "@/components/prompts/PromptTabsModal"
 import { requestApi } from "@/lib/apiClient"
+import { TRENDING_TOPIC_COUNT } from "@/constants/trending"
 import type { EditablePrompt } from "@/types/prompts"
 
 const PROMPT_ENDPOINT = "/api/trending-topics/prompt"
@@ -25,7 +26,7 @@ function savePrompt(_id: TrendingPromptId, prompt: string) {
 }
 
 const renderHint = () =>
-  "The app always keeps these fixed: at most 3 topics, verified sources and dates, and web content treated as untrusted data."
+  `The app always keeps these fixed: at most ${TRENDING_TOPIC_COUNT} topics, verified sources and dates, posts assembled as hook, body, source link and hashtags, and web content treated as untrusted data.`
 
 /**
  * Edits the single prompt every Trending Topics search uses, in the shared Update Prompt modal.

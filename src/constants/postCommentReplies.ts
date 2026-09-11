@@ -50,6 +50,7 @@ export const REPLY_STAGE_TEXT = {
   READING_POST: "Reading the post from your screenshot...",
   ANALYZING: "Analyzing the conversation...",
   WRITING: "Writing your reply...",
+  HUMANIZING: "Making the reply sound natural...",
 } as const
 
 export type ReplyStage = keyof typeof REPLY_STAGE_TEXT

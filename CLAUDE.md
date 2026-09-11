@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | Route | Tool | What it generates |
 |---|---|---|
-| `/trending-topics` | Trending Topics | 3 fresh, source-backed topics from live web research |
+| `/trending-topics` | Trending Topics | 6 fresh, source-backed web/AI/SaaS topics from live web research, each with a ready-to-post LinkedIn post |
 | `/connection-note` | Connection Note | ≤300-char invite note, 4 tones |
 | `/comment-writer` | Comment Writer | a comment on someone's post (text or screenshot), 6 tunes |
 | `/post-comment-replies` | Post Comment Replies | a reply to one comment, 2 contexts × 7 styles |
@@ -62,7 +62,12 @@ Model names live **only** in env. Never hardcode a model id in code. Gemini 1.5 
 - `services/senderGuard.ts` wraps it for outreach tools. It detects invented claims about the sender (the `SENDER_CLAIM` regex) and asks for one rewrite.
 - `services/liveResearch.ts` (`runLiveResearch`) handles web research for Trending Topics, Comment Writer and Post Comment Replies:
   - It tries Gemini with `{ googleSearch: {} }` grounding first. Only grounding chunks count as sources, and their Google redirect URIs are resolved to real URLs.
+  - Both providers take a list of passes (`geminiPasses`, `openAIPasses`) that run in parallel and are merged; failed passes are skipped. Trending runs one pass per lens in `trending-search-lenses.md` (so 3 Gemini research calls + 1 synthesis call per search); Comment Writer and Post Comment Replies use a single Gemini pass.
   - It falls back to OpenAI Responses `tools.webSearch()`, running parallel passes with `tool_choice: "required"`.
+- **Humanization (`services/humanizer.ts`, `humanizeTexts`) is the last step of all 8 tools.** Each tool passes its final, already-verified texts (note, message, InMail subject + message, reply, comment, Trending hooks + bodies) through the user's saved **Humanization** prompt from Global AI Prompts (`global_prompt:humanization`, default `prompts/global-humanization.md`, `{{text}}` = the drafts), under the fixed rules in `prompts/humanizer-system.md`.
+  - One structured call per result, each text as a `<draft id=… kind=… max_chars=… one_line=… rule=…>`. Code judges every rewrite on its own: same numbers, links, hashtags and @mentions; no new sender claim or placeholder; within `maxChars`/one line; plus the tool's own `validate(id, text)` (comment checks, conversation-reply problem checks, post-reply experience claims, Trending word limits).
+  - Failed texts get one targeted retry told exactly what broke (the backup provider takes over if that still fails); a text that never passes keeps its verified draft. Every tool logs `humanized`. New tools must humanize their output too.
+  - Global AI Prompts page: `/global-prompts` (`constants/globalPrompts.ts`, `services/globalPrompts.ts`); Rafay Profile Info is stored but not used yet.
 
 ## Architecture
 
@@ -70,6 +75,12 @@ Model names live **only** in env. Never hardcode a model id in code. Gemini 1.5 
 Each tool route has two parts:
 - A thin server `page.tsx` that holds only metadata and JSON-LD.
 - A `"use client"` `*Client.tsx` that composes `Sidebar` and `Header` from `src/components/ui/`. Sidebar collapse state comes from `hooks/useSidebarCollapse` (localStorage key `isSidebarCollapsed`).
+
+### Tool state survives switching tools (`lib/toolStore.ts`)
+- Never keep a tool's inputs or results in component `useState`: leaving the page would lose them. Each tool has module-level stores made with `createToolStore(name, initial, { version, toStored })`, read with `useToolStore` (`useSyncExternalStore`): a `<tool>:form` store in its `*Client.tsx` and a `<tool>:result` store for the generation (`createGenerationRequest` in `hooks/useGenerationRequest.ts` for JSON tools; `useCommentGenerator`, `usePostCommentReplyGenerator`, `useTrendingTopicsSearch` for the streaming ones).
+- Requests are never aborted on unmount, so a generation started before switching tools finishes into the store; only a newer request or Reset cancels it (and a cancelled request never writes).
+- Stores mirror to `localStorage` (`linkpilot:tool:<name>`) for 24h after the last change. `toStored` keeps uploaded `File`s (memory only) and unfinished requests out of storage. Bump `version` when a store's shape changes.
+- Every tool header has `components/ui/ResetButton` next to Update Prompt: it clears the pasted/uploaded data and the result, and keeps the chosen tone/tune/type/style/context.
 
 Styling is Tailwind with Material-3 color tokens from `tailwind.config.ts` (`bg-surface-container`, `text-on-surface-variant`, `bg-primary-container`, …). Use those tokens, not raw colors. The app is light theme only.
 
@@ -112,8 +123,23 @@ Styling is Tailwind with Material-3 color tokens from `tailwind.config.ts` (`bg-
 - Every prompt API handler (all `…/prompts` routes and `trending-topics/prompt`, GET and PUT) starts with `requirePromptAccess()`. New prompt routes must too. Generation routes stay open.
 - This is intentionally light security: clearing cookies resets the attempt counter.
 
-### Trending Topics persistence
-The last successful search is kept in `localStorage` (`lib/trendingResultStore.ts`, key `linkpilot:trending-topics`) for 24h. `useTrendingTopicsSearch` shows it via `useSyncExternalStore` until a new search replaces it. Bump `STORAGE_VERSION` when `TrendingResult` changes shape.
+### Dummy Data (every tool with an input)
+- `constants/dummyData.ts` (`DUMMY_DATA_KINDS`) registers each kind, its folder and its fields (key, label, limit = the input it fills, required):
+  - `profiles` → `src/data/dummy-profiles/` (profile), shared by Connection Note, First Message and InMail
+  - `posts` → `src/data/dummy-posts/` (post), Comment Writer
+  - `comment-threads` → `src/data/dummy-comment-threads/` (post optional + comments), Post Comment Replies
+  - `follow-up-conversations` → `src/data/dummy-follow-up-conversations/` (conversation + optional profile), Follow-Up
+  - `reply-conversations` → `src/data/dummy-reply-conversations/` (conversation + optional profile), Conversation Reply
+  - Trending Topics has no input, so no kind. Adding a kind = a registry entry + its folder.
+- Items are markdown files `<id>.md`: front matter (`name`, `createdAt`), then the text. A one-field kind stores its text as is; a multi-field kind starts each field with a `<!-- field: key -->` line. The file name is the id. No database. `services/dummyData.ts` reads and writes them (ids must match `DUMMY_ITEM_ID_PATTERN`, new files are created exclusively), and `next.config.ts` ships `src/data` with the API routes.
+- `GET/POST /api/dummy-data/[kind]` and `PUT/DELETE /api/dummy-data/[kind]/[id]` (body `{ name, fields }`) all start with `requirePromptAccess()`. Writes need a writable file system; on a read-only host they fail with a clear message.
+- `components/dummy-data/DummyDataModal` (`kind` prop, behind `PromptAccessGate`) edits items like prompts (one tab each, add, two-step delete, auto-close after save), with a Copy button per field. **Use this …** passes all fields to the tool's `onUse`, which fills its inputs, clears the previous result and closes the popup. `DummyDataButton` sits in each tool header.
+- Sample conversations use LinkedIn-style "Name  date" sender lines with the owner as Abdul Rafay; all seed items are fictional.
+
+### Trending Topics
+- The default brief (`prompts/trending-topics.md`) targets the owner's domain: web development, AI, and SaaS/MVPs for founders. Mobile apps and consumer hardware are excluded. A saved custom prompt overrides the file.
+- `TRENDING_TOPIC_COUNT` (6) caps the topics. Each topic's post is a `post_hook` (≤12 words, scroll-stopping) plus a 1–2 line `post_body`; `lib/trendingPost.ts` (`composeTrendingPost`) assembles hook, body, primary reference URL and hashtags into the one text the card shows and copies. Topics whose hook or body still contain a `[placeholder]` are rejected.
+
 
 ## Project rules (`ai_docs/AI_PROJECT_RULES.md`)
 - Keep `page.tsx` thin, with no business logic in it.

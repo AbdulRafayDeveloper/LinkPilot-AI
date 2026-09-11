@@ -5,7 +5,7 @@ import TrendingTopicsClient from "./TrendingTopicsClient"
 
 export const metadata: Metadata = {
   title: `Trending Topics | ${SITE_NAME}`,
-  description: "Discover fresh, source-backed technology developments professionals are discussing on LinkedIn, with ready-to-use searches, post ideas and conversation angles.",
+  description: "Discover fresh, source-backed web, AI and SaaS developments founders are discussing on LinkedIn, with ready-to-use searches and complete posts.",
   alternates: {
     canonical: `${SITE_URL}/trending-topics`,
   },

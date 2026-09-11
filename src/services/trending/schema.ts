@@ -34,18 +34,11 @@ export const SynthesisOutputSchema = z.object({
       linkedin_search_queries: z.array(z.string()),
       keywords: z.array(z.string()),
       suggested_hashtags: z.array(z.string()),
-      conversation_angle: z.string(),
-      post_approach: z
+      hook_style: z
         .string()
-        .describe(
-          'The approach and the exact opening words of this topic\'s post, e.g. "Technical observation, opens with: This release caught". Approaches and openings must differ across topics.'
-        ),
-      post_ends_with_question: z
-        .boolean()
-        .describe("Whether this topic's post ends with a question, decided from the configured prompt's post style guidance"),
-      short_post: z
-        .string()
-        .describe("Begins with the exact opening words recorded in post_approach, and ends with a question only if post_ends_with_question is true"),
+        .describe('The hook technique for this topic\'s post, e.g. "Contrarian take". Techniques must differ across topics.'),
+      post_hook: z.string().describe("Scroll-stopping first line of the post, at most 12 words, following hook_style"),
+      post_body: z.string().describe("1-2 short lines after the hook, at most 40 words, with no links or hashtags"),
       primary_reference: ModelReferenceSchema,
       secondary_references: z.array(ModelReferenceSchema),
       screenshot_reference: z.object({
@@ -75,9 +68,9 @@ export const TrendingTopicSchema = z.object({
   confidence: ConfidenceSchema,
   linkedin_search_queries: z.array(z.string().min(1)).min(1).max(6),
   keywords: z.array(z.string().min(1)).max(8),
-  suggested_hashtags: z.array(z.string().regex(/^#\S+$/)).max(6),
-  conversation_angle: z.string(),
-  short_post: z.string().min(1),
+  suggested_hashtags: z.array(z.string().regex(/^#\S+$/)).max(5),
+  post_hook: z.string().min(1),
+  post_body: z.string().min(1),
   primary_reference: ReferenceSchema,
   secondary_references: z.array(ReferenceSchema).max(3),
   screenshot_reference: z.object({ url: HttpUrlSchema, description: z.string() }),
@@ -101,7 +94,7 @@ export type TrendingReference = TrendingTopic["primary_reference"]
 export type TrendingResult = z.infer<typeof TrendingResultSchema>
 export type SearchProvider = (typeof SEARCH_PROVIDERS)[number]
 
-export type TrendingStage = "RESEARCHING" | "FALLBACK" | "RANKING" | "VERIFYING"
+export type TrendingStage = "RESEARCHING" | "FALLBACK" | "RANKING" | "VERIFYING" | "HUMANIZING"
 
 export type TrendingStreamEvent =
   | { status: TrendingStage; text: string }

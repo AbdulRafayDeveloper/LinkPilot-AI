@@ -9,8 +9,12 @@ import { PostInput } from "@/components/post-input/PostInput"
 import { DetectedComments } from "@/components/post-comment-replies/DetectedComments"
 import { ReplyResult } from "@/components/post-comment-replies/ReplyResult"
 import { ReplyPromptsModal } from "@/components/post-comment-replies/ReplyPromptsModal"
+import { ResetButton } from "@/components/ui/ResetButton"
+import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
+import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { usePostCommentReplyGenerator } from "@/hooks/usePostCommentReplyGenerator"
+import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { parseLinkedInConversation } from "@/lib/linkedinComments"
 import {
   DEFAULT_REPLY_CONTEXT,
@@ -36,24 +40,46 @@ const COMMENTS_PLACEHOLDER = `Paste the comments you want to reply to, for examp
 Sarah Khan: Interesting point. How do you handle urgent fixes?
 Omar Farooq: We saw the same thing after switching.`
 
+// Inputs outlive the page, so they're still here after visiting another tool. A screenshot
+// stays in memory only: it survives switching tools but not a refresh.
+const formStore = createToolStore(
+  "post-comment-replies:form",
+  {
+    context: DEFAULT_REPLY_CONTEXT as ReplyContextId,
+    style: null as ReplyStyleId | null,
+    postMode: "text" as PostInputMode,
+    postText: "",
+    postImage: null as File | null,
+    comments: "",
+    selectedCommentKey: null as string | null,
+  },
+  {
+    version: 1,
+    toStored: ({ context, style, postMode, postText, comments, selectedCommentKey }) => ({
+      context,
+      style,
+      postMode,
+      postText,
+      comments,
+      selectedCommentKey,
+    }),
+  }
+)
+
 const cardClass = "bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4"
 const labelClass = "text-[10px] font-bold text-outline uppercase tracking-wider"
 
 export default function PostCommentRepliesClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   const [isPromptsOpen, setIsPromptsOpen] = useState(false)
-  const [context, setContext] = useState<ReplyContextId>(DEFAULT_REPLY_CONTEXT)
-  const [style, setStyle] = useState<ReplyStyleId | null>(null)
-  const [postMode, setPostMode] = useState<PostInputMode>("text")
-  const [postText, setPostText] = useState("")
-  const [postImage, setPostImage] = useState<File | null>(null)
-  const [comments, setComments] = useState("")
-  const [selectedCommentKey, setSelectedCommentKey] = useState<string | null>(null)
+  const { context, style, postMode, postText, postImage, comments, selectedCommentKey } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
   const commentsRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
-  const { status, stage, result, error, generate } = usePostCommentReplyGenerator()
+  const { status, stage, result, error, generate, reset } = usePostCommentReplyGenerator()
   const isGenerating = status === "loading"
+  const canReset = postText !== "" || postImage !== null || comments !== "" || status !== "idle"
   // Anything other than the comment and style messages comes from the post input (image checks)
   const isPostError = formError !== null && formError !== missingComment && formError !== missingStyle
 
@@ -67,12 +93,27 @@ export default function PostCommentRepliesClient() {
   )
   const handlePostImageSelect = useCallback(
     (file: File) => {
-      setPostImage(file)
+      formStore.update({ postImage: file })
       clearPostError()
     },
     [clearPostError]
   )
-  const handlePostImageRemove = useCallback(() => setPostImage(null), [])
+  const handlePostImageRemove = useCallback(() => formStore.update({ postImage: null }), [])
+
+  // A dummy thread fills the post (as text) and the comments; the reply for the previous thread goes with it
+  const loadDummyThread = ({ post, comments }: Record<string, string>) => {
+    formStore.update({ postMode: "text", postText: post ?? "", postImage: null, comments: comments ?? "", selectedCommentKey: null })
+    reset()
+    setFormError(null)
+  }
+
+  // Clears the post, the comments, the picked comment and the reply; the chosen context and style stay
+  const resetTool = () => {
+    formStore.update({ postText: "", postImage: null, comments: "", selectedCommentKey: null })
+    reset()
+    setFormError(null)
+    commentsRef.current?.focus()
+  }
 
   const submit = () => {
     if (!comments.trim()) {
@@ -122,14 +163,18 @@ export default function PostCommentRepliesClient() {
                   Write a natural reply to a comment on your post or in someone else&apos;s thread.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsPromptsOpen(true)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors sm:shrink-0"
-              >
-                <FilePenLine size={16} aria-hidden="true" />
-                Update Prompt
-              </button>
+              <div className="flex flex-wrap gap-2 sm:shrink-0">
+                <ResetButton onReset={resetTool} disabled={!canReset} />
+                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
+                <button
+                  type="button"
+                  onClick={() => setIsPromptsOpen(true)}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                >
+                  <FilePenLine size={16} aria-hidden="true" />
+                  Update Prompt
+                </button>
+              </div>
             </div>
 
             <form
@@ -149,7 +194,7 @@ export default function PostCommentRepliesClient() {
                     legend="Where is the comment?"
                     options={REPLY_CONTEXTS}
                     value={context}
-                    onChange={setContext}
+                    onChange={(nextContext) => formStore.update({ context: nextContext })}
                     disabled={isGenerating}
                     columnsClassName="grid-cols-1 min-[440px]:grid-cols-2"
                   />
@@ -157,11 +202,11 @@ export default function PostCommentRepliesClient() {
                     idPrefix={ID_PREFIX}
                     mode={postMode}
                     onModeChange={(nextMode) => {
-                      setPostMode(nextMode)
+                      formStore.update({ postMode: nextMode })
                       clearPostError()
                     }}
                     text={postText}
-                    onTextChange={setPostText}
+                    onTextChange={(text) => formStore.update({ postText: text })}
                     image={postImage}
                     onImageSelect={handlePostImageSelect}
                     onImageRemove={handlePostImageRemove}
@@ -191,7 +236,7 @@ export default function PostCommentRepliesClient() {
                       id={COMMENTS_INPUT_ID}
                       value={comments}
                       onChange={(event) => {
-                        setComments(event.target.value)
+                        formStore.update({ comments: event.target.value })
                         if (formError === missingComment) setFormError(null)
                       }}
                       onKeyDown={(event) => {
@@ -217,7 +262,7 @@ export default function PostCommentRepliesClient() {
                       name={`${ID_PREFIX}-target`}
                       comments={detectedComments}
                       selectedKey={selectedCommentKey}
-                      onSelect={setSelectedCommentKey}
+                      onSelect={(key) => formStore.update({ selectedCommentKey: key })}
                       disabled={isGenerating}
                     />
                   )}
@@ -233,7 +278,7 @@ export default function PostCommentRepliesClient() {
                     options={REPLY_STYLES}
                     value={style}
                     onChange={(nextStyle) => {
-                      setStyle(nextStyle)
+                      formStore.update({ style: nextStyle })
                       if (formError === missingStyle) setFormError(null)
                     }}
                     disabled={isGenerating}
@@ -273,6 +318,9 @@ export default function PostCommentRepliesClient() {
 
       {isPromptsOpen && (
         <ReplyPromptsModal initialContext={context} initialStyle={style} onClose={() => setIsPromptsOpen(false)} />
+      )}
+      {isDummyDataOpen && (
+        <DummyDataModal kind="comment-threads" onUse={loadDummyThread} onClose={() => setIsDummyDataOpen(false)} />
       )}
     </div>
   )

@@ -7,27 +7,46 @@ import { Header } from "@/components/ui/Header"
 import { ToneSelector } from "@/components/connection-note/ToneSelector"
 import { NoteResult } from "@/components/connection-note/NoteResult"
 import { ConnectionNotePromptsModal } from "@/components/connection-note/ConnectionNotePromptsModal"
+import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
+import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
+import { ResetButton } from "@/components/ui/ResetButton"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
-import { useConnectionNoteGenerator } from "@/hooks/useConnectionNoteGenerator"
+import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
+import { createToolStore, useToolStore } from "@/lib/toolStore"
 import {
   CONNECTION_NOTE_MESSAGES,
+  DEFAULT_CONNECTION_NOTE_TONE,
   PROFILE_DATA_MAX_LENGTH,
   type ConnectionNoteToneId,
 } from "@/constants/connectionNote"
+import type { GeneratedConnectionNote } from "@/types/connectionNote"
 
 const PROFILE_INPUT_ID = "connection-note-profile"
 const FORM_ERROR_ID = "connection-note-form-error"
 
+// Inputs and the result outlive the page, so they're still here after visiting another tool
+const formStore = createToolStore(
+  "connection-note:form",
+  { profileData: "", tone: DEFAULT_CONNECTION_NOTE_TONE as ConnectionNoteToneId },
+  { version: 1 }
+)
+const generation = createGenerationRequest<{ profileData: string; tone: ConnectionNoteToneId }, GeneratedConnectionNote>(
+  "connection-note",
+  "/api/connection-notes/generate",
+  CONNECTION_NOTE_MESSAGES.generationFailed
+)
+
 export default function ConnectionNoteClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isPromptsOpen, setIsPromptsOpen] = useState(false)
-  const [profileData, setProfileData] = useState("")
-  const [tone, setTone] = useState<ConnectionNoteToneId | null>(null)
+  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
+  const { profileData, tone } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
   const profileInputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
-  const { status, result, error, generate } = useConnectionNoteGenerator()
+  const { status, result, error, generate, reset } = useGenerationRequest(generation)
   const isGenerating = status === "loading"
+  const canReset = profileData !== "" || status !== "idle"
 
   const submit = () => {
     if (!profileData.trim()) {
@@ -35,12 +54,23 @@ export default function ConnectionNoteClient() {
       profileInputRef.current?.focus()
       return
     }
-    if (!tone) {
-      setFormError(CONNECTION_NOTE_MESSAGES.missingTone)
-      return
-    }
     setFormError(null)
-    generate(profileData, tone)
+    generate({ profileData, tone })
+  }
+
+  // A dummy profile replaces the input, and the note written for the previous profile goes with it
+  const loadDummyProfile = ({ profile }: Record<string, string>) => {
+    formStore.update({ profileData: profile ?? "" })
+    reset()
+    setFormError(null)
+  }
+
+  // Clears the profile and the note; the chosen tone stays for the next profile
+  const resetTool = () => {
+    formStore.update({ profileData: "" })
+    reset()
+    setFormError(null)
+    profileInputRef.current?.focus()
   }
 
   return (
@@ -67,14 +97,18 @@ export default function ConnectionNoteClient() {
                   Create a personalized LinkedIn connection note from a profile.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsPromptsOpen(true)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors sm:shrink-0"
-              >
-                <FilePenLine size={16} aria-hidden="true" />
-                Update Prompt
-              </button>
+              <div className="flex flex-wrap gap-2 sm:shrink-0">
+                <ResetButton onReset={resetTool} disabled={!canReset} />
+                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
+                <button
+                  type="button"
+                  onClick={() => setIsPromptsOpen(true)}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                >
+                  <FilePenLine size={16} aria-hidden="true" />
+                  Update Prompt
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0">
@@ -101,7 +135,7 @@ export default function ConnectionNoteClient() {
                     id={PROFILE_INPUT_ID}
                     value={profileData}
                     onChange={(event) => {
-                      setProfileData(event.target.value)
+                      formStore.update({ profileData: event.target.value })
                       if (formError === CONNECTION_NOTE_MESSAGES.missingProfile) setFormError(null)
                     }}
                     maxLength={PROFILE_DATA_MAX_LENGTH}
@@ -114,10 +148,7 @@ export default function ConnectionNoteClient() {
 
                 <ToneSelector
                   value={tone}
-                  onChange={(nextTone) => {
-                    setTone(nextTone)
-                    if (formError === CONNECTION_NOTE_MESSAGES.missingTone) setFormError(null)
-                  }}
+                  onChange={(nextTone) => formStore.update({ tone: nextTone })}
                   disabled={isGenerating}
                 />
 
@@ -151,6 +182,7 @@ export default function ConnectionNoteClient() {
       </div>
 
       {isPromptsOpen && <ConnectionNotePromptsModal initialTone={tone} onClose={() => setIsPromptsOpen(false)} />}
+      {isDummyDataOpen && <DummyDataModal kind="profiles" onUse={loadDummyProfile} onClose={() => setIsDummyDataOpen(false)} />}
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
 import { NO_SENDER_PROFILE_TEXT, generateWithoutSenderClaims } from "@/services/senderGuard"
+import { humanizeTexts } from "@/services/humanizer"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
 import { INMAIL_BODY_MAX_CHARS, INMAIL_SUBJECT_MAX_CHARS } from "@/constants/linkedinLimits"
 import { getOutreachTuneLabel } from "@/constants/outreachTunes"
@@ -86,8 +87,8 @@ function buildWarnings(subject: string, message: string, unsupportedSenderClaim:
 
 /**
  * Generates one InMail (subject and message as separate outputs) using the latest saved
- * prompt for the tune and the shared sender profile. Profile text is untrusted data
- * inside its own delimiter tags.
+ * prompt for the tune and the shared sender profile, then rewrites both with the
+ * Humanization prompt. Profile text is untrusted data inside its own delimiter tags.
  */
 export async function generateInMail({ profileData, tune, signal }: GenerateOptions): Promise<GeneratedInMail> {
   const { tunePrompt, senderProfile } = await getInMailGenerationInputs(tune)
@@ -123,8 +124,27 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
     describeDraft: (output) => `Subject: ${cleanSubject(output.subject)}\n\n${cleanGeneratedText(output.message)}`,
   })
 
-  const subject = cleanSubject(data.subject)
-  const message = cleanMessage(data.message, subject)
+  const draftSubject = cleanSubject(data.subject)
+  const humanization = await humanizeTexts({
+    fields: [
+      {
+        id: "subject",
+        kind: "LinkedIn InMail subject line",
+        text: draftSubject,
+        maxChars: INMAIL_SUBJECT_MAX_CHARS,
+        singleLine: true,
+      },
+      {
+        id: "message",
+        kind: "LinkedIn InMail message body (without the subject)",
+        text: cleanMessage(data.message, draftSubject),
+        maxChars: INMAIL_BODY_MAX_CHARS,
+      },
+    ],
+    signal,
+  })
+  const subject = cleanSubject(humanization.texts.subject)
+  const message = cleanMessage(humanization.texts.message, subject)
 
   // Serialized so the details also survive Next's dev file log, which drops object arguments
   console.info(
@@ -135,6 +155,7 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
       usedSenderProfile: senderProfile !== null,
       senderClaimRewrite,
       unsupportedSenderClaim,
+      humanized: humanization.humanized,
       subjectCharacters: subject.length,
       messageCharacters: message.length,
     })

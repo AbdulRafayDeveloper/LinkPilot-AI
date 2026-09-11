@@ -28,8 +28,8 @@ export interface ResearchResult {
 }
 
 interface LiveResearchOptions {
-  // Gemini with Google Search grounding runs several searches itself, so one call covers the whole brief
-  geminiMessages: BaseMessage[]
+  // Each entry is one grounded Gemini call; several entries run as parallel passes and are merged
+  geminiPasses: BaseMessage[][]
   // The fallback OpenAI model searches shallowly per call, so each entry runs as its own parallel pass
   openAIPasses: BaseMessage[][]
   minSources: number
@@ -52,7 +52,7 @@ export function loadSearchLenses(templateName: PromptName): string[] {
 }
 
 /**
- * Gemini covers every lens in one grounded call, so its focus lists all of them.
+ * For a single research call that should cover every lens.
  */
 export function describeAllLenses(lenses: string[]): string {
   return `Cover each of these angles:\n${lenses.map((lens) => `- ${lens}`).join("\n")}`
@@ -126,10 +126,10 @@ async function resolveGroundingSource(chunk: GroundingChunk, signal: AbortSignal
 }
 
 /**
- * Gemini with Google Search grounding. Only grounding metadata counts as a source; URLs
- * the model writes into its text are not trusted.
+ * One grounded Gemini call. Only grounding metadata counts as a source; URLs the model
+ * writes into its text are not trusted.
  */
-async function searchWithGemini(messages: BaseMessage[], signal: AbortSignal): Promise<ResearchResult> {
+async function runGeminiPass(messages: BaseMessage[], signal: AbortSignal): Promise<ResearchResult> {
   const model = createGeminiModel({ maxRetries: RESEARCH_MAX_RETRIES })
   const response = await model.invoke(messages, {
     tools: [GOOGLE_SEARCH_TOOL],
@@ -144,31 +144,46 @@ async function searchWithGemini(messages: BaseMessage[], signal: AbortSignal): P
   return { provider: "gemini", notes, sources: dedupeSources(sources) }
 }
 
-async function searchWithOpenAI(passes: BaseMessage[][], signal: AbortSignal): Promise<ResearchResult> {
-  const model = createOpenAIModel({ timeout: RESEARCH_TIMEOUT_MS, maxRetries: RESEARCH_MAX_RETRIES })
-  const webSearch = openAITools.webSearch({ search_context_size: "high" })
-
-  const results = await Promise.allSettled(
-    passes.map(async (messages) => {
-      // "required" stops the model from answering from memory without searching
-      const response = await model.invoke(messages, { tools: [webSearch], tool_choice: "required", signal })
-      return extractOpenAIResearch(response)
-    })
-  )
-
+/**
+ * Runs research passes in parallel and merges the ones that succeed. Fails only when
+ * every pass fails.
+ */
+async function runPasses(
+  provider: SearchProvider,
+  passes: BaseMessage[][],
+  runPass: (messages: BaseMessage[]) => Promise<ResearchResult>
+): Promise<ResearchResult> {
+  const results = await Promise.allSettled(passes.map(runPass))
   const succeeded = results.flatMap((pass) => (pass.status === "fulfilled" ? [pass.value] : []))
   if (succeeded.length === 0) {
     const firstFailure = results.find((pass) => pass.status === "rejected")
-    throw firstFailure?.reason ?? new Error("OpenAIWebSearchException: every search pass failed")
+    throw firstFailure?.reason ?? new Error(`WebSearchException: every ${provider} search pass failed`)
   }
   if (succeeded.length < results.length) {
-    console.warn(`⚠️ ${results.length - succeeded.length} of ${results.length} OpenAI search passes failed`)
+    console.warn(`⚠️ ${results.length - succeeded.length} of ${results.length} ${provider} search passes failed`)
   }
   return {
-    provider: "openai",
-    notes: succeeded.map((result, index) => `### Search pass ${index + 1}\n${result.notes}`).join("\n\n"),
+    provider,
+    notes:
+      succeeded.length === 1
+        ? succeeded[0].notes
+        : succeeded.map((result, index) => `### Search pass ${index + 1}\n${result.notes}`).join("\n\n"),
     sources: dedupeSources(succeeded.flatMap((result) => result.sources)),
   }
+}
+
+function searchWithGemini(passes: BaseMessage[][], signal: AbortSignal): Promise<ResearchResult> {
+  return runPasses("gemini", passes, (messages) => runGeminiPass(messages, signal))
+}
+
+function searchWithOpenAI(passes: BaseMessage[][], signal: AbortSignal): Promise<ResearchResult> {
+  const model = createOpenAIModel({ timeout: RESEARCH_TIMEOUT_MS, maxRetries: RESEARCH_MAX_RETRIES })
+  const webSearch = openAITools.webSearch({ search_context_size: "high" })
+  return runPasses("openai", passes, async (messages) => {
+    // "required" stops the model from answering from memory without searching
+    const response = await model.invoke(messages, { tools: [webSearch], tool_choice: "required", signal })
+    return extractOpenAIResearch(response)
+  })
 }
 
 function hasUsableEvidence(result: ResearchResult, minSources: number): boolean {
@@ -180,7 +195,7 @@ function hasUsableEvidence(result: ResearchResult, minSources: number): boolean 
  * automatic fallback when Gemini isn't configured, fails, or returns too little evidence.
  */
 export async function runLiveResearch({
-  geminiMessages,
+  geminiPasses,
   openAIPasses,
   minSources,
   signal,
@@ -196,7 +211,7 @@ export async function runLiveResearch({
 
   if (canUseGemini) {
     try {
-      const result = await searchWithGemini(geminiMessages, signal)
+      const result = await searchWithGemini(geminiPasses, signal)
       if (hasUsableEvidence(result, minSources)) return result
       console.warn("⚠️ Gemini research returned too few sources", { sources: result.sources.length })
     } catch (error: unknown) {

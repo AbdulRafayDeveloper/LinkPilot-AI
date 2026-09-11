@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
 import { readSSEStream } from "@/lib/sse"
+import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { COMMENT_WRITER_MESSAGES, type CommentTuneId } from "@/constants/commentWriter"
 import type { PostInputMode } from "@/constants/postInput"
 import type { ApiEnvelope } from "@/types/api"
@@ -23,6 +23,23 @@ export interface CommentRequest {
   image: File | null
 }
 
+interface CommentGenerationState {
+  status: CommentWriterStatus
+  result: GeneratedComment | null
+  stages: CommentStageEntry[]
+  error: string | null
+}
+
+const IDLE: CommentGenerationState = { status: "idle", result: null, stages: [], error: null }
+
+// Lives outside the page, so a comment (or one still being written) is there when the user comes back
+const store = createToolStore<CommentGenerationState>("comment-writer:result", IDLE, {
+  version: 1,
+  // Only a finished comment survives a refresh; a running request can't resume after one
+  toStored: (state) => (state.status === "success" ? { ...state, stages: [] } : IDLE),
+})
+let controller: AbortController | null = null
+
 function toFormData({ tune, mode, postText, image }: CommentRequest): FormData {
   const form = new FormData()
   form.append("tune", tune)
@@ -37,66 +54,51 @@ function toFormData({ tune, mode, postText, image }: CommentRequest): FormData {
  * Starting a generation clears the previous comment immediately and cancels any request
  * still running, so an old comment is never shown alongside a new one.
  */
-export function useCommentGenerator() {
-  const [status, setStatus] = useState<CommentWriterStatus>("idle")
-  const [result, setResult] = useState<GeneratedComment | null>(null)
-  const [stages, setStages] = useState<CommentStageEntry[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const controllerRef = useRef<AbortController | null>(null)
+async function generate(request: CommentRequest) {
+  controller?.abort()
+  const current = new AbortController()
+  controller = current
+  const fail = (message: string) => store.update({ status: "error", error: message })
+  store.update({ status: "loading", result: null, stages: [], error: null })
 
-  useEffect(() => () => controllerRef.current?.abort(), [])
+  try {
+    const response = await fetch(GENERATE_ENDPOINT, { method: "POST", body: toFormData(request), signal: current.signal })
+    if (!response.ok || !response.body) {
+      // Validation failures come back as JSON with a user-safe message
+      const body = (await response.json().catch(() => null)) as ApiEnvelope<never> | null
+      if (!current.signal.aborted) fail(body?.message || COMMENT_WRITER_MESSAGES.generationFailed)
+      return
+    }
 
-  const fail = useCallback((message: string) => {
-    setError(message)
-    setStatus("error")
-  }, [])
-
-  const generate = useCallback(
-    async (request: CommentRequest) => {
-      controllerRef.current?.abort()
-      const controller = new AbortController()
-      controllerRef.current = controller
-
-      setResult(null)
-      setStages([])
-      setError(null)
-      setStatus("loading")
-
-      try {
-        const response = await fetch(GENERATE_ENDPOINT, {
-          method: "POST",
-          body: toFormData(request),
-          signal: controller.signal,
-        })
-        if (!response.ok || !response.body) {
-          // Validation failures come back as JSON with a user-safe message
-          const body = (await response.json().catch(() => null)) as ApiEnvelope<never> | null
-          fail(body?.message || COMMENT_WRITER_MESSAGES.generationFailed)
-          return
-        }
-
-        let isFinished = false
-        await readSSEStream<CommentStreamEvent>(response.body, (event) => {
-          if (event.status === "COMPLETE") {
-            isFinished = true
-            setResult(event.result)
-            setStatus("success")
-          } else if (event.status === "ERROR") {
-            isFinished = true
-            fail(event.message)
-          } else {
-            setStages((previous) => [...previous, { status: event.status, text: event.text }])
-          }
-        })
-        if (!isFinished) throw new Error("Comment stream ended without a result")
-      } catch (err: unknown) {
-        if (controller.signal.aborted) return
-        console.error("Comment generation failed:", err)
-        fail(COMMENT_WRITER_MESSAGES.generationFailed)
+    let isFinished = false
+    await readSSEStream<CommentStreamEvent>(response.body, (event) => {
+      if (current.signal.aborted) return
+      if (event.status === "COMPLETE") {
+        isFinished = true
+        store.update({ status: "success", result: event.result })
+      } else if (event.status === "ERROR") {
+        isFinished = true
+        fail(event.message)
+      } else {
+        store.update(({ stages }) => ({ stages: [...stages, { status: event.status, text: event.text }] }))
       }
-    },
-    [fail]
-  )
+    })
+    if (!isFinished && !current.signal.aborted) throw new Error("Comment stream ended without a result")
+  } catch (err: unknown) {
+    if (current.signal.aborted) return
+    console.error("Comment generation failed:", err)
+    fail(COMMENT_WRITER_MESSAGES.generationFailed)
+  }
+}
 
-  return { status, result, stages, error, generate }
+// Cancels any running request and clears the comment
+function reset() {
+  controller?.abort()
+  controller = null
+  store.reset()
+}
+
+export function useCommentGenerator() {
+  const { status, result, stages, error } = useToolStore(store)
+  return { status, result, stages, error, generate, reset }
 }

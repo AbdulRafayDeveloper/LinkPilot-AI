@@ -6,6 +6,7 @@ import { PromptAccessGate } from "./PromptAccessGate"
 import { PromptEditorField } from "./PromptEditorField"
 import { PromptTabStrip, type PromptTab } from "./PromptTabStrip"
 import { PromptLoadFailed, PromptLoading, PromptModalFooter, type PromptFeedback } from "./PromptModalParts"
+import { useCloseAfterSave } from "@/hooks/useCloseAfterSave"
 import type { EditablePrompt } from "@/types/prompts"
 
 export type { PromptTab } from "./PromptTabStrip"
@@ -58,6 +59,8 @@ function PromptTabsEditor<Id extends string>({
   const [activeTab, setActiveTab] = useState<Id>(initialTab ?? tabs[0].id)
   const [isSaving, setIsSaving] = useState(false)
   const [feedback, setFeedback] = useState<PromptFeedback | null>(null)
+  const { isClosing, closeAfterSave } = useCloseAfterSave(onClose)
+  const isBusy = isSaving || isClosing
 
   const panelId = `${idPrefix}-panel`
   const tabId = (id: Id) => `${idPrefix}-tab-${id}`
@@ -100,6 +103,7 @@ function PromptTabsEditor<Id extends string>({
       setSaved((current) => (current ? { ...current, [id]: data } : current))
       setDrafts((current) => ({ ...current, [id]: data.prompt }))
       setFeedback({ type: "success", message: message || "Prompt saved." })
+      closeAfterSave()
     } catch (error: unknown) {
       setFeedback({ type: "error", message: error instanceof Error ? error.message : "Couldn't save the prompt." })
     } finally {
@@ -119,7 +123,7 @@ function PromptTabsEditor<Id extends string>({
           feedback={feedback}
           hasUnsavedChanges={hasUnsavedChanges}
           isSaving={isSaving}
-          canSave={isTabDirty(activeTab) && activeDraft.trim().length > 0 && !isSaving}
+          canSave={isTabDirty(activeTab) && activeDraft.trim().length > 0 && !isBusy}
           onCancel={onClose}
           onSave={handleSave}
         />
@@ -145,7 +149,7 @@ function PromptTabsEditor<Id extends string>({
               ariaLabel={title}
               tabId={tabId}
               panelId={panelId}
-              disabled={isSaving}
+              disabled={isBusy}
             />
           )}
 
@@ -164,7 +168,7 @@ function PromptTabsEditor<Id extends string>({
               }}
               saved={saved[activeTab]}
               label={`${activeLabel} prompt`}
-              disabled={isSaving}
+              disabled={isBusy}
               hint={renderHint?.(activeTab, activeDraft)}
             />
           </div>

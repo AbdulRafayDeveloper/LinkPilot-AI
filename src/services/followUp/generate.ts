@@ -3,12 +3,14 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
+import { humanizeTexts } from "@/services/humanizer"
 import {
   conversationPeopleFields,
   loadConversationReadingRules,
   toConversationParties,
 } from "@/services/conversationTimeline"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
+import { LINKEDIN_MESSAGE_MAX_CHARS } from "@/constants/linkedinLimits"
 import { getFollowUpTypeLabel, type FollowUpTypeId } from "@/constants/followUp"
 import type { GeneratedFollowUp } from "@/types/followUp"
 import { getActiveFollowUpPrompt } from "./prompts"
@@ -50,9 +52,9 @@ function findUnusableReason(output: FollowUpOutput): string | null {
 }
 
 /**
- * Generates one follow-up with the latest saved prompt for the selected type. The pasted
- * conversation and profile are untrusted data inside their own delimiter tags;
- * {{follow_up_type}} inserts the type name.
+ * Generates one follow-up with the latest saved prompt for the selected type, then
+ * rewrites it with the Humanization prompt. The pasted conversation and profile are
+ * untrusted data inside their own delimiter tags; {{follow_up_type}} inserts the type name.
  */
 export async function generateFollowUp({
   conversation,
@@ -83,15 +85,30 @@ export async function generateFollowUp({
     validate: findUnusableReason,
   })
 
-  const message = cleanGeneratedText(data.message)
-  const parties = toConversationParties(data)
-  console.info("Follow-up generated:", {
-    type,
-    provider,
-    state: parties.state,
-    usedProfile: profileData !== null,
-    characters: message.length,
+  const humanization = await humanizeTexts({
+    fields: [
+      {
+        id: "message",
+        kind: "LinkedIn follow-up message in an existing conversation",
+        text: cleanGeneratedText(data.message),
+        maxChars: LINKEDIN_MESSAGE_MAX_CHARS,
+      },
+    ],
+    signal,
   })
+  const message = humanization.texts.message
+  const parties = toConversationParties(data)
+  console.info(
+    "Follow-up generated:",
+    JSON.stringify({
+      type,
+      provider,
+      state: parties.state,
+      usedProfile: profileData !== null,
+      humanized: humanization.humanized,
+      characters: message.length,
+    })
+  )
 
   return {
     message,

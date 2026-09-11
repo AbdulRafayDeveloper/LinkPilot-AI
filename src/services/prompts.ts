@@ -7,6 +7,7 @@ import type { FirstMessageTuneId } from "@/constants/firstMessage"
 import type { InMailTuneId } from "@/constants/inmail"
 import type { ReplyContextId, ReplyStyleId } from "@/constants/postCommentReplies"
 import type { ConversationReplyTypeId } from "@/constants/conversationReply"
+import type { GlobalPromptId } from "@/constants/globalPrompts"
 
 const PROMPTS_DIR = path.join(process.cwd(), "src/prompts")
 
@@ -37,6 +38,8 @@ export type PromptName =
   | "conversation-reply-analysis"
   | "conversation-reply-system"
   | `conversation-reply-${ConversationReplyTypeId}`
+  | `global-${GlobalPromptId}`
+  | "humanizer-system"
 
 /**
  * Loads a prompt template from src/prompts. A missing template fails loudly instead of

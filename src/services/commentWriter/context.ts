@@ -51,7 +51,7 @@ export async function researchPostTopic({
   const lenses = loadSearchLenses("comment-writer-research-lenses")
   try {
     return await runLiveResearch({
-      geminiMessages: buildResearchMessages(postText, styleBrief, now, describeAllLenses(lenses)),
+      geminiPasses: [buildResearchMessages(postText, styleBrief, now, describeAllLenses(lenses))],
       openAIPasses: lenses.map((lens) => buildResearchMessages(postText, styleBrief, now, lens)),
       minSources: MIN_RESEARCH_SOURCES,
       signal,
