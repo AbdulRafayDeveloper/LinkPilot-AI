@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { UserFacingError } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { getActiveTrendingPrompt, getDefaultTrendingPrompt, saveTrendingPrompt } from "@/services/trending/prompt"
+import { requirePromptAccess } from "@/services/promptAccess"
 
 export const dynamic = "force-dynamic"
 
@@ -17,6 +18,9 @@ function errorResponse(error: unknown, fallbackMessage: string) {
  * GET: Returns the exact prompt the Trending Topics search currently uses, plus the default.
  */
 export async function GET() {
+  const denied = await requirePromptAccess()
+  if (denied) return denied
+
   try {
     const active = await getActiveTrendingPrompt()
     return NextResponse.json({
@@ -34,6 +38,9 @@ export async function GET() {
  * PUT: Persists an updated prompt. The next search uses it without any code change.
  */
 export async function PUT(req: NextRequest) {
+  const denied = await requirePromptAccess()
+  if (denied) return denied
+
   try {
     const body = await req.json().catch(() => null)
     const parsed = PromptUpdateSchema.safeParse(body)

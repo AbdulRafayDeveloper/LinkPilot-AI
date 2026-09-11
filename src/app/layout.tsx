@@ -1,8 +1,7 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import "@/config/env"
-import { SITE_NAME, SITE_URL } from "@/config/site"
-import { ScrollToTop } from "@/components/ui/ScrollToTop"
+import { SITE_URL } from "@/config/env"
+import { SITE_NAME } from "@/config/site"
 import "./globals.css"
 
 const inter = Inter({
@@ -10,13 +9,17 @@ const inter = Inter({
   display: "swap",
 })
 
+const TITLE = `${SITE_NAME} | LinkedIn Outreach Tools`
+const DESCRIPTION =
+  "Eight AI tools for LinkedIn outreach: trending topics, connection notes, comments, comment replies, follow-ups, first messages, InMails and conversation replies."
+
 export const metadata: Metadata = {
-  title: `${SITE_NAME} | Conversational Helpdesk Intelligence`,
-  description: "Next-generation conversational AI support console. Securely search knowledge base documents, trace real-time execution graphs, and resolve tickets.",
+  title: TITLE,
+  description: DESCRIPTION,
   metadataBase: new URL(SITE_URL),
   openGraph: {
-    title: `${SITE_NAME} | Conversational Helpdesk Intelligence`,
-    description: "Next-generation conversational AI support console. Securely search knowledge base documents, trace real-time execution graphs, and resolve tickets.",
+    title: TITLE,
+    description: DESCRIPTION,
     url: SITE_URL,
     siteName: SITE_NAME,
     locale: "en_US",
@@ -25,8 +28,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE_NAME} | Conversational Helpdesk Intelligence`,
-    description: "Next-generation conversational AI support console. Securely search knowledge base documents, trace real-time execution graphs, and resolve tickets.",
+    title: TITLE,
+    description: DESCRIPTION,
     images: ["/logo.png"],
   },
   icons: {
@@ -54,20 +57,11 @@ export default function RootLayout({
               "name": SITE_NAME,
               "url": SITE_URL,
               "logo": `${SITE_URL}/logo.png`,
-              "contactPoint": {
-                "@type": "ContactPoint",
-                "telephone": "+1-800-555-0199",
-                "contactType": "customer service",
-                "availableLanguage": ["en"]
-              }
             })
           }}
         />
       </head>
-      <body suppressHydrationWarning>
-        {children}
-        <ScrollToTop />
-      </body>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   )
 }

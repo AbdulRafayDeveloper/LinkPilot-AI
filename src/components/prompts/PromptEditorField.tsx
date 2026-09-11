@@ -14,8 +14,6 @@ interface PromptEditorFieldProps {
   disabled?: boolean
   hint?: React.ReactNode
   textareaRef?: React.Ref<HTMLTextAreaElement>
-  // Editor height classes; modals with extra selector rows pass a shorter height so they fit the viewport
-  heightClassName?: string
 }
 
 function describeSavedState(saved: EditablePrompt): string {
@@ -25,8 +23,8 @@ function describeSavedState(saved: EditablePrompt): string {
 }
 
 /**
- * Full-height prompt editor with saved-state info, restore-default, copy and a length
- * counter. The textarea scrolls internally so long prompts never stretch the page.
+ * Prompt editor with saved-state info, restore-default, copy and a length counter. It fills
+ * the space its (flex column) container gives it, and long prompts scroll inside the textarea.
  */
 export const PromptEditorField: React.FC<PromptEditorFieldProps> = ({
   value,
@@ -36,14 +34,13 @@ export const PromptEditorField: React.FC<PromptEditorFieldProps> = ({
   disabled = false,
   hint,
   textareaRef,
-  heightClassName = "h-[46vh] min-h-[220px]",
 }) => {
   const isDirty = value !== saved.prompt
   const isDefaultValue = value.trim() === saved.defaultPrompt
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex flex-col gap-2 flex-1 min-h-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
         <p className="text-[11px] font-semibold text-outline">
           {describeSavedState(saved)}
           {isDirty && <span className="text-secondary"> · Unsaved changes</span>}
@@ -69,10 +66,10 @@ export const PromptEditorField: React.FC<PromptEditorFieldProps> = ({
         maxLength={PROMPT_MAX_LENGTH}
         spellCheck={false}
         aria-label={label}
-        className={`w-full ${heightClassName} resize-y rounded-xl border border-outline-variant bg-surface-container-lowest p-3 font-code text-[13px] leading-relaxed text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary`}
+        className="w-full flex-1 min-h-[240px] resize-none overflow-y-auto rounded-xl border border-outline-variant bg-surface-container-lowest p-3 font-code text-[13px] leading-relaxed whitespace-pre-wrap text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
       />
 
-      <div className="flex flex-wrap items-start justify-between gap-2 text-[11px] text-outline">
+      <div className="flex flex-wrap items-start justify-between gap-2 text-[11px] text-outline shrink-0">
         <div className="min-w-0 flex-1">{hint}</div>
         <p className="shrink-0">
           {value.length.toLocaleString()} / {PROMPT_MAX_LENGTH.toLocaleString()}

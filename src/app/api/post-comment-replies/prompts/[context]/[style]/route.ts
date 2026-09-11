@@ -9,6 +9,7 @@ import {
   getReplyStyleLabel,
 } from "@/constants/postCommentReplies"
 import { saveReplyPrompt } from "@/services/postCommentReplies/prompts"
+import { requirePromptAccess } from "@/services/promptAccess"
 
 export const dynamic = "force-dynamic"
 
@@ -21,6 +22,9 @@ const ParamsSchema = z.object({
  * PUT: Saves the prompt for exactly one context + style pair. The other 13 prompts are untouched.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ context: string; style: string }> }) {
+  const denied = await requirePromptAccess()
+  if (denied) return denied
+
   try {
     const target = ParamsSchema.safeParse(await params)
     if (!target.success) {

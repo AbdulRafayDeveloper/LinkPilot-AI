@@ -31,7 +31,7 @@ function saveTunePrompt(tune: CommentTuneId, prompt: string) {
 function describeDataSources(draft: string): string {
   const sources = [
     promptUsesVariable(draft, "research_context") && "runs live web research",
-    promptUsesVariable(draft, "user_experience") && "looks up your Knowledge Base",
+    promptUsesVariable(draft, "user_experience") && "uses your About Me profile",
   ].filter(Boolean)
   return sources.length > 0 ? `This prompt ${sources.join(" and ")}.` : "This prompt uses only the post."
 }
@@ -75,7 +75,6 @@ export const TunePromptsModal: React.FC<TunePromptsModalProps> = ({ initialTune,
     savePrompt={saveTunePrompt}
     renderHint={renderTuneHint}
     loadingText="Loading the saved comment style prompts..."
-    orientation="vertical"
     onClose={onClose}
   />
 )

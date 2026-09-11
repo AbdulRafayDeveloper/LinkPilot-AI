@@ -13,8 +13,16 @@ interface ModalProps {
   isCloseDisabled?: boolean
   footer?: React.ReactNode
   initialFocusRef?: React.RefObject<HTMLElement | null>
+  // "large" fills most of the viewport (prompt editors); the body then lays out as a flex column
+  size?: "compact" | "default" | "large"
   children: React.ReactNode
 }
+
+const PANEL_SIZE = {
+  compact: "w-full max-w-md max-h-[92dvh]",
+  default: "w-full max-w-3xl max-h-[92dvh]",
+  large: "w-full max-w-[min(95vw,1600px)] h-[92dvh]",
+} as const
 
 /**
  * Accessible dialog: Escape and backdrop close it, Tab stays inside it, and focus
@@ -27,6 +35,7 @@ export const Modal: React.FC<ModalProps> = ({
   isCloseDisabled = false,
   footer,
   initialFocusRef,
+  size = "default",
   children,
 }) => {
   const titleId = useId()
@@ -87,9 +96,9 @@ export const Modal: React.FC<ModalProps> = ({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className="bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col border border-outline-variant shadow-xl outline-none"
+        className={`bg-white rounded-2xl ${PANEL_SIZE[size]} flex flex-col border border-outline-variant shadow-xl outline-none`}
       >
-        <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3 border-b border-outline-variant/60">
+        <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3 border-b border-outline-variant/60 shrink-0">
           <div className="min-w-0">
             <h2 id={titleId} className="text-lg font-bold text-on-surface">
               {title}
@@ -111,9 +120,13 @@ export const Modal: React.FC<ModalProps> = ({
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">{children}</div>
+        <div
+          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4 ${size === "large" ? "flex flex-col" : ""}`}
+        >
+          {children}
+        </div>
 
-        {footer && <div className="px-5 py-4 border-t border-outline-variant/60">{footer}</div>}
+        {footer && <div className="px-5 py-4 border-t border-outline-variant/60 shrink-0">{footer}</div>}
       </div>
     </div>
   )

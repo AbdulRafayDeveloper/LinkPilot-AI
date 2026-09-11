@@ -11,9 +11,6 @@ import type { ConversationReplyTypeId } from "@/constants/conversationReply"
 const PROMPTS_DIR = path.join(process.cwd(), "src/prompts")
 
 export type PromptName =
-  | "system"
-  | "router"
-  | "agent"
   | "trending-topics"
   | "trending-research"
   | "trending-search-lenses"
@@ -41,16 +38,9 @@ export type PromptName =
   | "conversation-reply-system"
   | `conversation-reply-${ConversationReplyTypeId}`
 
-// Templates without a fallback fail loudly instead of running with a degraded prompt
-const defaultPrompts: Partial<Record<PromptName, string>> = {
-  system: "You are a helpful AI enterprise support assistant. Answer queries using the retrieved context documents.",
-  router: "Determine if the user query is 'simple' or 'complex'. Output exactly one word: simple or complex.",
-  agent: "You are an AI Agent with access to ticketing tools. Format thoughts and execute tool parameters.",
-}
-
 /**
- * Dynamically loads prompt templates from markdown files inside src/prompts.
- * If a template is missing or fails to load, falls back to safe default string values.
+ * Loads a prompt template from src/prompts. A missing template fails loudly instead of
+ * letting a tool run with a degraded prompt.
  */
 export function loadPrompt(templateName: PromptName): string {
   try {
@@ -61,11 +51,7 @@ export function loadPrompt(templateName: PromptName): string {
   } catch (error: unknown) {
     console.warn(`⚠️ Failed to load prompt template '${templateName}' from file system:`, error)
   }
-  const fallback = defaultPrompts[templateName]
-  if (fallback === undefined) {
-    throw new Error(`PromptTemplateMissing: src/prompts/${templateName}.md could not be loaded`)
-  }
-  return fallback
+  throw new Error(`PromptTemplateMissing: src/prompts/${templateName}.md could not be loaded`)
 }
 
 /**

@@ -69,7 +69,6 @@ export const ConversationReplyPromptsModal: React.FC<ConversationReplyPromptsMod
     savePrompt={savePrompt}
     renderHint={renderHint}
     loadingText="Loading the saved reply prompts..."
-    orientation="vertical"
     onClose={onClose}
   />
 )

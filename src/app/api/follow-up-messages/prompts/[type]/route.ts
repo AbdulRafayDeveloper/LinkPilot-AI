@@ -4,6 +4,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { FOLLOW_UP_TYPE_IDS, getFollowUpTypeLabel } from "@/constants/followUp"
 import { saveFollowUpPrompt } from "@/services/followUp/prompts"
+import { requirePromptAccess } from "@/services/promptAccess"
 
 export const dynamic = "force-dynamic"
 
@@ -13,6 +14,9 @@ const TypeSchema = z.enum(FOLLOW_UP_TYPE_IDS)
  * PUT: Saves the prompt for one follow-up type only. The other type's prompt is untouched.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ type: string }> }) {
+  const denied = await requirePromptAccess()
+  if (denied) return denied
+
   try {
     const type = TypeSchema.safeParse((await params).type)
     if (!type.success) {

@@ -125,7 +125,7 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
     CURRENT_DATE: now.toISOString().slice(0, 10),
     MAX_CHARS: COMMENT_MAX_CHARS,
   })
-  const write = (data: MessageData, writers: ModelProvider[], requireNoCitation: boolean) =>
+  const write = (data: MessageData, writers: readonly ModelProvider[], requireNoCitation: boolean) =>
     generateStructuredWithFallback({
       schema: CommentDraftSchema,
       name: "linkedin_comment",

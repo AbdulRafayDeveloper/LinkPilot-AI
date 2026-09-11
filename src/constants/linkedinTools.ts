@@ -15,10 +15,12 @@ export interface LinkedInTool {
   title: string
   description: string
   icon: LucideIcon
-  // Set once the tool has a page; tools without one render as inert buttons
-  href?: string
+  href: string
 }
 
+/**
+ * The app's entire navigation: exactly these 8 LinkedIn tools, in sidebar order.
+ */
 export const LINKEDIN_TOOLS: LinkedInTool[] = [
   { id: "trending-topics", title: "Trending Topics", description: "Latest IT & AI buzz", icon: Flame, href: "/trending-topics" },
   { id: "connection-note", title: "Connection Note", description: "Personalized connection requests", icon: UserPlus, href: "/connection-note" },

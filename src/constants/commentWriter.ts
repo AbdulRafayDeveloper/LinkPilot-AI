@@ -28,7 +28,7 @@ export function commentWriterPromptKey(tune: CommentTuneId): string {
 export const COMMENT_MAX_CHARS = 1250
 
 /**
- * Optional variables for tune prompts. The web research and Knowledge Base lookups only
+ * Optional variables for tune prompts. The web research and About Me lookups only
  * run when the saved prompt includes their variable, so each prompt decides its data sources.
  */
 export const COMMENT_PROMPT_VARIABLES = [
@@ -39,7 +39,7 @@ export const COMMENT_PROMPT_VARIABLES = [
   { name: "selected_tune", description: "Inserts the comment style name." },
   {
     name: "user_experience",
-    description: "Places your About Me profile and related Knowledge Base excerpts here.",
+    description: "Places your About Me profile here.",
   },
   {
     name: "research_context",
@@ -58,7 +58,7 @@ export const COMMENT_WRITER_MESSAGES = {
   missingTune: "Please select a comment style.",
   generationFailed: "Unable to generate the comment right now. Please try again.",
   noRecentDevelopment: "No verified recent development fit this post, so the comment doesn't cite one.",
-  noExperience: "Nothing in your profile or Knowledge Base fit this post, so the comment doesn't claim personal experience.",
+  noExperience: "Nothing in your About Me profile fit this post, so the comment doesn't claim personal experience.",
   missingProfile:
     "Your About Me profile is empty, so the comment doesn't claim personal experience. Fill it in under First Message → Update Prompt → About Me so the writer knows which experience is yours.",
 } as const

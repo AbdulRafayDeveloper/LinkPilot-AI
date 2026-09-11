@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: SITE_NAME,
     short_name: "LinkPilot",
-    description: "Next-generation conversational AI support console and helpdesk intelligence hub.",
+    description: "Eight AI tools for LinkedIn outreach, from trending topics to conversation replies.",
     start_url: "/",
     display: "standalone",
     background_color: "#FAF7F2",

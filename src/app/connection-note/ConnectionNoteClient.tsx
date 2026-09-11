@@ -6,7 +6,7 @@ import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ToneSelector } from "@/components/connection-note/ToneSelector"
 import { NoteResult } from "@/components/connection-note/NoteResult"
-import { TonePromptsModal } from "@/components/connection-note/TonePromptsModal"
+import { ConnectionNotePromptsModal } from "@/components/connection-note/ConnectionNotePromptsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useConnectionNoteGenerator } from "@/hooks/useConnectionNoteGenerator"
 import {
@@ -150,7 +150,7 @@ export default function ConnectionNoteClient() {
         </main>
       </div>
 
-      {isPromptsOpen && <TonePromptsModal initialTone={tone} onClose={() => setIsPromptsOpen(false)} />}
+      {isPromptsOpen && <ConnectionNotePromptsModal initialTone={tone} onClose={() => setIsPromptsOpen(false)} />}
     </div>
   )
 }

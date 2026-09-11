@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
-import { SITE_NAME, SITE_URL } from "@/config/site"
+import { SITE_URL } from "@/config/env"
+import { SITE_NAME } from "@/config/site"
 import TrendingTopicsClient from "./TrendingTopicsClient"
 
 export const metadata: Metadata = {

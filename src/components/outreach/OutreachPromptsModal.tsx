@@ -76,7 +76,6 @@ export const OutreachPromptsModal: React.FC<OutreachPromptsModalProps> = ({ api,
     savePrompt={api.savePrompt}
     renderHint={renderHint}
     loadingText="Loading the saved tune prompts..."
-    orientation="vertical"
     onClose={onClose}
   />
 )

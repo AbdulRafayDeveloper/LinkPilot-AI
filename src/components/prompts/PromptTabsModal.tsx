@@ -1,19 +1,19 @@
 "use client"
 
-import React, { useEffect, useId, useRef, useState } from "react"
+import React, { useEffect, useId, useState } from "react"
 import { Modal } from "@/components/ui/Modal"
+import { PromptAccessGate } from "./PromptAccessGate"
 import { PromptEditorField } from "./PromptEditorField"
+import { PromptTabStrip, type PromptTab } from "./PromptTabStrip"
 import { PromptLoadFailed, PromptLoading, PromptModalFooter, type PromptFeedback } from "./PromptModalParts"
 import type { EditablePrompt } from "@/types/prompts"
 
-export interface PromptTab<Id extends string> {
-  id: Id
-  label: string
-}
+export type { PromptTab } from "./PromptTabStrip"
 
 interface PromptTabsModalProps<Id extends string> {
   title: string
   description: string
+  // One tab per independent prompt; with a single tab the selector is hidden
   tabs: readonly PromptTab<Id>[]
   initialTab: Id | null
   // Pass stable (module-level) functions; they own the endpoint calls
@@ -22,16 +22,24 @@ interface PromptTabsModalProps<Id extends string> {
   // Receives the active tab's current draft too, so a hint can react to unsaved edits
   renderHint?: (id: Id, draft: string) => React.ReactNode
   loadingText?: string
-  // "vertical" puts the tabs in a left-hand list on md+ screens, for many or long tab labels
-  orientation?: "horizontal" | "vertical"
   onClose: () => void
 }
 
 /**
- * Edits several independent prompts, one tab each. Drafts are kept per tab while the
- * modal is open, and Save persists only the active tab's prompt.
+ * The Update Prompt modal every tool uses (Connection Note's pattern, in a large dialog):
+ * a tab per independent prompt, the editor filling the rest of the dialog, and the shared
+ * footer. It opens only after the prompt password check (PromptAccessGate).
  */
-export function PromptTabsModal<Id extends string>({
+export function PromptTabsModal<Id extends string>(props: PromptTabsModalProps<Id>) {
+  return (
+    <PromptAccessGate onClose={props.onClose}>
+      <PromptTabsEditor {...props} />
+    </PromptAccessGate>
+  )
+}
+
+// Drafts are kept per tab while the editor is open; Save persists only the active tab
+function PromptTabsEditor<Id extends string>({
   title,
   description,
   tabs,
@@ -40,10 +48,8 @@ export function PromptTabsModal<Id extends string>({
   savePrompt,
   renderHint,
   loadingText = "Loading the saved prompts...",
-  orientation = "horizontal",
   onClose,
 }: PromptTabsModalProps<Id>) {
-  const isVertical = orientation === "vertical"
   const idPrefix = useId()
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -52,10 +58,10 @@ export function PromptTabsModal<Id extends string>({
   const [activeTab, setActiveTab] = useState<Id>(initialTab ?? tabs[0].id)
   const [isSaving, setIsSaving] = useState(false)
   const [feedback, setFeedback] = useState<PromptFeedback | null>(null)
-  const tabRefs = useRef<Partial<Record<Id, HTMLButtonElement | null>>>({})
 
   const panelId = `${idPrefix}-panel`
   const tabId = (id: Id) => `${idPrefix}-tab-${id}`
+  const hasSelector = tabs.length > 1
 
   useEffect(() => {
     const controller = new AbortController()
@@ -80,26 +86,9 @@ export function PromptTabsModal<Id extends string>({
   const activeDraft = drafts[activeTab] ?? ""
   const activeLabel = tabs.find((tab) => tab.id === activeTab)?.label ?? activeTab
 
-  const selectTab = (id: Id, moveFocus = false) => {
+  const selectTab = (id: Id) => {
     setActiveTab(id)
     setFeedback(null)
-    if (moveFocus) tabRefs.current[id]?.focus()
-  }
-
-  const handleTabKeyDown = (event: React.KeyboardEvent, index: number) => {
-    const lastIndex = tabs.length - 1
-    const next = index === lastIndex ? 0 : index + 1
-    const previous = index === 0 ? lastIndex : index - 1
-    const targetIndex: number | undefined = {
-      ArrowRight: next,
-      ArrowLeft: previous,
-      ...(isVertical ? { ArrowDown: next, ArrowUp: previous } : {}),
-      Home: 0,
-      End: lastIndex,
-    }[event.key]
-    if (targetIndex === undefined) return
-    event.preventDefault()
-    selectTab(tabs[targetIndex].id, true)
   }
 
   const handleSave = async () => {
@@ -124,6 +113,7 @@ export function PromptTabsModal<Id extends string>({
       description={description}
       onClose={onClose}
       isCloseDisabled={isSaving}
+      size="large"
       footer={
         <PromptModalFooter
           feedback={feedback}
@@ -145,54 +135,26 @@ export function PromptTabsModal<Id extends string>({
           }}
         />
       ) : (
-        <div className={isVertical ? "flex flex-col md:flex-row gap-3" : "space-y-3"}>
-          <div
-            role="tablist"
-            aria-label={title}
-            aria-orientation={isVertical ? "vertical" : "horizontal"}
-            className={`flex flex-wrap gap-1 bg-surface-container-low p-1 rounded-xl ${
-              isVertical ? "md:flex-col md:flex-nowrap md:w-52 md:shrink-0 md:self-start" : ""
-            }`}
-          >
-            {tabs.map((tab, index) => {
-              const isActive = tab.id === activeTab
-              const isDirty = isTabDirty(tab.id)
-              return (
-                <button
-                  key={tab.id}
-                  ref={(element) => {
-                    tabRefs.current[tab.id] = element
-                  }}
-                  id={tabId(tab.id)}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  aria-controls={panelId}
-                  tabIndex={isActive ? 0 : -1}
-                  disabled={isSaving}
-                  onClick={() => selectTab(tab.id)}
-                  onKeyDown={(event) => handleTabKeyDown(event, index)}
-                  className={`flex-1 min-w-[calc(50%-0.25rem)] sm:min-w-0 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-                    isVertical ? "justify-center md:justify-between md:flex-none md:text-left" : "justify-center"
-                  } ${
-                    isActive
-                      ? "bg-white text-primary font-bold shadow-sm"
-                      : "text-on-surface-variant font-semibold hover:text-on-surface hover:bg-white/60"
-                  }`}
-                >
-                  <span className="truncate">{tab.label}</span>
-                  {isDirty && (
-                    <>
-                      <span className="w-1.5 h-1.5 rounded-full bg-secondary shrink-0" aria-hidden="true" />
-                      <span className="sr-only">(unsaved changes)</span>
-                    </>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+        <div className="flex flex-col gap-3 flex-1 min-h-0">
+          {hasSelector && (
+            <PromptTabStrip
+              tabs={tabs}
+              activeId={activeTab}
+              onSelect={selectTab}
+              isDirty={isTabDirty}
+              ariaLabel={title}
+              tabId={tabId}
+              panelId={panelId}
+              disabled={isSaving}
+            />
+          )}
 
-          <div role="tabpanel" id={panelId} aria-labelledby={tabId(activeTab)} className="min-w-0 flex-1">
+          <div
+            role={hasSelector ? "tabpanel" : undefined}
+            id={panelId}
+            aria-labelledby={hasSelector ? tabId(activeTab) : undefined}
+            className="flex flex-col flex-1 min-h-0"
+          >
             <PromptEditorField
               key={activeTab}
               value={activeDraft}

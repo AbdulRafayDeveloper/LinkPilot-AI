@@ -10,7 +10,7 @@ export default function NotFound() {
   return (
     <div className="font-body-md bg-[#FAF7F2] text-on-surface flex flex-col items-center justify-center p-4 min-h-screen max-h-screen h-screen overflow-hidden w-screen select-none">
       {/* Brand Header Banner */}
-      <div className="flex items-center gap-3 mb-8 animate-fadeIn">
+      <div className="flex items-center gap-3 mb-8">
         <Image
           alt={`${SITE_NAME} Logo`}
           className="w-10 h-10 object-contain"
@@ -26,7 +26,7 @@ export default function NotFound() {
       </div>
 
       {/* Main 404 Card */}
-      <div className="bg-white border border-outline-variant p-8 md:p-12 rounded-2xl max-w-md w-full text-center shadow-lg space-y-6 animate-scaleUp">
+      <div className="bg-white border border-outline-variant p-8 md:p-12 rounded-2xl max-w-md w-full text-center shadow-lg space-y-6">
         {/* Glow Logo Container */}
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-surface-container-low border border-outline-variant p-4 shadow-sm relative">
           <Image
@@ -47,7 +47,7 @@ export default function NotFound() {
           <h1 className="text-4xl font-extrabold text-primary font-mono tracking-wider">404</h1>
           <h2 className="text-lg font-bold text-on-surface">Page Not Found</h2>
           <p className="text-sm text-on-surface-variant leading-relaxed">
-            The resource you requested could not be located on the server. Let&apos;s get you back to the main console dashboard.
+            The resource you requested could not be located on the server. Let&apos;s get you back to your LinkedIn tools.
           </p>
         </div>
 
@@ -63,7 +63,7 @@ export default function NotFound() {
       </div>
 
       {/* Footer Branding Subline */}
-      <p className="mt-12 text-[11px] text-outline-variant uppercase tracking-widest font-semibold animate-fadeIn">
+      <p className="mt-12 text-[11px] text-outline-variant uppercase tracking-widest font-semibold">
         {SITE_NAME} © {new Date().getFullYear()}
       </p>
     </div>

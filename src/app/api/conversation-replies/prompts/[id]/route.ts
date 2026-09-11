@@ -4,6 +4,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { ABOUT_ME_TAB_ID, CONVERSATION_REPLY_PROMPT_IDS, getReplyTypeLabel } from "@/constants/conversationReply"
 import { saveConversationReplyPrompt } from "@/services/conversationReply/prompts"
+import { requirePromptAccess } from "@/services/promptAccess"
 
 export const dynamic = "force-dynamic"
 
@@ -13,6 +14,9 @@ const PromptIdSchema = z.enum(CONVERSATION_REPLY_PROMPT_IDS)
  * PUT: Saves one reply type's prompt, or the shared About Me. Nothing else changes.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requirePromptAccess()
+  if (denied) return denied
+
   try {
     const id = PromptIdSchema.safeParse((await params).id)
     if (!id.success) {

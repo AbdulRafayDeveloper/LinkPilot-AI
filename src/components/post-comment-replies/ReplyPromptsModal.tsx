@@ -1,8 +1,10 @@
 "use client"
 
-import React, { useEffect, useId, useRef, useState } from "react"
+import React, { useEffect, useId, useState } from "react"
 import { Modal } from "@/components/ui/Modal"
+import { PromptAccessGate } from "@/components/prompts/PromptAccessGate"
 import { PromptEditorField } from "@/components/prompts/PromptEditorField"
+import { PromptTabStrip } from "@/components/prompts/PromptTabStrip"
 import {
   PromptLoadFailed,
   PromptLoading,
@@ -37,42 +39,25 @@ const variableChip = "font-code text-on-surface-variant bg-surface-container px-
 const VariablesHint = () => (
   <p className="leading-relaxed">
     Variables: <code className={variableChip}>{"{{conversation}}"}</code> the post (pasted or from a screenshot) and the
-    pasted comments (appended if omitted) · <code className={variableChip}>{"{{knowledge_base}}"}</code> matching Knowledge Base excerpts ·{" "}
+    pasted comments (appended if omitted) · <code className={variableChip}>{"{{sender_profile}}"}</code> your About Me profile ·{" "}
     <code className={variableChip}>{"{{web_research}}"}</code> live web research (slower). Replies always answer a real
     comment and never invent facts.
   </p>
 )
 
-// Arrow-key navigation for a tab list: returns the tab to move to, or null for other keys
-function nextTabIndex(key: string, index: number, count: number): number | null {
-  const lastIndex = count - 1
-  const targets: Record<string, number> = {
-    ArrowRight: index === lastIndex ? 0 : index + 1,
-    ArrowLeft: index === 0 ? lastIndex : index - 1,
-    Home: 0,
-    End: lastIndex,
-  }
-  return targets[key] ?? null
-}
-
-const tabClass = (isActive: boolean) =>
-  `inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-    isActive ? "bg-white text-primary font-bold shadow-sm" : "text-on-surface-variant font-semibold hover:text-on-surface hover:bg-white/60"
-  }`
-
-const UnsavedDot = () => (
-  <>
-    <span className="w-1.5 h-1.5 rounded-full bg-secondary shrink-0" aria-hidden="true" />
-    <span className="sr-only">(unsaved changes)</span>
-  </>
-)
-
 /**
  * Edits the 14 independent reply prompts: choose the context, then the style, and the
  * editor loads that exact pair's prompt. Drafts are kept per pair while the modal is
- * open, and Save persists only the active pair.
+ * open, and Save persists only the active pair. It opens only after the prompt password
+ * check (PromptAccessGate).
  */
-export const ReplyPromptsModal: React.FC<ReplyPromptsModalProps> = ({ initialContext, initialStyle, onClose }) => {
+export const ReplyPromptsModal: React.FC<ReplyPromptsModalProps> = (props) => (
+  <PromptAccessGate onClose={props.onClose}>
+    <ReplyPromptsEditor {...props} />
+  </PromptAccessGate>
+)
+
+const ReplyPromptsEditor: React.FC<ReplyPromptsModalProps> = ({ initialContext, initialStyle, onClose }) => {
   const idPrefix = useId()
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -82,8 +67,6 @@ export const ReplyPromptsModal: React.FC<ReplyPromptsModalProps> = ({ initialCon
   const [activeStyle, setActiveStyle] = useState<ReplyStyleId>(initialStyle ?? REPLY_STYLES[0].id)
   const [isSaving, setIsSaving] = useState(false)
   const [feedback, setFeedback] = useState<PromptFeedback | null>(null)
-  const contextTabRefs = useRef<Partial<Record<ReplyContextId, HTMLButtonElement | null>>>({})
-  const styleTabRefs = useRef<Partial<Record<ReplyStyleId, HTMLButtonElement | null>>>({})
 
   const contextPanelId = `${idPrefix}-context-panel`
   const stylePanelId = `${idPrefix}-style-panel`
@@ -114,16 +97,14 @@ export const ReplyPromptsModal: React.FC<ReplyPromptsModalProps> = ({ initialCon
   const isContextDirty = (context: ReplyContextId) => REPLY_STYLES.some((style) => isDirty(promptKey(context, style.id)))
   const unsavedCount = saved ? (Object.keys(saved) as PromptKey[]).filter(isDirty).length : 0
 
-  const selectContext = (context: ReplyContextId, moveFocus = false) => {
+  const selectContext = (context: ReplyContextId) => {
     setActiveContext(context)
     setFeedback(null)
-    if (moveFocus) contextTabRefs.current[context]?.focus()
   }
 
-  const selectStyle = (style: ReplyStyleId, moveFocus = false) => {
+  const selectStyle = (style: ReplyStyleId) => {
     setActiveStyle(style)
     setFeedback(null)
-    if (moveFocus) styleTabRefs.current[style]?.focus()
   }
 
   const handleSave = async () => {
@@ -154,6 +135,7 @@ export const ReplyPromptsModal: React.FC<ReplyPromptsModalProps> = ({ initialCon
       description="Each context and reply style has its own independent prompt, 14 in total. Saving one never changes the others, and future replies with that context and style use the saved version."
       onClose={onClose}
       isCloseDisabled={isSaving}
+      size="large"
       footer={
         <PromptModalFooter
           feedback={feedback}
@@ -175,77 +157,41 @@ export const ReplyPromptsModal: React.FC<ReplyPromptsModalProps> = ({ initialCon
           }}
         />
       ) : (
-        <div className="space-y-3">
-          <div role="tablist" aria-label="Post context" className="grid grid-cols-2 gap-1 bg-surface-container-low p-1 rounded-xl">
-            {REPLY_CONTEXTS.map((context, index) => {
-              const isActive = context.id === activeContext
-              return (
-                <button
-                  key={context.id}
-                  ref={(element) => {
-                    contextTabRefs.current[context.id] = element
-                  }}
-                  id={contextTabId(context.id)}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  aria-controls={contextPanelId}
-                  tabIndex={isActive ? 0 : -1}
-                  disabled={isSaving}
-                  onClick={() => selectContext(context.id)}
-                  onKeyDown={(event) => {
-                    const target = nextTabIndex(event.key, index, REPLY_CONTEXTS.length)
-                    if (target === null) return
-                    event.preventDefault()
-                    selectContext(REPLY_CONTEXTS[target].id, true)
-                  }}
-                  className={`${tabClass(isActive)} text-[13px] py-2`}
-                >
-                  <span className="truncate">{context.label}</span>
-                  {isContextDirty(context.id) && <UnsavedDot />}
-                </button>
-              )
-            })}
-          </div>
+        <div className="flex flex-col gap-3 flex-1 min-h-0">
+          <PromptTabStrip
+            tabs={REPLY_CONTEXTS}
+            activeId={activeContext}
+            onSelect={selectContext}
+            isDirty={isContextDirty}
+            ariaLabel="Post context"
+            tabId={contextTabId}
+            panelId={contextPanelId}
+            disabled={isSaving}
+          />
 
-          <div role="tabpanel" id={contextPanelId} aria-labelledby={contextTabId(activeContext)} className="space-y-3">
+          <div
+            role="tabpanel"
+            id={contextPanelId}
+            aria-labelledby={contextTabId(activeContext)}
+            className="flex flex-col gap-3 flex-1 min-h-0"
+          >
+            <PromptTabStrip
+              tabs={REPLY_STYLES}
+              activeId={activeStyle}
+              onSelect={selectStyle}
+              isDirty={(style) => isDirty(promptKey(activeContext, style))}
+              ariaLabel={`${getReplyContextLabel(activeContext)} reply styles`}
+              tabId={styleTabId}
+              panelId={stylePanelId}
+              disabled={isSaving}
+            />
+
             <div
-              role="tablist"
-              aria-label={`${getReplyContextLabel(activeContext)} reply styles`}
-              className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-surface-container-low p-1 rounded-xl"
+              role="tabpanel"
+              id={stylePanelId}
+              aria-labelledby={styleTabId(activeStyle)}
+              className="flex flex-col flex-1 min-h-0"
             >
-              {REPLY_STYLES.map((style, index) => {
-                const isActive = style.id === activeStyle
-                return (
-                  <button
-                    key={style.id}
-                    ref={(element) => {
-                      styleTabRefs.current[style.id] = element
-                    }}
-                    id={styleTabId(style.id)}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    aria-controls={stylePanelId}
-                    tabIndex={isActive ? 0 : -1}
-                    disabled={isSaving}
-                    onClick={() => selectStyle(style.id)}
-                    onKeyDown={(event) => {
-                      const target = nextTabIndex(event.key, index, REPLY_STYLES.length)
-                      if (target === null) return
-                      event.preventDefault()
-                      selectStyle(REPLY_STYLES[target].id, true)
-                    }}
-                    className={tabClass(isActive)}
-                  >
-                    <span className="truncate">{style.label}</span>
-                    {isDirty(promptKey(activeContext, style.id)) && <UnsavedDot />}
-                  </button>
-                )
-              })}
-            </div>
-
-            <div role="tabpanel" id={stylePanelId} aria-labelledby={styleTabId(activeStyle)}>
               <PromptEditorField
                 key={activeKey}
                 value={activeDraft}
@@ -257,7 +203,6 @@ export const ReplyPromptsModal: React.FC<ReplyPromptsModalProps> = ({ initialCon
                 label={`${getReplyContextLabel(activeContext)} ${getReplyStyleLabel(activeStyle)} prompt`}
                 disabled={isSaving}
                 hint={<VariablesHint />}
-                heightClassName="h-[34vh] min-h-[180px]"
               />
             </div>
           </div>

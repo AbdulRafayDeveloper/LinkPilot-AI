@@ -1,7 +1,7 @@
 Write a LinkedIn comment that connects this post to the user's own relevant experience.
 
 Where the experience comes from
-The only trustworthy sources of the user's experience are in the section below: the user's own "About me" profile and excerpts from their Knowledge Base. Use an experience only if it clearly describes something the user personally did, built, led, learned or worked on (for example a profile line, resume entry or project note) AND it genuinely relates to the post's topic.
+The only trustworthy source of the user's experience is the section below: the user's own "About me" profile. Use an experience only if it clearly describes something the user personally did, built, led, learned or worked on AND it genuinely relates to the post's topic.
 
 If a relevant experience exists
 - Connect it to a specific point in the post in one or two sentences: what the user did, and what it taught them about the post's topic.
@@ -17,7 +17,7 @@ Style
 - Open with the point or the experience itself, not with agreement filler such as "That resonates", "So true" or "This hits home".
 - No hashtags, no emojis, no self-promotion and no links.
 
-The user's experience (their profile and Knowledge Base):
+The user's experience (their "About me" profile):
 {{user_experience}}
 
 The post:

@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { readSSEStream } from "@/lib/sse"
+import { readStoredTrendingResult, saveTrendingResult, subscribeToStoredTrendingResult } from "@/lib/trendingResultStore"
 import { TRENDING_ERROR_MESSAGE, TRENDING_TOPIC_COUNT } from "@/constants/trending"
 import type { TrendingResult, TrendingStage, TrendingStreamEvent } from "@/services/trending/schema"
 
@@ -12,9 +13,14 @@ export interface TrendingStageEntry {
   text: string
 }
 
+const statusFor = (result: TrendingResult): TrendingSearchStatus =>
+  result.topics.length >= TRENDING_TOPIC_COUNT ? "success" : "partial_success"
+
 /**
  * Drives one fresh Trending Topics search at a time. Starting a search clears the
  * previous results immediately, so old topics never stay on screen under new ones.
+ * The last successful results are kept in the browser for 24 hours: until a new search
+ * replaces them, they come back after navigating away or refreshing.
  */
 export function useTrendingTopicsSearch() {
   const [status, setStatus] = useState<TrendingSearchStatus>("idle")
@@ -22,6 +28,7 @@ export function useTrendingTopicsSearch() {
   const [stages, setStages] = useState<TrendingStageEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const controllerRef = useRef<AbortController | null>(null)
+  const stored = useSyncExternalStore(subscribeToStoredTrendingResult, readStoredTrendingResult, () => null)
 
   useEffect(() => () => controllerRef.current?.abort(), [])
 
@@ -43,8 +50,9 @@ export function useTrendingTopicsSearch() {
       await readSSEStream<TrendingStreamEvent>(response.body, (event) => {
         if (event.status === "COMPLETE") {
           isFinished = true
+          saveTrendingResult(event.result)
           setResult(event.result)
-          setStatus(event.result.topics.length >= TRENDING_TOPIC_COUNT ? "success" : "partial_success")
+          setStatus(statusFor(event.result))
         } else if (event.status === "ERROR") {
           isFinished = true
           setError(event.message)
@@ -62,5 +70,9 @@ export function useTrendingTopicsSearch() {
     }
   }, [])
 
+  // Before any search on this visit, show the results kept from the last one
+  if (status === "idle" && stored) {
+    return { status: statusFor(stored.result), result: stored.result, stages, error, search }
+  }
   return { status, result, stages, error, search }
 }

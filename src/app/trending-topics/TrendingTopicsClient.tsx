@@ -4,7 +4,7 @@ import React, { useState } from "react"
 import { Flame, FilePenLine, Loader2, Search } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
-import { PromptEditorModal } from "@/components/trending-topics/PromptEditorModal"
+import { TrendingPromptModal } from "@/components/trending-topics/TrendingPromptModal"
 import { ResearchProgress } from "@/components/trending-topics/ResearchProgress"
 import { TrendingEmptyState, TrendingErrorState } from "@/components/trending-topics/StatusPanels"
 import { TrendingResults } from "@/components/trending-topics/TrendingResults"
@@ -78,7 +78,7 @@ export default function TrendingTopicsClient() {
         </main>
       </div>
 
-      {isPromptEditorOpen && <PromptEditorModal onClose={() => setIsPromptEditorOpen(false)} />}
+      {isPromptEditorOpen && <TrendingPromptModal onClose={() => setIsPromptEditorOpen(false)} />}
     </div>
   )
 }
