@@ -1,0 +1,12 @@
+{
+  "support_tiers": {
+    "tier_1": "Standard Support",
+    "tier_2": "Priority Support",
+    "tier_3": "Enterprise Support"
+  },
+  "sla_threshold_hours": {
+    "tier_1": 24,
+    "tier_2": 4,
+    "tier_3": 1
+  }
+}

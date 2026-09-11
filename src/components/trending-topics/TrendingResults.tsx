@@ -1,0 +1,48 @@
+"use client"
+
+import React from "react"
+import { Info } from "lucide-react"
+import { TRENDING_TOPIC_COUNT } from "@/constants/trending"
+import type { SearchProvider, TrendingResult } from "@/services/trending/schema"
+import { TopicCard } from "./TopicCard"
+
+const PROVIDER_LABELS: Record<SearchProvider, string> = {
+  gemini: "Gemini + Google Search",
+  openai: "OpenAI web search",
+}
+
+export const TrendingResults: React.FC<{ result: TrendingResult }> = ({ result }) => {
+  const { topics, notice, research_metadata: metadata } = result
+  const isFullSet = topics.length === TRENDING_TOPIC_COUNT
+
+  return (
+    <div className="space-y-4">
+      {notice && (
+        <div
+          role="status"
+          className="flex items-start gap-2 bg-secondary-fixed/40 border border-secondary-fixed-dim text-on-secondary-fixed-variant rounded-xl px-4 py-3 text-[13px] leading-relaxed"
+        >
+          <Info size={16} className="shrink-0 mt-0.5" aria-hidden="true" />
+          <p>{notice}</p>
+        </div>
+      )}
+
+      {topics.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
+          {topics.map((topic, index) => (
+            <TopicCard
+              key={`${topic.primary_reference.url}-${index}`}
+              topic={topic}
+              className={isFullSet && index === TRENDING_TOPIC_COUNT - 1 ? "md:col-span-2 xl:col-span-1" : ""}
+            />
+          ))}
+        </div>
+      )}
+
+      <p className="text-[11px] text-outline">
+        Researched {new Date(metadata.searched_at).toLocaleString()} · {metadata.sources_checked} sources checked ·{" "}
+        {metadata.candidates_evaluated} candidates evaluated · {PROVIDER_LABELS[metadata.search_provider]}
+      </p>
+    </div>
+  )
+}

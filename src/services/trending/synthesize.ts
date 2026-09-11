@@ -1,0 +1,53 @@
+import { HumanMessage, SystemMessage } from "@langchain/core/messages"
+import { generateStructuredWithFallback } from "@/services/ai"
+import { loadPrompt, renderPrompt } from "@/services/prompts"
+import { TRENDING_TOPIC_COUNT } from "@/constants/trending"
+import { SynthesisOutputSchema, type SynthesisOutput } from "./schema"
+import type { ResearchResult } from "@/services/liveResearch"
+import { sanitizeForTag } from "./sanitize"
+
+const SYNTHESIS_TIMEOUT_MS = 60_000
+// Slightly above the project default so the three posts don't read alike
+const SYNTHESIS_TEMPERATURE = 0.4
+const MAX_RESEARCH_CHARS = 24_000
+const MAX_LISTED_SOURCES = 60
+
+interface SynthesisOptions {
+  brief: string
+  research: ResearchResult
+  now: Date
+  signal: AbortSignal
+}
+
+/**
+ * One structured model call that ranks the researched candidates and writes the
+ * LinkedIn-ready fields, keeping system rules, the configured prompt and untrusted
+ * web research in separate, clearly delimited sections.
+ */
+export async function synthesizeTopics({ brief, research, now, signal }: SynthesisOptions): Promise<SynthesisOutput> {
+  const system = renderPrompt(loadPrompt("trending-synthesis"), {
+    CURRENT_DATE: now.toISOString().slice(0, 10),
+    TOPIC_COUNT: TRENDING_TOPIC_COUNT,
+  })
+
+  const sourceList = research.sources
+    .slice(0, MAX_LISTED_SOURCES)
+    .map((source) => `- ${sanitizeForTag(source.title)} | ${source.url}`)
+    .join("\n")
+
+  const user = [
+    `<configured_prompt>\n${sanitizeForTag(brief)}\n</configured_prompt>`,
+    `<untrusted_research_data>\n${sanitizeForTag(research.notes.slice(0, MAX_RESEARCH_CHARS))}\n</untrusted_research_data>`,
+    `<verified_source_urls>\n${sourceList}\n</verified_source_urls>`,
+  ].join("\n\n")
+
+  const { data } = await generateStructuredWithFallback({
+    schema: SynthesisOutputSchema,
+    name: "trending_topics",
+    messages: [new SystemMessage(system), new HumanMessage(user)],
+    temperature: SYNTHESIS_TEMPERATURE,
+    timeoutMs: SYNTHESIS_TIMEOUT_MS,
+    signal,
+  })
+  return data
+}

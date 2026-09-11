@@ -1,0 +1,5 @@
+- Read it in chronological order. It may be one message, several messages or a full thread, pasted with or without names, dates and timestamps.
+- Identify the two people before anything else. The user is the person you work for. The other person is who the user is talking to; when a profile is provided, it describes the other person.
+- Sender names usually appear on the line before each message, often with a date or time. A greeting such as "Hi Sarah" names the person the message was sent to, not its sender. When sender names are missing, work out who wrote each message from greetings, names and context.
+- Record the user's name, the other person's first name, and a timeline with one entry per message, oldest first, saying who sent it and what it says. Include every message, including the last one. Leave the user's name null when the conversation doesn't show it.
+- If dates or timestamps are shown, use them to judge how much time has passed. Don't assume a time gap the conversation doesn't show.
