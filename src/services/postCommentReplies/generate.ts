@@ -12,8 +12,8 @@ import { createTagSanitizer } from "@/lib/sanitize"
 import { parseLinkedInConversation } from "@/lib/linkedinComments"
 import type { PostSource } from "@/lib/validation/postInput"
 import {
-  LINKEDIN_COMMENT_MAX_CHARS,
   POST_COMMENT_REPLY_MESSAGES,
+  REPLY_TARGET_MAX_CHARS,
   getReplyStyleLabel,
   isReplyAuthor,
   type ReplyContextId,
@@ -32,7 +32,7 @@ const NO_SENDER_PROFILE_TEXT =
   "Abdul hasn't filled in his profile, so nothing is known about his background, services or experience."
 const NO_POST_TEXT = "The original post wasn't provided."
 const LATEST_COMMENT_TEXT = "The other person's latest comment in the thread (the most recent one not written by Abdul Rafay)."
-// Targeted rewrites for made-up figures, unsupported claims or a reply over LinkedIn's limit
+// Targeted rewrites for made-up figures, unsupported claims, a reply that's too long or stiff punctuation
 const MAX_REWRITES = 2
 // One cited source is enough to support a single reply
 const MIN_RESEARCH_SOURCES = 1
@@ -43,14 +43,17 @@ const WRAPPED_IN_QUOTES = /^(["“])([\s\S]*)(["”])$/
 const EXPERIENCE_CLAIM =
   /\b(?:we|i|our team|my team)\s+(?:usually|typically|normally|generally|often|always|tend to|found (?:that|it)|have (?:found|seen|tried))\b|\b(?:we|i)['’]ve (?:found|seen|tried)\b|\bin (?:my|our) experience\b|\bat (?:my|our) (?:company|job|work|firm)\b/i
 
-// Figures that read as results or facts: percentages, multiples, counts, durations and money
+// Figures that read as results or facts: percentages, multiples, counts, durations and money, in digits or
+// words ("two weeks"); "one" is left out so phrasing like "one approach" isn't taken for a result
 const FIGURE =
-  /(?:[$€£]\s?)?\d[\d,.]*(?:\s*(?:-|–|to)\s*\d[\d,.]*)?\s*(?:%|x\b|\+|[kKmM]\b|ms\b|milliseconds?\b|seconds?\b|secs?\b|minutes?\b|mins?\b|hours?\b|hrs?\b|days?\b|weeks?\b|months?\b|years?\b|users?\b|clients?\b|customers?\b|projects?\b|products?\b|MVPs?\b|teams?\b|companies\b)/gi
+  /(?:[$€£]\s?)?(?:\d[\d,.]*|\b(?:two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty|thirty|forty|fifty|hundred)\b)(?:\s*(?:-|–|to)\s*\d[\d,.]*)?\s*(?:%|percent\b|x\b|\+|[kKmM]\b|ms\b|milliseconds?\b|seconds?\b|secs?\b|minutes?\b|mins?\b|hours?\b|hrs?\b|days?\b|weeks?\b|months?\b|years?\b|users?\b|clients?\b|customers?\b|projects?\b|products?\b|MVPs?\b|teams?\b|companies\b)/gi
 // A story about an unnamed client, which the model tends to invent to fill a case-study structure
 const CLIENT_STORY =
   /\b(?:a|one|another)\s+(?:recent\s+|former\s+|past\s+)?client(?:\s+of\s+(?:ours|mine))?\b|\bone of (?:our|my) clients\b/i
 // LinkedIn shows markdown literally, so emphasis marks and code ticks are removed
 const MARKDOWN_MARKS = /\*\*|__|`/g
+// Replies read like a person typing: no colons, semicolons, dashes or commas (a comma or colon inside a number is fine)
+const STIFF_PUNCTUATION = /(?<!\d)[,:]|[,:](?!\d)|;|[—–]|\s-\s/
 
 // Prompt variables. Live research runs only when the saved prompt uses it. {{knowledge_base}} is
 // an alias of {{sender_profile}}, and {{comment}} of {{latest_comment}}, so every saved prompt keeps working.
@@ -252,11 +255,12 @@ function cleanReply(raw: string): string {
   return (wrapped && !/["“”]/.test(wrapped[2]) ? wrapped[2] : text).replace(MARKDOWN_MARKS, "").trim()
 }
 
-// Compares figures loosely: case, spacing and plural units don't matter ("3 Weeks" = "3 week")
+// Compares figures loosely: case, spacing, plural units and "percent" vs "%" don't matter ("3 Weeks" = "3 week")
 const normalizeFigures = (text: string) =>
   text
     .toLowerCase()
     .replace(/\s+/g, "")
+    .replace(/percent/g, "%")
     .replace(/(second|sec|minute|min|hour|hr|day|week|month|year|user|client|customer|project|product|mvp|team)s\b/g, "$1")
 
 /**
@@ -276,16 +280,21 @@ interface ReplyProblems {
   story: string | null
   figures: string[]
   length: number
+  punctuation: string | null
 }
 
 // Short labels for the log line
-function findProblemLabels({ claim, story, figures, length }: ReplyProblems): string[] {
-  return [claim && `claim "${claim}"`, story && `story "${story}"`, ...figures.map((figure) => `figure "${figure}"`), length > LINKEDIN_COMMENT_MAX_CHARS && `${length} chars`].filter(
-    (label): label is string => typeof label === "string"
-  )
+function findProblemLabels({ claim, story, figures, length, punctuation }: ReplyProblems): string[] {
+  return [
+    claim && `claim "${claim}"`,
+    story && `story "${story}"`,
+    ...figures.map((figure) => `figure "${figure}"`),
+    length > REPLY_TARGET_MAX_CHARS && `${length} chars`,
+    punctuation && `punctuation "${punctuation.trim()}"`,
+  ].filter((label): label is string => typeof label === "string")
 }
 
-function describeProblems({ claim, story, figures, length }: ReplyProblems): string[] {
+function describeProblems({ claim, story, figures, length, punctuation }: ReplyProblems): string[] {
   return [
     story &&
       `It tells a story about "${story}" that isn't in Abdul's profile. Use a real project described in <sender_profile>, named as written there, or make the point without a story.`,
@@ -293,8 +302,10 @@ function describeProblems({ claim, story, figures, length }: ReplyProblems): str
       `It says "${claim}". Keep a statement about what Abdul or his team does, did, uses or has experienced only if the post, Abdul's own comments or his profile in <sender_profile> states it; rewrite any other one as a general option (for example "one approach is...").`,
     figures.length > 0 &&
       `It states figures that neither Abdul's profile, the post nor the comments contain: ${figures.join(", ")}. Remove them, or use a real number from <sender_profile> instead. Never invent results.`,
-    length > LINKEDIN_COMMENT_MAX_CHARS &&
-      `It is ${length.toLocaleString()} characters, but a LinkedIn comment allows at most ${LINKEDIN_COMMENT_MAX_CHARS.toLocaleString()}. Make it shorter than that while keeping its structure and point.`,
+    length > REPLY_TARGET_MAX_CHARS &&
+      `It is ${length.toLocaleString()} characters, but it must be at most ${REPLY_TARGET_MAX_CHARS} including spaces. Keep the parts that carry the style's goal, drop the rest and aim for 200 to 270 characters.`,
+    punctuation &&
+      `It uses "${punctuation.trim()}". Use short plain sentences with no colons, semicolons, dashes or commas (a comma inside a number such as 10,000 is fine), and write the name without a comma.`,
   ].filter((problem): problem is string => typeof problem === "string")
 }
 
@@ -313,8 +324,8 @@ function problemRewrite(reply: string, problems: string[]): HumanMessage {
 }
 
 function lengthWarning(length: number): string | null {
-  return length > LINKEDIN_COMMENT_MAX_CHARS
-    ? `This reply is ${length.toLocaleString()} characters, over LinkedIn's ${LINKEDIN_COMMENT_MAX_CHARS.toLocaleString()}-character comment limit. Shorten it before posting.`
+  return length > REPLY_TARGET_MAX_CHARS
+    ? `This reply is ${length.toLocaleString()} characters, longer than the ${REPLY_TARGET_MAX_CHARS}-character target. Trim it before posting.`
     : null
 }
 
@@ -372,13 +383,14 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
   let replyingTo = first.data.replying_to
   let provider = first.provider
 
-  // Targeted rewrites for unsupported experience claims, made-up figures or a reply over LinkedIn's limit
+  // Targeted rewrites for unsupported experience claims, made-up figures, a reply that's too long or stiff punctuation
   const sourceText = [conversation.postText ?? "", input.comments, senderProfile, stylePrompt].join("\n")
   const findProblems = (text: string): ReplyProblems => ({
     claim: text.match(EXPERIENCE_CLAIM)?.[0] ?? null,
     story: text.match(CLIENT_STORY)?.[0] ?? null,
     figures: findUnsupportedFigures(text, sourceText),
     length: text.length,
+    punctuation: text.match(STIFF_PUNCTUATION)?.[0] ?? null,
   })
   const draftProblemState = findProblems(reply)
   let problems = describeProblems(draftProblemState)
@@ -401,19 +413,25 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
 
   onStage("HUMANIZING")
   const draftHasClaim = EXPERIENCE_CLAIM.test(reply)
+  const draftHasStiffPunctuation = STIFF_PUNCTUATION.test(reply)
   const humanization = await humanizeTexts({
     fields: [
       {
         id: "reply",
         kind: input.context === "my-post" ? "LinkedIn reply to a comment on my own post" : "LinkedIn reply in someone else's comment thread",
         text: reply,
-        // Stays within LinkedIn's comment limit, unless the draft couldn't be brought under it
-        maxChars: Math.max(LINKEDIN_COMMENT_MAX_CHARS, reply.length),
+        // Stays within the target length, unless the draft couldn't be brought under it
+        maxChars: Math.max(REPLY_TARGET_MAX_CHARS, reply.length),
+        rule: "short plain sentences; no colons, semicolons, dashes or commas (a comma inside a number is fine); the name without a comma",
       },
     ],
     providers: providers.slice(providers.indexOf(provider)),
     signal,
-    validate: (_id, text) => (!draftHasClaim && EXPERIENCE_CLAIM.test(text) ? "adds a first-person experience claim" : null),
+    validate: (_id, text) => {
+      if (!draftHasClaim && EXPERIENCE_CLAIM.test(text)) return "adds a first-person experience claim"
+      if (!draftHasStiffPunctuation && STIFF_PUNCTUATION.test(text)) return "adds colons, semicolons, dashes or commas"
+      return null
+    },
   })
   reply = cleanReply(humanization.texts.reply)
 
@@ -440,7 +458,7 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
     style: input.style,
     replyingTo: replyingTo.trim() || conversation.targetComment?.author || null,
     characterCount: reply.length,
-    maxCharacters: LINKEDIN_COMMENT_MAX_CHARS,
+    maxCharacters: REPLY_TARGET_MAX_CHARS,
     warning: lengthWarning(reply.length),
     extractedPost,
   }

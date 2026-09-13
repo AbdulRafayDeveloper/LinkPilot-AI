@@ -55,8 +55,8 @@ export function postCommentReplyPromptKey(context: ReplyContextId, style: ReplyS
 
 // Limit for the pasted comments; the post has its own limit (POST_TEXT_MAX_LENGTH)
 export const REPLY_COMMENTS_MAX_LENGTH = 30000
-// LinkedIn's maximum comment length; shown as guidance only, since each saved prompt sets the real length
-export const LINKEDIN_COMMENT_MAX_CHARS = 1250
+// Replies stay short enough that people actually read them (LinkedIn itself allows 1,250)
+export const REPLY_TARGET_MAX_CHARS = 280
 
 export const REPLY_STAGE_TEXT = {
   READING_POST: "Reading the post from your screenshot...",
