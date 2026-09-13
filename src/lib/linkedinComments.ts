@@ -1,7 +1,8 @@
 /**
  * Best-effort detection of the original post excerpt and the individual comments in text
- * pasted from LinkedIn. It powers the comment picker only: the model always receives the
- * full pasted text, so input this parser can't structure still works.
+ * pasted from LinkedIn. Post Comment Replies uses it to find the other person's latest comment
+ * to answer; the model always receives the full pasted text too, so input this parser can't
+ * structure still works.
  *
  * Two formats are recognized:
  * - Labelled: "Name: comment" (or "Name:" on its own line), optionally under

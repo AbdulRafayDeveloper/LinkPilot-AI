@@ -11,11 +11,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `/trending-topics` | Trending Topics | 6 fresh, source-backed web/AI/SaaS topics from live web research, each with a ready-to-post LinkedIn post |
 | `/connection-note` | Connection Note | ≤300-char invite note, 4 tones |
 | `/comment-writer` | Comment Writer | a comment on someone's post (text or screenshot), 6 tunes |
-| `/post-comment-replies` | Post Comment Replies | a reply to one comment, 2 contexts × 7 styles |
+| `/post-comment-replies` | Post Comment Replies | a reply to one comment, 2 contexts × 6 tones (Show Expertise, Ask Their Opinion, Give Useful Tips, Share Real Example, Politely Disagree, Invite to DM), written as Abdul Rafay to the other person's latest comment |
 | `/follow-up-message` | Follow-Up Message | a follow-up from a pasted conversation, 2 types |
-| `/first-message` | First Message | a first DM from a profile, 7 tunes |
-| `/inmail-message` | InMail Composer | subject + message from a profile, 7 tunes |
-| `/conversation-reply` | Conversation Reply | analysis + next reply from a conversation, 5 types |
+| `/first-message` | First Message | a first DM from a profile, 5 tones (Curiosity Hook default) |
+| `/inmail-message` | InMail Composer | subject + message from a profile, 4 tones (Trigger Event default) |
+| `/conversation-reply` | Conversation Reply | analysis + next reply from a conversation, 6 tones (Validate + Share Pattern default) |
 
 `/` redirects to the first tool. There is no chat, knowledge base, analytics, inspector or auth. Those were removed on purpose, so don't reintroduce them. `src/constants/linkedinTools.ts` (`LINKEDIN_TOOLS`) is the single list that drives the sidebar and the sitemap.
 
@@ -67,7 +67,7 @@ Model names live **only** in env. Never hardcode a model id in code. Gemini 1.5 
 - **Humanization (`services/humanizer.ts`, `humanizeTexts`) is the last step of all 8 tools.** Each tool passes its final, already-verified texts (note, message, InMail subject + message, reply, comment, Trending hooks + bodies) through the user's saved **Humanization** prompt from Global AI Prompts (`global_prompt:humanization`, default `prompts/global-humanization.md`, `{{text}}` = the drafts), under the fixed rules in `prompts/humanizer-system.md`.
   - One structured call per result, each text as a `<draft id=… kind=… max_chars=… one_line=… rule=…>`. Code judges every rewrite on its own: same numbers, links, hashtags and @mentions; no new sender claim or placeholder; within `maxChars`/one line; plus the tool's own `validate(id, text)` (comment checks, conversation-reply problem checks, post-reply experience claims, Trending word limits).
   - Failed texts get one targeted retry told exactly what broke (the backup provider takes over if that still fails); a text that never passes keeps its verified draft. Every tool logs `humanized`. New tools must humanize their output too.
-  - Global AI Prompts page: `/global-prompts` (`constants/globalPrompts.ts`, `services/globalPrompts.ts`); Rafay Profile Info is stored but not used yet.
+  - Global AI Prompts page: `/global-prompts` (`constants/globalPrompts.ts`, `services/globalPrompts.ts`); Rafay Profile Info is Abdul's facts source for Post Comment Replies (with About Me).
 
 ## Architecture
 
@@ -112,6 +112,7 @@ Styling is Tailwind with Material-3 color tokens from `tailwind.config.ts` (`bg-
   - The tab strip is hidden when there's only one prompt.
 - Each tool has a thin wrapper that supplies its tabs, a load/save API and a hint: `ConnectionNotePromptsModal`, `TrendingPromptModal`, `OutreachPromptsModal` (First Message and InMail), `TunePromptsModal`, `FollowUpPromptsModal`, `ConversationReplyPromptsModal`.
 - `ReplyPromptsModal` (Post Comment Replies) uses two `PromptTabStrip` rows, one for context and one for style.
+- Drafts are kept per tab while an editor is open, and one Save stores **every edited tab** (`components/prompts/saveEditedPrompts.ts`, in parallel; the button reads "Save N Prompts"). A blank edited tab blocks the save; if some fail, the saved ones stick, the failed ones stay edited, and the editor switches to the first problem tab instead of closing.
 - Results render through `ResultCard` / `GeneratedResultPanel` with `CopyButton variant="prominent"`.
 
 ### Prompt password (`services/promptAccess.ts`, no database)
@@ -122,6 +123,10 @@ Styling is Tailwind with Material-3 color tokens from `tailwind.config.ts` (`bg-
   - Cookies are HMAC-signed with a key derived from the password, so changing the password ends every session.
 - Every prompt API handler (all `…/prompts` routes and `trending-topics/prompt`, GET and PUT) starts with `requirePromptAccess()`. New prompt routes must too. Generation routes stay open.
 - This is intentionally light security: clearing cookies resets the attempt counter.
+
+### Lead Signals (Follow-Up Message, Conversation Reply)
+- One shared 16-row table (`components/lead-signals/LeadSignalsTable`, row order = the owner's chosen order), service (`services/leadSignals.ts`, `assessLeadSignalsSafely` runs alongside the main generation and returns null instead of failing it), types (`types/leadSignals.ts`), label options (`constants/leadSignals.ts`) and fixed rules (`prompts/lead-signals-system.md`).
+- Each tool keeps its **own** editable "Lead Signals" prompt tab (`follow_up_prompt:lead-signals` / `conversation_reply_prompt:lead-signals`, defaults `follow-up-lead-signals.md` / `conversation-reply-lead-signals.md`), so editing one never changes the other. The signals never see the chosen type or tone.
 
 ### Dummy Data (every tool with an input)
 - `constants/dummyData.ts` (`DUMMY_DATA_KINDS`) registers each kind, its folder and its fields (key, label, limit = the input it fills, required):
@@ -135,6 +140,12 @@ Styling is Tailwind with Material-3 color tokens from `tailwind.config.ts` (`bg-
 - `GET/POST /api/dummy-data/[kind]` and `PUT/DELETE /api/dummy-data/[kind]/[id]` (body `{ name, fields }`) all start with `requirePromptAccess()`. Writes need a writable file system; on a read-only host they fail with a clear message.
 - `components/dummy-data/DummyDataModal` (`kind` prop, behind `PromptAccessGate`) edits items like prompts (one tab each, add, two-step delete, auto-close after save), with a Copy button per field. **Use this …** passes all fields to the tool's `onUse`, which fills its inputs, clears the previous result and closes the popup. `DummyDataButton` sits in each tool header.
 - Sample conversations use LinkedIn-style "Name  date" sender lines with the owner as Abdul Rafay; all seed items are fictional.
+
+### Post Comment Replies
+- Replies are written as `REPLY_AUTHOR_NAME` (Abdul Rafay). There is no comment picker: `resolveTargetComment` always answers the latest parsed comment not written by him (`isReplyAuthor`); his own comments are context only.
+- Style prompts can place `{{conversation}}`, `{{post_content}}`, `{{latest_comment}}` / `{{comment}}` (the comment being answered), `{{sender_profile}}` and `{{web_research}}`; anything not placed is appended, without repeating placed parts.
+- `<sender_profile>` is always included: About Me plus Rafay Profile Info (Global AI Prompts). It is the only source of facts, numbers and projects about Abdul; contact details from it never go into a reply.
+- After the first draft, code checks for unsupported experience claims, unnamed client stories, figures (number + unit) that appear in none of the sources (profile, post, comments, style prompt) and replies over 1,250 characters, and runs up to `MAX_REWRITES` targeted rewrites, keeping the cleanest version. Markdown marks are stripped.
 
 ### Trending Topics
 - The default brief (`prompts/trending-topics.md`) targets the owner's domain: web development, AI, and SaaS/MVPs for founders. Mobile apps and consumer hardware are excluded. A saved custom prompt overrides the file.

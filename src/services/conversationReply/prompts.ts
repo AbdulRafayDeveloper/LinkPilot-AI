@@ -1,6 +1,7 @@
 import { loadPrompt } from "@/services/prompts"
-import { getStoredPrompt, getStoredPrompts, saveStoredPrompt, type PromptEntry } from "@/services/promptStore"
+import { getStoredPrompts, saveStoredPrompt, type PromptEntry } from "@/services/promptStore"
 import { senderProfileEntry } from "@/services/senderProfile"
+import { LEAD_SIGNALS_PROMPT_ID } from "@/constants/leadSignals"
 import {
   ABOUT_ME_TAB_ID,
   CONVERSATION_REPLY_PROMPT_IDS,
@@ -11,8 +12,9 @@ import {
 import type { ConversationReplyPrompt } from "@/types/conversationReply"
 
 /**
- * Each reply type has its own Setting record and default template, so editing one
- * type's prompt can never change another's. "About me" maps to the shared sender profile.
+ * Each tone, and this tool's Lead Signals prompt, has its own Setting record and default
+ * template, so editing one never changes another (or Follow-Up's Lead Signals prompt).
+ * "About me" maps to the shared sender profile.
  */
 function promptEntry(id: ConversationReplyPromptId): PromptEntry {
   return id === ABOUT_ME_TAB_ID
@@ -36,9 +38,11 @@ export async function saveConversationReplyPrompt(
 }
 
 /**
- * The latest saved prompt for the reply type, read fresh for every generation.
+ * The latest saved prompts for the tone and the Lead Signals, read fresh for every generation.
  */
-export async function getActiveReplyTypePrompt(type: ConversationReplyTypeId): Promise<string> {
-  const { prompt } = await getStoredPrompt(promptEntry(type))
-  return prompt
+export async function getGenerationPrompts(
+  type: ConversationReplyTypeId
+): Promise<{ typePrompt: string; signalsPrompt: string }> {
+  const [typePrompt, signalsPrompt] = await getStoredPrompts([promptEntry(type), promptEntry(LEAD_SIGNALS_PROMPT_ID)])
+  return { typePrompt: typePrompt.prompt, signalsPrompt: signalsPrompt.prompt }
 }

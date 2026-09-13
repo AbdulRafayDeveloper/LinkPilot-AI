@@ -18,6 +18,7 @@ import {
   DEFAULT_INMAIL_TUNE,
   INMAIL_MESSAGES,
   INMAIL_PROFILE_MAX_LENGTH,
+  INMAIL_TUNES,
   type InMailPromptId,
   type InMailTuneId,
 } from "@/constants/inmail"
@@ -34,12 +35,14 @@ interface GeneratePayload {
 const formStore = createToolStore(
   "inmail-message:form",
   { profileData: "", tune: DEFAULT_INMAIL_TUNE as InMailTuneId | null },
-  { version: 1 }
+  // v2: the tones were replaced, so a tone saved by v1 no longer exists
+  { version: 2 }
 )
 const generation = createGenerationRequest<GeneratePayload, GeneratedInMail>(
   "inmail-message",
   GENERATE_ENDPOINT,
-  INMAIL_MESSAGES.generationFailed
+  INMAIL_MESSAGES.generationFailed,
+  { resultVersion: 2 }
 )
 
 export default function InMailClient() {
@@ -133,6 +136,8 @@ export default function InMailClient() {
                 }}
                 profileMaxLength={INMAIL_PROFILE_MAX_LENGTH}
                 profileInputRef={profileInputRef}
+                tunes={INMAIL_TUNES}
+                tuneLegend="Tone"
                 tune={tune}
                 onTuneChange={(nextTune) => {
                   formStore.update({ tune: nextTune })

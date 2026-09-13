@@ -6,6 +6,7 @@ import { PromptAccessGate } from "./PromptAccessGate"
 import { PromptEditorField } from "./PromptEditorField"
 import { PromptTabStrip, type PromptTab } from "./PromptTabStrip"
 import { PromptLoadFailed, PromptLoading, PromptModalFooter, type PromptFeedback } from "./PromptModalParts"
+import { saveEditedPrompts } from "./saveEditedPrompts"
 import { useCloseAfterSave } from "@/hooks/useCloseAfterSave"
 import type { EditablePrompt } from "@/types/prompts"
 
@@ -39,7 +40,7 @@ export function PromptTabsModal<Id extends string>(props: PromptTabsModalProps<I
   )
 }
 
-// Drafts are kept per tab while the editor is open; Save persists only the active tab
+// Drafts are kept per tab while the editor is open; Save stores every tab that was edited
 function PromptTabsEditor<Id extends string>({
   title,
   description,
@@ -85,7 +86,7 @@ function PromptTabsEditor<Id extends string>({
   }, [loadAttempt, loadPrompts, tabs])
 
   const isTabDirty = (id: Id) => saved !== null && drafts[id] !== saved[id].prompt
-  const hasUnsavedChanges = tabs.some((tab) => isTabDirty(tab.id))
+  const editedTabs = tabs.filter((tab) => isTabDirty(tab.id))
   const activeDraft = drafts[activeTab] ?? ""
   const activeLabel = tabs.find((tab) => tab.id === activeTab)?.label ?? activeTab
 
@@ -95,20 +96,27 @@ function PromptTabsEditor<Id extends string>({
   }
 
   const handleSave = async () => {
-    const id = activeTab
     setIsSaving(true)
     setFeedback(null)
-    try {
-      const { data, message } = await savePrompt(id, drafts[id] ?? "")
-      setSaved((current) => (current ? { ...current, [id]: data } : current))
-      setDrafts((current) => ({ ...current, [id]: data.prompt }))
-      setFeedback({ type: "success", message: message || "Prompt saved." })
-      closeAfterSave()
-    } catch (error: unknown) {
-      setFeedback({ type: "error", message: error instanceof Error ? error.message : "Couldn't save the prompt." })
-    } finally {
-      setIsSaving(false)
-    }
+    const result = await saveEditedPrompts(
+      editedTabs.map((tab) => ({ key: tab.id, label: tab.label, prompt: drafts[tab.id] ?? "" })),
+      savePrompt,
+    )
+    setSaved((current) => {
+      if (!current) return current
+      const next = { ...current }
+      for (const { key, data } of result.saved) next[key] = data
+      return next
+    })
+    setDrafts((current) => {
+      const next = { ...current }
+      for (const { key, data } of result.saved) next[key] = data.prompt
+      return next
+    })
+    setFeedback(result.feedback)
+    setIsSaving(false)
+    if (result.problemKey === null) closeAfterSave()
+    else setActiveTab(result.problemKey)
   }
 
   return (
@@ -121,9 +129,9 @@ function PromptTabsEditor<Id extends string>({
       footer={
         <PromptModalFooter
           feedback={feedback}
-          hasUnsavedChanges={hasUnsavedChanges}
+          unsavedCount={editedTabs.length}
           isSaving={isSaving}
-          canSave={isTabDirty(activeTab) && activeDraft.trim().length > 0 && !isBusy}
+          canSave={editedTabs.length > 0 && !isBusy}
           onCancel={onClose}
           onSave={handleSave}
         />

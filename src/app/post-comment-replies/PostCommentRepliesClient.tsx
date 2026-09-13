@@ -1,12 +1,11 @@
 "use client"
 
-import React, { useCallback, useDeferredValue, useMemo, useRef, useState } from "react"
+import React, { useCallback, useRef, useState } from "react"
 import { AlertTriangle, FilePenLine, Loader2, Reply, Sparkles } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
 import { PostInput } from "@/components/post-input/PostInput"
-import { DetectedComments } from "@/components/post-comment-replies/DetectedComments"
 import { ReplyResult } from "@/components/post-comment-replies/ReplyResult"
 import { ReplyPromptsModal } from "@/components/post-comment-replies/ReplyPromptsModal"
 import { ResetButton } from "@/components/ui/ResetButton"
@@ -15,9 +14,9 @@ import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { usePostCommentReplyGenerator } from "@/hooks/usePostCommentReplyGenerator"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
-import { parseLinkedInConversation } from "@/lib/linkedinComments"
 import {
   DEFAULT_REPLY_CONTEXT,
+  DEFAULT_REPLY_STYLE,
   POST_COMMENT_REPLY_MESSAGES,
   REPLY_COMMENTS_MAX_LENGTH,
   REPLY_CONTEXTS,
@@ -31,7 +30,7 @@ const ID_PREFIX = "post-comment-replies"
 const COMMENTS_INPUT_ID = `${ID_PREFIX}-comments`
 const COMMENTS_HINT_ID = `${ID_PREFIX}-comments-hint`
 const FORM_ERROR_ID = `${ID_PREFIX}-form-error`
-const { missingComment, missingStyle } = POST_COMMENT_REPLY_MESSAGES
+const { missingComment } = POST_COMMENT_REPLY_MESSAGES
 
 const POST_PLACEHOLDER = "Paste the original post here. It's optional, but it helps the reply stay on topic."
 
@@ -46,49 +45,38 @@ const formStore = createToolStore(
   "post-comment-replies:form",
   {
     context: DEFAULT_REPLY_CONTEXT as ReplyContextId,
-    style: null as ReplyStyleId | null,
+    style: DEFAULT_REPLY_STYLE as ReplyStyleId,
     postMode: "text" as PostInputMode,
     postText: "",
     postImage: null as File | null,
     comments: "",
-    selectedCommentKey: null as string | null,
   },
   {
-    version: 1,
-    toStored: ({ context, style, postMode, postText, comments, selectedCommentKey }) => ({
-      context,
-      style,
-      postMode,
-      postText,
-      comments,
-      selectedCommentKey,
-    }),
+    version: 5,
+    toStored: ({ context, style, postMode, postText, comments }) => ({ context, style, postMode, postText, comments }),
   }
 )
 
-const cardClass = "bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4"
+// Compact cards so the Generate button is on screen without scrolling on laptop-height windows
+const cardClass = "bg-white border border-outline-variant rounded-2xl shadow-sm p-4 flex flex-col gap-3"
 const labelClass = "text-[10px] font-bold text-outline uppercase tracking-wider"
 
 export default function PostCommentRepliesClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   const [isPromptsOpen, setIsPromptsOpen] = useState(false)
-  const { context, style, postMode, postText, postImage, comments, selectedCommentKey } = useToolStore(formStore)
+  const { context, style, postMode, postText, postImage, comments } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
   const commentsRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const { status, stage, result, error, generate, reset } = usePostCommentReplyGenerator()
   const isGenerating = status === "loading"
   const canReset = postText !== "" || postImage !== null || comments !== "" || status !== "idle"
-  // Anything other than the comment and style messages comes from the post input (image checks)
-  const isPostError = formError !== null && formError !== missingComment && formError !== missingStyle
-
-  // Parsing trails typing slightly so large pastes never make the textarea lag
-  const deferredComments = useDeferredValue(comments)
-  const detectedComments = useMemo(() => parseLinkedInConversation(deferredComments).comments, [deferredComments])
+  // Anything other than the comment message comes from the post input (image checks)
+  const isPostError = formError !== null && formError !== missingComment
 
   const clearPostError = useCallback(
-    () => setFormError((current) => (current === missingComment || current === missingStyle ? current : null)),
+    () => setFormError((current) => (current === missingComment ? current : null)),
     []
   )
   const handlePostImageSelect = useCallback(
@@ -102,14 +90,14 @@ export default function PostCommentRepliesClient() {
 
   // A dummy thread fills the post (as text) and the comments; the reply for the previous thread goes with it
   const loadDummyThread = ({ post, comments }: Record<string, string>) => {
-    formStore.update({ postMode: "text", postText: post ?? "", postImage: null, comments: comments ?? "", selectedCommentKey: null })
+    formStore.update({ postMode: "text", postText: post ?? "", postImage: null, comments: comments ?? "" })
     reset()
     setFormError(null)
   }
 
-  // Clears the post, the comments, the picked comment and the reply; the chosen context and style stay
+  // Clears the post, the comments and the reply; the chosen context and style stay
   const resetTool = () => {
-    formStore.update({ postText: "", postImage: null, comments: "", selectedCommentKey: null })
+    formStore.update({ postText: "", postImage: null, comments: "" })
     reset()
     setFormError(null)
     commentsRef.current?.focus()
@@ -121,22 +109,9 @@ export default function PostCommentRepliesClient() {
       commentsRef.current?.focus()
       return
     }
-    if (!style) {
-      setFormError(missingStyle)
-      return
-    }
     setFormError(null)
-    // Resolve the picked comment against the current text, not the deferred parse
-    const target = parseLinkedInConversation(comments).comments.find((comment) => comment.key === selectedCommentKey)
-    generate({
-      context,
-      style,
-      comments,
-      postMode,
-      postText,
-      postImage,
-      targetComment: target ? { author: target.author, text: target.text } : null,
-    })
+    // The reply always answers the other person's latest comment; the server finds it
+    generate({ context, style, comments, postMode, postText, postImage })
   }
 
   return (
@@ -151,7 +126,7 @@ export default function PostCommentRepliesClient() {
         />
 
         <main className="flex-1 overflow-y-auto bg-[#FAF7F2] overflow-x-hidden">
-          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:h-full">
+          <div className="max-w-[1400px] mx-auto p-4 md:px-6 md:py-5 lg:px-8 flex flex-col gap-4">
             {/* Page header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
               <div className="min-w-0">
@@ -183,122 +158,107 @@ export default function PostCommentRepliesClient() {
                 event.preventDefault()
                 submit()
               }}
-              className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-[640px]"
+              className="grid grid-cols-1 lg:grid-cols-2 gap-4"
             >
-              {/* The input column grows with its content (post preview, detected comments) instead of squeezing it */}
-              <div className="flex flex-col gap-5">
-                {/* Post: where the comment is, and the original post as text or a screenshot */}
-                <section aria-label="Post" className={`${cardClass} shrink-0`}>
-                  <RadioCardGroup
-                    name={`${ID_PREFIX}-context`}
-                    legend="Where is the comment?"
-                    options={REPLY_CONTEXTS}
-                    value={context}
-                    onChange={(nextContext) => formStore.update({ context: nextContext })}
-                    disabled={isGenerating}
-                    columnsClassName="grid-cols-1 min-[440px]:grid-cols-2"
-                  />
-                  <PostInput
-                    idPrefix={ID_PREFIX}
-                    mode={postMode}
-                    onModeChange={(nextMode) => {
-                      formStore.update({ postMode: nextMode })
-                      clearPostError()
-                    }}
-                    text={postText}
-                    onTextChange={(text) => formStore.update({ postText: text })}
-                    image={postImage}
-                    onImageSelect={handlePostImageSelect}
-                    onImageRemove={handlePostImageRemove}
-                    onImageReject={setFormError}
-                    placeholder={POST_PLACEHOLDER}
-                    optional
-                    compact
-                    disabled={isGenerating}
-                    invalid={isPostError}
-                    describedBy={isPostError ? FORM_ERROR_ID : undefined}
-                  />
-                </section>
-
-                {/* Comments: pasted separately from the post */}
-                <section aria-label="Comments" className={`${cardClass} lg:flex-1`}>
-                  <div className="flex flex-col flex-1">
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <label htmlFor={COMMENTS_INPUT_ID} className={labelClass}>
-                        Comments
-                      </label>
-                      <span className="text-[11px] text-outline">
-                        {comments.length.toLocaleString()} / {REPLY_COMMENTS_MAX_LENGTH.toLocaleString()}
-                      </span>
-                    </div>
-                    <textarea
-                      ref={commentsRef}
-                      id={COMMENTS_INPUT_ID}
-                      value={comments}
-                      onChange={(event) => {
-                        formStore.update({ comments: event.target.value })
-                        if (formError === missingComment) setFormError(null)
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-                          event.preventDefault()
-                          if (!isGenerating) submit()
-                        }
-                      }}
-                      maxLength={REPLY_COMMENTS_MAX_LENGTH}
-                      disabled={isGenerating}
-                      placeholder={COMMENTS_PLACEHOLDER}
-                      aria-invalid={formError === missingComment}
-                      aria-describedby={formError === missingComment ? `${COMMENTS_HINT_ID} ${FORM_ERROR_ID}` : COMMENTS_HINT_ID}
-                      className="flex-1 w-full min-h-[180px] lg:min-h-[130px] resize-none rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary disabled:opacity-70"
-                    />
-                    <p id={COMMENTS_HINT_ID} className="text-[11px] text-outline mt-1.5">
-                      Paste one comment or a whole thread. Press Ctrl + Enter to generate.
-                    </p>
+              {/* Comments: what to reply to, pasted separately from the post */}
+              <section aria-label="Comments" className={cardClass}>
+                <div className="flex flex-col flex-1">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <label htmlFor={COMMENTS_INPUT_ID} className={labelClass}>
+                      Comments
+                    </label>
+                    <span className="text-[11px] text-outline">
+                      {comments.length.toLocaleString()} / {REPLY_COMMENTS_MAX_LENGTH.toLocaleString()}
+                    </span>
                   </div>
-
-                  {detectedComments.length > 0 && (
-                    <DetectedComments
-                      name={`${ID_PREFIX}-target`}
-                      comments={detectedComments}
-                      selectedKey={selectedCommentKey}
-                      onSelect={(key) => formStore.update({ selectedCommentKey: key })}
-                      disabled={isGenerating}
-                    />
-                  )}
-                </section>
-              </div>
-
-              {/* Style, action and result */}
-              <div className="flex flex-col gap-5 min-h-0">
-                <div className={`${cardClass} shrink-0`}>
-                  <RadioCardGroup
-                    name={`${ID_PREFIX}-style`}
-                    legend="Reply style"
-                    options={REPLY_STYLES}
-                    value={style}
-                    onChange={(nextStyle) => {
-                      formStore.update({ style: nextStyle })
-                      if (formError === missingStyle) setFormError(null)
+                  <textarea
+                    ref={commentsRef}
+                    id={COMMENTS_INPUT_ID}
+                    value={comments}
+                    onChange={(event) => {
+                      formStore.update({ comments: event.target.value })
+                      if (formError === missingComment) setFormError(null)
                     }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                        event.preventDefault()
+                        if (!isGenerating) submit()
+                      }
+                    }}
+                    maxLength={REPLY_COMMENTS_MAX_LENGTH}
                     disabled={isGenerating}
-                    invalid={formError === missingStyle}
-                    columnsClassName="grid-cols-2 md:grid-cols-3 lg:grid-cols-2"
-                    wrapLabels
+                    placeholder={COMMENTS_PLACEHOLDER}
+                    aria-invalid={formError === missingComment}
+                    aria-describedby={formError === missingComment ? `${COMMENTS_HINT_ID} ${FORM_ERROR_ID}` : COMMENTS_HINT_ID}
+                    className="flex-1 w-full min-h-[140px] resize-none rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary disabled:opacity-70"
                   />
+                  <p id={COMMENTS_HINT_ID} className="text-[11px] text-outline mt-1.5">
+                    Paste one comment or a whole thread. Press Ctrl + Enter to generate.
+                  </p>
+                </div>
 
-                  {formError && (
-                    <p id={FORM_ERROR_ID} role="alert" className="flex items-center gap-1.5 text-xs font-semibold text-error">
-                      <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
-                      {formError}
-                    </p>
-                  )}
+              </section>
 
+              {/* Post (optional): where the comment is, and the original post as text or a screenshot */}
+              <section aria-label="Post" className={cardClass}>
+                <RadioCardGroup
+                  name={`${ID_PREFIX}-context`}
+                  legend="Where is the comment?"
+                  options={REPLY_CONTEXTS}
+                  value={context}
+                  onChange={(nextContext) => formStore.update({ context: nextContext })}
+                  disabled={isGenerating}
+                  columnsClassName="grid-cols-1 min-[440px]:grid-cols-2"
+                />
+                <PostInput
+                  idPrefix={ID_PREFIX}
+                  mode={postMode}
+                  onModeChange={(nextMode) => {
+                    formStore.update({ postMode: nextMode })
+                    clearPostError()
+                  }}
+                  text={postText}
+                  onTextChange={(text) => formStore.update({ postText: text })}
+                  image={postImage}
+                  onImageSelect={handlePostImageSelect}
+                  onImageRemove={handlePostImageRemove}
+                  onImageReject={setFormError}
+                  placeholder={POST_PLACEHOLDER}
+                  optional
+                  compact
+                  disabled={isGenerating}
+                  invalid={isPostError}
+                  describedBy={isPostError ? FORM_ERROR_ID : undefined}
+                />
+              </section>
+
+              {/* Style and action, under the comments */}
+              <div className={cardClass}>
+                <RadioCardGroup
+                  name={`${ID_PREFIX}-style`}
+                  legend="Reply style"
+                  options={REPLY_STYLES}
+                  value={style}
+                  onChange={(nextStyle) => formStore.update({ style: nextStyle })}
+                  disabled={isGenerating}
+                  columnsClassName="grid-cols-2 min-[480px]:grid-cols-3"
+                  wrapLabels
+                />
+
+                {formError && (
+                  <p id={FORM_ERROR_ID} role="alert" className="flex items-center gap-1.5 text-xs font-semibold text-error">
+                    <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
+                    {formError}
+                  </p>
+                )}
+
+                {/* The card's footer sticks to the bottom of the window on short screens, so Generate is always one click away */}
+                <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-auto px-4 pb-4 pt-3 bg-white rounded-b-2xl border-t border-outline-variant/50">
                   <button
                     type="submit"
                     disabled={isGenerating}
                     aria-busy={isGenerating}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-semibold shadow-sm active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-semibold shadow-sm active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     {isGenerating ? (
                       <Loader2 size={16} className="animate-spin" aria-hidden="true" />
@@ -308,9 +268,9 @@ export default function PostCommentRepliesClient() {
                     {isGenerating ? "Generating reply..." : "Generate Reply"}
                   </button>
                 </div>
-
-                <ReplyResult status={status} stage={stage} result={result} error={error} onRetry={submit} />
               </div>
+
+              <ReplyResult status={status} stage={stage} result={result} error={error} onRetry={submit} />
             </form>
           </div>
         </main>

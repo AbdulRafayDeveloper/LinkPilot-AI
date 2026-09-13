@@ -20,7 +20,6 @@ export interface GenerateReplyRequest {
   postMode: PostInputMode
   postText: string
   postImage: File | null
-  targetComment: TargetComment | null
 }
 
 export interface GeneratedReply {

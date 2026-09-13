@@ -47,7 +47,7 @@ export function RadioCardGroup<Id extends string>({
           return (
             <label
               key={option.id}
-              className={`flex items-start gap-2 min-w-0 cursor-pointer rounded-xl border px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
+              className={`relative flex items-start gap-2 min-w-0 cursor-pointer rounded-xl border px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
                 isSelected
                   ? "bg-primary-container border-primary-container text-on-primary-container"
                   : `bg-white text-on-surface hover:bg-surface-container-low ${invalid ? "border-error" : "border-outline-variant"}`
@@ -73,7 +73,16 @@ export function RadioCardGroup<Id extends string>({
                   {option.description}
                 </span>
               </span>
-              {isSelected && <CheckCircle2 size={16} className="shrink-0 mt-0.5" aria-hidden="true" />}
+              {/* Wrapped cards are narrow, so their checkmark sits on the corner instead of taking text width */}
+              {isSelected && (
+                <CheckCircle2
+                  size={16}
+                  className={
+                    wrapLabels ? "absolute -top-1.5 -right-1.5 rounded-full bg-white text-primary" : "shrink-0 mt-0.5"
+                  }
+                  aria-hidden="true"
+                />
+              )}
             </label>
           )
         })}

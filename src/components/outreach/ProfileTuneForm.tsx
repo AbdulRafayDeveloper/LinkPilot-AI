@@ -2,17 +2,20 @@
 
 import React from "react"
 import { AlertTriangle, Loader2, type LucideIcon } from "lucide-react"
-import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
-import { OUTREACH_TUNES, type OutreachTuneId } from "@/constants/outreachTunes"
+import { RadioCardGroup, type RadioCardOption } from "@/components/ui/RadioCardGroup"
 
-interface ProfileTuneFormProps {
+interface ProfileTuneFormProps<TuneId extends string> {
   idPrefix: string
   profileData: string
   onProfileChange: (value: string) => void
   profileMaxLength: number
   profileInputRef: React.RefObject<HTMLTextAreaElement | null>
-  tune: OutreachTuneId | null
-  onTuneChange: (tune: OutreachTuneId) => void
+  // The module's own tune list, in display order
+  tunes: readonly RadioCardOption<TuneId>[]
+  // What the module calls its options, e.g. "Tone"
+  tuneLegend?: string
+  tune: TuneId | null
+  onTuneChange: (tune: TuneId) => void
   formError: string | null
   profileInvalid: boolean
   tuneInvalid: boolean
@@ -27,12 +30,14 @@ interface ProfileTuneFormProps {
  * Profile Information input, tune cards and the generate button shared by the outreach
  * tools. The textarea grows to fill the card and scrolls internally.
  */
-export const ProfileTuneForm: React.FC<ProfileTuneFormProps> = ({
+export function ProfileTuneForm<TuneId extends string>({
   idPrefix,
   profileData,
   onProfileChange,
   profileMaxLength,
   profileInputRef,
+  tunes,
+  tuneLegend = "Tune",
   tune,
   onTuneChange,
   formError,
@@ -43,7 +48,7 @@ export const ProfileTuneForm: React.FC<ProfileTuneFormProps> = ({
   submitLabel,
   generatingLabel,
   submitIcon: SubmitIcon,
-}) => {
+}: ProfileTuneFormProps<TuneId>) {
   const inputId = `${idPrefix}-profile`
   const errorId = `${idPrefix}-form-error`
 
@@ -80,8 +85,8 @@ export const ProfileTuneForm: React.FC<ProfileTuneFormProps> = ({
 
       <RadioCardGroup
         name={`${idPrefix}-tune`}
-        legend="Tune"
-        options={OUTREACH_TUNES}
+        legend={tuneLegend}
+        options={tunes}
         value={tune}
         onChange={onTuneChange}
         disabled={isGenerating}

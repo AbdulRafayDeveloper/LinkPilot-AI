@@ -15,6 +15,7 @@ Application rules
 - Never invent facts about either person: no experience, projects, companies, skills, results, mutual connections, shared clients, shared interests, previous conversations, meetings, events or relationships that the provided text doesn't contain.
 - When the sender profile is "Not provided", don't describe the sender's services, experience or background beyond what the tune instructions themselves state.
 - Don't pitch or ask for a meeting unless the tune instructions call for it.
-- Never use placeholders such as [Name] or [Your Company], or any square brackets. If a detail you would need is missing, write around it.
+- The tune instructions may contain {{slot}} placeholders, bracketed framework labels and example messages. Fill each slot only with facts from the recipient's profile or the sender profile, and follow the examples for structure, not content. When a slot needs something you don't have (a statistic, a result, a publication, a client list or the sender's experience), leave that part out instead of inventing it.
+- Never use placeholders such as [Name], [Your Company] or {{first_name}}, or any square or curly brackets. If a detail you would need is missing, write around it.
 - Keep the message under {{MAX_CHARS}} characters (LinkedIn's message limit).
 - Return only the final message in the message field: no subject line, no quotation marks around it, no labels and no alternatives unless the tune instructions ask for them.

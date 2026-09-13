@@ -4,14 +4,14 @@ import { Globe, type LucideIcon } from "lucide-react"
  * Global AI Prompts registry: app-wide prompts that aren't tied to one LinkedIn tool.
  * Each owns an independent, separately stored prompt (default template:
  * src/prompts/global-<id>.md). Every tool's output is rewritten with the Humanization
- * prompt (services/humanizer.ts); Rafay Profile Info is stored for future use.
+ * prompt (services/humanizer.ts); Post Comment Replies takes Abdul's facts from Rafay Profile Info.
  */
 export const GLOBAL_PROMPTS = [
   {
     id: "rafay-profile",
     label: "Rafay Profile Info",
     description: "Abdul Rafay's background, experience, projects and skills, written as a reusable prompt.",
-    usage: "Not used by any tool yet",
+    usage: "Used by Post Comment Replies as the source of your experience, projects and numbers",
   },
   {
     id: "humanization",

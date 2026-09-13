@@ -1,7 +1,9 @@
 "use client"
 
 import React from "react"
-import { getScoreBand, type RiskLevel } from "@/constants/conversationReply"
+import { ScoreMeter } from "@/components/ui/ScoreMeter"
+import type { RiskLevel } from "@/constants/conversationReply"
+import { getScoreBand } from "@/constants/scoreBands"
 import type { ConversationSignals, ScoreSignal, ScoreSignalKey } from "@/types/conversationReply"
 
 type SignalTile =
@@ -29,12 +31,6 @@ const RISK_STYLES: Record<RiskLevel, string> = {
   High: "bg-error-container text-on-error-container",
 }
 
-function barColor(score: number): string {
-  if (score >= 61) return "bg-primary"
-  if (score >= 41) return "bg-secondary-container"
-  return "bg-error/70"
-}
-
 const TileShell: React.FC<{ label: string; value: React.ReactNode; summary: string; children?: React.ReactNode }> = ({
   label,
   value,
@@ -42,8 +38,8 @@ const TileShell: React.FC<{ label: string; value: React.ReactNode; summary: stri
   children,
 }) => (
   <li className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 min-w-0 flex flex-col">
-    <div className="flex items-start justify-between gap-2">
-      <h4 className="text-[10px] font-bold text-outline uppercase tracking-wider leading-tight pt-0.5">{label}</h4>
+    <div className="flex items-center justify-between gap-2 min-h-[22px]">
+      <h4 className="text-[10px] font-bold text-outline uppercase tracking-wider leading-tight">{label}</h4>
       <div className="shrink-0 text-right">{value}</div>
     </div>
     {children}
@@ -53,33 +49,18 @@ const TileShell: React.FC<{ label: string; value: React.ReactNode; summary: stri
   </li>
 )
 
-const ScoreTile: React.FC<{ label: string; signal: ScoreSignal }> = ({ label, signal }) => {
-  const band = getScoreBand(signal.score)
-  return (
-    <TileShell
-      label={label}
-      summary={signal.summary}
-      value={
-        <>
-          <span className="text-base font-bold text-on-surface leading-none">{signal.score}%</span>
-          <span className="block text-[10px] font-semibold text-outline mt-0.5">{band.label}</span>
-        </>
-      }
-    >
-      <div
-        role="meter"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={signal.score}
-        aria-valuetext={`${signal.score}%, ${band.label}`}
-        className="mt-2 h-1.5 rounded-full bg-surface-container overflow-hidden"
-      >
-        <div className={`h-full rounded-full ${barColor(signal.score)}`} style={{ width: `${signal.score}%` }} />
-      </div>
-    </TileShell>
-  )
-}
+const ScoreTile: React.FC<{ label: string; signal: ScoreSignal }> = ({ label, signal }) => (
+  <TileShell
+    label={label}
+    summary={signal.summary}
+    value={<span className="text-base font-bold text-on-surface leading-none">{signal.score}%</span>}
+  >
+    <div className="mt-2 flex items-center gap-2">
+      <ScoreMeter label={label} score={signal.score} className="flex-1" />
+      <span className="shrink-0 text-[10px] font-semibold text-outline">{getScoreBand(signal.score).label}</span>
+    </div>
+  </TileShell>
+)
 
 const ValueChip: React.FC<{ className: string; children: React.ReactNode }> = ({ className, children }) => (
   <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${className}`}>{children}</span>

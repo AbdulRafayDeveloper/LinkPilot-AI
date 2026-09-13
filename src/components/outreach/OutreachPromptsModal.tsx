@@ -1,25 +1,25 @@
 "use client"
 
 import React from "react"
-import { PromptTabsModal } from "@/components/prompts/PromptTabsModal"
+import { PromptTabsModal, type PromptTab } from "@/components/prompts/PromptTabsModal"
 import { requestApi } from "@/lib/apiClient"
-import { ABOUT_ME_TAB_ID, OUTREACH_PROMPT_TABS, type OutreachPromptId } from "@/constants/outreachTunes"
+import { ABOUT_ME_TAB_ID } from "@/constants/outreachTunes"
 import type { EditablePrompt } from "@/types/prompts"
 
-export interface OutreachPromptsApi {
-  loadPrompts: (signal: AbortSignal) => Promise<Record<OutreachPromptId, EditablePrompt>>
-  savePrompt: (id: OutreachPromptId, prompt: string) => Promise<{ data: EditablePrompt; message?: string }>
+export interface OutreachPromptsApi<Id extends string> {
+  loadPrompts: (signal: AbortSignal) => Promise<Record<Id, EditablePrompt>>
+  savePrompt: (id: Id, prompt: string) => Promise<{ data: EditablePrompt; message?: string }>
 }
 
 /**
  * Builds the prompt endpoints for a module. Call it at module level so the functions
  * stay stable across renders (the modal refetches when they change).
  */
-export function createOutreachPromptsApi(endpoint: string): OutreachPromptsApi {
+export function createOutreachPromptsApi<Id extends string>(endpoint: string): OutreachPromptsApi<Id> {
   return {
     async loadPrompts(signal) {
-      const { data } = await requestApi<Array<EditablePrompt & { id: OutreachPromptId }>>(endpoint, { signal })
-      const byId = {} as Record<OutreachPromptId, EditablePrompt>
+      const { data } = await requestApi<Array<EditablePrompt & { id: Id }>>(endpoint, { signal })
+      const byId = {} as Record<Id, EditablePrompt>
       for (const prompt of data) byId[prompt.id] = prompt
       return byId
     },
@@ -35,7 +35,7 @@ export function createOutreachPromptsApi(endpoint: string): OutreachPromptsApi {
 
 const variableChip = "font-code text-on-surface-variant bg-surface-container px-1 rounded"
 
-function renderHint(id: OutreachPromptId) {
+function renderHint(id: string) {
   if (id === ABOUT_ME_TAB_ID) {
     return (
       <p className="leading-relaxed">
@@ -50,32 +50,44 @@ function renderHint(id: OutreachPromptId) {
       Variables: <code className={variableChip}>{"{{profile_data}}"}</code> the pasted profile ·{" "}
       <code className={variableChip}>{"{{sender_profile}}"}</code> your About Me ·{" "}
       <code className={variableChip}>{"{{tune}}"}</code> the tune name. Profile and About Me are added at the end if you
-      leave them out. The pasted profile is always treated as untrusted text.
+      leave them out; any other <code className={variableChip}>{"{{…}}"}</code> slot is filled in by the AI from them. The
+      pasted profile is always treated as untrusted text.
     </p>
   )
 }
 
-interface OutreachPromptsModalProps {
-  api: OutreachPromptsApi
+interface OutreachPromptsModalProps<Id extends string> {
+  api: OutreachPromptsApi<Id>
+  // The module's tunes plus About Me, in tab order
+  tabs: readonly PromptTab<Id>[]
   title: string
   description: string
-  initialTab: OutreachPromptId | null
+  initialTab: Id | null
   onClose: () => void
 }
 
 /**
- * Edits a module's seven independent tune prompts plus the shared "About Me" sender profile.
+ * Edits a module's independent tune prompts plus the shared "About Me" sender profile.
  */
-export const OutreachPromptsModal: React.FC<OutreachPromptsModalProps> = ({ api, title, description, initialTab, onClose }) => (
-  <PromptTabsModal
-    title={title}
-    description={description}
-    tabs={OUTREACH_PROMPT_TABS}
-    initialTab={initialTab}
-    loadPrompts={api.loadPrompts}
-    savePrompt={api.savePrompt}
-    renderHint={renderHint}
-    loadingText="Loading the saved tune prompts..."
-    onClose={onClose}
-  />
-)
+export function OutreachPromptsModal<Id extends string>({
+  api,
+  tabs,
+  title,
+  description,
+  initialTab,
+  onClose,
+}: OutreachPromptsModalProps<Id>) {
+  return (
+    <PromptTabsModal
+      title={title}
+      description={description}
+      tabs={tabs}
+      initialTab={initialTab}
+      loadPrompts={api.loadPrompts}
+      savePrompt={api.savePrompt}
+      renderHint={renderHint}
+      loadingText="Loading the saved tune prompts..."
+      onClose={onClose}
+    />
+  )
+}

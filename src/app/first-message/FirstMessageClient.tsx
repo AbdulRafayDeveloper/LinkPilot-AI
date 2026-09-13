@@ -19,6 +19,7 @@ import {
   DEFAULT_FIRST_MESSAGE_TUNE,
   FIRST_MESSAGE_MESSAGES,
   FIRST_MESSAGE_PROFILE_MAX_LENGTH,
+  FIRST_MESSAGE_TUNES,
   getTuneLabel,
   type FirstMessagePromptId,
   type FirstMessageTuneId,
@@ -36,12 +37,14 @@ interface GeneratePayload {
 const formStore = createToolStore(
   "first-message:form",
   { profileData: "", tune: DEFAULT_FIRST_MESSAGE_TUNE as FirstMessageTuneId | null },
-  { version: 1 }
+  // v2: the tones were replaced, so a tone saved by v1 no longer exists
+  { version: 2 }
 )
 const generation = createGenerationRequest<GeneratePayload, GeneratedFirstMessage>(
   "first-message",
   GENERATE_ENDPOINT,
-  FIRST_MESSAGE_MESSAGES.generationFailed
+  FIRST_MESSAGE_MESSAGES.generationFailed,
+  { resultVersion: 2 }
 )
 
 export default function FirstMessageClient() {
@@ -79,7 +82,7 @@ export default function FirstMessageClient() {
     setFormError(null)
   }
 
-  // Clears the profile and the result; the chosen tune stays for the next profile
+  // Clears the profile and the result; the chosen tone stays for the next profile
   const resetTool = () => {
     formStore.update({ profileData: "" })
     setFormError(null)
@@ -135,6 +138,8 @@ export default function FirstMessageClient() {
                 }}
                 profileMaxLength={FIRST_MESSAGE_PROFILE_MAX_LENGTH}
                 profileInputRef={profileInputRef}
+                tunes={FIRST_MESSAGE_TUNES}
+                tuneLegend="Tone"
                 tune={tune}
                 onTuneChange={(nextTune) => {
                   formStore.update({ tune: nextTune })
@@ -157,7 +162,7 @@ export default function FirstMessageClient() {
                 error={error}
                 onRetry={submit}
                 idleIcon={Hand}
-                idleText="Paste the person's profile, pick a tune, and generate a personalized first message."
+                idleText="Paste the person's profile, pick a tone, and generate a personalized first message."
                 loadingText="Writing your first message..."
                 copyLabel="Copy first message"
                 copyButtonText="Copy Message"
@@ -165,7 +170,7 @@ export default function FirstMessageClient() {
                 meta={
                   result && (
                     <>
-                      {result.characterCount.toLocaleString()} characters · {getTuneLabel(result.tune)} tune
+                      {result.characterCount.toLocaleString()} characters · {getTuneLabel(result.tune)} tone
                     </>
                   )
                 }

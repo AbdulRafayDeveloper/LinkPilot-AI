@@ -1,3 +1,5 @@
+import { LEAD_SIGNALS_PROMPT_ID, LEAD_SIGNALS_TAB_LABEL } from "./leadSignals"
+
 /**
  * Follow-up type registry. Each type owns an independent, separately stored prompt
  * (default template: src/prompts/follow-up-<id>.md). Adding a type means adding an
@@ -16,8 +18,22 @@ export function getFollowUpTypeLabel(type: FollowUpTypeId): string {
   return FOLLOW_UP_TYPES.find((entry) => entry.id === type)?.label ?? type
 }
 
-export function followUpPromptKey(type: FollowUpTypeId): string {
-  return `follow_up_prompt:${type}`
+// The lead signals have their own editable prompt, independent of the follow-up type
+export type FollowUpPromptId = FollowUpTypeId | typeof LEAD_SIGNALS_PROMPT_ID
+
+export const FOLLOW_UP_PROMPT_TABS: ReadonlyArray<{ id: FollowUpPromptId; label: string }> = [
+  ...FOLLOW_UP_TYPES.map(({ id, label }) => ({ id, label })),
+  { id: LEAD_SIGNALS_PROMPT_ID, label: LEAD_SIGNALS_TAB_LABEL },
+]
+
+export const FOLLOW_UP_PROMPT_IDS = FOLLOW_UP_PROMPT_TABS.map((tab) => tab.id) as [FollowUpPromptId, ...FollowUpPromptId[]]
+
+export function getFollowUpPromptLabel(id: FollowUpPromptId): string {
+  return FOLLOW_UP_PROMPT_TABS.find((tab) => tab.id === id)?.label ?? id
+}
+
+export function followUpPromptKey(id: FollowUpPromptId): string {
+  return `follow_up_prompt:${id}`
 }
 
 export const CONVERSATION_MAX_LENGTH = 30000

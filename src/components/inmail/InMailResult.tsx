@@ -6,7 +6,7 @@ import { ResultCard } from "@/components/ui/ResultCard"
 import { ResultWarning } from "@/components/ui/GeneratedResultPanel"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { AboutMeNotice, AnalysisDetails } from "@/components/outreach/OutreachResultExtras"
-import { getOutreachTuneLabel } from "@/constants/outreachTunes"
+import { getInMailTuneLabel } from "@/constants/inmail"
 import type { GenerationStatus } from "@/hooks/useGenerationRequest"
 import type { GeneratedInMail } from "@/types/inmail"
 
@@ -30,7 +30,7 @@ export const InMailResult: React.FC<InMailResultProps> = ({ status, result, erro
     error={error}
     onRetry={onRetry}
     idleIcon={Mail}
-    idleText="Paste the person's profile, pick a tune, and generate a personalized InMail subject and message."
+    idleText="Paste the person's profile, pick a tone, and generate a personalized InMail subject and message."
     loadingText="Writing your InMail..."
   >
     {result && (
@@ -58,7 +58,7 @@ export const InMailResult: React.FC<InMailResultProps> = ({ status, result, erro
           </blockquote>
           <p className="text-[11px] text-outline mt-1">
             {result.messageCharacters.toLocaleString()} / {result.messageMaxCharacters.toLocaleString()} characters ·{" "}
-            {getOutreachTuneLabel(result.tune)} tune
+            {getInMailTuneLabel(result.tune)} tone
           </p>
         </div>
 

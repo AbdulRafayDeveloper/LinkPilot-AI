@@ -7,6 +7,7 @@ import { Header } from "@/components/ui/Header"
 import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
 import { FollowUpResult } from "@/components/follow-up-message/FollowUpResult"
 import { FollowUpPromptsModal } from "@/components/follow-up-message/FollowUpPromptsModal"
+import { LeadSignalsTable } from "@/components/lead-signals/LeadSignalsTable"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { ResetButton } from "@/components/ui/ResetButton"
 import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
@@ -42,7 +43,9 @@ const formStore = createToolStore(
 const generation = createGenerationRequest<GeneratePayload, GeneratedFollowUp>(
   "follow-up-message",
   GENERATE_ENDPOINT,
-  FOLLOW_UP_MESSAGES.generationFailed
+  FOLLOW_UP_MESSAGES.generationFailed,
+  // v2 added the lead signals, v3 the extra client-hunting signals
+  { resultVersion: 3 }
 )
 
 const labelClass = "text-[10px] font-bold text-outline uppercase tracking-wider"
@@ -62,6 +65,7 @@ export default function FollowUpMessageClient() {
   const canReset = conversation !== "" || profileData !== "" || status !== "idle"
   const isConversationMissing = formError === FOLLOW_UP_MESSAGES.missingConversation
   const isTypeMissing = formError === FOLLOW_UP_MESSAGES.missingType
+  const showSignals = isGenerating || (status === "success" && result !== null)
 
   const submit = () => {
     if (!conversation.trim()) {
@@ -221,14 +225,19 @@ export default function FollowUpMessageClient() {
                 </button>
               </form>
 
-              {/* Output */}
-              <FollowUpResult status={status} result={result} error={error} onRetry={submit} />
+              {/* Output: the follow-up, then the lead signals; the column scrolls on its own */}
+              <div className="flex flex-col gap-5 min-w-0 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+                <div className={`grid ${showSignals ? "shrink-0" : "flex-1"}`}>
+                  <FollowUpResult status={status} result={result} error={error} onRetry={submit} />
+                </div>
+                {showSignals && <LeadSignalsTable signals={result?.signals ?? null} isLoading={isGenerating} />}
+              </div>
             </div>
           </div>
         </main>
       </div>
 
-      {isPromptsOpen && <FollowUpPromptsModal initialType={followUpType} onClose={() => setIsPromptsOpen(false)} />}
+      {isPromptsOpen && <FollowUpPromptsModal initialTab={followUpType} onClose={() => setIsPromptsOpen(false)} />}
       {isDummyDataOpen && (
         <DummyDataModal kind="follow-up-conversations" onUse={loadDummyConversation} onClose={() => setIsDummyDataOpen(false)} />
       )}

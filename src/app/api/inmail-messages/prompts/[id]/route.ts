@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
-import { ABOUT_ME_TAB_ID, getOutreachTuneLabel } from "@/constants/outreachTunes"
-import { INMAIL_PROMPT_IDS } from "@/constants/inmail"
+import { ABOUT_ME_TAB_ID } from "@/constants/outreachTunes"
+import { INMAIL_PROMPT_IDS, getInMailTuneLabel } from "@/constants/inmail"
 import { saveInMailPrompt } from "@/services/inmail/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
 
@@ -36,8 +36,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const saved = await saveInMailPrompt(id.data, parsed.data.prompt)
     const message =
       id.data === ABOUT_ME_TAB_ID
-        ? "About Me saved. Every tune in First Message and InMail will use it."
-        : `${getOutreachTuneLabel(id.data)} InMail prompt saved. Future ${getOutreachTuneLabel(id.data)} InMails will use it.`
+        ? "About Me saved. Every tone in First Message and InMail will use it."
+        : `${getInMailTuneLabel(id.data)} InMail prompt saved. Future ${getInMailTuneLabel(id.data)} InMails will use it.`
     return NextResponse.json({ success: true, message, data: saved })
   } catch (error: unknown) {
     console.error("PUT InMail Prompt Exception:", error)

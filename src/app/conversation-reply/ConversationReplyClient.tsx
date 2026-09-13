@@ -7,6 +7,7 @@ import { Header } from "@/components/ui/Header"
 import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
 import { GeneratedResultPanel } from "@/components/ui/GeneratedResultPanel"
 import { ConversationAnalysisCard } from "@/components/conversation-reply/ConversationAnalysisCard"
+import { LeadSignalsTable } from "@/components/lead-signals/LeadSignalsTable"
 import { ConversationReplyPromptsModal } from "@/components/conversation-reply/ConversationReplyPromptsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { ResetButton } from "@/components/ui/ResetButton"
@@ -43,12 +44,15 @@ interface GeneratePayload {
 const formStore = createToolStore(
   "conversation-reply:form",
   { conversation: "", profileData: "", replyType: DEFAULT_CONVERSATION_REPLY_TYPE as ConversationReplyTypeId },
-  { version: 1 }
+  // v2: the reply tones were replaced, so a tone saved by v1 no longer exists
+  { version: 2 }
 )
 const generation = createGenerationRequest<GeneratePayload, ConversationReplyResult>(
   "conversation-reply",
   GENERATE_ENDPOINT,
-  CONVERSATION_REPLY_MESSAGES.generationFailed
+  CONVERSATION_REPLY_MESSAGES.generationFailed,
+  // v2 replaced the tones, v3 added the lead signals
+  { resultVersion: 3 }
 )
 
 const labelClass = "text-[10px] font-bold text-outline uppercase tracking-wider"
@@ -88,7 +92,7 @@ export default function ConversationReplyClient() {
     setFormError(null)
   }
 
-  // Clears the conversation, profile and result; the chosen reply type stays
+  // Clears the conversation, profile and result; the chosen reply tone stays
   const resetTool = () => {
     formStore.update({ conversation: "", profileData: "" })
     setFormError(null)
@@ -134,7 +138,7 @@ export default function ConversationReplyClient() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-5 lg:flex-1 lg:min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0">
               {/* Input */}
               <form
                 noValidate
@@ -142,9 +146,10 @@ export default function ConversationReplyClient() {
                   event.preventDefault()
                   submit()
                 }}
-                className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-h-0"
+                className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-h-0 lg:overflow-y-auto"
               >
-                <div className="flex flex-col flex-[3] min-h-0">
+                {/* The fields grow into spare height but never shrink below their textarea's minimum */}
+                <div className="flex flex-col flex-[3]">
                   <div className="flex items-center justify-between gap-2 mb-1.5">
                     <label htmlFor={CONVERSATION_INPUT_ID} className={labelClass}>
                       Previous Conversation
@@ -165,13 +170,13 @@ export default function ConversationReplyClient() {
                     placeholder="Paste the complete conversation here..."
                     aria-invalid={isConversationMissing}
                     aria-describedby={isConversationMissing ? FORM_ERROR_ID : undefined}
-                    className={`${textareaClass} min-h-[200px] lg:min-h-[120px] ${
+                    className={`${textareaClass} min-h-[200px] lg:min-h-[96px] ${
                       isConversationMissing ? "border-error" : "border-outline-variant"
                     }`}
                   />
                 </div>
 
-                <div className="flex flex-col flex-[2] min-h-0">
+                <div className="flex flex-col flex-[2]">
                   <div className="flex items-center justify-between gap-2 mb-1.5">
                     <label htmlFor={PROFILE_INPUT_ID} className={labelClass}>
                       Profile Information <span className="normal-case font-semibold tracking-normal">(optional)</span>
@@ -186,14 +191,16 @@ export default function ConversationReplyClient() {
                     onChange={(event) => formStore.update({ profileData: event.target.value })}
                     maxLength={CONVERSATION_REPLY_PROFILE_MAX_LENGTH}
                     placeholder="Paste the person's LinkedIn profile information here if available..."
-                    className={`${textareaClass} min-h-[110px] lg:min-h-[80px] border-outline-variant`}
+                    className={`${textareaClass} min-h-[110px] lg:min-h-[64px] border-outline-variant`}
                   />
                 </div>
 
                 <RadioCardGroup
                   name="conversation-reply-type"
-                  legend="Reply Type"
+                  legend="Reply Tone"
                   options={CONVERSATION_REPLY_TYPES}
+                  columnsClassName="grid-cols-2 md:grid-cols-3"
+                  wrapLabels
                   value={replyType}
                   onChange={(nextType) => formStore.update({ replyType: nextType })}
                   disabled={isGenerating}
@@ -231,7 +238,7 @@ export default function ConversationReplyClient() {
                     error={error}
                     onRetry={submit}
                     idleIcon={MessagesSquare}
-                    idleText="Paste the conversation, choose a reply type, and get the next reply plus an honest read of the opportunity."
+                    idleText="Paste the conversation, choose a reply tone, and get the next reply plus an honest read of the opportunity."
                     loadingText={LOADING_TEXT}
                     copyLabel="Copy suggested reply"
                     copyButtonText="Copy Reply"
@@ -271,6 +278,7 @@ export default function ConversationReplyClient() {
                   </GeneratedResultPanel>
                 </div>
 
+                {showAnalysis && <LeadSignalsTable signals={result?.leadSignals ?? null} isLoading={isGenerating} />}
                 {showAnalysis && <ConversationAnalysisCard analysis={result?.analysis ?? null} isLoading={isGenerating} />}
               </div>
             </div>

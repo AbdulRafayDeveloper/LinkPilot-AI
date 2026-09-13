@@ -5,11 +5,11 @@
  */
 export const COMMENT_TUNES = [
   { id: "thoughtful", label: "Thoughtful", shortLabel: "Thoughtful", description: "A nuanced observation" },
-  { id: "impressive", label: "Impressive", shortLabel: "Impressive", description: "A sharp, memorable idea" },
-  { id: "concerning", label: "Concerning", shortLabel: "Concerning", description: "A fair risk or question" },
-  { id: "appreciative", label: "Appreciative", shortLabel: "Appreciative", description: "Credits a specific point" },
   { id: "past-experience", label: "Based on My Past Experience", shortLabel: "My Experience", description: "Your real experience" },
   { id: "latest-trends", label: "Latest Trends / Informative", shortLabel: "Latest Trends", description: "Recent, sourced context" },
+  { id: "concerning", label: "Concerning", shortLabel: "Concerning", description: "A fair risk or question" },
+  { id: "appreciative", label: "Appreciative", shortLabel: "Appreciative", description: "Credits a specific point" },
+  { id: "impressive", label: "Impressive", shortLabel: "Impressive", description: "A sharp, memorable idea" },
 ] as const
 
 export type CommentTuneId = (typeof COMMENT_TUNES)[number]["id"]

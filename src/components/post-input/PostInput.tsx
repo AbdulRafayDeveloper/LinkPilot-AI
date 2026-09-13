@@ -127,7 +127,7 @@ export const PostInput: React.FC<PostInputProps> = ({
               aria-invalid={invalid}
               aria-describedby={describedBy}
               className={`flex-1 w-full resize-none rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary disabled:opacity-70 ${
-                compact ? "min-h-[110px]" : "min-h-[180px] lg:min-h-[120px]"
+                compact ? "min-h-[80px]" : "min-h-[180px] lg:min-h-[120px]"
               }`}
             />
           </>

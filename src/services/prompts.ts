@@ -1,12 +1,12 @@
 import fs from "fs"
 import path from "path"
 import type { ConnectionNoteToneId } from "@/constants/connectionNote"
-import type { FollowUpTypeId } from "@/constants/followUp"
+import type { FollowUpPromptId } from "@/constants/followUp"
 import type { CommentTuneId } from "@/constants/commentWriter"
 import type { FirstMessageTuneId } from "@/constants/firstMessage"
 import type { InMailTuneId } from "@/constants/inmail"
 import type { ReplyContextId, ReplyStyleId } from "@/constants/postCommentReplies"
-import type { ConversationReplyTypeId } from "@/constants/conversationReply"
+import type { ConversationReplyOwnPromptId } from "@/constants/conversationReply"
 import type { GlobalPromptId } from "@/constants/globalPrompts"
 
 const PROMPTS_DIR = path.join(process.cwd(), "src/prompts")
@@ -19,7 +19,8 @@ export type PromptName =
   | "connection-note-system"
   | `connection-note-${ConnectionNoteToneId}`
   | "follow-up-system"
-  | `follow-up-${FollowUpTypeId}`
+  | `follow-up-${FollowUpPromptId}`
+  | "lead-signals-system"
   | "comment-writer-system"
   | "post-image-extraction"
   | "comment-writer-research"
@@ -37,7 +38,7 @@ export type PromptName =
   | "conversation-reading"
   | "conversation-reply-analysis"
   | "conversation-reply-system"
-  | `conversation-reply-${ConversationReplyTypeId}`
+  | `conversation-reply-${ConversationReplyOwnPromptId}`
   | `global-${GlobalPromptId}`
   | "humanizer-system"
 

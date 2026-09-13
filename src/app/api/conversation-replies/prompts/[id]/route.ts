@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
-import { ABOUT_ME_TAB_ID, CONVERSATION_REPLY_PROMPT_IDS, getReplyTypeLabel } from "@/constants/conversationReply"
+import {
+  ABOUT_ME_TAB_ID,
+  CONVERSATION_REPLY_PROMPT_IDS,
+  getConversationReplyPromptLabel,
+} from "@/constants/conversationReply"
+import { LEAD_SIGNALS_PROMPT_ID } from "@/constants/leadSignals"
 import { saveConversationReplyPrompt } from "@/services/conversationReply/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
 
@@ -11,7 +16,8 @@ export const dynamic = "force-dynamic"
 const PromptIdSchema = z.enum(CONVERSATION_REPLY_PROMPT_IDS)
 
 /**
- * PUT: Saves one reply type's prompt, or the shared About Me. Nothing else changes.
+ * PUT: Saves one reply tone's prompt, this tool's Lead Signals prompt, or the shared About Me.
+ * Nothing else changes.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = await requirePromptAccess()
@@ -33,10 +39,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const saved = await saveConversationReplyPrompt(id.data, parsed.data.prompt)
+    const label = getConversationReplyPromptLabel(id.data)
     const message =
       id.data === ABOUT_ME_TAB_ID
-        ? "About Me saved. Every reply type and the analysis will use it."
-        : `${getReplyTypeLabel(id.data)} prompt saved. Future ${getReplyTypeLabel(id.data)} replies will use it.`
+        ? "About Me saved. Every reply tone and the analysis will use it."
+        : id.data === LEAD_SIGNALS_PROMPT_ID
+          ? "Lead Signals prompt saved. The next Conversation Reply uses it; Follow-Up's Lead Signals prompt is unchanged."
+          : `${label} prompt saved. Future ${label} replies will use it.`
     return NextResponse.json({ success: true, message, data: saved })
   } catch (error: unknown) {
     console.error("PUT Conversation Reply Prompt Exception:", error)

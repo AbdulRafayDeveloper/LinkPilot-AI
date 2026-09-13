@@ -1,7 +1,8 @@
 import { createOutreachPromptStore } from "@/services/outreachPrompts"
-import { inmailPromptKey } from "@/constants/inmail"
+import { INMAIL_PROMPT_IDS, inmailPromptKey, type InMailTuneId } from "@/constants/inmail"
 
-const store = createOutreachPromptStore({
+const store = createOutreachPromptStore<InMailTuneId>({
+  promptIds: INMAIL_PROMPT_IDS,
   settingKey: inmailPromptKey,
   templateName: (tune) => `inmail-${tune}`,
 })

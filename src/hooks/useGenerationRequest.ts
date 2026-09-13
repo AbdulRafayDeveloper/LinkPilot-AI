@@ -29,10 +29,12 @@ const idle = <TResult>(): GenerationState<TResult> => ({ status: "idle", result:
 export function createGenerationRequest<TPayload, TResult>(
   name: string,
   endpoint: string,
-  fallbackError: string
+  fallbackError: string,
+  // Bump when TResult changes shape, so a result saved by an older version is ignored
+  { resultVersion = 1 }: { resultVersion?: number } = {}
 ): GenerationRequest<TPayload, TResult> {
   const store = createToolStore<GenerationState<TResult>>(`${name}:result`, idle<TResult>(), {
-    version: 1,
+    version: resultVersion,
     // Only a finished result survives a refresh; a running request can't resume after one
     toStored: (state) => (state.status === "success" ? state : idle<TResult>()),
   })

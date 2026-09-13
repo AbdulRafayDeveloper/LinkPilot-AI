@@ -33,7 +33,6 @@ function toFormData(request: GenerateReplyRequest): FormData {
   form.append("context", request.context)
   form.append("style", request.style)
   form.append("comments", request.comments)
-  if (request.targetComment) form.append("targetComment", JSON.stringify(request.targetComment))
   form.append("inputMode", request.postMode)
   if (request.postMode === "text" && request.postText.trim()) form.append("postText", request.postText)
   if (request.postMode === "image" && request.postImage) form.append("image", request.postImage)

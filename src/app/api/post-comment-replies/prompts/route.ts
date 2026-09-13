@@ -6,7 +6,7 @@ import { requirePromptAccess } from "@/services/promptAccess"
 export const dynamic = "force-dynamic"
 
 /**
- * GET: Returns the latest saved prompt (or default) for all 14 context + style pairs.
+ * GET: Returns the latest saved prompt (or default) for every context + style pair.
  */
 export async function GET() {
   const denied = await requirePromptAccess()

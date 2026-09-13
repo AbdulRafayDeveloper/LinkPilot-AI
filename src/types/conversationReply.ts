@@ -5,6 +5,7 @@ import type {
   RiskLevel,
 } from "@/constants/conversationReply"
 import type { ConversationParties } from "./conversation"
+import type { LeadSignals } from "./leadSignals"
 import type { EditablePrompt } from "./prompts"
 
 export interface ConversationReplyPrompt extends EditablePrompt {
@@ -55,4 +56,6 @@ export interface ConversationReplyResult {
   usedProfile: boolean
   usedSenderProfile: boolean
   analysis: ConversationAnalysis
+  // Null when the lead signals couldn't be produced; the reply and analysis are still returned
+  leadSignals: LeadSignals | null
 }

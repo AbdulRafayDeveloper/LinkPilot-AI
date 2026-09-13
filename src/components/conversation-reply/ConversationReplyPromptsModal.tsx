@@ -2,12 +2,14 @@
 
 import React from "react"
 import { PromptTabsModal } from "@/components/prompts/PromptTabsModal"
+import { LeadSignalsPromptHint } from "@/components/lead-signals/LeadSignalsPromptHint"
 import { requestApi } from "@/lib/apiClient"
 import {
   ABOUT_ME_TAB_ID,
   CONVERSATION_REPLY_PROMPT_TABS,
   type ConversationReplyPromptId,
 } from "@/constants/conversationReply"
+import { LEAD_SIGNALS_PROMPT_ID } from "@/constants/leadSignals"
 import type { ConversationReplyPrompt } from "@/types/conversationReply"
 import type { EditablePrompt } from "@/types/prompts"
 
@@ -30,6 +32,7 @@ function savePrompt(id: ConversationReplyPromptId, prompt: string) {
 }
 
 function renderHint(id: ConversationReplyPromptId) {
+  if (id === LEAD_SIGNALS_PROMPT_ID) return <LeadSignalsPromptHint />
   if (id === ABOUT_ME_TAB_ID) {
     return (
       <p className="leading-relaxed">
@@ -45,8 +48,9 @@ function renderHint(id: ConversationReplyPromptId) {
       <code className={variableChip}>{"{{profile_data}}"}</code> their profile ·{" "}
       <code className={variableChip}>{"{{sender_profile}}"}</code> your About Me ·{" "}
       <code className={variableChip}>{"{{conversation_analysis}}"}</code> the objective analysis ·{" "}
-      <code className={variableChip}>{"{{reply_type}}"}</code> the type name. Blocks you leave out are added at the end.
-      This prompt steers the reply only. The signals are analyzed separately, so they never depend on the reply type.
+      <code className={variableChip}>{"{{reply_type}}"}</code> the tone name. Blocks you leave out are added at the end; any
+      other <code className={variableChip}>{"{{…}}"}</code> slot is filled in by the AI from them.
+      This prompt steers the reply only. The signals are analyzed separately, so they never depend on the reply tone.
     </p>
   )
 }

@@ -11,7 +11,6 @@ import { getGenerationInputs } from "./prompts"
 
 // Slightly creative so messages read like a person wrote them
 const WRITING_TEMPERATURE = 0.7
-
 /**
  * The analysis fields come before the message on purpose: the model commits to the
  * profile detail and the sender link it will use before it writes.

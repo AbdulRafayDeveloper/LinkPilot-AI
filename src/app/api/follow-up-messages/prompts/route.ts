@@ -6,7 +6,7 @@ import { requirePromptAccess } from "@/services/promptAccess"
 export const dynamic = "force-dynamic"
 
 /**
- * GET: Returns the latest saved prompt (or default) for every follow-up type.
+ * GET: Returns the latest saved prompt (or default) for every follow-up type and the Lead Signals.
  */
 export async function GET() {
   const denied = await requirePromptAccess()

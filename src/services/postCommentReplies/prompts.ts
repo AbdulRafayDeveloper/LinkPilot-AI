@@ -21,7 +21,7 @@ function replyPromptEntry(context: ReplyContextId, style: ReplyStyleId): PromptE
 }
 
 /**
- * All 14 prompts in one settings query, ordered by context then style.
+ * Every context + style prompt in one settings query, ordered by context then style.
  */
 export async function getPostCommentReplyPrompts(): Promise<ReplyPrompt[]> {
   const pairs = REPLY_CONTEXTS.flatMap((context) =>

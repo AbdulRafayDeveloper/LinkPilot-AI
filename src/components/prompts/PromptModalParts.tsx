@@ -10,7 +10,8 @@ export interface PromptFeedback {
 
 interface PromptModalFooterProps {
   feedback: PromptFeedback | null
-  hasUnsavedChanges: boolean
+  // How many prompts (tabs) have unsaved edits; Save stores all of them
+  unsavedCount: number
   isSaving: boolean
   canSave: boolean
   onCancel: () => void
@@ -19,7 +20,7 @@ interface PromptModalFooterProps {
 
 export const PromptModalFooter: React.FC<PromptModalFooterProps> = ({
   feedback,
-  hasUnsavedChanges,
+  unsavedCount,
   isSaving,
   canSave,
   onCancel,
@@ -48,7 +49,7 @@ export const PromptModalFooter: React.FC<PromptModalFooterProps> = ({
         disabled={isSaving}
         className="flex-1 sm:flex-none px-4 py-2 border border-outline-variant rounded-xl text-sm font-semibold text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-50"
       >
-        {hasUnsavedChanges ? "Cancel" : "Close"}
+        {unsavedCount > 0 ? "Cancel" : "Close"}
       </button>
       <button
         type="button"
@@ -57,7 +58,7 @@ export const PromptModalFooter: React.FC<PromptModalFooterProps> = ({
         className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSaving && <Loader2 size={16} className="animate-spin" aria-hidden="true" />}
-        {isSaving ? "Saving..." : "Save Prompt"}
+        {isSaving ? "Saving..." : unsavedCount > 1 ? `Save ${unsavedCount} Prompts` : "Save Prompt"}
       </button>
     </div>
   </div>

@@ -6,7 +6,7 @@ import type { GlobalPrompt } from "@/types/globalPrompts"
 /**
  * Each global prompt has its own Setting record and its own default template, so
  * editing one can never change another. Every tool's output passes through the
- * Humanization prompt (services/humanizer.ts); Rafay Profile Info isn't used yet.
+ * Humanization prompt (services/humanizer.ts); Post Comment Replies draws on Rafay Profile Info.
  */
 function globalPromptEntry(id: GlobalPromptId): PromptEntry {
   return { key: globalPromptKey(id), defaultPrompt: loadPrompt(`global-${id}`) }

@@ -55,7 +55,7 @@ export default function GlobalPromptsClient() {
             <p className="flex items-start gap-2 bg-surface-container-low border border-outline-variant/60 text-on-surface-variant rounded-xl px-4 py-3 text-[13px] leading-relaxed">
               <Lock size={15} className="shrink-0 mt-0.5 text-primary" aria-hidden="true" />
               <span>
-                The Humanization prompt rewrites the results of all 8 LinkedIn tools; Rafay Profile Info is saved for future use. Viewing or editing them needs the prompt
+                The Humanization prompt rewrites the results of all 8 LinkedIn tools; Rafay Profile Info gives Post Comment Replies your real experience, projects and numbers. Viewing or editing them needs the prompt
                 password, which stays unlocked in this browser for {PROMPT_ACCESS_SESSION_HOURS} hours.
               </span>
             </p>

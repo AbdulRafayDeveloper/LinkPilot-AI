@@ -10,6 +10,7 @@ import {
 } from "@/services/conversationTimeline"
 import { CONVERSATION_STATES } from "@/constants/conversationState"
 import { CLIENT_SIZES, MAX_KEY_OPPORTUNITIES, MAX_KEY_RISKS, RISK_LEVELS } from "@/constants/conversationReply"
+import { toScore } from "@/constants/scoreBands"
 import type { ConversationAnalysis, ScoreSignal } from "@/types/conversationReply"
 
 // Zero temperature so the same conversation scores as consistently as possible from run to run
@@ -84,7 +85,7 @@ function findUnusableReason(output: AnalysisOutput): string | null {
 }
 
 function toScoreSignal({ score, summary }: { score: number; summary: string }): ScoreSignal {
-  return { score: Math.min(100, Math.max(0, Math.round(score))), summary: summary.trim() }
+  return { score: toScore(score), summary: summary.trim() }
 }
 
 function cleanList(items: string[], max: number): string[] {

@@ -6,8 +6,7 @@ import { NO_SENDER_PROFILE_TEXT, generateWithoutSenderClaims } from "@/services/
 import { humanizeTexts } from "@/services/humanizer"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
 import { INMAIL_BODY_MAX_CHARS, INMAIL_SUBJECT_MAX_CHARS } from "@/constants/linkedinLimits"
-import { getOutreachTuneLabel } from "@/constants/outreachTunes"
-import type { InMailTuneId } from "@/constants/inmail"
+import { getInMailTuneLabel, type InMailTuneId } from "@/constants/inmail"
 import type { GeneratedInMail } from "@/types/inmail"
 import { getInMailGenerationInputs } from "./prompts"
 
@@ -109,7 +108,7 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
       },
       { variable: "profile_data", tag: "profile_data", label: "Their profile", content: profileData },
     ],
-    { tune: getOutreachTuneLabel(tune) }
+    { tune: getInMailTuneLabel(tune) }
   )
 
   const { data, provider, senderClaimRewrite, unsupportedSenderClaim } = await generateWithoutSenderClaims({

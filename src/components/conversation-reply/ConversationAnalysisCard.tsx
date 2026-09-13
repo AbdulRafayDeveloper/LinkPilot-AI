@@ -54,7 +54,7 @@ export const ConversationAnalysisCard: React.FC<ConversationAnalysisCardProps> =
         <h2 id={titleId} className="text-sm font-bold text-on-surface">
           Conversation Signals
         </h2>
-        <p className="text-[11px] text-outline">Evidence-based estimates, independent of the reply type</p>
+        <p className="text-[11px] text-outline">Evidence-based estimates, independent of the reply tone</p>
       </div>
 
       {isLoading && <AnalysisSkeleton />}

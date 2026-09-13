@@ -2,8 +2,9 @@ import { z } from "zod"
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
-import { composePromptMessage } from "@/services/promptComposer"
+import { composePromptMessage, type PromptDataBlock } from "@/services/promptComposer"
 import { humanizeTexts } from "@/services/humanizer"
+import { assessLeadSignalsSafely } from "@/services/leadSignals"
 import {
   conversationPeopleFields,
   loadConversationReadingRules,
@@ -13,15 +14,15 @@ import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
 import { LINKEDIN_MESSAGE_MAX_CHARS } from "@/constants/linkedinLimits"
 import { getFollowUpTypeLabel, type FollowUpTypeId } from "@/constants/followUp"
 import type { GeneratedFollowUp } from "@/types/followUp"
-import { getActiveFollowUpPrompt } from "./prompts"
+import { getGenerationInputs } from "./prompts"
 
 // Slightly creative so follow-ups read like a person wrote them
 const WRITING_TEMPERATURE = 0.7
 
 /**
- * The model lists every message with its sender before writing, so the follow-up is
- * grounded in the actual thread. Who spoke last and whether the other person ever
- * replied are derived from that timeline in code, never asked of the model directly.
+ * The model lists every message with its sender and summarizes the thread before writing,
+ * so the follow-up is grounded in what was actually said. These fields steer the writing
+ * and are logged; only the message is shown.
  */
 const FollowUpSchema = z.object({
   ...conversationPeopleFields,
@@ -53,7 +54,8 @@ function findUnusableReason(output: FollowUpOutput): string | null {
 
 /**
  * Generates one follow-up with the latest saved prompt for the selected type, then
- * rewrites it with the Humanization prompt. The pasted conversation and profile are
+ * rewrites it with the Humanization prompt. In parallel, the saved Lead Signals prompt
+ * estimates the lead, independently of the type. The pasted conversation and profile are
  * untrusted data inside their own delimiter tags; {{follow_up_type}} inserts the type name.
  */
 export async function generateFollowUp({
@@ -62,19 +64,25 @@ export async function generateFollowUp({
   type,
   signal,
 }: GenerateOptions): Promise<GeneratedFollowUp> {
-  const typePrompt = await getActiveFollowUpPrompt(type)
+  const { typePrompt, signalsPrompt, senderProfile } = await getGenerationInputs(type)
+  const conversationBlocks: PromptDataBlock[] = [
+    { variable: "conversation", tag: "conversation_history", label: "Previous conversation", content: conversation },
+    { variable: "profile_data", tag: "profile_data", label: "Profile information about them", content: profileData },
+  ]
+  const signalsPromise = assessLeadSignalsSafely({
+    signalsPrompt,
+    dataBlocks: [
+      ...conversationBlocks,
+      { variable: "sender_profile", tag: "sender_profile", label: "About me", content: senderProfile },
+    ],
+    signal,
+  })
+
   const system = renderPrompt(loadPrompt("follow-up-system"), {
     CURRENT_DATE: new Date().toISOString().slice(0, 10),
     CONVERSATION_READING_RULES: loadConversationReadingRules(),
   })
-  const user = composePromptMessage(
-    typePrompt,
-    [
-      { variable: "conversation", tag: "conversation_history", label: "Previous conversation", content: conversation },
-      { variable: "profile_data", tag: "profile_data", label: "Profile information about them", content: profileData },
-    ],
-    { follow_up_type: getFollowUpTypeLabel(type) }
-  )
+  const user = composePromptMessage(typePrompt, conversationBlocks, { follow_up_type: getFollowUpTypeLabel(type) })
 
   const { data, provider } = await generateStructuredWithFallback({
     schema: FollowUpSchema,
@@ -98,6 +106,7 @@ export async function generateFollowUp({
   })
   const message = humanization.texts.message
   const parties = toConversationParties(data)
+  const signals = await signalsPromise
   console.info(
     "Follow-up generated:",
     JSON.stringify({
@@ -106,6 +115,7 @@ export async function generateFollowUp({
       state: parties.state,
       usedProfile: profileData !== null,
       humanized: humanization.humanized,
+      leadSignals: signals !== null,
       characters: message.length,
     })
   )
@@ -115,6 +125,6 @@ export async function generateFollowUp({
     type,
     characterCount: message.length,
     usedProfile: profileData !== null,
-    reading: { ...parties, summary: data.conversation_summary.trim() },
+    signals,
   }
 }

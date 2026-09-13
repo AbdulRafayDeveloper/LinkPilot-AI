@@ -11,6 +11,7 @@ import {
   PromptModalFooter,
   type PromptFeedback,
 } from "@/components/prompts/PromptModalParts"
+import { saveEditedPrompts } from "@/components/prompts/saveEditedPrompts"
 import { requestApi } from "@/lib/apiClient"
 import { useCloseAfterSave } from "@/hooks/useCloseAfterSave"
 import {
@@ -29,6 +30,25 @@ type PromptKey = `${ReplyContextId}:${ReplyStyleId}`
 
 const promptKey = (context: ReplyContextId, style: ReplyStyleId): PromptKey => `${context}:${style}`
 
+// Every context + style pair in tab order, so Save goes through the edited ones in the order they appear
+const PROMPT_PAIRS = REPLY_CONTEXTS.flatMap((context) =>
+  REPLY_STYLES.map((style) => ({
+    key: promptKey(context.id, style.id),
+    context: context.id,
+    style: style.id,
+    label: `${context.label} · ${style.label}`,
+  })),
+)
+
+function savePairPrompt(key: PromptKey, prompt: string) {
+  const [context, style] = key.split(":")
+  return requestApi<ReplyPrompt>(`${PROMPTS_ENDPOINT}/${context}/${style}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  })
+}
+
 interface ReplyPromptsModalProps {
   initialContext: ReplyContextId
   initialStyle: ReplyStyleId | null
@@ -39,17 +59,20 @@ const variableChip = "font-code text-on-surface-variant bg-surface-container px-
 
 const VariablesHint = () => (
   <p className="leading-relaxed">
-    Variables: <code className={variableChip}>{"{{conversation}}"}</code> the post (pasted or from a screenshot) and the
-    pasted comments (appended if omitted) · <code className={variableChip}>{"{{sender_profile}}"}</code> your About Me profile ·{" "}
-    <code className={variableChip}>{"{{web_research}}"}</code> live web research (slower). Replies always answer a real
-    comment and never invent facts.
+    Variables: <code className={variableChip}>{"{{conversation}}"}</code> the post and the whole comment thread ·{" "}
+    <code className={variableChip}>{"{{latest_comment}}"}</code> or <code className={variableChip}>{"{{comment}}"}</code>{" "}
+    the comment being answered (the latest one from someone other than you) ·{" "}
+    <code className={variableChip}>{"{{post_content}}"}</code> the original post ·{" "}
+    <code className={variableChip}>{"{{sender_profile}}"}</code> your profile (About Me + Rafay Profile Info) ·{" "}
+    <code className={variableChip}>{"{{web_research}}"}</code> live web research (slower). Anything you leave out is added
+    at the end. Replies always answer a real comment and never invent facts or numbers.
   </p>
 )
 
 /**
- * Edits the 14 independent reply prompts: choose the context, then the style, and the
+ * Edits the independent reply prompts, one per context + style pair: choose the context, then the style, and the
  * editor loads that exact pair's prompt. Drafts are kept per pair while the modal is
- * open, and Save persists only the active pair. It opens only after the prompt password
+ * open, and Save stores every pair that was edited. It opens only after the prompt password
  * check (PromptAccessGate).
  */
 export const ReplyPromptsModal: React.FC<ReplyPromptsModalProps> = (props) => (
@@ -98,7 +121,7 @@ const ReplyPromptsEditor: React.FC<ReplyPromptsModalProps> = ({ initialContext, 
   const activeDraft = drafts[activeKey] ?? ""
   const isDirty = (key: PromptKey) => saved !== null && drafts[key] !== saved[key].prompt
   const isContextDirty = (context: ReplyContextId) => REPLY_STYLES.some((style) => isDirty(promptKey(context, style.id)))
-  const unsavedCount = saved ? (Object.keys(saved) as PromptKey[]).filter(isDirty).length : 0
+  const editedPairs = PROMPT_PAIRS.filter((pair) => isDirty(pair.key))
 
   const selectContext = (context: ReplyContextId) => {
     setActiveContext(context)
@@ -111,41 +134,47 @@ const ReplyPromptsEditor: React.FC<ReplyPromptsModalProps> = ({ initialContext, 
   }
 
   const handleSave = async () => {
-    const context = activeContext
-    const style = activeStyle
-    const key = promptKey(context, style)
     setIsSaving(true)
     setFeedback(null)
-    try {
-      const { data, message } = await requestApi<ReplyPrompt>(`${PROMPTS_ENDPOINT}/${context}/${style}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: drafts[key] ?? "" }),
-      })
-      setSaved((current) => (current ? { ...current, [key]: data } : current))
-      setDrafts((current) => ({ ...current, [key]: data.prompt }))
-      setFeedback({ type: "success", message: message || "Prompt saved." })
+    const result = await saveEditedPrompts(
+      editedPairs.map((pair) => ({ key: pair.key, label: pair.label, prompt: drafts[pair.key] ?? "" })),
+      savePairPrompt,
+    )
+    setSaved((current) => {
+      if (!current) return current
+      const next = { ...current }
+      for (const { key, data } of result.saved) next[key] = data
+      return next
+    })
+    setDrafts((current) => {
+      const next = { ...current }
+      for (const { key, data } of result.saved) next[key] = data.prompt
+      return next
+    })
+    setFeedback(result.feedback)
+    setIsSaving(false)
+    const problem = PROMPT_PAIRS.find((pair) => pair.key === result.problemKey)
+    if (problem) {
+      setActiveContext(problem.context)
+      setActiveStyle(problem.style)
+    } else {
       closeAfterSave()
-    } catch (error: unknown) {
-      setFeedback({ type: "error", message: error instanceof Error ? error.message : "Couldn't save the prompt." })
-    } finally {
-      setIsSaving(false)
     }
   }
 
   return (
     <Modal
       title="Update Reply Prompts"
-      description="Each context and reply style has its own independent prompt, 14 in total. Saving one never changes the others, and future replies with that context and style use the saved version."
+      description={`Each context and reply style has its own independent prompt, ${REPLY_CONTEXTS.length * REPLY_STYLES.length} in total. Saving one never changes the others, and future replies with that context and style use the saved version.`}
       onClose={onClose}
       isCloseDisabled={isSaving}
       size="large"
       footer={
         <PromptModalFooter
           feedback={feedback}
-          hasUnsavedChanges={unsavedCount > 0}
+          unsavedCount={editedPairs.length}
           isSaving={isSaving}
-          canSave={isDirty(activeKey) && activeDraft.trim().length > 0 && !isBusy}
+          canSave={editedPairs.length > 0 && !isBusy}
           onCancel={onClose}
           onSave={handleSave}
         />

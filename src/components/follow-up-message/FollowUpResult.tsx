@@ -1,10 +1,9 @@
 "use client"
 
 import React from "react"
-import { AlertTriangle, Loader2, MessagesSquare, RefreshCw, Repeat } from "lucide-react"
+import { AlertTriangle, Loader2, RefreshCw, Repeat } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { getFollowUpTypeLabel } from "@/constants/followUp"
-import { CONVERSATION_STATES } from "@/constants/conversationState"
 import type { GenerationStatus } from "@/hooks/useGenerationRequest"
 import type { GeneratedFollowUp } from "@/types/followUp"
 
@@ -73,23 +72,6 @@ export const FollowUpResult: React.FC<FollowUpResultProps> = ({ status, result, 
           {result.characterCount.toLocaleString()} characters · {getFollowUpTypeLabel(result.type)}
           {result.usedProfile && " · Personalized with profile"}
         </p>
-
-        <div className="border-t border-outline-variant/60 pt-3">
-          <h3 className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1.5">How the conversation was read</h3>
-          <p className="flex items-start gap-2 text-[13px] text-on-surface font-semibold">
-            <MessagesSquare size={14} className="shrink-0 mt-0.5 text-primary" aria-hidden="true" />
-            <span>
-              {CONVERSATION_STATES[result.reading.state]}
-              {result.reading.otherPersonName && (
-                <span className="font-normal text-on-surface-variant">
-                  {" "}
-                  · {result.reading.userName ? `From ${result.reading.userName} to` : "To"} {result.reading.otherPersonName}
-                </span>
-              )}
-            </span>
-          </p>
-          <p className="text-[12px] text-on-surface-variant leading-relaxed mt-1 ml-6">{result.reading.summary}</p>
-        </div>
       </div>
     )}
   </section>

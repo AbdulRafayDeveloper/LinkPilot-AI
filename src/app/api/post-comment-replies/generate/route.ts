@@ -16,7 +16,6 @@ export const dynamic = "force-dynamic"
 // Reading a screenshot, optional live research (only when a prompt uses {{web_research}}) and a possible fallback call
 export const maxDuration = 300
 
-const MAX_AUTHOR_LENGTH = 120
 const { missingComment, missingContext, missingStyle, commentsTooLong, generationFailed } = POST_COMMENT_REPLY_MESSAGES
 
 const FieldsSchema = z.object({
@@ -27,23 +26,7 @@ const FieldsSchema = z.object({
     .trim()
     .min(1, missingComment)
     .max(REPLY_COMMENTS_MAX_LENGTH, commentsTooLong),
-  targetComment: z
-    .object({
-      author: z.string().trim().max(MAX_AUTHOR_LENGTH).nullable(),
-      text: z.string().trim().min(1).max(REPLY_COMMENTS_MAX_LENGTH),
-    })
-    .nullable()
-    .catch(null),
 })
-
-function parseJson(value: FormDataEntryValue | null): unknown {
-  if (typeof value !== "string") return null
-  try {
-    return JSON.parse(value)
-  } catch {
-    return null
-  }
-}
 
 async function parseRequest(req: NextRequest): Promise<ReplyInput | { error: string }> {
   const form = await req.formData().catch(() => null)
@@ -53,7 +36,6 @@ async function parseRequest(req: NextRequest): Promise<ReplyInput | { error: str
     context: form.get("context") ?? undefined,
     style: form.get("style") ?? undefined,
     comments: form.get("comments") ?? undefined,
-    targetComment: parseJson(form.get("targetComment")),
   })
   if (!fields.success) return { error: fields.error.issues[0]?.message || missingComment }
 
@@ -64,8 +46,8 @@ async function parseRequest(req: NextRequest): Promise<ReplyInput | { error: str
 }
 
 /**
- * POST (multipart form: context, style, comments, targetComment?, inputMode, postText | image):
- * generates one reply with the latest saved prompt for the exact context + style, streaming
+ * POST (multipart form: context, style, comments, inputMode, postText | image): generates one
+ * reply to the other person's latest comment with the latest saved prompt for the exact context + style, streaming
  * real pipeline stages as Server-Sent Events and ending with COMPLETE or ERROR.
  */
 export async function POST(req: NextRequest) {

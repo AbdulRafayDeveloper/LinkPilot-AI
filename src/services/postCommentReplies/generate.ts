@@ -4,15 +4,18 @@ import { AI_PROVIDERS, generateStructuredWithFallback, type ModelProvider } from
 import { runLiveResearch } from "@/services/liveResearch"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { getSenderProfile } from "@/services/senderProfile"
+import { getActiveGlobalPrompt } from "@/services/globalPrompts"
 import { extractPostFromImage } from "@/services/postImage"
 import { humanizeTexts } from "@/services/humanizer"
 import { UserFacingError } from "@/lib/errors"
 import { createTagSanitizer } from "@/lib/sanitize"
+import { parseLinkedInConversation } from "@/lib/linkedinComments"
 import type { PostSource } from "@/lib/validation/postInput"
 import {
   LINKEDIN_COMMENT_MAX_CHARS,
   POST_COMMENT_REPLY_MESSAGES,
   getReplyStyleLabel,
+  isReplyAuthor,
   type ReplyContextId,
   type ReplyStage,
   type ReplyStyleId,
@@ -26,7 +29,11 @@ const WRITING_TEMPERATURE = 0.7
 const REPLY_MAX_CHARS = 5000
 const RESEARCH_NOTES_MAX_CHARS = 12000
 const NO_SENDER_PROFILE_TEXT =
-  "The user hasn't filled in their About Me profile, so nothing is known about their background, services or experience."
+  "Abdul hasn't filled in his profile, so nothing is known about his background, services or experience."
+const NO_POST_TEXT = "The original post wasn't provided."
+const LATEST_COMMENT_TEXT = "The other person's latest comment in the thread (the most recent one not written by Abdul Rafay)."
+// Targeted rewrites for made-up figures, unsupported claims or a reply over LinkedIn's limit
+const MAX_REWRITES = 2
 // One cited source is enough to support a single reply
 const MIN_RESEARCH_SOURCES = 1
 // Gemini first; OpenAI only when Gemini can't deliver
@@ -36,10 +43,22 @@ const WRAPPED_IN_QUOTES = /^(["“])([\s\S]*)(["”])$/
 const EXPERIENCE_CLAIM =
   /\b(?:we|i|our team|my team)\s+(?:usually|typically|normally|generally|often|always|tend to|found (?:that|it)|have (?:found|seen|tried))\b|\b(?:we|i)['’]ve (?:found|seen|tried)\b|\bin (?:my|our) experience\b|\bat (?:my|our) (?:company|job|work|firm)\b/i
 
-// Prompt variables. The About Me lookup and live research run only when the saved prompt uses them.
-// {{knowledge_base}} is kept as an alias of {{sender_profile}} so earlier saved prompts keep working.
+// Figures that read as results or facts: percentages, multiples, counts, durations and money
+const FIGURE =
+  /(?:[$€£]\s?)?\d[\d,.]*(?:\s*(?:-|–|to)\s*\d[\d,.]*)?\s*(?:%|x\b|\+|[kKmM]\b|ms\b|milliseconds?\b|seconds?\b|secs?\b|minutes?\b|mins?\b|hours?\b|hrs?\b|days?\b|weeks?\b|months?\b|years?\b|users?\b|clients?\b|customers?\b|projects?\b|products?\b|MVPs?\b|teams?\b|companies\b)/gi
+// A story about an unnamed client, which the model tends to invent to fill a case-study structure
+const CLIENT_STORY =
+  /\b(?:a|one|another)\s+(?:recent\s+|former\s+|past\s+)?client(?:\s+of\s+(?:ours|mine))?\b|\bone of (?:our|my) clients\b/i
+// LinkedIn shows markdown literally, so emphasis marks and code ticks are removed
+const MARKDOWN_MARKS = /\*\*|__|`/g
+
+// Prompt variables. Live research runs only when the saved prompt uses it. {{knowledge_base}} is
+// an alias of {{sender_profile}}, and {{comment}} of {{latest_comment}}, so every saved prompt keeps working.
 const VARIABLE = {
   conversation: "conversation",
+  postContent: "post_content",
+  latestComment: "latest_comment",
+  comment: "comment",
   senderProfile: "sender_profile",
   legacySenderProfile: "knowledge_base",
   webResearch: "web_research",
@@ -70,7 +89,6 @@ export interface ReplyInput {
   comments: string
   // The original post as pasted text or a verified screenshot, or null when not provided
   post: PostSource | null
-  targetComment: TargetComment | null
 }
 
 // The input after any screenshot has been read, so every prompt sees plain text
@@ -94,28 +112,54 @@ function wrapSection(tag: string, content: string): string {
   return `<${tag}>\n${stripDataTags(content).trim()}\n</${tag}>`
 }
 
-/**
- * The post and the comments come from separate inputs, so each gets its own section.
- * The post section is left out entirely when the user didn't provide the post.
- */
-function conversationSection({ postText, comments, targetComment }: Conversation): string {
-  const sections = [
-    ...(postText ? [wrapSection("linkedin_post", postText)] : []),
-    wrapSection("linkedin_comments", comments),
-  ]
-  if (targetComment) {
-    const author = targetComment.author ? `${targetComment.author}:\n` : ""
-    sections.push(wrapSection("target_comment", `${author}${targetComment.text}`))
-  }
-  return sections.join("\n\n")
+function postSection(postText: string | null): string | null {
+  return postText ? wrapSection("linkedin_post", postText) : null
+}
+
+function targetSection(targetComment: TargetComment | null): string | null {
+  if (!targetComment) return null
+  const author = targetComment.author ? `${targetComment.author}:\n` : ""
+  return wrapSection("target_comment", `${author}${targetComment.text}`)
 }
 
 /**
- * The user's own About Me profile: the only source of facts about their background,
- * services and experience.
+ * The post and the comments come from separate inputs, so each gets its own section.
+ * The post section is left out entirely when the user didn't provide the post, and a
+ * part the prompt already places elsewhere ({{post_content}}, {{latest_comment}}) isn't repeated.
+ */
+function conversationSection(
+  { postText, comments, targetComment }: Conversation,
+  { includePost = true, includeTarget = true }: { includePost?: boolean; includeTarget?: boolean } = {}
+): string {
+  return [
+    includePost ? postSection(postText) : null,
+    wrapSection("linkedin_comments", comments),
+    includeTarget ? targetSection(targetComment) : null,
+  ]
+    .filter((section): section is string => section !== null)
+    .join("\n\n")
+}
+
+/**
+ * The comment to answer: the latest comment in the thread that Abdul didn't write. Null
+ * when the comments can't be told apart, and then the writer finds it itself.
+ */
+function resolveTargetComment(comments: string): TargetComment | null {
+  const latest = parseLinkedInConversation(comments)
+    .comments.filter((comment) => !isReplyAuthor(comment.author))
+    .at(-1)
+  return latest ? { author: latest.author, text: latest.text } : null
+}
+
+/**
+ * Everything Abdul has written about himself: his About Me profile and his Rafay Profile
+ * Info (Global AI Prompts). It is the only source of facts about his background, work,
+ * results and numbers, and every reply style may draw on it.
  */
 async function loadSenderProfileSection(): Promise<string> {
-  return (await getSenderProfile())?.trim() || NO_SENDER_PROFILE_TEXT
+  const [aboutMe, rafayProfile] = await Promise.all([getSenderProfile(), getActiveGlobalPrompt("rafay-profile")])
+  const parts = [aboutMe?.trim(), rafayProfile.trim()].filter((part): part is string => Boolean(part))
+  return parts.join("\n\n") || NO_SENDER_PROFILE_TEXT
 }
 
 /**
@@ -126,8 +170,11 @@ async function researchConversation(conversation: Conversation, stylePrompt: str
   const system = renderPrompt(loadPrompt("post-comment-reply-research"), { CURRENT_DATETIME: new Date().toISOString() })
   const styleBrief = renderPrompt(stylePrompt, {
     [VARIABLE.conversation]: "(the post and comments below)",
-    [VARIABLE.senderProfile]: "(the user's About Me profile)",
-    [VARIABLE.legacySenderProfile]: "(the user's About Me profile)",
+    [VARIABLE.postContent]: "(the post below)",
+    [VARIABLE.latestComment]: "(the comment being answered, below)",
+    [VARIABLE.comment]: "(the comment being answered, below)",
+    [VARIABLE.senderProfile]: "(Abdul's profile)",
+    [VARIABLE.legacySenderProfile]: "(Abdul's profile)",
     [VARIABLE.webResearch]: "(this research)",
   })
   const messages: BaseMessage[] = [
@@ -157,14 +204,16 @@ async function researchConversation(conversation: Conversation, stylePrompt: str
 /**
  * Keeps the three instruction layers separate: application rules (with the post-ownership
  * context) in the system message, the saved style prompt as the user's instructions, and
- * pasted or retrieved text inside delimiter tags it cannot close. {{conversation}} places
- * the post and comment sections where the prompt wants them; otherwise they are appended.
+ * pasted or retrieved text inside delimiter tags it cannot close. Each variable places its
+ * section where the prompt wants it: {{conversation}} (post, comments and the comment being
+ * answered), {{post_content}}, {{latest_comment}} / {{comment}} and {{sender_profile}}.
+ * Whatever the prompt doesn't place is appended after it.
  */
 function buildMessages(
   input: ReplyInput,
   conversation: Conversation,
   stylePrompt: string,
-  senderProfile: string | null,
+  senderProfile: string,
   webResearch: string | null
 ): BaseMessage[] {
   const system = renderPrompt(loadPrompt("post-comment-reply-system"), {
@@ -172,25 +221,81 @@ function buildMessages(
     STYLE: getReplyStyleLabel(input.style),
   })
 
-  const sections = conversationSection(conversation)
-  const variables: Record<string, string> = { [VARIABLE.conversation]: sections }
-  if (senderProfile !== null) {
-    const section = wrapSection("sender_profile", senderProfile)
-    variables[VARIABLE.senderProfile] = section
-    variables[VARIABLE.legacySenderProfile] = section
+  const uses = (...names: string[]) => names.some((name) => usesVariable(stylePrompt, name))
+  const placesPost = uses(VARIABLE.postContent)
+  const placesTarget = uses(VARIABLE.latestComment, VARIABLE.comment)
+  const target = targetSection(conversation.targetComment) ?? LATEST_COMMENT_TEXT
+  const profile = wrapSection("sender_profile", senderProfile)
+  const variables: Record<string, string> = {
+    [VARIABLE.conversation]: conversationSection(conversation, { includePost: !placesPost, includeTarget: !placesTarget }),
+    [VARIABLE.postContent]: postSection(conversation.postText) ?? NO_POST_TEXT,
+    [VARIABLE.latestComment]: target,
+    [VARIABLE.comment]: target,
+    [VARIABLE.senderProfile]: profile,
+    [VARIABLE.legacySenderProfile]: profile,
   }
   if (webResearch !== null) variables[VARIABLE.webResearch] = wrapSection("web_research", webResearch)
 
-  const instructions = renderPrompt(stylePrompt, variables)
-  const userMessage = usesVariable(stylePrompt, VARIABLE.conversation) ? instructions : `${instructions}\n\n${sections}`
-  return [new SystemMessage(system), new HumanMessage(userMessage)]
+  const appended = [
+    uses(VARIABLE.conversation)
+      ? null
+      : conversationSection(conversation, { includePost: !placesPost, includeTarget: !placesTarget }),
+    uses(VARIABLE.senderProfile, VARIABLE.legacySenderProfile) ? null : `About Abdul:\n${profile}`,
+  ].filter((section): section is string => section !== null)
+  return [new SystemMessage(system), new HumanMessage([renderPrompt(stylePrompt, variables), ...appended].join("\n\n"))]
 }
 
 function cleanReply(raw: string): string {
   const text = raw.trim()
   const wrapped = text.match(WRAPPED_IN_QUOTES)
   // Strip quotes only when they wrap the whole reply, not when it merely starts or ends with a quotation
-  return (wrapped && !/["“”]/.test(wrapped[2]) ? wrapped[2] : text).trim()
+  return (wrapped && !/["“”]/.test(wrapped[2]) ? wrapped[2] : text).replace(MARKDOWN_MARKS, "").trim()
+}
+
+// Compares figures loosely: case, spacing and plural units don't matter ("3 Weeks" = "3 week")
+const normalizeFigures = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/(second|sec|minute|min|hour|hr|day|week|month|year|user|client|customer|project|product|mvp|team)s\b/g, "$1")
+
+/**
+ * Figures in the reply (a number with its unit) that appear nowhere in the sources: Abdul's
+ * profile, the post, the comments or the style prompt itself. These are results the model
+ * made up. A figure worded differently from its source is flagged too, which only costs a
+ * rewrite that uses the number as written in the source.
+ */
+function findUnsupportedFigures(reply: string, sourceText: string): string[] {
+  const source = normalizeFigures(sourceText)
+  const figures = [...reply.matchAll(FIGURE)].map((match) => match[0].trim())
+  return [...new Set(figures.filter((figure) => !source.includes(normalizeFigures(figure))))]
+}
+
+interface ReplyProblems {
+  claim: string | null
+  story: string | null
+  figures: string[]
+  length: number
+}
+
+// Short labels for the log line
+function findProblemLabels({ claim, story, figures, length }: ReplyProblems): string[] {
+  return [claim && `claim "${claim}"`, story && `story "${story}"`, ...figures.map((figure) => `figure "${figure}"`), length > LINKEDIN_COMMENT_MAX_CHARS && `${length} chars`].filter(
+    (label): label is string => typeof label === "string"
+  )
+}
+
+function describeProblems({ claim, story, figures, length }: ReplyProblems): string[] {
+  return [
+    story &&
+      `It tells a story about "${story}" that isn't in Abdul's profile. Use a real project described in <sender_profile>, named as written there, or make the point without a story.`,
+    claim &&
+      `It says "${claim}". Keep a statement about what Abdul or his team does, did, uses or has experienced only if the post, Abdul's own comments or his profile in <sender_profile> states it; rewrite any other one as a general option (for example "one approach is...").`,
+    figures.length > 0 &&
+      `It states figures that neither Abdul's profile, the post nor the comments contain: ${figures.join(", ")}. Remove them, or use a real number from <sender_profile> instead. Never invent results.`,
+    length > LINKEDIN_COMMENT_MAX_CHARS &&
+      `It is ${length.toLocaleString()} characters, but a LinkedIn comment allows at most ${LINKEDIN_COMMENT_MAX_CHARS.toLocaleString()}. Make it shorter than that while keeping its structure and point.`,
+  ].filter((problem): problem is string => typeof problem === "string")
 }
 
 function findUnusableReason(output: ReplyOutput): string | null {
@@ -201,9 +306,9 @@ function findUnusableReason(output: ReplyOutput): string | null {
   return null
 }
 
-function experienceClaimRewrite(reply: string, claim: string): HumanMessage {
+function problemRewrite(reply: string, problems: string[]): HumanMessage {
   return new HumanMessage(
-    `Your draft reply below says "${claim}". Check every statement in it about what the user or their team does, did, uses or has experienced. Keep such a statement only if the post, the user's own comment or the user's About Me profile states it. Rewrite any other one as a general option (for example "one approach is..."). Keep the same style, length and target comment.\n\n${wrapSection("draft_reply", reply)}`
+    `Rewrite your draft reply below. ${problems.join(" ")} Keep everything else: the same style, the same target comment and plain text.\n\n${wrapSection("draft_reply", reply)}`
   )
 }
 
@@ -222,8 +327,6 @@ function lengthWarning(length: number): string | null {
  */
 export async function generatePostCommentReply({ input, signal, onStage }: GenerateOptions): Promise<GeneratedReply> {
   const stylePrompt = await getActiveReplyPrompt(input.context, input.style)
-  const needsSenderProfile =
-    usesVariable(stylePrompt, VARIABLE.senderProfile) || usesVariable(stylePrompt, VARIABLE.legacySenderProfile)
   const needsResearch = usesVariable(stylePrompt, VARIABLE.webResearch)
   let providers = PROVIDER_ORDER
 
@@ -238,18 +341,14 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
   const conversation: Conversation = {
     postText: input.post?.type === "text" ? input.post.text : extractedPost,
     comments: input.comments,
-    targetComment: input.targetComment,
+    targetComment: resolveTargetComment(input.comments),
   }
 
-  let senderProfile: string | null = null
-  let webResearch: string | null = null
-  if (needsSenderProfile || needsResearch) {
-    onStage("ANALYZING")
-    ;[senderProfile, webResearch] = await Promise.all([
-      needsSenderProfile ? loadSenderProfileSection() : null,
-      needsResearch ? researchConversation(conversation, stylePrompt, signal) : null,
-    ])
-  }
+  if (needsResearch) onStage("ANALYZING")
+  const [senderProfile, webResearch] = await Promise.all([
+    loadSenderProfileSection(),
+    needsResearch ? researchConversation(conversation, stylePrompt, signal) : null,
+  ])
 
   onStage("WRITING")
   const messages = buildMessages(input, conversation, stylePrompt, senderProfile, webResearch)
@@ -273,19 +372,31 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
   let replyingTo = first.data.replying_to
   let provider = first.provider
 
-  // One controlled rewrite when the draft claims experience the sources may not support
-  const claim = reply.match(EXPERIENCE_CLAIM)?.[0]
-  if (claim) {
-    const rewrite = await write([...messages, experienceClaimRewrite(reply, claim)]).catch((error: unknown) => {
+  // Targeted rewrites for unsupported experience claims, made-up figures or a reply over LinkedIn's limit
+  const sourceText = [conversation.postText ?? "", input.comments, senderProfile, stylePrompt].join("\n")
+  const findProblems = (text: string): ReplyProblems => ({
+    claim: text.match(EXPERIENCE_CLAIM)?.[0] ?? null,
+    story: text.match(CLIENT_STORY)?.[0] ?? null,
+    figures: findUnsupportedFigures(text, sourceText),
+    length: text.length,
+  })
+  const draftProblemState = findProblems(reply)
+  let problems = describeProblems(draftProblemState)
+  // A rewrite can bring in new made-up figures, so each one is checked again; the cleanest version wins
+  for (let attempt = 0; attempt < MAX_REWRITES && problems.length > 0; attempt++) {
+    const rewrite = await write([...messages, problemRewrite(reply, problems)]).catch((error: unknown) => {
       if (signal.aborted) throw error
-      console.warn("⚠️ Post comment reply claim rewrite failed; returning the original draft:", error)
+      console.warn("⚠️ Post comment reply rewrite failed; keeping the current draft:", error)
       return null
     })
-    if (rewrite?.data.target_found) {
-      reply = cleanReply(rewrite.data.reply)
-      replyingTo = rewrite.data.replying_to || replyingTo
-      provider = rewrite.provider
-    }
+    if (!rewrite?.data.target_found) break
+    const rewritten = cleanReply(rewrite.data.reply)
+    const rewrittenProblems = describeProblems(findProblems(rewritten))
+    if (rewrittenProblems.length > problems.length) continue
+    reply = rewritten
+    problems = rewrittenProblems
+    replyingTo = rewrite.data.replying_to || replyingTo
+    provider = rewrite.provider
   }
 
   onStage("HUMANIZING")
@@ -296,7 +407,8 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
         id: "reply",
         kind: input.context === "my-post" ? "LinkedIn reply to a comment on my own post" : "LinkedIn reply in someone else's comment thread",
         text: reply,
-        maxChars: REPLY_MAX_CHARS,
+        // Stays within LinkedIn's comment limit, unless the draft couldn't be brought under it
+        maxChars: Math.max(LINKEDIN_COMMENT_MAX_CHARS, reply.length),
       },
     ],
     providers: providers.slice(providers.indexOf(provider)),
@@ -315,9 +427,10 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
       humanized: humanization.humanized,
       post: input.post?.type ?? "none",
       characters: reply.length,
-      senderProfile: needsSenderProfile,
+      target: conversation.targetComment?.author ?? (conversation.targetComment ? "unnamed" : "left to the writer"),
       webResearch: needsResearch,
-      claimRewrite: claim ?? null,
+      rewriteFor: findProblemLabels(draftProblemState),
+      unresolved: problems.length,
     })
   )
 
@@ -325,7 +438,7 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
     reply,
     context: input.context,
     style: input.style,
-    replyingTo: replyingTo.trim() || input.targetComment?.author || null,
+    replyingTo: replyingTo.trim() || conversation.targetComment?.author || null,
     characterCount: reply.length,
     maxCharacters: LINKEDIN_COMMENT_MAX_CHARS,
     warning: lengthWarning(reply.length),

@@ -1,7 +1,7 @@
 /**
  * Post Comment Replies registry. Every context × style pair owns an independent,
  * separately stored prompt (default template: src/prompts/post-comment-reply-<context>-<style>.md),
- * so there are 14 prompts and saving one can never change another.
+ * so there is one prompt per pair and saving one can never change another.
  */
 // Someone else's post comes first: it's the default and the more common case
 export const REPLY_CONTEXTS = [
@@ -15,19 +15,31 @@ export const REPLY_CONTEXT_IDS = REPLY_CONTEXTS.map((context) => context.id) as 
 
 export const DEFAULT_REPLY_CONTEXT: ReplyContextId = "other-post"
 
+// Replies are written as this person; their own comments in a thread are never the ones answered
+export const REPLY_AUTHOR_NAME = "Abdul Rafay"
+
+// LinkedIn labels the viewer's own comments with their name, or "You" in some copies
+export function isReplyAuthor(author: string | null): boolean {
+  const name = author?.trim().toLowerCase() ?? ""
+  return name === REPLY_AUTHOR_NAME.toLowerCase() || name === "you" || name === "me"
+}
+
+// Plain names on screen; the ids stay stable so saved prompts and selections keep working
 export const REPLY_STYLES = [
-  { id: "professional", label: "Professional", description: "Polished and respectful" },
-  { id: "informative", label: "Informative", description: "Adds useful context" },
-  { id: "informative-funny", label: "Informative + Funny", description: "Useful, with light humor" },
-  { id: "questionable", label: "Questionable", description: "Opens a new angle" },
-  { id: "conversation", label: "Conversation Carry-On", description: "Keeps the thread going" },
-  { id: "pitch", label: "Pitch", description: "Connects to your expertise" },
-  { id: "common-dm", label: "Common DM", description: "Casual, like a DM" },
+  { id: "authority-builder", label: "Show Expertise", description: "Expert view + data" },
+  { id: "curiosity-driver", label: "Ask Their Opinion", description: "Gets them talking" },
+  { id: "value-demonstrator", label: "Give Useful Tips", description: "Helpful, no pitch" },
+  { id: "experience-share", label: "Share Real Example", description: "Result + lesson" },
+  { id: "contrarian-insight", label: "Politely Disagree", description: "Kind pushback" },
+  { id: "come-on-dm", label: "Invite to DM", description: "Move talk to DM" },
 ] as const
 
 export type ReplyStyleId = (typeof REPLY_STYLES)[number]["id"]
 
 export const REPLY_STYLE_IDS = REPLY_STYLES.map((style) => style.id) as [ReplyStyleId, ...ReplyStyleId[]]
+
+// Preselected so a reply can be generated right away; the user can pick another style
+export const DEFAULT_REPLY_STYLE: ReplyStyleId = REPLY_STYLES[0].id
 
 export function getReplyContextLabel(context: ReplyContextId): string {
   return REPLY_CONTEXTS.find((entry) => entry.id === context)?.label ?? context

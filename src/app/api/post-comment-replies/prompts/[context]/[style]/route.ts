@@ -19,7 +19,7 @@ const ParamsSchema = z.object({
 })
 
 /**
- * PUT: Saves the prompt for exactly one context + style pair. The other 13 prompts are untouched.
+ * PUT: Saves the prompt for exactly one context + style pair. Every other prompt is untouched.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ context: string; style: string }> }) {
   const denied = await requirePromptAccess()

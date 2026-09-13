@@ -1,9 +1,10 @@
 import type { PromptDataBlock } from "@/services/promptComposer"
 import { findRelevantExperience } from "@/services/senderContext"
+import { assessLeadSignalsSafely } from "@/services/leadSignals"
 import { LINKEDIN_MESSAGE_MAX_CHARS } from "@/constants/linkedinLimits"
 import type { ConversationReplyTypeId } from "@/constants/conversationReply"
 import type { ConversationReplyResult } from "@/types/conversationReply"
-import { getActiveReplyTypePrompt } from "./prompts"
+import { getGenerationPrompts } from "./prompts"
 import { analyzeConversation } from "./analyze"
 import { writeReply } from "./reply"
 
@@ -19,9 +20,10 @@ interface AnalyzeAndReplyOptions {
 }
 
 /**
- * Two steps. First an objective analysis that never sees the reply type or its prompt,
+ * Two steps. First an objective analysis that never sees the reply tone or its prompt,
  * so the signals can't be steered by the chosen strategy. Then the reply, written with
- * the latest saved prompt for the reply type and the analysis as guidance.
+ * the latest saved prompt for the tone and the analysis as guidance. Alongside the
+ * analysis, this tool's saved Lead Signals prompt estimates the lead, also without the tone.
  */
 export async function analyzeAndReply({
   conversation,
@@ -29,8 +31,8 @@ export async function analyzeAndReply({
   replyType,
   signal,
 }: AnalyzeAndReplyOptions): Promise<ConversationReplyResult> {
-  const [typePrompt, experience] = await Promise.all([
-    getActiveReplyTypePrompt(replyType),
+  const [{ typePrompt, signalsPrompt }, experience] = await Promise.all([
+    getGenerationPrompts(replyType),
     findRelevantExperience(),
   ])
 
@@ -46,6 +48,7 @@ export async function analyzeAndReply({
     },
   ]
 
+  const leadSignalsPromise = assessLeadSignalsSafely({ signalsPrompt, dataBlocks, signal })
   const { analysis, brief, userHasSpoken } = await analyzeConversation({ dataBlocks, signal })
   const { reply, strategyNote, provider, humanized, unsupportedSpecifics, unsupportedClaims, unsupportedSenderClaim } = await writeReply({
     typePrompt,
@@ -57,6 +60,7 @@ export async function analyzeAndReply({
     signal,
   })
 
+  const leadSignals = await leadSignalsPromise
   const warnings = [
     unsupportedSpecifics.length > 0 &&
       `This reply mentions ${unsupportedSpecifics.join(", ")}, which isn't in the conversation or your About Me. Check it before sending.`,
@@ -78,6 +82,7 @@ export async function analyzeAndReply({
       unsupportedSpecifics,
       unsupportedClaims,
       unsupportedSenderClaim,
+      leadSignals: leadSignals !== null,
       characters: reply.length,
     })
   )
@@ -91,5 +96,6 @@ export async function analyzeAndReply({
     usedProfile: profileData !== null,
     usedSenderProfile: experience.hasProfile,
     analysis,
+    leadSignals,
   }
 }
