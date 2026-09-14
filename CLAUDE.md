@@ -152,6 +152,7 @@ Styling is Tailwind with Material-3 color tokens from `tailwind.config.ts` (`bg-
 
 ### Trending Topics
 - The default brief (`prompts/trending-topics.md`) targets the owner's domain: web development, AI, and SaaS/MVPs for founders. Mobile apps and consumer hardware are excluded. A saved custom prompt overrides the file.
+- **Shared saved topics:** the latest search is saved for everyone in `src/data/trending-topics/latest.md` (`services/trending/savedTopics.ts`: readable topics on top, the full `TrendingResult` in a closing ```json block that is Zod-validated on read; written to a temp file and renamed). A search that finds at least one topic replaces it; one with none keeps the previous file. `GET /api/trending-topics/saved` returns it (the page loads it on arrival and when the tab becomes visible again), `DELETE` is Reset and removes it for everyone. Like Dummy Data, it needs a writable file system.
 - `TRENDING_TOPIC_COUNT` (6) caps the topics. Each topic's post is a `post_hook` (≤12 words, scroll-stopping) plus a 1–2 line `post_body`; `lib/trendingPost.ts` (`composeTrendingPost`) assembles hook, body, primary reference URL and hashtags into the one text the card shows and copies. Topics whose hook or body still contain a `[placeholder]` are rejected.
 
 
