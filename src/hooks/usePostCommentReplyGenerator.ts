@@ -24,6 +24,7 @@ const store = createToolStore<ReplyGenerationState>("post-comment-replies:result
   version: 1,
   // Only a finished reply survives a refresh; a running request can't resume after one
   toStored: (state) => (state.status === "success" ? state : IDLE),
+  activity: { href: "/post-comment-replies", statusOf: (state) => state.status },
 })
 let controller: AbortController | null = null
 

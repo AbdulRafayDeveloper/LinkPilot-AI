@@ -76,7 +76,10 @@ Model names live **only** in env. Never hardcode a model id in code. Gemini 1.5 
 ### Page pattern
 Each tool route has two parts:
 - A thin server `page.tsx` that holds only metadata and JSON-LD.
-- A `"use client"` `*Client.tsx` that composes `Sidebar` and `Header` from `src/components/ui/`. Sidebar collapse state comes from `hooks/useSidebarCollapse` (localStorage key `isSidebarCollapsed`).
+- A `"use client"` `*Client.tsx` that composes `Sidebar` and `Header` from `src/components/ui/`. Sidebar collapse state comes from `hooks/useSidebarCollapse` (localStorage key `isSidebarCollapsed`; Ctrl/⌘+B toggles it on desktop).
+  - **Sidebar:** brand row (`SITE_LOGO_PNG` mark + "LinkPilot" + AI pill) as tall as the header; tools listed under `TOOL_GROUPS` (Discover, Outreach, Engage on posts, Conversations; each tool's `group` in `constants/linkedinTools.ts`); Global AI Prompts pinned at the bottom. The current tool gets a filled icon tile and a left accent bar. Collapsed on desktop it's a 76px icon rail with a custom tooltip (name + description or activity); the mobile drawer (`z-[45]`) always shows the full list. No per-link "open in new tab" arrow.
+  - **Header:** `SITE_PURPOSE` ("LinkedIn Writing Assistant", `config/site.ts`), the background-activity indicator and a "Jump to a tool" search (`components/ui/ToolSwitcher`, also Ctrl/⌘+K) over the same links as the sidebar. No user/profile or AI-status badge.
+  - **Background activity (`lib/toolActivity.ts`):** result stores pass `activity: { href, statusOf }` to `createToolStore`; a run shows as a spinner on its sidebar item and "X is writing" in the header (`components/ui/ActivityIndicator`) while the user is on another page, then a dot / "X is ready" (or "didn't finish") until that tool is opened. New result stores must pass `activity` too.
 
 ### Tool state survives switching tools (`lib/toolStore.ts`)
 - Never keep a tool's inputs or results in component `useState`: leaving the page would lose them. Each tool has module-level stores made with `createToolStore(name, initial, { version, toStored })`, read with `useToolStore` (`useSyncExternalStore`): a `<tool>:form` store in its `*Client.tsx` and a `<tool>:result` store for the generation (`createGenerationRequest` in `hooks/useGenerationRequest.ts` for JSON tools; `useCommentGenerator`, `usePostCommentReplyGenerator`, `useTrendingTopicsSearch` for the streaming ones).
@@ -85,6 +88,19 @@ Each tool route has two parts:
 - Every tool header has `components/ui/ResetButton` next to Update Prompt: it clears the pasted/uploaded data and the result, and keeps the chosen tone/tune/type/style/context.
 
 Styling is Tailwind with Material-3 color tokens from `tailwind.config.ts` (`bg-surface-container`, `text-on-surface-variant`, `bg-primary-container`, …). Use those tokens, not raw colors. The app is light theme only.
+- The scheme is **Signal Violet & Gold** (it replaced the original teal, blue-tinted surfaces and orange):
+  - Brand violet: `primary` #5b21b6, hover `on-primary-fixed-variant` #4c1d95, selected `primary-container` #6d28d9 with `on-primary-container` #ede9fe, light tags `primary-fixed` #ddd6fe. Button hovers use `hover:bg-on-primary-fixed-variant`.
+  - Gold accent (`secondary*`, amber): Hot/Warm tags, warnings, moderate score bars.
+  - Neutrals are violet-tinted porcelain: `background` #f7f6fa (use `bg-background`, never a hex), ink `on-surface` #1c1826, `on-surface-variant` #4a4658, `outline` #686477 (keeps small labels ≥4.5:1 even on hover fills), hairline `outline-variant` #d6d2df. `shadow-sm/lg/xl` are overridden with soft ink-tinted shadows.
+  - Colors outside the tokens: `globals.css` (body, selection, scrollbar), `SITE_THEME_COLOR` / `SITE_BACKGROUND_COLOR` in `config/site.ts` (manifest, viewport) and the social cards in `app/og/[slug]`.
+- The logo is `public/linkpilot-mark.svg` (source and favicon) and its 512px render `public/linkpilot-mark.png`: a violet gradient tile with a white guiding star and a gold spark. Reference them only through `SITE_LOGO_SVG` / `SITE_LOGO_PNG` in `config/site.ts`.
+
+### Branding, icons and link previews
+- **Icons:** every icon in `public/` is generated from `linkpilot-mark.svg` by `npm run brand:icons` (`scripts/generate-brand-icons.mjs`, sharp): `favicon.ico` (16/32/48), `favicon-{16,32,48}x….png`, `favicon.png` (96), `icon-{48…512}.png`, opaque full-bleed `apple-touch-icon[-180x180].png` (iOS paints transparency black), `maskable-icon[-512x512].png` (glyph inside the 80% safe zone), `monochrome-icon.png` and `safari-pinned-tab.svg`. Rerun it whenever the mark changes; never hand-edit them. `BRAND_ICONS` in `config/site.ts` lists them for the layout and manifest.
+- **Metadata:** the root layout sets `metadataBase` (`NEXT_PUBLIC_BASE_URL`), the `%s | LinkPilot AI` title template, icons, `appleWebApp` and `viewport` (theme colour). Each page's `metadata` is `pageMetadata("<slug>")` (`lib/metadata.ts`) built from its entry in `constants/seo.ts` (`SEO_PAGES`: title, description, card heading, indexable): canonical, `og:url`/title/description and its own card. A new page needs an `SEO_PAGES` entry. `TWITTER_HANDLE` (optional env) adds `twitter:site`/`creator`.
+- **Link preview cards:** `app/og/[slug]/route.tsx` renders `/og/<slug>.png` (1200×630, ~130 KB, logo + page title centred for WhatsApp's square crop, Inter from `src/assets/fonts`), prerendered at build. Unknown slugs get the home card; a render failure returns the logo.
+- **Manifest:** `app/manifest.ts` (`/manifest.webmanifest`; `/manifest.json` and `/site.webmanifest` rewrite to it) with any/maskable/monochrome icons and a shortcut per tool.
+- **Headers (`next.config.ts`):** no `X-Powered-By`; nosniff, Referrer-Policy, Permissions-Policy, no framing; HSTS in production only; brand icons cached for 7 days. `/` is a 308 to the first tool.
 
 ### Layers
 - `src/app/api/<tool>/generate` and `…/prompts[/<id>]`: route handlers. They Zod-validate input and return `{ success, message, data }`. Dynamic `params` is a `Promise` and must be awaited.

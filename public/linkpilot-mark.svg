@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="LinkPilot AI">
+  <defs>
+    <linearGradient id="lp-tile" x1="6" y1="4" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="0.55" stop-color="#5b21b6"/>
+      <stop offset="1" stop-color="#3b0f7a"/>
+    </linearGradient>
+    <radialGradient id="lp-sheen" cx="14" cy="8" r="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="lp-star" x1="30" y1="12" x2="30" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ede9fe"/>
+    </linearGradient>
+    <linearGradient id="lp-gold" x1="44" y1="10" x2="52" y2="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#lp-tile)"/>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#lp-sheen)"/>
+  <rect x="2.5" y="2.5" width="59" height="59" rx="15.5" fill="none" stroke="#ffffff" stroke-opacity="0.16"/>
+  <path d="M29 12 Q29.6 30.4 45 33.5 Q29.6 36.6 29 55 Q28.4 36.6 13 33.5 Q28.4 30.4 29 12 Z" fill="url(#lp-star)"/>
+  <path d="M48 10.5 Q48.35 16.65 54 17.5 Q48.35 18.35 48 24.5 Q47.65 18.35 42 17.5 Q47.65 16.65 48 10.5 Z" fill="url(#lp-gold)"/>
+</svg>

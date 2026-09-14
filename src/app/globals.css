@@ -7,13 +7,18 @@ html {
 }
 
 body {
-  background-color: #FAF7F2;
-  color: #121c2a;
+  background-color: #f7f6fa;
+  color: #1c1826;
   -webkit-font-smoothing: antialiased;
 }
 
+::selection {
+  background: #ddd6fe;
+  color: #2e1065;
+}
+
 .ambient-card-shadow {
-  box-shadow: 0 4px 24px 0 rgba(31, 41, 55, 0.04);
+  box-shadow: 0 4px 24px 0 rgba(28, 24, 38, 0.05);
 }
 
 /* Custom Scrollbar */
@@ -25,9 +30,9 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #bdc9c6;
+  background: #d6d2df;
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #005c55;
+  background: #5b21b6;
 }

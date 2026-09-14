@@ -1,15 +1,9 @@
 import type { Metadata } from "next"
+import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
-import { SITE_NAME } from "@/config/site"
 import FirstMessageClient from "./FirstMessageClient"
 
-export const metadata: Metadata = {
-  title: `First Message | ${SITE_NAME}`,
-  description: "Paste a LinkedIn profile, pick an outreach tune and generate a personalized first message in seconds.",
-  alternates: {
-    canonical: `${SITE_URL}/first-message`,
-  },
-}
+export const metadata: Metadata = pageMetadata("first-message")
 
 export default function Page() {
   return (

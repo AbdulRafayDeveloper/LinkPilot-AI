@@ -41,7 +41,7 @@ export default function TrendingTopicsClient() {
           onToggleCollapse={toggleCollapsed}
         />
 
-        <main className="flex-1 overflow-y-auto bg-[#FAF7F2] overflow-x-hidden">
+        <main className="flex-1 overflow-y-auto bg-background overflow-x-hidden">
           <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-6">
             {/* Page header & controls */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -1,16 +1,9 @@
 import type { Metadata } from "next"
+import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
-import { SITE_NAME } from "@/config/site"
 import CommentWriterClient from "./CommentWriterClient"
 
-export const metadata: Metadata = {
-  title: `Comment Writer | ${SITE_NAME}`,
-  description:
-    "Write thoughtful, relevant LinkedIn comments from a pasted post or a screenshot, in six editable comment styles.",
-  alternates: {
-    canonical: `${SITE_URL}/comment-writer`,
-  },
-}
+export const metadata: Metadata = pageMetadata("comment-writer")
 
 export default function Page() {
   return (

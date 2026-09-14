@@ -40,6 +40,7 @@ const statusFor = (result: TrendingResult): TrendingSearchStatus =>
 const store = createToolStore<TrendingSearchState>("trending-topics:result", IDLE, {
   version: 1,
   toStored: (state) => (isFinished(state.status) ? { ...state, stages: [], error: null } : IDLE),
+  activity: { href: "/trending-topics", statusOf: (state) => state.status },
 })
 let controller: AbortController | null = null
 // Every search, reset and load takes a new token; a slower, older one never overwrites a newer one

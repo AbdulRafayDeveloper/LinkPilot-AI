@@ -37,6 +37,7 @@ const store = createToolStore<CommentGenerationState>("comment-writer:result", I
   version: 1,
   // Only a finished comment survives a refresh; a running request can't resume after one
   toStored: (state) => (state.status === "success" ? { ...state, stages: [] } : IDLE),
+  activity: { href: "/comment-writer", statusOf: (state) => state.status },
 })
 let controller: AbortController | null = null
 

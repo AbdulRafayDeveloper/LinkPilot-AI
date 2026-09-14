@@ -1,6 +1,7 @@
 "use client"
 
 import { useSyncExternalStore } from "react"
+import { reportToolStatus } from "./toolActivity"
 
 // A tool's inputs and results survive navigation, and refreshes for this long after the last change
 const TOOL_STATE_RETENTION_HOURS = 24
@@ -20,6 +21,9 @@ interface ToolStoreOptions<S extends object> {
   version: number
   // The part that survives a refresh; files and in-flight requests belong in memory only
   toStored?: (state: S) => Partial<S>
+  // Result stores: the tool's page and its status, so the sidebar and header can show
+  // a generation running or finished in the background (lib/toolActivity.ts)
+  activity?: { href: string; statusOf: (state: S) => string }
 }
 
 interface StoredState {
@@ -74,7 +78,10 @@ export function createToolStore<S extends object>(name: string, initial: S, opti
     }
   }
 
-  const notify = () => listeners.forEach((listener) => listener())
+  const notify = () => {
+    if (options.activity) reportToolStatus(options.activity.href, options.activity.statusOf(state))
+    listeners.forEach((listener) => listener())
+  }
 
   return {
     getSnapshot() {

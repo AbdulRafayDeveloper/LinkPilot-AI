@@ -1,15 +1,9 @@
 import type { Metadata } from "next"
+import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
-import { SITE_NAME } from "@/config/site"
 import PostCommentRepliesClient from "./PostCommentRepliesClient"
 
-export const metadata: Metadata = {
-  title: `Post Comment Replies | ${SITE_NAME}`,
-  description: "Paste a LinkedIn post and its comments, choose your context and reply style, and generate a natural reply to the right comment.",
-  alternates: {
-    canonical: `${SITE_URL}/post-comment-replies`,
-  },
-}
+export const metadata: Metadata = pageMetadata("post-comment-replies")
 
 export default function Page() {
   return (

@@ -37,6 +37,8 @@ export function createGenerationRequest<TPayload, TResult>(
     version: resultVersion,
     // Only a finished result survives a refresh; a running request can't resume after one
     toStored: (state) => (state.status === "success" ? state : idle<TResult>()),
+    // The store name is the tool's route
+    activity: { href: `/${name}`, statusOf: (state) => state.status },
   })
   let controller: AbortController | null = null
 

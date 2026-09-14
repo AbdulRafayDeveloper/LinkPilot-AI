@@ -1,15 +1,9 @@
 import type { Metadata } from "next"
+import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
-import { SITE_NAME } from "@/config/site"
 import ConnectionNoteClient from "./ConnectionNoteClient"
 
-export const metadata: Metadata = {
-  title: `Connection Note | ${SITE_NAME}`,
-  description: "Paste a LinkedIn profile, pick a tone and generate a personalized connection request note in seconds.",
-  alternates: {
-    canonical: `${SITE_URL}/connection-note`,
-  },
-}
+export const metadata: Metadata = pageMetadata("connection-note")
 
 export default function Page() {
   return (

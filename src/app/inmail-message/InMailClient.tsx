@@ -99,7 +99,7 @@ export default function InMailClient() {
           onToggleCollapse={toggleCollapsed}
         />
 
-        <main className="flex-1 overflow-y-auto bg-[#FAF7F2] overflow-x-hidden">
+        <main className="flex-1 overflow-y-auto bg-background overflow-x-hidden">
           <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:h-full">
             {/* Page header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">

@@ -1,15 +1,9 @@
 import type { Metadata } from "next"
+import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
-import { SITE_NAME } from "@/config/site"
 import ConversationReplyClient from "./ConversationReplyClient"
 
-export const metadata: Metadata = {
-  title: `Conversation Reply Analyzer | ${SITE_NAME}`,
-  description: "Paste a LinkedIn conversation to get the next reply plus evidence-based client, relationship, buying-intent and risk signals.",
-  alternates: {
-    canonical: `${SITE_URL}/conversation-reply`,
-  },
-}
+export const metadata: Metadata = pageMetadata("conversation-reply")
 
 export default function Page() {
   return (

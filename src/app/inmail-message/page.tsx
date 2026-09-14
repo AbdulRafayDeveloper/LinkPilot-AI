@@ -1,15 +1,9 @@
 import type { Metadata } from "next"
+import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
-import { SITE_NAME } from "@/config/site"
 import InMailClient from "./InMailClient"
 
-export const metadata: Metadata = {
-  title: `InMail Message | ${SITE_NAME}`,
-  description: "Paste a LinkedIn profile, pick an outreach tune and generate a personalized InMail subject and message.",
-  alternates: {
-    canonical: `${SITE_URL}/inmail-message`,
-  },
-}
+export const metadata: Metadata = pageMetadata("inmail-message")
 
 export default function Page() {
   return (

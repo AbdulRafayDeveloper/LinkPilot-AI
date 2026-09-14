@@ -15,6 +15,11 @@ const envSchema = z.object({
   GEMINI_LIGHTWEIGHT_MODEL: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_LIGHTWEIGHT_MODEL: z.string().optional(),
+  // The X (Twitter) account for twitter:site and twitter:creator; left out of the cards when unset
+  TWITTER_HANDLE: z
+    .string()
+    .regex(/^@\w{1,15}$/, { error: 'must look like "@handle"' })
+    .optional(),
 })
 
 function readEnv() {

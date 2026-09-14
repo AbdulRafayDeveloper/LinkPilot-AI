@@ -1,8 +1,11 @@
 "use client"
 
-import React from "react"
-import { Menu, PanelLeftClose, PanelLeftOpen, UserRound } from "lucide-react"
-import { SITE_NAME } from "@/config/site"
+import React, { useEffect, useRef, useState, useSyncExternalStore } from "react"
+import { Menu, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react"
+import { SITE_PURPOSE } from "@/config/site"
+import { ActivityIndicator } from "./ActivityIndicator"
+import { BrandLogo } from "./BrandLogo"
+import { ToolSwitcher } from "./ToolSwitcher"
 
 interface HeaderProps {
   onOpenSidebar: () => void
@@ -10,64 +13,95 @@ interface HeaderProps {
   onToggleCollapse?: () => void
 }
 
+const subscribeToNothing = () => () => {}
+// The server render shows "Ctrl"; Apple devices switch to ⌘ once the page is running
+const useIsApple = () => useSyncExternalStore(subscribeToNothing, () => /Mac|iPhone|iPad/.test(navigator.userAgent), () => false)
+
+const isShortcut = (event: KeyboardEvent, key: string) => event.key.toLowerCase() === key && (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey
+
+/**
+ * The top bar of every page: sidebar controls, what the app is for, background work on other
+ * tools, and a quick way to jump to any tool. Shortcuts: Ctrl/⌘+K opens the tool search,
+ * Ctrl/⌘+B collapses or expands the sidebar (desktop).
+ */
 export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarCollapsed = false, onToggleCollapse }) => {
+  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false)
+  const isApple = useIsApple()
+  const modifier = isApple ? "⌘" : "Ctrl"
+  const toggleRef = useRef(onToggleCollapse)
+
+  useEffect(() => {
+    toggleRef.current = onToggleCollapse
+  }, [onToggleCollapse])
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      // Another dialog (a prompt editor, say) keeps the keyboard
+      if (document.querySelector('[role="dialog"]')) return
+      if (isShortcut(event, "k")) {
+        event.preventDefault()
+        setIsSwitcherOpen(true)
+      } else if (isShortcut(event, "b") && toggleRef.current && window.matchMedia("(min-width: 1024px)").matches) {
+        event.preventDefault()
+        toggleRef.current()
+      }
+    }
+    document.addEventListener("keydown", handleShortcut)
+    return () => document.removeEventListener("keydown", handleShortcut)
+  }, [])
+
+  const toggleLabel = isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+
   return (
-    <header className="w-full h-16 bg-surface border-b border-outline-variant flex justify-between items-center px-4 md:px-8 lg:px-margin-desktop flex-shrink-0">
-      <div className="flex items-center gap-2 md:gap-4">
+    <header className="flex h-16 w-full flex-shrink-0 items-center justify-between gap-3 border-b border-outline-variant/80 bg-surface-container-lowest px-4 md:px-6 lg:px-8">
+      <div className="flex min-w-0 items-center gap-2 md:gap-3">
         {/* Hamburger Button for Mobile/Tablet */}
         <button
           onClick={onOpenSidebar}
-          className="lg:hidden p-2 hover:bg-surface-container rounded-lg text-on-surface-variant transition-colors"
+          className="lg:hidden rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container"
           aria-label="Open Sidebar"
         >
           <Menu size={20} />
         </button>
 
-        {/* Sidebar Toggle Button for Desktop - ChatGPT Style */}
+        {/* Sidebar Toggle Button for Desktop */}
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
-            className="hidden lg:block p-2 hover:bg-surface-container rounded-lg text-on-surface-variant transition-colors mr-2"
-            title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="hidden lg:block rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            title={`${toggleLabel} (${modifier}+B)`}
+            aria-label={toggleLabel}
+            aria-keyshortcuts={isApple ? "Meta+B" : "Control+B"}
           >
             {isSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
           </button>
         )}
 
-        <h2 className="font-headline-md text-base md:text-headline-md font-extrabold text-primary">{SITE_NAME}</h2>
+        {/* Below lg the sidebar is a hidden drawer, so the header carries the logo */}
+        <BrandLogo className="lg:hidden" wordmarkClassName="max-[359px]:sr-only" />
+
+        <span className="hidden h-5 w-px bg-outline-variant md:block" aria-hidden="true" />
+        <p className="hidden truncate text-sm font-semibold tracking-tight text-on-surface md:block md:text-[15px]">{SITE_PURPOSE}</p>
       </div>
 
-      <div className="flex items-center gap-4">
-        {/* AI Status Indicator inside Navbar */}
-        <div className="relative group cursor-help flex items-center gap-2 bg-white ambient-card-shadow rounded-full px-3 py-1.5 border border-outline-variant text-[11px] font-semibold text-primary">
-          <span className="flex h-1.5 w-1.5 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
-          </span>
-          <span>AI Ready</span>
-
-          {/* Tooltip Hover info Box */}
-          <div className="absolute right-0 top-9 hidden group-hover:block bg-neutral-950 text-neutral-200 text-xs rounded-xl p-3 shadow-2xl border border-neutral-800 min-w-[240px] leading-relaxed z-50 font-normal">
-            <p className="font-bold text-primary mb-1 text-left">AI providers</p>
-            <ul className="list-disc ml-4 text-left text-[10px] space-y-1 text-neutral-400">
-              <li>Google Gemini is the primary model for every tool</li>
-              <li>OpenAI is the automatic fallback when Gemini fails</li>
-              <li>Live research uses Google Search, with OpenAI web search as fallback</li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Profile */}
-        <div className="flex items-center gap-3">
-          <span className="text-right hidden lg:block mr-1">
-            <p className="font-label-md text-label-md text-on-surface font-semibold">User</p>
-          </span>
-          <div className="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container">
-            <UserRound size={18} aria-hidden="true" />
-          </div>
-        </div>
+      <div className="flex min-w-0 items-center gap-2">
+        <ActivityIndicator />
+        <button
+          type="button"
+          onClick={() => setIsSwitcherOpen(true)}
+          aria-label="Jump to a tool"
+          aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}
+          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-low px-2.5 text-sm text-outline transition-colors hover:border-primary/40 hover:bg-surface-container-lowest hover:text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:w-60 sm:px-3"
+        >
+          <Search size={16} className="shrink-0" aria-hidden="true" />
+          <span className="hidden sm:inline">Jump to a tool...</span>
+          <kbd className="ml-auto hidden items-center rounded-md border border-outline-variant bg-surface-container-lowest px-1.5 py-0.5 font-body-md text-[10px] font-semibold text-on-surface-variant sm:inline-flex">
+            {modifier} K
+          </kbd>
+        </button>
       </div>
+
+      {isSwitcherOpen && <ToolSwitcher onClose={() => setIsSwitcherOpen(false)} />}
     </header>
   )
 }
