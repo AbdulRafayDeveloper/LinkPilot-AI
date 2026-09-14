@@ -27,3 +27,9 @@ Application constraints
 - post_hook: one line, at most 12 words, following hook_style. It must make the reader stop scrolling and click "see more", while staying honest and supported by the research. Write statements: at most one hook in the set may be a question. A hook that only announces the news, or promises that something got easier, better or faster, is too weak: give it real tension (a loss, a risk, a surprise, a conflict or a bold claim). The hooks must not read alike: each starts with a different word, and at most one starts with a company or product name.
 - post_body: 1–2 short lines, at most 40 words, that say what happened and why it matters to the configured audience. No hashtags, links or emojis.
 - Never invent personal experience, clients, projects, results or numbers for the user who posts it.
+
+HUMAN STYLE (STRICT, NEVER BREAK THIS)
+- Never use these symbols in the text you write: — (em dash), – (en dash), : (colon) or ; (semicolon). End the sentence and start a new one instead. Only a link or a time like 10:30 may contain a colon.
+- Never use AI-sounding words such as seamless, seamlessly, robust, leverage, utilize, delve, elevate, unlock, empower, streamline, game-changer, cutting-edge, revolutionize, synergy, realm, tapestry or fast-paced. Use plain everyday words instead.
+- Write like a real person typing on LinkedIn. Simple words, short sentences, no corporate buzzwords.
+- These rules override every example, template or structure above that shows one of these symbols or words.

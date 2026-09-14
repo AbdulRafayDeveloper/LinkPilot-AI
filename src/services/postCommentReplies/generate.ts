@@ -8,6 +8,7 @@ import { getActiveGlobalPrompt } from "@/services/globalPrompts"
 import { extractPostFromImage } from "@/services/postImage"
 import { humanizeTexts } from "@/services/humanizer"
 import { UserFacingError } from "@/lib/errors"
+import { findUnsupportedFigures } from "@/lib/figures"
 import { createTagSanitizer } from "@/lib/sanitize"
 import { parseLinkedInConversation } from "@/lib/linkedinComments"
 import type { PostSource } from "@/lib/validation/postInput"
@@ -43,10 +44,6 @@ const WRAPPED_IN_QUOTES = /^(["“])([\s\S]*)(["”])$/
 const EXPERIENCE_CLAIM =
   /\b(?:we|i|our team|my team)\s+(?:usually|typically|normally|generally|often|always|tend to|found (?:that|it)|have (?:found|seen|tried))\b|\b(?:we|i)['’]ve (?:found|seen|tried)\b|\bin (?:my|our) experience\b|\bat (?:my|our) (?:company|job|work|firm)\b/i
 
-// Figures that read as results or facts: percentages, multiples, counts, durations and money, in digits or
-// words ("two weeks"); "one" is left out so phrasing like "one approach" isn't taken for a result
-const FIGURE =
-  /(?:[$€£]\s?)?(?:\d[\d,.]*|\b(?:two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty|thirty|forty|fifty|hundred)\b)(?:\s*(?:-|–|to)\s*\d[\d,.]*)?\s*(?:%|percent\b|x\b|\+|[kKmM]\b|ms\b|milliseconds?\b|seconds?\b|secs?\b|minutes?\b|mins?\b|hours?\b|hrs?\b|days?\b|weeks?\b|months?\b|years?\b|users?\b|clients?\b|customers?\b|projects?\b|products?\b|MVPs?\b|teams?\b|companies\b)/gi
 // A story about an unnamed client, which the model tends to invent to fill a case-study structure
 const CLIENT_STORY =
   /\b(?:a|one|another)\s+(?:recent\s+|former\s+|past\s+)?client(?:\s+of\s+(?:ours|mine))?\b|\bone of (?:our|my) clients\b/i
@@ -253,26 +250,6 @@ function cleanReply(raw: string): string {
   const wrapped = text.match(WRAPPED_IN_QUOTES)
   // Strip quotes only when they wrap the whole reply, not when it merely starts or ends with a quotation
   return (wrapped && !/["“”]/.test(wrapped[2]) ? wrapped[2] : text).replace(MARKDOWN_MARKS, "").trim()
-}
-
-// Compares figures loosely: case, spacing, plural units and "percent" vs "%" don't matter ("3 Weeks" = "3 week")
-const normalizeFigures = (text: string) =>
-  text
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/percent/g, "%")
-    .replace(/(second|sec|minute|min|hour|hr|day|week|month|year|user|client|customer|project|product|mvp|team)s\b/g, "$1")
-
-/**
- * Figures in the reply (a number with its unit) that appear nowhere in the sources: Abdul's
- * profile, the post, the comments or the style prompt itself. These are results the model
- * made up. A figure worded differently from its source is flagged too, which only costs a
- * rewrite that uses the number as written in the source.
- */
-function findUnsupportedFigures(reply: string, sourceText: string): string[] {
-  const source = normalizeFigures(sourceText)
-  const figures = [...reply.matchAll(FIGURE)].map((match) => match[0].trim())
-  return [...new Set(figures.filter((figure) => !source.includes(normalizeFigures(figure))))]
 }
 
 interface ReplyProblems {

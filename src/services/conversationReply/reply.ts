@@ -5,8 +5,9 @@ import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage, type PromptDataBlock } from "@/services/promptComposer"
 import { containsSenderClaim } from "@/services/senderGuard"
 import { humanizeTexts } from "@/services/humanizer"
-import { findUnsupportedUserClaims } from "./claims"
+import { findUnsupportedUserClaims } from "@/services/userClaims"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
+import { findUnsupportedFigures } from "@/lib/figures"
 import { LINKEDIN_MESSAGE_MAX_CHARS } from "@/constants/linkedinLimits"
 import { getReplyTypeLabel, type ConversationReplyTypeId } from "@/constants/conversationReply"
 
@@ -56,7 +57,7 @@ interface WriteReplyOptions {
 }
 
 interface ReplyProblems {
-  // Durations or prices the reply states that no source supports
+  // Durations, prices, percentages or other figures the reply states that no source supports
   unsupportedSpecifics: string[]
   // Sentences describing the user's own work in terms no source contains
   unsupportedClaims: string[]
@@ -81,10 +82,12 @@ function findUnusableReason(output: ReplyOutput): string | null {
   return null
 }
 
+// Unsupported durations and prices, plus invented results such as "40% faster"
 function findUnsupportedSpecifics(reply: string, sourceText: string): string[] {
   const sources = sourceText.toLowerCase()
   const matches = [...reply.matchAll(SPECIFIC_COMMITMENT)].map((match) => match[0].trim())
-  return [...new Set(matches.filter((match) => !sources.includes(match.toLowerCase())))]
+  const commitments = matches.filter((match) => !sources.includes(match.toLowerCase()))
+  return [...new Set([...commitments, ...findUnsupportedFigures(reply, sourceText)])]
 }
 
 // True when the rewrite has a problem the draft didn't have
@@ -105,7 +108,7 @@ function describeProblems({
 }: ReplyProblems): string[] {
   return [
     unsupportedSpecifics.length > 0 &&
-      `It states specifics that neither the conversation nor my About Me contains: ${unsupportedSpecifics.join(", ")}. Don't invent durations, prices or other commitments; where they asked for one, acknowledge the question and offer a real way forward instead.`,
+      `It states specifics that neither the conversation nor my About Me contains: ${unsupportedSpecifics.join(", ")}. Don't invent durations, prices, results, percentages or other figures; where they asked for one, acknowledge the question and offer a real way forward instead.`,
     unsupportedClaims.length > 0 &&
       `It says things about me that neither my About Me nor my own messages support: ${unsupportedClaims.map((claim) => `"${claim}"`).join("; ")}. Remove them. If they asked about my work, acknowledge the question warmly without describing specifics, and keep the focus on them.`,
     unsupportedSenderClaim &&

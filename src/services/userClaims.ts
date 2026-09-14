@@ -4,6 +4,10 @@ import { containsSenderClaim } from "@/services/senderGuard"
 // when asked "what are you working on?"
 const CURRENT_WORK_CLAIM =
   /\b(?:I'm|I am|I've been|we're|we are|we've been)\s+(?:(?:currently|also|now|mostly|mainly|actually)\s+)?(?:exploring|working|building|developing|focusing|diving|researching|experimenting|designing|creating|launching|leading|running|helping|scaling|optimizing|optimising|improving|enhancing|implementing|shipping|automating|studying|learning)\b/i
+// Social proof models invent to back a pitch: case studies, unnamed similar companies and
+// results in words ("cut it in half") that no number check can see
+const INVENTED_PROOF =
+  /\bcase stud(?:y|ies)\b|\b(?:a|one|another)\s+(?:similar|recent|former|past)\s+(?:client|company|team|startup|business|customer)\b|\b(?:helped|worked with)\s+(?:other|similar|many|several|lots of|dozens of)\s+(?:companies|teams|clients|startups|businesses|customers)\b|\b(?:in|by) half\b|\b(?:halved|doubled|tripled)\b/gi
 const SENTENCE_BOUNDARY = /(?<=[.!?])\s+/
 const WORD = /[a-z][a-z0-9-]{3,}/g
 // Words are compared by their first letters so "library" matches "libraries"
@@ -48,4 +52,14 @@ export function findUnsupportedUserClaims(reply: string, sourceText: string): st
       const supported = stems.filter((stem) => sourceStems.has(stem)).length
       return supported / stems.length < MIN_SUPPORTED_SHARE
     })
+}
+
+/**
+ * Case studies, unnamed similar companies and worded results ("in half") in the text that
+ * the sources don't mention. With nothing known about the user's past work, these are made up.
+ */
+export function findInventedProof(text: string, sourceText: string): string[] {
+  const sources = sourceText.toLowerCase()
+  const matches = [...text.matchAll(INVENTED_PROOF)].map((match) => match[0])
+  return [...new Set(matches.filter((match) => !sources.includes(match.toLowerCase())))]
 }

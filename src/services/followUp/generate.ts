@@ -5,12 +5,14 @@ import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage, type PromptDataBlock } from "@/services/promptComposer"
 import { humanizeTexts } from "@/services/humanizer"
 import { assessLeadSignalsSafely } from "@/services/leadSignals"
+import { findInventedProof, findUnsupportedUserClaims } from "@/services/userClaims"
 import {
   conversationPeopleFields,
   loadConversationReadingRules,
   toConversationParties,
 } from "@/services/conversationTimeline"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
+import { findUnsupportedFigures } from "@/lib/figures"
 import { LINKEDIN_MESSAGE_MAX_CHARS } from "@/constants/linkedinLimits"
 import { getFollowUpTypeLabel, type FollowUpTypeId } from "@/constants/followUp"
 import type { GeneratedFollowUp } from "@/types/followUp"
@@ -44,6 +46,15 @@ interface GenerateOptions {
   signal: AbortSignal
 }
 
+interface MessageProblems {
+  // Figures (results, percentages, durations, counts) that neither the conversation nor the profile contains
+  figures: string[]
+  // Sentences describing the user's own work in terms the conversation doesn't contain
+  claims: string[]
+  // Case studies, unnamed similar companies or worded results ("in half") the conversation doesn't mention
+  proof: string[]
+}
+
 function findUnusableReason(output: FollowUpOutput): string | null {
   const message = cleanGeneratedText(output.message)
   if (!message) return "empty message"
@@ -52,11 +63,33 @@ function findUnusableReason(output: FollowUpOutput): string | null {
   return null
 }
 
+function describeProblems({ figures, claims, proof }: MessageProblems): string[] {
+  return [
+    figures.length > 0 &&
+      `It states figures that neither the conversation nor the profile contains: ${figures.join(", ")}. These are invented results. Remove them and make the point without numbers.`,
+    claims.length > 0 &&
+      `It says things about me that my own messages don't support: ${claims.map((claim) => `"${claim}"`).join("; ")}. Remove them and keep the focus on them.`,
+    proof.length > 0 &&
+      `It backs the message with results or examples nobody mentioned (${proof.map((item) => `"${item}"`).join(", ")}). Don't invent case studies, other companies' results or outcomes. Offer something real instead, such as a question about how they handle it today or an offer to walk them through the idea.`,
+  ].filter((problem): problem is string => typeof problem === "string")
+}
+
+// True when the humanized text has a problem the verified draft didn't have
+function addsProblems(draft: MessageProblems, rewrite: MessageProblems): boolean {
+  return (
+    rewrite.figures.some((figure) => !draft.figures.includes(figure)) ||
+    rewrite.claims.length > draft.claims.length ||
+    rewrite.proof.some((item) => !draft.proof.includes(item))
+  )
+}
+
 /**
- * Generates one follow-up with the latest saved prompt for the selected type, then
- * rewrites it with the Humanization prompt. In parallel, the saved Lead Signals prompt
- * estimates the lead, independently of the type. The pasted conversation and profile are
- * untrusted data inside their own delimiter tags; {{follow_up_type}} inserts the type name.
+ * Generates one follow-up with the latest saved prompt for the selected type. A message
+ * with invented figures or unsupported claims about the user gets one controlled rewrite,
+ * then it's rewritten with the Humanization prompt, which may not add either. In parallel,
+ * the saved Lead Signals prompt estimates the lead, independently of the type. The pasted
+ * conversation and profile are untrusted data inside their own delimiter tags;
+ * {{follow_up_type}} inserts the type name.
  */
 export async function generateFollowUp({
   conversation,
@@ -84,27 +117,64 @@ export async function generateFollowUp({
   })
   const user = composePromptMessage(typePrompt, conversationBlocks, { follow_up_type: getFollowUpTypeLabel(type) })
 
-  const { data, provider } = await generateStructuredWithFallback({
+  const messages = [new SystemMessage(system), new HumanMessage(user)]
+  const generation = {
     schema: FollowUpSchema,
     name: "follow_up_message",
-    messages: [new SystemMessage(system), new HumanMessage(user)],
     temperature: WRITING_TEMPERATURE,
     signal,
     validate: findUnusableReason,
+  }
+  const sourceText = [conversation, profileData ?? ""].join("\n")
+  const findProblems = (text: string): MessageProblems => ({
+    figures: findUnsupportedFigures(text, sourceText),
+    claims: findUnsupportedUserClaims(text, sourceText),
+    proof: findInventedProof(text, sourceText),
   })
 
+  let { data, provider } = await generateStructuredWithFallback({ ...generation, messages })
+  let draft = cleanGeneratedText(data.message)
+  let problems = findProblems(draft)
+  const problemDescriptions = describeProblems(problems)
+  const rewritten = problemDescriptions.length > 0
+  if (rewritten) {
+    const rewrite = await generateStructuredWithFallback({
+      ...generation,
+      messages: [
+        ...messages,
+        new HumanMessage(
+          `Rewrite your draft below. ${problemDescriptions.join(" ")} Keep everything else.\n\n<draft_message>\n${draft}\n</draft_message>`
+        ),
+      ],
+    }).catch((error: unknown) => {
+      if (signal.aborted) throw error
+      console.warn("⚠️ Follow-up rewrite failed; keeping the draft:", error)
+      return null
+    })
+    if (rewrite) {
+      data = rewrite.data
+      provider = rewrite.provider
+      draft = cleanGeneratedText(data.message)
+      problems = findProblems(draft)
+    }
+  }
+
+  const draftProblems = problems
   const humanization = await humanizeTexts({
     fields: [
       {
         id: "message",
         kind: "LinkedIn follow-up message in an existing conversation",
-        text: cleanGeneratedText(data.message),
+        text: draft,
         maxChars: LINKEDIN_MESSAGE_MAX_CHARS,
       },
     ],
     signal,
+    validate: (_id, text) =>
+      addsProblems(draftProblems, findProblems(text)) ? "adds invented figures or claims about the user" : null,
   })
   const message = humanization.texts.message
+  const finalProblems = findProblems(message)
   const parties = toConversationParties(data)
   const signals = await signalsPromise
   console.info(
@@ -114,6 +184,10 @@ export async function generateFollowUp({
       provider,
       state: parties.state,
       usedProfile: profileData !== null,
+      rewritten,
+      unsupportedFigures: finalProblems.figures,
+      unsupportedClaims: finalProblems.claims.length,
+      inventedProof: finalProblems.proof,
       humanized: humanization.humanized,
       leadSignals: signals !== null,
       characters: message.length,

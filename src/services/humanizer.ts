@@ -6,14 +6,17 @@ import { composePromptMessage } from "@/services/promptComposer"
 import { getActiveGlobalPrompt } from "@/services/globalPrompts"
 import { containsSenderClaim } from "@/services/senderGuard"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
+import { applyHumanStyle, findAiWords } from "@/lib/humanStyle"
 import { createTagSanitizer } from "@/lib/sanitize"
 
 /**
  * The last step of every tool: the drafts it wrote are rewritten with the user's saved
  * Humanization prompt (Global AI Prompts) so they read like a person wrote them. The
  * rewrite may only change wording. Code checks that every number, link, hashtag and
- * @mention survives, that nothing new is claimed about the user and that each text keeps
- * its limits; a tool can add its own checks. Each text is judged on its own: a rewrite
+ * @mention survives, that nothing new is claimed about the user or in AI-sounding words and
+ * that each text keeps its limits; a tool can add its own checks. Drafts and rewrites alike
+ * get the human style (lib/humanStyle.ts: no pause dashes, colons or semicolons, no
+ * "seamless" or "robust"). Each text is judged on its own: a rewrite
  * that fails a check gets one targeted retry, and if that fails too, just that text keeps
  * its already-verified draft.
  */
@@ -91,6 +94,8 @@ function findFieldProblem<Id extends string>(field: HumanizeField<Id>, rewrite: 
   if (MARKUP.test(rewrite)) return `${field.id}: contains prompt markup`
   if (containsPlaceholder(rewrite) && !containsPlaceholder(field.text)) return `${field.id}: contains a placeholder`
   if (containsSenderClaim(rewrite) && !containsSenderClaim(field.text)) return `${field.id}: adds a claim about the user`
+  const aiWords = findAiWords(rewrite).filter((word) => !findAiWords(field.text).includes(word))
+  if (aiWords.length > 0) return `${field.id}: uses AI-sounding words (${aiWords.join(", ")}); use plain everyday words`
   const changed =
     describeTokenChange(field.text, rewrite, URL, "links") ??
     describeTokenChange(field.text, rewrite, HASHTAG, "hashtags") ??
@@ -114,13 +119,18 @@ function draftsOf<Id extends string>(fields: HumanizeField<Id>[]): Record<Id, st
   return Object.fromEntries(fields.map((field) => [field.id, field.text])) as Record<Id, string>
 }
 
+// Every text leaves here in the human style (lib/humanStyle.ts), whether it's a rewrite or a kept draft
+const styleOf = <Id extends string>(field: HumanizeField<Id>, text: string) =>
+  applyHumanStyle(text, { maxChars: field.maxChars, singleLine: field.singleLine })
+
 export async function humanizeTexts<Id extends string>({
-  fields,
+  fields: rawFields,
   signal,
   providers,
   onFallback,
   validate,
 }: HumanizeOptions<Id>): Promise<HumanizedTexts<Id>> {
+  const fields = rawFields.map((field) => ({ ...field, text: styleOf(field, field.text) }))
   const drafts = draftsOf(fields)
   const toHumanize = fields.filter((field) => field.text.trim())
   if (toHumanize.length === 0) return { texts: drafts, humanized: false, provider: null }
@@ -132,7 +142,7 @@ export async function humanizeTexts<Id extends string>({
     const failed: HumanizeField<Id>[] = []
     const problems: string[] = []
     for (const field of subset) {
-      const rewrite = byId.get(field.id) ?? ""
+      const rewrite = styleOf(field, byId.get(field.id) ?? "")
       const problem = findFieldProblem(field, rewrite) ?? validate?.(field.id, rewrite) ?? null
       if (problem) {
         failed.push(field)
