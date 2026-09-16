@@ -1,6 +1,7 @@
 import OpenAI, { toFile } from "openai"
 import { env } from "@/config/env"
 import { UserFacingError } from "@/lib/errors"
+import { describeProviderFailure } from "@/lib/providerErrors"
 import { withProviderRetry } from "@/services/ai"
 import { POST_IMAGES_MESSAGES } from "@/constants/postImages"
 
@@ -105,9 +106,15 @@ export async function generateImage({ prompt, size, photo, signal }: ImageReques
   ).catch((error: unknown) => {
     if (signal.aborted) throw error
     const status = (error as { status?: number }).status
-    console.error("❌ Image generation failed:", status ?? "", error instanceof Error ? error.message : error)
-    // 400 from the images API is the provider refusing the request, not a fault in the app
-    throw new UserFacingError(status === 400 ? POST_IMAGES_MESSAGES.refused : POST_IMAGES_MESSAGES.generationFailed)
+    const message = error instanceof Error ? error.message : String(error)
+    console.error("❌ Image generation failed:", status ?? "", message)
+    // The images API refusing the content is the user's to reword; anything else says what to fix
+    if (status === 400 && /safety|moderation|content policy|rejected as a result/i.test(message)) {
+      throw new UserFacingError(POST_IMAGES_MESSAGES.refused)
+    }
+    throw new UserFacingError(
+      describeProviderFailure(error, { label: "OpenAI images", keyVariable: "OPENAI_API_KEY", modelVariable: "OPENAI_IMAGE_MODEL" })
+    )
   })
 
   const encoded = answer.data?.[0]?.b64_json

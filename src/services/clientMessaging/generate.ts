@@ -3,7 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
-import { UserFacingError } from "@/lib/errors"
+import { asUserFacingError } from "@/lib/errors"
 import { cleanGeneratedText, findPlaceholders, stripMarkdownMarks } from "@/lib/generatedText"
 import {
   CLIENT_MESSAGING_MESSAGES,
@@ -114,7 +114,7 @@ async function writeFirstDraft<T>(
     } catch (retryError: unknown) {
       if (signal.aborted) throw retryError
       console.error("❌ Client message draft failed twice:", retryError instanceof Error ? retryError.message : retryError)
-      throw new UserFacingError(CLIENT_MESSAGING_MESSAGES.providerUnavailable)
+      throw asUserFacingError(retryError, CLIENT_MESSAGING_MESSAGES.providerUnavailable)
     }
   }
 }

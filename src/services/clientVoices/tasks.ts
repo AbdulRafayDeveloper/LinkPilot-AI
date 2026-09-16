@@ -3,7 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
-import { UserFacingError } from "@/lib/errors"
+import { UserFacingError, asUserFacingError } from "@/lib/errors"
 import { cleanGeneratedText, stripMarkdownMarks } from "@/lib/generatedText"
 import { CLIENT_VOICES_MESSAGES, TASK_LIST_MAX, VOICE_BATCH_MAX } from "@/constants/clientVoices"
 import type { ClientTask, TaskExtraction, TranscriptInput } from "@/types/clientVoices"
@@ -105,7 +105,7 @@ export async function extractTasks({ voices, missingVoices, signal }: ExtractOpt
   }).catch((error: unknown) => {
     if (signal.aborted) throw error
     console.error("❌ Client voice task extraction failed:", error instanceof Error ? error.message : error)
-    throw new UserFacingError(CLIENT_VOICES_MESSAGES.tasksFailed)
+    throw asUserFacingError(error, CLIENT_VOICES_MESSAGES.tasksFailed)
   })
 
   const available = new Set(voices.map((entry) => entry.voice))

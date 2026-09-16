@@ -8,6 +8,7 @@ import {
 } from "@/services/ai"
 import { loadPrompt } from "@/services/prompts"
 import { UserFacingError } from "@/lib/errors"
+import { describeProviderFailure } from "@/lib/providerErrors"
 import type { VerifiedAudio } from "@/lib/audioType"
 import { VOICE_MESSAGES } from "@/constants/voiceInput"
 
@@ -77,7 +78,10 @@ export async function transcribeRecording({ audio, signal }: TranscribeOptions):
     transcript = await transcribeWithOpenAI(audio, signal).catch((error: unknown) => {
       if (signal.aborted) throw error
       console.error("❌ openai could not read the recording:", error instanceof Error ? error.message : error)
-      throw new UserFacingError(VOICE_MESSAGES.transcriptionFailed)
+      // A key or model problem is worth naming; the recording itself is not the issue then
+      throw new UserFacingError(
+        describeProviderFailure(error, { label: "OpenAI transcription", keyVariable: "OPENAI_API_KEY", modelVariable: "OPENAI_TRANSCRIPTION_MODEL" })
+      )
     })
   }
 

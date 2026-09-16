@@ -4,7 +4,7 @@ import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
 import { humanizeTexts } from "@/services/humanizer"
-import { UserFacingError } from "@/lib/errors"
+import { asUserFacingError } from "@/lib/errors"
 import { cleanGeneratedText, findPlaceholders, stripMarkdownMarks } from "@/lib/generatedText"
 import { MESSAGE_REWRITER_MESSAGES, rewrittenMaxChars } from "@/constants/messageRewriter"
 import type { MessageSource, RewrittenMessage } from "@/types/messageRewriter"
@@ -92,7 +92,7 @@ export async function rewriteMessage({ message: original, source, signal }: Rewr
   const first = await write(messages).catch((error: unknown) => {
     if (signal.aborted) throw error
     console.error("❌ Message rewrite failed on every provider:", error instanceof Error ? error.message : error)
-    throw new UserFacingError(MESSAGE_REWRITER_MESSAGES.providerUnavailable)
+    throw asUserFacingError(error, MESSAGE_REWRITER_MESSAGES.providerUnavailable)
   })
 
   let draft = clean(first.data.message)

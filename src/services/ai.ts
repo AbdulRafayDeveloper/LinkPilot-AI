@@ -5,6 +5,7 @@ import type { BaseMessage } from "@langchain/core/messages"
 import type { InteropZodType } from "@langchain/core/utils/types"
 import { env } from "@/config/env"
 import { UserFacingError } from "@/lib/errors"
+import { describeProviderFailure, type ProviderNames } from "@/lib/providerErrors"
 import { withRetry } from "@/lib/retry"
 import { isTransientError, retryAfterOf } from "@/lib/transientErrors"
 
@@ -28,6 +29,12 @@ interface ProviderSettings {
   model: string | undefined
   keyVariable: string
   modelVariable: string
+}
+
+/** What a provider is called, and which variables carry its key and its model name. */
+export function providerNames(provider: ModelProvider): ProviderNames {
+  const { keyVariable, modelVariable } = providerSettings(provider)
+  return { label: provider === "gemini" ? "Gemini" : "OpenAI", keyVariable, modelVariable }
 }
 
 function providerSettings(provider: ModelProvider): ProviderSettings {
@@ -58,7 +65,7 @@ function requireProvider(provider: ModelProvider): { apiKey: string; model: stri
   const { apiKey, model, keyVariable, modelVariable } = providerSettings(provider)
   if (!apiKey || !model) {
     const missing = [!apiKey && keyVariable, !model && modelVariable].filter(Boolean).join(" and ")
-    throw new UserFacingError(`The ${provider} provider isn't configured. Set ${missing} in .env.local.`)
+    throw new UserFacingError(`The ${provider} provider is not configured. Set ${missing} where the app runs (.env.local here, Environment Variables on the host).`)
   }
   return { apiKey, model }
 }
@@ -184,17 +191,31 @@ function invokeStructured<T extends Record<string, unknown>>(
  * output that fails validation, so a successful request never calls both providers. The
  * timeout covers every attempt on one provider.
  */
+/** Which variables each unconfigured provider is waiting for, named one provider at a time. */
+export function missingConfiguration(providers: readonly ModelProvider[] = AI_PROVIDERS): string[] {
+  return providers
+    .filter((provider) => !isProviderConfigured(provider))
+    .map((provider) => {
+      const { apiKey, model } = providerSettings(provider)
+      const { label, keyVariable, modelVariable } = providerNames(provider)
+      const missing = [!apiKey && keyVariable, !model && modelVariable].filter(Boolean).join(" and ")
+      return `${label} needs ${missing}.`
+    })
+}
+
 export async function generateStructuredWithFallback<T extends Record<string, unknown>>(
   options: StructuredGenerationOptions<T>
 ): Promise<StructuredGeneration<T>> {
   const providers = (options.providers ?? AI_PROVIDERS).filter(isProviderConfigured)
   if (providers.length === 0) {
     throw new UserFacingError(
-      "No AI provider is configured. Set GOOGLE_API_KEY and GEMINI_LIGHTWEIGHT_MODEL, or OPENAI_API_KEY and OPENAI_LIGHTWEIGHT_MODEL, in .env.local."
+      `No AI provider is configured. ${missingConfiguration().join(" ")} Set them where the app runs (.env.local here, Environment Variables on the host), then redeploy.`
     )
   }
 
   let lastError: unknown
+  // Why each provider gave up, so a failure can say what to go and change
+  const failures: string[] = []
   for (const [index, provider] of providers.entries()) {
     const timeout = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_GENERATION_TIMEOUT_MS)
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
@@ -206,6 +227,13 @@ export async function generateStructuredWithFallback<T extends Record<string, un
     } catch (error: unknown) {
       if (options.signal?.aborted) throw error
       lastError = error
+      // An output that failed the tool's own check is not a provider problem
+      const unusable = error instanceof Error && error.message.startsWith("UnusableOutputException:")
+      failures.push(
+        unusable
+          ? `${providerNames(provider).label} wrote something the app could not use.`
+          : describeProviderFailure(error, providerNames(provider))
+      )
       const next = providers[index + 1]
       console.warn(
         `⚠️ ${provider} generation failed${next ? `, falling back to ${next}` : ""}:`,
@@ -213,6 +241,14 @@ export async function generateStructuredWithFallback<T extends Record<string, un
       )
       if (next) options.onFallback?.(provider, next)
     }
+  }
+  // Every provider failed. The reasons are what the user needs, not "please try again"
+  if (failures.length > 0) {
+    // A provider that was skipped for missing configuration is usually the one meant to cover this
+    const skipped = missingConfiguration(options.providers ?? AI_PROVIDERS)
+    const reason = [...failures, ...skipped.map((note) => `${note} It was not tried.`)].join(" ")
+    console.error("❌ Every AI provider failed:", reason)
+    throw new UserFacingError(reason)
   }
   throw lastError
 }
