@@ -8,6 +8,7 @@ import {
   FOLLOW_UP_TYPE_IDS,
 } from "@/constants/followUp"
 import { generateFollowUp } from "@/services/followUp/generate"
+import { recordFollowUp } from "@/services/generationRecords"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
 
     const { conversation, profileData, followUpType } = parsed.data
     const result = await generateFollowUp({ conversation, profileData, type: followUpType, signal: req.signal })
+    await recordFollowUp({ conversation, profileData }, result)
     return NextResponse.json({ success: true, message: "Follow-up message generated", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

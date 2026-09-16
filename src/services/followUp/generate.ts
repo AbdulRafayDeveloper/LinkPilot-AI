@@ -111,9 +111,9 @@ export async function generateFollowUp({
     signal,
   })
 
-  const system = renderPrompt(loadPrompt("follow-up-system"), {
+  const system = renderPrompt(await loadPrompt("follow-up-system"), {
     CURRENT_DATE: new Date().toISOString().slice(0, 10),
-    CONVERSATION_READING_RULES: loadConversationReadingRules(),
+    CONVERSATION_READING_RULES: await loadConversationReadingRules(),
   })
   const user = composePromptMessage(typePrompt, conversationBlocks, { follow_up_type: getFollowUpTypeLabel(type) })
 

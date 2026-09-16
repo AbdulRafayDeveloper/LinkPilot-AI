@@ -1,62 +1,76 @@
-import { connectDB } from "@/lib/db"
-import { UserFacingError } from "@/lib/errors"
-import { Setting } from "@/models/Setting"
-import type { StoredPrompt } from "@/types/prompts"
+import { connectDatabase } from "@/lib/db"
+import { Prompt, type IPrompt } from "@/models/Prompt"
+import { PromptRevision } from "@/models/PromptRevision"
+import type { PromptName } from "@/services/prompts"
+import type { EditablePrompt } from "@/types/prompts"
 
-export interface PromptEntry {
-  key: string
-  defaultPrompt: string
+type PromptRecord = Pick<IPrompt, "key" | "content" | "defaultContent" | "updatedAt">
+
+// A template loaded for generation is reused this long; saving a prompt clears it at once
+const TEMPLATE_CACHE_MS = 60_000
+const templateCache = new Map<PromptName, { content: string; expiresAt: number }>()
+
+async function findPrompts(names: readonly PromptName[]): Promise<Map<string, PromptRecord>> {
+  await connectDatabase()
+  const records = await Prompt.find({ key: { $in: names } }, { key: 1, content: 1, defaultContent: 1, updatedAt: 1 }).lean()
+  const byKey = new Map<string, PromptRecord>(records.map((record) => [record.key, record]))
+  const missing = names.filter((name) => !byKey.has(name))
+  if (missing.length > 0) {
+    throw new Error(`PromptTemplateMissing: ${missing.join(", ")} not found in the prompts collection`)
+  }
+  return byKey
 }
 
-async function connectSettingsStore() {
-  try {
-    await connectDB()
-  } catch {
-    throw new UserFacingError("The prompt settings database is unavailable. Check MONGODB_URI and try again.")
-  }
+function toEditablePrompt({ content, defaultContent, updatedAt }: PromptRecord): EditablePrompt {
+  const isCustom = content !== defaultContent
+  return { prompt: content, defaultPrompt: defaultContent, isCustom, updatedAt: isCustom ? updatedAt.toISOString() : null }
 }
 
 /**
- * Resolves several editable prompts in one query. Each is the saved custom value from
- * the Setting collection when present, otherwise its default template.
+ * The current text of one template, for building a generation's messages.
  */
-export async function getStoredPrompts(entries: PromptEntry[]): Promise<StoredPrompt[]> {
-  await connectSettingsStore()
-  const saved = await Setting.find({ key: { $in: entries.map((entry) => entry.key) } }).lean()
-  const savedByKey = new Map(saved.map((setting) => [setting.key, setting]))
+export async function loadPromptText(name: PromptName): Promise<string> {
+  const cached = templateCache.get(name)
+  if (cached && cached.expiresAt > Date.now()) return cached.content
 
-  return entries.map(({ key, defaultPrompt }) => {
-    const setting = savedByKey.get(key)
-    return setting?.value.trim()
-      ? { prompt: setting.value, isCustom: true, updatedAt: setting.updatedAt.toISOString() }
-      : { prompt: defaultPrompt, isCustom: false, updatedAt: null }
-  })
+  const content = (await findPrompts([name])).get(name)?.content ?? ""
+  templateCache.set(name, { content, expiresAt: Date.now() + TEMPLATE_CACHE_MS })
+  return content
 }
 
-export async function getStoredPrompt(entry: PromptEntry): Promise<StoredPrompt> {
-  const [prompt] = await getStoredPrompts([entry])
+/**
+ * Several editable prompts in one query, in the order asked, each with its default text.
+ * Always read fresh, so a generation uses the prompt exactly as last saved.
+ */
+export async function getStoredPrompts(names: readonly PromptName[]): Promise<EditablePrompt[]> {
+  const byKey = await findPrompts(names)
+  return names.map((name) => toEditablePrompt(byKey.get(name) as PromptRecord))
+}
+
+export async function getStoredPrompt(name: PromptName): Promise<EditablePrompt> {
+  const [prompt] = await getStoredPrompts([name])
   return prompt
 }
 
 /**
- * Persists one prompt under its own key. Saving text identical to the default removes
- * the custom record, so future improvements to the default template apply again.
+ * Saves new text for one editable prompt and keeps the text it replaces in prompt_revisions.
+ * Saving the default text again restores the default.
  */
-export async function saveStoredPrompt({ key, defaultPrompt }: PromptEntry, prompt: string): Promise<StoredPrompt> {
-  await connectSettingsStore()
-
-  if (prompt.trim() === defaultPrompt) {
-    await Setting.deleteOne({ key })
-    return { prompt: defaultPrompt, isCustom: false, updatedAt: null }
+export async function saveStoredPrompt(name: PromptName, prompt: string): Promise<EditablePrompt> {
+  await connectDatabase()
+  const current = await Prompt.findOne({ key: name, editable: true }).lean()
+  if (!current) {
+    throw new Error(`PromptSaveException: '${name}' is not an editable prompt in the prompts collection`)
   }
 
-  const saved = await Setting.findOneAndUpdate(
-    { key },
-    { value: prompt },
-    { upsert: true, new: true, runValidators: true }
-  ).lean()
+  const content = prompt.trim() === current.defaultContent ? current.defaultContent : prompt
+  if (content === current.content) return toEditablePrompt(current)
+
+  await PromptRevision.create({ promptKey: name, content: current.content })
+  const saved = await Prompt.findOneAndUpdate({ key: name }, { content }, { returnDocument: "after", runValidators: true }).lean()
   if (!saved) {
-    throw new Error(`PromptSaveException: Settings store returned no document for '${key}'`)
+    throw new Error(`PromptSaveException: the prompts collection returned no document for '${name}'`)
   }
-  return { prompt: saved.value, isCustom: true, updatedAt: saved.updatedAt.toISOString() }
+  templateCache.delete(name)
+  return toEditablePrompt(saved)
 }

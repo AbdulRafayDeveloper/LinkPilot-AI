@@ -1,9 +1,12 @@
+import OpenAI, { toFile } from "openai"
 import { ChatOpenAI } from "@langchain/openai"
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai"
 import type { BaseMessage } from "@langchain/core/messages"
 import type { InteropZodType } from "@langchain/core/utils/types"
 import { env } from "@/config/env"
 import { UserFacingError } from "@/lib/errors"
+import { withRetry } from "@/lib/retry"
+import { isTransientError, retryAfterOf } from "@/lib/transientErrors"
 
 /**
  * The only AI providers the LinkedIn tools use, in priority order: Gemini is primary,
@@ -69,6 +72,50 @@ export function createGeminiModel(options: Omit<ModelOptions, "timeout"> = {}): 
 }
 
 /**
+ * Whether OpenAI can read recordings: its API key and a transcription model are both set in ENV.
+ */
+export function isTranscriptionConfigured(): boolean {
+  return Boolean(env.OPENAI_API_KEY && env.OPENAI_TRANSCRIPTION_MODEL)
+}
+
+// File extension per container, because the transcription API decides the format from the name
+const AUDIO_EXTENSIONS: Record<string, string> = {
+  "audio/wav": "wav",
+  "audio/ogg": "ogg",
+  "audio/webm": "webm",
+  "audio/mp4": "mp4",
+  "audio/mpeg": "mp3",
+  "audio/flac": "flac",
+}
+
+/**
+ * Writes out a recording with OpenAI's transcription model from ENV (OPENAI_TRANSCRIPTION_MODEL).
+ * This is the fallback for audio, which the chat models in this file cannot read: it goes to
+ * OpenAI's own transcription endpoint, retried on transient failures like every other call.
+ */
+export async function transcribeWithOpenAI(
+  audio: { data: Buffer; mimeType: string },
+  signal: AbortSignal
+): Promise<string> {
+  const apiKey = env.OPENAI_API_KEY
+  const model = env.OPENAI_TRANSCRIPTION_MODEL
+  if (!apiKey || !model) {
+    const missing = [!apiKey && "OPENAI_API_KEY", !model && "OPENAI_TRANSCRIPTION_MODEL"].filter(Boolean).join(" and ")
+    throw new UserFacingError(`Reading recordings needs ${missing} in .env.local.`)
+  }
+
+  const client = new OpenAI({ apiKey, maxRetries: 0 })
+  const file = await toFile(audio.data, `recording.${AUDIO_EXTENSIONS[audio.mimeType] ?? "webm"}`, { type: audio.mimeType })
+  // response_format "text" answers with the transcript itself, which every model supports
+  const text = await withProviderRetry(
+    "openai",
+    () => client.audio.transcriptions.create({ file, model, response_format: "text" }, { signal }),
+    signal
+  )
+  return String(text)
+}
+
+/**
  * The OpenAI fallback chat model from ENV (GPT-4o Mini).
  */
 export function createOpenAIModel(options: ModelOptions = {}): ChatOpenAI {
@@ -77,7 +124,25 @@ export function createOpenAIModel(options: ModelOptions = {}): ChatOpenAI {
 }
 
 const DEFAULT_GENERATION_TIMEOUT_MS = 45_000
-const GENERATION_MAX_RETRIES = 1
+// Transient failures (rate limit, 5xx, dropped connection) are retried on the same provider this many
+// times, with backoff, before the next provider takes over. LangChain's own blind retries are switched
+// off (maxRetries: 0) so the two never stack.
+const PROVIDER_RETRIES = 2
+
+/**
+ * Retries one provider call on transient failures only (lib/transientErrors.ts), honoring a
+ * Retry-After the provider sends. Shared by generation and live research.
+ */
+export function withProviderRetry<T>(provider: ModelProvider, call: () => Promise<T>, signal: AbortSignal, retries = PROVIDER_RETRIES): Promise<T> {
+  return withRetry(call, {
+    retries,
+    signal,
+    shouldRetry: isTransientError,
+    retryAfterMs: retryAfterOf,
+    onRetry: (error, attempt, delayMs) =>
+      console.warn(`↻ ${provider} call failed (${error instanceof Error ? error.message : error}); retry ${attempt} of ${retries} in ${delayMs}ms`),
+  })
+}
 
 export interface StructuredGenerationOptions<T extends Record<string, unknown>> {
   schema: InteropZodType<T>
@@ -104,7 +169,7 @@ function invokeStructured<T extends Record<string, unknown>>(
   { schema, name, messages, temperature = DEFAULT_TEMPERATURE }: StructuredGenerationOptions<T>,
   signal: AbortSignal
 ): Promise<T> {
-  const modelOptions = { temperature, maxRetries: GENERATION_MAX_RETRIES }
+  const modelOptions = { temperature, maxRetries: 0 }
   if (provider === "gemini") {
     return createGeminiModel(modelOptions).withStructuredOutput(schema, { name }).invoke(messages, { signal })
   }
@@ -113,9 +178,11 @@ function invokeStructured<T extends Record<string, unknown>>(
 
 /**
  * The single generation path for every LinkedIn tool: LangChain structured output with
- * Gemini first and OpenAI (GPT-4o Mini) only as the fallback. The fallback runs only when
- * Gemini is unconfigured, errors, times out or returns output that fails validation, so a
- * successful request never calls both providers.
+ * Gemini first and OpenAI (GPT-4o Mini) only as the fallback. A transient failure is retried
+ * on the same provider first (withProviderRetry); the fallback runs only when Gemini is
+ * unconfigured, keeps failing, fails for good (bad key, used-up quota), times out or returns
+ * output that fails validation, so a successful request never calls both providers. The
+ * timeout covers every attempt on one provider.
  */
 export async function generateStructuredWithFallback<T extends Record<string, unknown>>(
   options: StructuredGenerationOptions<T>
@@ -132,7 +199,7 @@ export async function generateStructuredWithFallback<T extends Record<string, un
     const timeout = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_GENERATION_TIMEOUT_MS)
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
     try {
-      const data = await invokeStructured(provider, options, signal)
+      const data = await withProviderRetry(provider, () => invokeStructured(provider, options, signal), signal)
       const problem = options.validate?.(data) ?? null
       if (problem) throw new Error(`UnusableOutputException: ${problem}`)
       return { data, provider }

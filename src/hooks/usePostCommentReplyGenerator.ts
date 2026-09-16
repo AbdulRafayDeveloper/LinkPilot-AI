@@ -1,6 +1,7 @@
 "use client"
 
 import { readSSEStream } from "@/lib/sse"
+import { fetchWithRetry } from "@/lib/apiClient"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { POST_COMMENT_REPLY_MESSAGES, type ReplyStage } from "@/constants/postCommentReplies"
 import type { ApiEnvelope } from "@/types/api"
@@ -58,7 +59,8 @@ async function generate(request: GenerateReplyRequest) {
   })
 
   try {
-    const response = await fetch(GENERATE_ENDPOINT, { method: "POST", body: toFormData(request), signal: current.signal })
+    // Retried only until the stream starts; a stream that has begun is never repeated
+    const response = await fetchWithRetry(GENERATE_ENDPOINT, { method: "POST", body: toFormData(request), signal: current.signal }, { retry: true })
     if (!response.ok || !response.body) {
       // Validation failures come back as the standard JSON envelope with a user-safe message
       const body = (await response.json().catch(() => null)) as ApiEnvelope<never> | null

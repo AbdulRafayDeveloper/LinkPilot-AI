@@ -14,8 +14,8 @@ interface ResearchOptions {
   onFallback: () => void
 }
 
-function buildResearchMessages(brief: string, now: Date, searchFocus: string): BaseMessage[] {
-  const system = renderPrompt(loadPrompt("trending-research"), {
+function buildResearchMessages(template: string, brief: string, now: Date, searchFocus: string): BaseMessage[] {
+  const system = renderPrompt(template, {
     CURRENT_DATETIME: now.toISOString(),
     CANDIDATE_TARGET: PASS_CANDIDATE_TARGET,
     SEARCH_FOCUS: searchFocus,
@@ -29,11 +29,12 @@ function buildResearchMessages(brief: string, now: Date, searchFocus: string): B
 }
 
 /**
- * Runs live trend research over the subject-agnostic lenses in trending-search-lenses.md.
+ * Runs live trend research over the subject-agnostic lenses in the trending-search-lenses prompt.
  * The configured brief still decides the subject area.
  */
 export async function runTrendingResearch({ brief, now, signal, onFallback }: ResearchOptions): Promise<ResearchResult> {
-  const passes = loadSearchLenses("trending-search-lenses").map((lens) => buildResearchMessages(brief, now, lens))
+  const [template, lenses] = await Promise.all([loadPrompt("trending-research"), loadSearchLenses("trending-search-lenses")])
+  const passes = lenses.map((lens) => buildResearchMessages(template, brief, now, lens))
   return runLiveResearch({
     geminiPasses: passes,
     openAIPasses: passes,

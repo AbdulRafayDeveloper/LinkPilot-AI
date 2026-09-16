@@ -20,14 +20,9 @@ export default function TrendingTopicsClient() {
   const { status, result, stages, error, search, reset, loadSaved } = useTrendingTopicsSearch()
   const isLoading = status === "loading"
 
-  // Everyone sees the latest saved topics: checked on arrival and whenever the tab comes back into view
+  // Opening or refreshing the page shows the latest saved topics; a tab's topics then stay until it searches again
   useEffect(() => {
     void loadSaved()
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") void loadSaved()
-    }
-    document.addEventListener("visibilitychange", refreshWhenVisible)
-    return () => document.removeEventListener("visibilitychange", refreshWhenVisible)
   }, [loadSaved])
 
   return (

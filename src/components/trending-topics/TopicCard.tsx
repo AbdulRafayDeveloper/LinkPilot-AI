@@ -81,6 +81,13 @@ export const TopicCard: React.FC<{ topic: TrendingTopic }> = ({ topic }) => {
         <p className="text-[13px] text-on-surface-variant leading-relaxed">{topic.why_trending}</p>
       </section>
 
+      {topic.linkedin_angle && (
+        <section>
+          <SectionLabel>The angle on LinkedIn</SectionLabel>
+          <p className="text-[13px] text-on-surface-variant leading-relaxed">{topic.linkedin_angle}</p>
+        </section>
+      )}
+
       <section>
         <SectionLabel
           action={

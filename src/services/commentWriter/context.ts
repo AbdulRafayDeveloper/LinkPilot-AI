@@ -24,8 +24,14 @@ interface ResearchOptions {
   onFallback: () => void
 }
 
-function buildResearchMessages(postText: string, styleBrief: string, now: Date, searchFocus: string): BaseMessage[] {
-  const system = renderPrompt(loadPrompt("comment-writer-research"), {
+function buildResearchMessages(
+  template: string,
+  postText: string,
+  styleBrief: string,
+  now: Date,
+  searchFocus: string
+): BaseMessage[] {
+  const system = renderPrompt(template, {
     CURRENT_DATETIME: now.toISOString(),
     CURRENT_DATE: now.toISOString().slice(0, 10),
     CURRENT_MONTH_YEAR: now.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }),
@@ -48,11 +54,11 @@ export async function researchPostTopic({
   signal,
   onFallback,
 }: ResearchOptions): Promise<ResearchResult | null> {
-  const lenses = loadSearchLenses("comment-writer-research-lenses")
+  const [template, lenses] = await Promise.all([loadPrompt("comment-writer-research"), loadSearchLenses("comment-writer-research-lenses")])
   try {
     return await runLiveResearch({
-      geminiPasses: [buildResearchMessages(postText, styleBrief, now, describeAllLenses(lenses))],
-      openAIPasses: lenses.map((lens) => buildResearchMessages(postText, styleBrief, now, lens)),
+      geminiPasses: [buildResearchMessages(template, postText, styleBrief, now, describeAllLenses(lenses))],
+      openAIPasses: lenses.map((lens) => buildResearchMessages(template, postText, styleBrief, now, lens)),
       minSources: MIN_RESEARCH_SOURCES,
       signal,
       onFallback,

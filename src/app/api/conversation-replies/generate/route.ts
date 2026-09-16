@@ -8,6 +8,7 @@ import {
   CONVERSATION_REPLY_TYPE_IDS,
 } from "@/constants/conversationReply"
 import { analyzeAndReply } from "@/services/conversationReply"
+import { recordConversationReply } from "@/services/generationRecords"
 
 export const dynamic = "force-dynamic"
 // Analysis and reply run one after the other, each with a Gemini → OpenAI fallback
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await analyzeAndReply({ ...parsed.data, signal: req.signal })
+    await recordConversationReply(parsed.data, result)
     return NextResponse.json({ success: true, message: "Conversation analyzed and reply generated", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

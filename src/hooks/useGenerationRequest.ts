@@ -49,12 +49,17 @@ export function createGenerationRequest<TPayload, TResult>(
     store.update({ status: "loading", result: null, error: null })
 
     try {
-      const { data } = await requestApi<TResult>(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: current.signal,
-      })
+      // Generating changes nothing on the server, so a dropped request is safe to send again
+      const { data } = await requestApi<TResult>(
+        endpoint,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: current.signal,
+        },
+        { retry: true }
+      )
       if (current.signal.aborted) return
       store.update({ status: "success", result: data })
     } catch (err: unknown) {

@@ -65,7 +65,8 @@ Tool-specific details:
 
 - The sidebar groups tools into Discover, Outreach, Engage on posts and Conversations. It collapses to an icon rail (Ctrl/⌘+B), and a tool switcher opens with Ctrl/⌘+K.
 - Inputs and results are kept in module-level stores, so switching tools doesn't lose work. A generation started before you switch keeps running in the background.
-- Stores are mirrored to `localStorage` for 24 hours. The header and sidebar show which tools are still writing, or have finished while you were on another page.
+- Each browser tab keeps its own inputs and results, so you can run the same tool in several tabs with different inputs. A tab restores its own state after a reload. A new tab starts from the latest state saved in the last 24 hours.
+- The header and sidebar show which tools are still writing, or have finished while you were on another page.
 - The streaming tools (Trending Topics, Comment Writer and Post Comment Replies) show each pipeline stage as it happens, including a switch to the backup model.
 - Every tool has a **Reset** button, which clears the inputs and result but keeps the chosen tone.
 
@@ -93,7 +94,7 @@ Generation endpoints are open to anyone who can reach the app.
 | Authentication | None. Prompt editors use a password with HMAC-signed httpOnly cookies (`node:crypto`) |
 | AI Services | LangChain (`@langchain/core`, `@langchain/google-genai`, `@langchain/openai`); Google Gemini as the primary model with Google Search grounding; OpenAI as the fallback model with the Responses API web search tool |
 | Validation | Zod 4 (API input, environment, model output) |
-| State Management | Custom module-level stores read with `useSyncExternalStore`, mirrored to `localStorage` |
+| State Management | Custom module-level stores read with `useSyncExternalStore`, saved per tab in `sessionStorage` and mirrored to `localStorage` |
 | Styling | Tailwind CSS 3.4, PostCSS, Autoprefixer, lucide-react icons, Inter via `next/font` |
 | Deployment | No deployment configuration in the repo; standard `next build` / `next start` |
 | Tooling | ESLint 9 with `eslint-config-next` |
@@ -182,7 +183,7 @@ Some tools add steps:
 | Default prompts | `src/prompts/*.md`, read at request time by `loadPrompt()` |
 | Dummy data samples | `src/data/<kind>/<id>.md` |
 | Latest Trending Topics search | `src/data/trending-topics/latest.md` (readable Markdown with the full result in a JSON block at the end) |
-| Tool inputs and results | Browser `localStorage` (`linkpilot:tool:<name>`), kept 24 hours |
+| Tool inputs and results | Browser `sessionStorage` per tab, plus `localStorage` for new tabs (`linkpilot:tool:<name>`, kept 24 hours) |
 
 ### Prompt editor access flow
 

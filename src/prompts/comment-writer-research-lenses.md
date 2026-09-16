@@ -1,2 +1,0 @@
-- Official sources: announcements, releases, documentation, changelogs and research papers directly about the post's subject.
-- Coverage and discussion: reputable news, industry publications and practitioner discussion about the post's subject in the last few days.

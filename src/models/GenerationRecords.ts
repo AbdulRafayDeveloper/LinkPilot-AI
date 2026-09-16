@@ -1,0 +1,237 @@
+import mongoose, { Schema, type Model } from "mongoose"
+import type { LeadInfo } from "@/lib/leadInfo"
+
+/**
+ * One collection per tool, one document per generation: who it was for (`lead`), what was
+ * pasted and chosen, the text written, and the full result exactly as the page received it.
+ */
+interface RecordBase {
+  // The full result object, stored as is
+  result: unknown
+  createdAt: Date
+  updatedAt: Date
+}
+
+interface LeadRecord extends RecordBase {
+  lead: LeadInfo
+}
+
+export interface IConnectionNoteRecord extends LeadRecord {
+  tone: string
+  companyName: string | null
+  profileData: string
+  note: string
+  characterCount: number
+}
+
+export interface ICommentRecord extends RecordBase {
+  tune: string
+  postSource: "text" | "image"
+  postText: string | null
+  comment: string
+  characterCount: number
+}
+
+export interface IPostCommentReplyRecord extends RecordBase {
+  context: string
+  style: string
+  postSource: "text" | "image" | "none"
+  postText: string | null
+  comments: string
+  replyingTo: string | null
+  reply: string
+  characterCount: number
+}
+
+export interface IFollowUpMessageRecord extends LeadRecord {
+  followUpType: string
+  conversation: string
+  profileData: string | null
+  message: string
+  characterCount: number
+}
+
+export interface IFirstMessageRecord extends LeadRecord {
+  tune: string
+  profileData: string
+  message: string
+  characterCount: number
+}
+
+export interface IInMailMessageRecord extends LeadRecord {
+  tune: string
+  profileData: string
+  subject: string
+  message: string
+}
+
+export interface IConversationReplyRecord extends LeadRecord {
+  replyType: string
+  conversation: string
+  profileData: string | null
+  reply: string
+  strategyNote: string
+  characterCount: number
+}
+
+export interface IClientMessageRecord extends RecordBase {
+  client: { id: string; name: string; country: string }
+  channel: string
+  update: string
+  subject: string | null
+  message: string
+  characterCount: number
+}
+
+const LeadSchema = new Schema<LeadInfo>(
+  {
+    name: { type: String, default: null },
+    headline: { type: String, default: null },
+    company: { type: String, default: null },
+  },
+  { _id: false }
+)
+
+// Outputs are saved as they are, so a field is never rejected for being empty
+const TEXT = { type: String, default: null }
+const COUNT = { type: Number, default: null }
+const LEAD = { type: LeadSchema, required: true }
+// Who the client message went to, kept with the message itself
+const ClientSchema = new Schema<IClientMessageRecord["client"]>(
+  { id: { type: String, required: true }, name: { type: String, required: true }, country: { type: String, default: null } },
+  { _id: false }
+)
+const RESULT = { type: Schema.Types.Mixed, required: true }
+
+function recordModel<T>(name: string, schema: Schema<T>): Model<T> {
+  schema.index({ createdAt: -1 })
+  return (mongoose.models[name] as Model<T> | undefined) ?? mongoose.model<T>(name, schema)
+}
+
+export const ConnectionNoteRecord = recordModel(
+  "ConnectionNoteRecord",
+  new Schema<IConnectionNoteRecord>(
+    {
+      lead: LEAD,
+      tone: TEXT,
+      companyName: TEXT,
+      profileData: TEXT,
+      note: TEXT,
+      characterCount: COUNT,
+      result: RESULT,
+    },
+    { timestamps: true, collection: "connection_notes" }
+  )
+)
+
+export const CommentRecord = recordModel(
+  "CommentRecord",
+  new Schema<ICommentRecord>(
+    {
+      tune: TEXT,
+      postSource: { type: String, enum: ["text", "image"], required: true },
+      postText: TEXT,
+      comment: TEXT,
+      characterCount: COUNT,
+      result: RESULT,
+    },
+    { timestamps: true, collection: "comment_writer_comments" }
+  )
+)
+
+export const PostCommentReplyRecord = recordModel(
+  "PostCommentReplyRecord",
+  new Schema<IPostCommentReplyRecord>(
+    {
+      context: TEXT,
+      style: TEXT,
+      postSource: { type: String, enum: ["text", "image", "none"], required: true },
+      postText: TEXT,
+      comments: TEXT,
+      replyingTo: TEXT,
+      reply: TEXT,
+      characterCount: COUNT,
+      result: RESULT,
+    },
+    { timestamps: true, collection: "post_comment_replies" }
+  )
+)
+
+export const FollowUpMessageRecord = recordModel(
+  "FollowUpMessageRecord",
+  new Schema<IFollowUpMessageRecord>(
+    {
+      lead: LEAD,
+      followUpType: TEXT,
+      conversation: TEXT,
+      profileData: TEXT,
+      message: TEXT,
+      characterCount: COUNT,
+      result: RESULT,
+    },
+    { timestamps: true, collection: "follow_up_messages" }
+  )
+)
+
+export const FirstMessageRecord = recordModel(
+  "FirstMessageRecord",
+  new Schema<IFirstMessageRecord>(
+    {
+      lead: LEAD,
+      tune: TEXT,
+      profileData: TEXT,
+      message: TEXT,
+      characterCount: COUNT,
+      result: RESULT,
+    },
+    { timestamps: true, collection: "first_messages" }
+  )
+)
+
+export const InMailMessageRecord = recordModel(
+  "InMailMessageRecord",
+  new Schema<IInMailMessageRecord>(
+    {
+      lead: LEAD,
+      tune: TEXT,
+      profileData: TEXT,
+      subject: TEXT,
+      message: TEXT,
+      result: RESULT,
+    },
+    { timestamps: true, collection: "inmail_messages" }
+  )
+)
+
+export const ConversationReplyRecord = recordModel(
+  "ConversationReplyRecord",
+  new Schema<IConversationReplyRecord>(
+    {
+      lead: LEAD,
+      replyType: TEXT,
+      conversation: TEXT,
+      profileData: TEXT,
+      reply: TEXT,
+      strategyNote: TEXT,
+      characterCount: COUNT,
+      result: RESULT,
+    },
+    { timestamps: true, collection: "conversation_replies" }
+  )
+)
+
+export const ClientMessageRecord = recordModel(
+  "ClientMessageRecord",
+  new Schema<IClientMessageRecord>(
+    {
+      client: { type: ClientSchema, required: true },
+      channel: TEXT,
+      update: TEXT,
+      subject: TEXT,
+      message: TEXT,
+      characterCount: COUNT,
+      result: RESULT,
+    },
+    { timestamps: true, collection: "client_messages" }
+  )
+)

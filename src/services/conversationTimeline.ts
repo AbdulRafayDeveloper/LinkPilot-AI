@@ -73,6 +73,6 @@ export function toConversationParties(output: ConversationPeopleOutput): Convers
  * Shared rules for reading a pasted conversation, inserted into each tool's system
  * prompt at {{CONVERSATION_READING_RULES}}.
  */
-export function loadConversationReadingRules(): string {
+export function loadConversationReadingRules(): Promise<string> {
   return loadPrompt("conversation-reading")
 }

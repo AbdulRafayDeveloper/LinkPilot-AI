@@ -2,8 +2,8 @@ import { Globe, type LucideIcon } from "lucide-react"
 
 /**
  * Global AI Prompts registry: app-wide prompts that aren't tied to one LinkedIn tool.
- * Each owns an independent, separately stored prompt (default template:
- * src/prompts/global-<id>.md). Every tool's output is rewritten with the Humanization
+ * Each owns an independent, separately stored prompt (prompt record:
+ * global-<id> in the prompts collection). Every tool's output is rewritten with the Humanization
  * prompt (services/humanizer.ts); Post Comment Replies takes Abdul's facts from Rafay Profile Info.
  */
 export const GLOBAL_PROMPTS = [
@@ -31,10 +31,6 @@ export function getGlobalPromptUsage(id: GlobalPromptId): string {
 
 export function getGlobalPromptLabel(id: GlobalPromptId): string {
   return GLOBAL_PROMPTS.find((prompt) => prompt.id === id)?.label ?? id
-}
-
-export function globalPromptKey(id: GlobalPromptId): string {
-  return `global_prompt:${id}`
 }
 
 // The module's sidebar entry, shown below the LinkedIn tools

@@ -3,8 +3,8 @@ import { LEAD_SIGNALS_PROMPT_ID, LEAD_SIGNALS_TAB_LABEL } from "@/constants/lead
 
 /**
  * Reply-tone registry: the owner's recommended tones (2, 3, 5) first, then the rest in stage
- * order. Each tone owns an independent, separately stored prompt (default template:
- * src/prompts/conversation-reply-<id>.md). The tone only steers the reply: the conversation
+ * order. Each tone owns an independent, separately stored prompt (prompt record:
+ * conversation-reply-<id> in the prompts collection). The tone only steers the reply: the conversation
  * signals are analyzed without it.
  */
 export const CONVERSATION_REPLY_TYPES = [
@@ -50,10 +50,6 @@ export function getReplyTypeLabel(type: ConversationReplyTypeId): string {
 
 export function getConversationReplyPromptLabel(id: ConversationReplyPromptId): string {
   return CONVERSATION_REPLY_PROMPT_TABS.find((tab) => tab.id === id)?.label ?? id
-}
-
-export function conversationReplyPromptKey(id: ConversationReplyOwnPromptId): string {
-  return `conversation_reply_prompt:${id}`
 }
 
 export const CLIENT_SIZES = ["Small", "Mid-Market", "Large", "Enterprise", "Unknown"] as const

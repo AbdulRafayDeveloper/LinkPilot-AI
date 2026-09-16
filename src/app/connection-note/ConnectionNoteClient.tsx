@@ -14,6 +14,8 @@ import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import {
+  COMPANY_NAME_MAX_LENGTH,
+  COMPANY_TONES,
   CONNECTION_NOTE_MESSAGES,
   DEFAULT_CONNECTION_NOTE_TONE,
   PROFILE_DATA_MAX_LENGTH,
@@ -22,15 +24,20 @@ import {
 import type { GeneratedConnectionNote } from "@/types/connectionNote"
 
 const PROFILE_INPUT_ID = "connection-note-profile"
+const COMPANY_INPUT_ID = "connection-note-company"
+const COMPANY_HINT_ID = "connection-note-company-hint"
 const FORM_ERROR_ID = "connection-note-form-error"
 
 // Inputs and the result outlive the page, so they're still here after visiting another tool
 const formStore = createToolStore(
   "connection-note:form",
-  { profileData: "", tone: DEFAULT_CONNECTION_NOTE_TONE as ConnectionNoteToneId },
+  { profileData: "", tone: DEFAULT_CONNECTION_NOTE_TONE as ConnectionNoteToneId, companyName: "" },
   { version: 1 }
 )
-const generation = createGenerationRequest<{ profileData: string; tone: ConnectionNoteToneId }, GeneratedConnectionNote>(
+const generation = createGenerationRequest<
+  { profileData: string; tone: ConnectionNoteToneId; companyName?: string },
+  GeneratedConnectionNote
+>(
   "connection-note",
   "/api/connection-notes/generate",
   CONNECTION_NOTE_MESSAGES.generationFailed
@@ -40,13 +47,14 @@ export default function ConnectionNoteClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isPromptsOpen, setIsPromptsOpen] = useState(false)
   const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
-  const { profileData, tone } = useToolStore(formStore)
+  const { profileData, tone, companyName } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
   const profileInputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const { status, result, error, generate, reset } = useGenerationRequest(generation)
   const isGenerating = status === "loading"
-  const canReset = profileData !== "" || status !== "idle"
+  const companyTone = COMPANY_TONES[tone]
+  const canReset = profileData !== "" || companyName !== "" || status !== "idle"
 
   const submit = () => {
     if (!profileData.trim()) {
@@ -55,19 +63,20 @@ export default function ConnectionNoteClient() {
       return
     }
     setFormError(null)
-    generate({ profileData, tone })
+    // Only the company tones use the company name
+    generate({ profileData, tone, ...(companyTone && companyName.trim() ? { companyName: companyName.trim() } : {}) })
   }
 
-  // A dummy profile replaces the input, and the note written for the previous profile goes with it
+  // A dummy profile replaces the input, and the note (and company) for the previous profile go with it
   const loadDummyProfile = ({ profile }: Record<string, string>) => {
-    formStore.update({ profileData: profile ?? "" })
+    formStore.update({ profileData: profile ?? "", companyName: "" })
     reset()
     setFormError(null)
   }
 
-  // Clears the profile and the note; the chosen tone stays for the next profile
+  // Clears the profile, the company and the note; the chosen tone stays for the next profile
   const resetTool = () => {
-    formStore.update({ profileData: "" })
+    formStore.update({ profileData: "", companyName: "" })
     reset()
     setFormError(null)
     profileInputRef.current?.focus()
@@ -151,6 +160,30 @@ export default function ConnectionNoteClient() {
                   onChange={(nextTone) => formStore.update({ tone: nextTone })}
                   disabled={isGenerating}
                 />
+
+                {/* Company tones: the company the news is about (funding raised, or hiring) */}
+                {companyTone && (
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    <label htmlFor={COMPANY_INPUT_ID} className="text-[10px] font-bold text-outline uppercase tracking-wider">
+                      {companyTone.fieldLabel}
+                    </label>
+                    <input
+                      id={COMPANY_INPUT_ID}
+                      type="text"
+                      value={companyName}
+                      onChange={(event) => formStore.update({ companyName: event.target.value })}
+                      maxLength={COMPANY_NAME_MAX_LENGTH}
+                      placeholder="Company name, e.g. Clinicly"
+                      disabled={isGenerating}
+                      autoComplete="organization"
+                      aria-describedby={COMPANY_HINT_ID}
+                      className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-[13px] text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary disabled:opacity-60"
+                    />
+                    <p id={COMPANY_HINT_ID} className="text-[11px] text-outline">
+                      {companyTone.hint} Leave it empty to take the company from the profile.
+                    </p>
+                  </div>
+                )}
 
                 {formError && (
                   <p id={FORM_ERROR_ID} role="alert" className="flex items-center gap-1.5 text-xs font-semibold text-error">

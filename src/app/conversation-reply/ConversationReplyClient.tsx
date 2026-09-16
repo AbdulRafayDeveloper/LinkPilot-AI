@@ -235,6 +235,8 @@ export default function ConversationReplyClient() {
                     title="Suggested Reply"
                     status={status}
                     text={result?.reply ?? null}
+                    editScope="conversation-reply"
+                    textLabel="Suggested reply"
                     error={error}
                     onRetry={submit}
                     idleIcon={MessagesSquare}
@@ -246,7 +248,7 @@ export default function ConversationReplyClient() {
                     meta={
                       result && (
                         <>
-                          {result.characterCount.toLocaleString()} characters · {getReplyTypeLabel(result.replyType)}
+                          {getReplyTypeLabel(result.replyType)}
                           {result.usedProfile && " · Profile used"}
                         </>
                       )

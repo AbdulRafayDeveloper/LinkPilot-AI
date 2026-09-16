@@ -1,33 +1,25 @@
-import { loadPrompt } from "@/services/prompts"
-import { getStoredPrompts, saveStoredPrompt, type PromptEntry } from "@/services/promptStore"
-import { GLOBAL_PROMPTS, globalPromptKey, type GlobalPromptId } from "@/constants/globalPrompts"
+import type { PromptName } from "@/services/prompts"
+import { getStoredPrompt, getStoredPrompts, saveStoredPrompt } from "@/services/promptStore"
+import { GLOBAL_PROMPTS, type GlobalPromptId } from "@/constants/globalPrompts"
 import type { GlobalPrompt } from "@/types/globalPrompts"
 
 /**
- * Each global prompt has its own Setting record and its own default template, so
- * editing one can never change another. Every tool's output passes through the
- * Humanization prompt (services/humanizer.ts); Post Comment Replies draws on Rafay Profile Info.
+ * Each global prompt has its own prompt record, so editing one can never change another.
+ * Every tool's output passes through the Humanization prompt (services/humanizer.ts);
+ * Rafay Profile Info is part of the sender's facts (services/senderProfile.ts).
  */
-function globalPromptEntry(id: GlobalPromptId): PromptEntry {
-  return { key: globalPromptKey(id), defaultPrompt: loadPrompt(`global-${id}`) }
-}
+const globalPromptName = (id: GlobalPromptId): PromptName => `global-${id}`
 
 export async function getGlobalPrompts(): Promise<GlobalPrompt[]> {
-  const entries = GLOBAL_PROMPTS.map((prompt) => ({ id: prompt.id, entry: globalPromptEntry(prompt.id) }))
-  const stored = await getStoredPrompts(entries.map(({ entry }) => entry))
-  return entries.map(({ id, entry }, index) => ({ id, ...stored[index], defaultPrompt: entry.defaultPrompt }))
+  const stored = await getStoredPrompts(GLOBAL_PROMPTS.map((prompt) => globalPromptName(prompt.id)))
+  return GLOBAL_PROMPTS.map((prompt, index) => ({ id: prompt.id, ...stored[index] }))
 }
 
-/**
- * The saved text of one global prompt, or its default template when it was never edited.
- */
 export async function getActiveGlobalPrompt(id: GlobalPromptId): Promise<string> {
-  const [stored] = await getStoredPrompts([globalPromptEntry(id)])
-  return stored.prompt
+  const { prompt } = await getStoredPrompt(globalPromptName(id))
+  return prompt
 }
 
 export async function saveGlobalPrompt(id: GlobalPromptId, prompt: string): Promise<GlobalPrompt> {
-  const entry = globalPromptEntry(id)
-  const saved = await saveStoredPrompt(entry, prompt)
-  return { id, ...saved, defaultPrompt: entry.defaultPrompt }
+  return { id, ...(await saveStoredPrompt(globalPromptName(id), prompt)) }
 }

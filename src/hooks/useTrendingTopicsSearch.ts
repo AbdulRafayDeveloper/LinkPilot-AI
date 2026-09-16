@@ -1,7 +1,7 @@
 "use client"
 
 import { readSSEStream } from "@/lib/sse"
-import { requestApi } from "@/lib/apiClient"
+import { fetchWithRetry, requestApi } from "@/lib/apiClient"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { TRENDING_ERROR_MESSAGE, TRENDING_MESSAGES, TRENDING_TOPIC_COUNT } from "@/constants/trending"
 import type { TrendingResult, TrendingStage, TrendingStreamEvent } from "@/services/trending/schema"
@@ -31,8 +31,8 @@ const statusFor = (result: TrendingResult): TrendingSearchStatus =>
   result.topics.length >= TRENDING_TOPIC_COUNT ? "success" : "partial_success"
 
 /**
- * The topics everyone sees are saved on the server (src/data/trending-topics/latest.md):
- * each search replaces them and Reset removes them for everyone. This store shows them,
+ * The topics everyone sees are saved in the database (trending_searches, every search kept):
+ * each search that finds topics replaces them and Reset hides them for everyone. This store shows them,
  * keeps a running search alive while visiting another tool, and mirrors the last topics to
  * localStorage so they appear instantly before the saved ones are checked again. Bump the
  * version when TrendingResult changes shape.
@@ -45,12 +45,17 @@ const store = createToolStore<TrendingSearchState>("trending-topics:result", IDL
 let controller: AbortController | null = null
 // Every search, reset and load takes a new token; a slower, older one never overwrites a newer one
 let latestAction = 0
+// Set by the first check after a page load; later visits in the same tab keep what it shows
+let hasCheckedSaved = false
 
 /**
- * Shows the saved topics, the latest search anyone ran. Nothing changes while a search
- * from this browser is running.
+ * Shows the saved topics, the latest search anyone ran, once per page load (a new tab or a
+ * refresh). Coming back to the tab or to this tool later never swaps what the tab shows,
+ * and nothing changes while a search from this tab is running.
  */
 async function loadSaved() {
+  if (hasCheckedSaved) return
+  hasCheckedSaved = true
   if (store.getSnapshot().status === "loading") return
   const action = ++latestAction
   if (store.getSnapshot().status === "idle") store.update({ status: "checking" })
@@ -80,7 +85,8 @@ async function search() {
   store.update({ status: "loading", result: null, stages: [], error: null })
 
   try {
-    const response = await fetch(SEARCH_ENDPOINT, { method: "POST", signal: current.signal })
+    // Retried only until the stream starts; a stream that has begun is never repeated
+    const response = await fetchWithRetry(SEARCH_ENDPOINT, { method: "POST", signal: current.signal }, { retry: true })
     if (!response.ok || !response.body) throw new Error(`Search request failed with status ${response.status}`)
 
     let hasResult = false

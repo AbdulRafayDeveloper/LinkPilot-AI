@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next"
-import { LINKEDIN_TOOLS } from "@/constants/linkedinTools"
+import { APP_TOOLS } from "@/constants/linkedinTools"
 import {
   BRAND_ICONS,
   SITE_BACKGROUND_COLOR,
@@ -43,7 +43,7 @@ export default function manifest(): MetadataRoute.Manifest {
       ...BRAND_ICONS.maskable.map((icon) => png(icon, "maskable")),
       png(BRAND_ICONS.monochrome, "monochrome"),
     ],
-    shortcuts: LINKEDIN_TOOLS.map((tool) => ({
+    shortcuts: APP_TOOLS.map((tool) => ({
       name: tool.title,
       short_name: tool.title,
       description: tool.description,

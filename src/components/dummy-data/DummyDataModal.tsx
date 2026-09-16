@@ -42,7 +42,7 @@ interface DummyDataModalProps {
 
 /**
  * Manages one kind of Dummy Data (sample profiles, posts, comment threads, conversations)
- * kept as markdown files: one tab per item, edited like a prompt, plus adding, removing,
+ * saved in the database: one tab per item, edited like a prompt, plus adding, removing,
  * copying a field and loading an item into the tool. Behind the prompt password, like
  * Update Prompt.
  */

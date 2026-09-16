@@ -92,7 +92,7 @@ function buildWarnings(subject: string, message: string, unsupportedSenderClaim:
 export async function generateInMail({ profileData, tune, signal }: GenerateOptions): Promise<GeneratedInMail> {
   const { tunePrompt, senderProfile } = await getInMailGenerationInputs(tune)
 
-  const system = renderPrompt(loadPrompt("inmail-system"), {
+  const system = renderPrompt(await loadPrompt("inmail-system"), {
     SUBJECT_MAX_CHARS: INMAIL_SUBJECT_MAX_CHARS,
     BODY_MAX_CHARS: INMAIL_BODY_MAX_CHARS,
   })

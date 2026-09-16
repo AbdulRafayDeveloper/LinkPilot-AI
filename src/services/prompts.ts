@@ -1,5 +1,4 @@
-import fs from "fs"
-import path from "path"
+import { loadPromptText } from "@/services/promptStore"
 import type { ConnectionNoteToneId } from "@/constants/connectionNote"
 import type { FollowUpPromptId } from "@/constants/followUp"
 import type { CommentTuneId } from "@/constants/commentWriter"
@@ -8,8 +7,7 @@ import type { InMailTuneId } from "@/constants/inmail"
 import type { ReplyContextId, ReplyStyleId } from "@/constants/postCommentReplies"
 import type { ConversationReplyOwnPromptId } from "@/constants/conversationReply"
 import type { GlobalPromptId } from "@/constants/globalPrompts"
-
-const PROMPTS_DIR = path.join(process.cwd(), "src/prompts")
+import type { PromptTargetId } from "@/constants/promptCreator"
 
 export type PromptName =
   | "trending-topics"
@@ -41,21 +39,18 @@ export type PromptName =
   | `conversation-reply-${ConversationReplyOwnPromptId}`
   | `global-${GlobalPromptId}`
   | "humanizer-system"
+  | "prompt-creator-system"
+  | "prompt-creator-transcription"
+  | `prompt-creator-${PromptTargetId}`
+  | "client-message-system"
+  | "client-message"
 
 /**
- * Loads a prompt template from src/prompts. A missing template fails loudly instead of
- * letting a tool run with a degraded prompt.
+ * Loads a prompt template from the prompts collection. A missing template fails loudly
+ * instead of letting a tool run with a degraded prompt.
  */
-export function loadPrompt(templateName: PromptName): string {
-  try {
-    const filePath = path.join(PROMPTS_DIR, `${templateName}.md`)
-    if (fs.existsSync(filePath)) {
-      return fs.readFileSync(filePath, "utf-8").trim()
-    }
-  } catch (error: unknown) {
-    console.warn(`⚠️ Failed to load prompt template '${templateName}' from file system:`, error)
-  }
-  throw new Error(`PromptTemplateMissing: src/prompts/${templateName}.md could not be loaded`)
+export function loadPrompt(templateName: PromptName): Promise<string> {
+  return loadPromptText(templateName)
 }
 
 /**

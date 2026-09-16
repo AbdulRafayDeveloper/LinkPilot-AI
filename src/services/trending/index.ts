@@ -1,8 +1,10 @@
 import { TRENDING_TOPIC_COUNT } from "@/constants/trending"
+import { composeTrendingPost } from "@/lib/trendingPost"
 import { getActiveTrendingPrompt } from "./prompt"
 import { runTrendingResearch } from "./research"
 import { synthesizeTopics } from "./synthesize"
-import { finalizeTopics } from "./finalize"
+import { finalizeTopics, type RejectionReason } from "./finalize"
+import { expandShortPosts } from "./expand"
 import { humanizeTopicPosts } from "./humanize"
 import { TrendingResultSchema, type TrendingResult, type TrendingStage } from "./schema"
 
@@ -11,21 +13,38 @@ interface FindTrendingOptions {
   onStage: (stage: TrendingStage, text: string) => void
 }
 
-function buildNotice(topicCount: number, rejectedCount: number, shortfallReason: string | null): string | null {
+// What each rejection means in the user's words, so a thin search says what actually went wrong
+const REJECTION_WORDING: Record<RejectionReason, string> = {
+  unverified_source: "no source the live search returned",
+  unverified_date: "no date the sources confirm",
+  incomplete: "a missing title, post or search query",
+  duplicate: "the same development as another topic",
+  weak_post: "a post too thin to publish",
+}
+
+// One round to fix what the tone rewrite broke, one more for anything the fix missed
+const REPAIR_ROUNDS = 2
+
+function buildNotice(
+  topicCount: number,
+  rejected: Array<{ reason: RejectionReason }>,
+  shortfallReason: string | null
+): string | null {
   if (topicCount >= TRENDING_TOPIC_COUNT) return null
   const parts = [
     shortfallReason?.trim() ||
       `Only ${topicCount} of ${TRENDING_TOPIC_COUNT} topics met the freshness and relevance threshold in this search.`,
   ]
-  if (rejectedCount > 0) {
-    parts.push(
-      rejectedCount === 1
-        ? "1 candidate was removed because its source, date or freshness couldn't be verified, or it duplicated another topic."
-        : `${rejectedCount} candidates were removed because their sources, dates or freshness couldn't be verified, or they duplicated other topics.`
-    )
+  const counts = new Map<RejectionReason, number>()
+  for (const { reason } of rejected) counts.set(reason, (counts.get(reason) ?? 0) + 1)
+  const reasons = [...counts.entries()].sort((a, b) => b[1] - a[1])
+  if (reasons.length > 0) {
+    const listed = reasons.map(([reason, count]) => `${count} had ${REJECTION_WORDING[reason]}`).join(", ")
+    parts.push(`${rejected.length === 1 ? "1 candidate was" : `${rejected.length} candidates were`} removed. ${listed}.`)
   }
   return parts.join(" ")
 }
+
 
 /**
  * Fresh end-to-end Trending Topics run: latest saved prompt → live web research
@@ -52,8 +71,17 @@ export async function findTrendingTopics({ signal, onStage }: FindTrendingOption
   const finalized = finalizeTopics(output.topics, research, now)
   const { rejected } = finalized
 
+  onStage("EXPANDING", "Filling out any post that came back too short")
+  const { topics: fullLength, expanded } = await expandShortPosts(finalized.topics, research.notes, signal)
+
   onStage("HUMANIZING", "Making the posts sound natural")
-  const { topics, humanized } = await humanizeTopicPosts(finalized.topics, signal)
+  const { topics: natural, humanized } = await humanizeTopicPosts(fullLength, signal)
+
+  // Rewriting for tone can shorten a post or bring a stock phrase back, so the finished text
+  // gets one more repair round. Nothing changes unless a post is still short, still ends on a
+  // generic question, or still carries a phrase the reader has seen a hundred times.
+  onStage("EXPANDING", "Checking the finished posts one last time")
+  const { topics, expanded: repaired } = await expandShortPosts(natural, research.notes, signal, REPAIR_ROUNDS)
   // A JSON string, so the dev log file keeps the details (it flattens objects to {})
   console.info(
     "Trending Topics run:",
@@ -63,6 +91,9 @@ export async function findTrendingTopics({ signal, onStage }: FindTrendingOption
       candidates: output.candidates_evaluated,
       proposed: output.topics.length,
       accepted: topics.length,
+      expanded,
+      repaired,
+      postLengths: topics.map((topic) => composeTrendingPost(topic).length),
       rejected,
       humanized,
     })
@@ -70,7 +101,7 @@ export async function findTrendingTopics({ signal, onStage }: FindTrendingOption
 
   const parsed = TrendingResultSchema.safeParse({
     topics,
-    notice: buildNotice(topics.length, rejected.length, output.shortfall_reason),
+    notice: buildNotice(topics.length, rejected, output.shortfall_reason),
     research_metadata: {
       searched_at: now.toISOString(),
       search_provider: research.provider,

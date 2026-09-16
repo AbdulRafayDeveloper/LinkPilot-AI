@@ -1,6 +1,6 @@
 /**
  * Post Comment Replies registry. Every context × style pair owns an independent,
- * separately stored prompt (default template: src/prompts/post-comment-reply-<context>-<style>.md),
+ * separately stored prompt (prompt record: post-comment-reply-<context>-<style> in the prompts collection),
  * so there is one prompt per pair and saving one can never change another.
  */
 // Someone else's post comes first: it's the default and the more common case
@@ -47,10 +47,6 @@ export function getReplyContextLabel(context: ReplyContextId): string {
 
 export function getReplyStyleLabel(style: ReplyStyleId): string {
   return REPLY_STYLES.find((entry) => entry.id === style)?.label ?? style
-}
-
-export function postCommentReplyPromptKey(context: ReplyContextId, style: ReplyStyleId): string {
-  return `post_comment_reply_prompt:${context}:${style}`
 }
 
 // Limit for the pasted comments; the post has its own limit (POST_TEXT_MAX_LENGTH)

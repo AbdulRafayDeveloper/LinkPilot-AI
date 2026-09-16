@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { UserFacingError } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
-import { getActiveTrendingPrompt, getDefaultTrendingPrompt, saveTrendingPrompt } from "@/services/trending/prompt"
+import { getActiveTrendingPrompt, saveTrendingPrompt } from "@/services/trending/prompt"
 import { requirePromptAccess } from "@/services/promptAccess"
 
 export const dynamic = "force-dynamic"
@@ -26,7 +26,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       message: "Active trending topics prompt retrieved",
-      data: { ...active, defaultPrompt: getDefaultTrendingPrompt() },
+      data: active,
     })
   } catch (error: unknown) {
     console.error("GET Trending Prompt Exception:", error)
@@ -55,7 +55,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Prompt saved. Your next search will use it.",
-      data: { ...saved, defaultPrompt: getDefaultTrendingPrompt() },
+      data: saved,
     })
   } catch (error: unknown) {
     console.error("PUT Trending Prompt Exception:", error)

@@ -3,6 +3,7 @@ import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { INMAIL_MESSAGES, INMAIL_PROFILE_MAX_LENGTH, INMAIL_TUNE_IDS } from "@/constants/inmail"
 import { generateInMail } from "@/services/inmail/generate"
+import { recordInMail } from "@/services/generationRecords"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await generateInMail({ ...parsed.data, signal: req.signal })
+    await recordInMail(parsed.data, result)
     return NextResponse.json({ success: true, message: "InMail generated", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

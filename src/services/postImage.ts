@@ -40,7 +40,7 @@ export async function extractPostFromImage({
     schema: PostTranscriptionSchema,
     name: "linkedin_post_transcription",
     messages: [
-      new SystemMessage(loadPrompt("post-image-extraction")),
+      new SystemMessage(await loadPrompt("post-image-extraction")),
       new HumanMessage({
         content: [
           { type: "text", text: "Transcribe the LinkedIn post in this screenshot." },

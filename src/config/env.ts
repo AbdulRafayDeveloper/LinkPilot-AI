@@ -15,6 +15,8 @@ const envSchema = z.object({
   GEMINI_LIGHTWEIGHT_MODEL: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_LIGHTWEIGHT_MODEL: z.string().optional(),
+  // Reads recordings when Gemini cannot (Prompt Creator voice input); OpenAI's transcription model
+  OPENAI_TRANSCRIPTION_MODEL: z.string().optional(),
   // The X (Twitter) account for twitter:site and twitter:creator; left out of the cards when unset
   TWITTER_HANDLE: z
     .string()

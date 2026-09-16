@@ -1,7 +1,15 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
-import { TRENDING_TOPIC_COUNT } from "@/constants/trending"
+import {
+  POST_HASHTAG_MAX,
+  POST_HASHTAG_MIN,
+  POST_TARGET_MAX_CHARS,
+  POST_TARGET_MIN_CHARS,
+  TRENDING_POST_FORMATS,
+  TRENDING_CANDIDATE_COUNT,
+  TRENDING_TOPIC_COUNT,
+} from "@/constants/trending"
 import { SynthesisOutputSchema, type SynthesisOutput } from "./schema"
 import type { ResearchResult } from "@/services/liveResearch"
 import { sanitizeForTag } from "./sanitize"
@@ -12,6 +20,14 @@ const SYNTHESIS_TIMEOUT_MS = 90_000
 const SYNTHESIS_TEMPERATURE = 0.4
 const MAX_RESEARCH_CHARS = 40_000
 const MAX_LISTED_SOURCES = 60
+
+/**
+ * The formats the prompt assigns by rank, listed from constants/trending.ts so the prompt and
+ * the app can never disagree about what a format means.
+ */
+const POST_FORMATS = TRENDING_POST_FORMATS.map(
+  (format, index) => `${index + 1}. ${format.id} (${format.label}). ${format.structure}`
+).join("\n")
 
 interface SynthesisOptions {
   brief: string
@@ -26,9 +42,15 @@ interface SynthesisOptions {
  * web research in separate, clearly delimited sections.
  */
 export async function synthesizeTopics({ brief, research, now, signal }: SynthesisOptions): Promise<SynthesisOutput> {
-  const system = renderPrompt(loadPrompt("trending-synthesis"), {
+  const system = renderPrompt(await loadPrompt("trending-synthesis"), {
     CURRENT_DATE: now.toISOString().slice(0, 10),
-    TOPIC_COUNT: TRENDING_TOPIC_COUNT,
+    TOPIC_COUNT: TRENDING_CANDIDATE_COUNT,
+    PUBLISH_COUNT: TRENDING_TOPIC_COUNT,
+    POST_FORMATS,
+    POST_MIN_CHARS: POST_TARGET_MIN_CHARS,
+    POST_MAX_CHARS: POST_TARGET_MAX_CHARS,
+    HASHTAG_MIN: POST_HASHTAG_MIN,
+    HASHTAG_MAX: POST_HASHTAG_MAX,
   })
 
   const sourceList = research.sources

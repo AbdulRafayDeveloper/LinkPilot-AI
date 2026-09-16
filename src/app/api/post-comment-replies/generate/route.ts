@@ -10,6 +10,7 @@ import {
   REPLY_STYLE_IDS,
 } from "@/constants/postCommentReplies"
 import { generatePostCommentReply, type ReplyInput } from "@/services/postCommentReplies/generate"
+import { recordPostCommentReply } from "@/services/generationRecords"
 import type { ReplyStreamEvent } from "@/types/postCommentReplies"
 
 export const dynamic = "force-dynamic"
@@ -63,6 +64,7 @@ export async function POST(req: NextRequest) {
         signal: req.signal,
         onStage: (status) => send({ status }),
       })
+      await recordPostCommentReply(input, result)
       send({ status: "COMPLETE", result })
     } catch (error: unknown) {
       if (req.signal.aborted) return

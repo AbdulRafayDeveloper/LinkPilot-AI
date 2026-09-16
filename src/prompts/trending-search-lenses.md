@@ -1,3 +1,0 @@
-- Launches, releases and official announcements: new products, models, versions, features, APIs and company announcements.
-- Practitioner discussion: what developers, engineers, founders and other professionals are actively discussing and reacting to right now, for example on X, Hacker News, Reddit, GitHub and LinkedIn.
-- Industry coverage: what reputable news and industry publications have reported in the last few days.

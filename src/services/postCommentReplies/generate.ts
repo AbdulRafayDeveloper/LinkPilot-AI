@@ -3,11 +3,11 @@ import { HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/m
 import { AI_PROVIDERS, generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
 import { runLiveResearch } from "@/services/liveResearch"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
-import { getSenderProfile } from "@/services/senderProfile"
-import { getActiveGlobalPrompt } from "@/services/globalPrompts"
+import { getFullSenderProfile } from "@/services/senderProfile"
 import { extractPostFromImage } from "@/services/postImage"
 import { humanizeTexts } from "@/services/humanizer"
 import { UserFacingError } from "@/lib/errors"
+import { stripMarkdownMarks } from "@/lib/generatedText"
 import { findUnsupportedFigures } from "@/lib/figures"
 import { createTagSanitizer } from "@/lib/sanitize"
 import { parseLinkedInConversation } from "@/lib/linkedinComments"
@@ -47,8 +47,6 @@ const EXPERIENCE_CLAIM =
 // A story about an unnamed client, which the model tends to invent to fill a case-study structure
 const CLIENT_STORY =
   /\b(?:a|one|another)\s+(?:recent\s+|former\s+|past\s+)?client(?:\s+of\s+(?:ours|mine))?\b|\bone of (?:our|my) clients\b/i
-// LinkedIn shows markdown literally, so emphasis marks and code ticks are removed
-const MARKDOWN_MARKS = /\*\*|__|`/g
 // Replies read like a person typing: no colons, semicolons, dashes or commas (a comma or colon inside a number is fine)
 const STIFF_PUNCTUATION = /(?<!\d)[,:]|[,:](?!\d)|;|[—–]|\s-\s/
 
@@ -157,9 +155,7 @@ function resolveTargetComment(comments: string): TargetComment | null {
  * results and numbers, and every reply style may draw on it.
  */
 async function loadSenderProfileSection(): Promise<string> {
-  const [aboutMe, rafayProfile] = await Promise.all([getSenderProfile(), getActiveGlobalPrompt("rafay-profile")])
-  const parts = [aboutMe?.trim(), rafayProfile.trim()].filter((part): part is string => Boolean(part))
-  return parts.join("\n\n") || NO_SENDER_PROFILE_TEXT
+  return (await getFullSenderProfile()) ?? NO_SENDER_PROFILE_TEXT
 }
 
 /**
@@ -167,7 +163,7 @@ async function loadSenderProfileSection(): Promise<string> {
  * nothing verifiable is found, the writer is told not to state current facts.
  */
 async function researchConversation(conversation: Conversation, stylePrompt: string, signal: AbortSignal): Promise<string> {
-  const system = renderPrompt(loadPrompt("post-comment-reply-research"), { CURRENT_DATETIME: new Date().toISOString() })
+  const system = renderPrompt(await loadPrompt("post-comment-reply-research"), { CURRENT_DATETIME: new Date().toISOString() })
   const styleBrief = renderPrompt(stylePrompt, {
     [VARIABLE.conversation]: "(the post and comments below)",
     [VARIABLE.postContent]: "(the post below)",
@@ -209,15 +205,19 @@ async function researchConversation(conversation: Conversation, stylePrompt: str
  * answered), {{post_content}}, {{latest_comment}} / {{comment}} and {{sender_profile}}.
  * Whatever the prompt doesn't place is appended after it.
  */
-function buildMessages(
+async function buildMessages(
   input: ReplyInput,
   conversation: Conversation,
   stylePrompt: string,
   senderProfile: string,
   webResearch: string | null
-): BaseMessage[] {
-  const system = renderPrompt(loadPrompt("post-comment-reply-system"), {
-    POST_CONTEXT: loadPrompt(`post-comment-reply-context-${input.context}`),
+): Promise<BaseMessage[]> {
+  const [systemTemplate, postContext] = await Promise.all([
+    loadPrompt("post-comment-reply-system"),
+    loadPrompt(`post-comment-reply-context-${input.context}`),
+  ])
+  const system = renderPrompt(systemTemplate, {
+    POST_CONTEXT: postContext,
     STYLE: getReplyStyleLabel(input.style),
   })
 
@@ -249,7 +249,7 @@ function cleanReply(raw: string): string {
   const text = raw.trim()
   const wrapped = text.match(WRAPPED_IN_QUOTES)
   // Strip quotes only when they wrap the whole reply, not when it merely starts or ends with a quotation
-  return (wrapped && !/["“”]/.test(wrapped[2]) ? wrapped[2] : text).replace(MARKDOWN_MARKS, "").trim()
+  return stripMarkdownMarks(wrapped && !/["“”]/.test(wrapped[2]) ? wrapped[2] : text).trim()
 }
 
 interface ReplyProblems {
@@ -339,7 +339,7 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
   ])
 
   onStage("WRITING")
-  const messages = buildMessages(input, conversation, stylePrompt, senderProfile, webResearch)
+  const messages = await buildMessages(input, conversation, stylePrompt, senderProfile, webResearch)
   const write = (thread: BaseMessage[]) =>
     generateStructuredWithFallback({
       schema: ReplySchema,

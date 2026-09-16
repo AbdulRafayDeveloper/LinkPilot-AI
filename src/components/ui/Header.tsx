@@ -17,6 +17,9 @@ const subscribeToNothing = () => () => {}
 // The server render shows "Ctrl"; Apple devices switch to ⌘ once the page is running
 const useIsApple = () => useSyncExternalStore(subscribeToNothing, () => /Mac|iPhone|iPad/.test(navigator.userAgent), () => false)
 
+const isTextField = (target: EventTarget | null) =>
+  target instanceof HTMLElement && (target.isContentEditable || target.tagName === "TEXTAREA" || target.tagName === "INPUT")
+
 const isShortcut = (event: KeyboardEvent, key: string) => event.key.toLowerCase() === key && (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey
 
 /**
@@ -41,7 +44,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarCollapse
       if (isShortcut(event, "k")) {
         event.preventDefault()
         setIsSwitcherOpen(true)
-      } else if (isShortcut(event, "b") && toggleRef.current && window.matchMedia("(min-width: 1024px)").matches) {
+      } else if (
+        isShortcut(event, "b") &&
+        // In a text field Ctrl/⌘+B means Bold (the result editors), not the sidebar
+        !event.defaultPrevented &&
+        !isTextField(event.target) &&
+        toggleRef.current &&
+        window.matchMedia("(min-width: 1024px)").matches
+      ) {
         event.preventDefault()
         toggleRef.current()
       }

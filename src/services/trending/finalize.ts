@@ -1,4 +1,10 @@
-import { TRENDING_TOPIC_COUNT } from "@/constants/trending"
+import {
+  POST_UNUSABLE_CHARS,
+  TRENDING_POST_FORMAT_IDS,
+  TRENDING_TOPIC_COUNT,
+  type TrendingPostFormatId,
+} from "@/constants/trending"
+import { cleanPostText, composeTrendingPost, stripPostLinks, tidyPostBody } from "@/lib/trendingPost"
 import type { ResearchResult, ResearchSource } from "@/services/liveResearch"
 import { hostnameOf, normalizeUrl } from "@/lib/url"
 import { daysSince, verifyEventDate } from "@/lib/eventDate"
@@ -12,7 +18,7 @@ const MAX_SECONDARY_REFERENCES = 3
 // Hard ceiling for anything presented as "trending"; the configured prompt sets the tighter window
 const MAX_TOPIC_AGE_DAYS = 30
 
-export type RejectionReason = "unverified_source" | "unverified_date" | "incomplete" | "duplicate"
+export type RejectionReason = "unverified_source" | "unverified_date" | "incomplete" | "duplicate" | "weak_post"
 
 export interface FinalizedTopics {
   topics: TrendingTopic[]
@@ -47,6 +53,30 @@ function describeFreshness(eventDate: string, now: Date): string {
   return days === 1 ? "1 day ago" : `${days} days ago`
 }
 
+
+/**
+ * One format per topic, in rank order, so the six posts never read alike. The model's own
+ * choice is kept while it is still free; otherwise the next unused format takes its place.
+ */
+function assignFormat(requested: TrendingPostFormatId, used: Set<TrendingPostFormatId>): TrendingPostFormatId {
+  const format = used.has(requested) ? TRENDING_POST_FORMAT_IDS.find((id) => !used.has(id)) ?? requested : requested
+  used.add(format)
+  return format
+}
+
+/**
+ * A page's identity without the parts a model gets wrong when copying a URL back: the scheme,
+ * a www prefix, the query string and capitalisation of the host.
+ */
+function pageKey(url: string): string {
+  try {
+    const parsed = new URL(url)
+    return `${parsed.hostname.replace(/^www\./, "")}${parsed.pathname.replace(/\/$/, "")}`.toLowerCase()
+  } catch {
+    return url.toLowerCase()
+  }
+}
+
 /**
  * Keeps only references whose URL was actually returned by the live search, so the
  * model cannot introduce unverified or invented links.
@@ -56,16 +86,25 @@ function verifyReferences(topic: SynthesisTopic, verifiedUrls: Map<string, Resea
   const verified: TrendingReference[] = []
   for (const reference of [topic.primary_reference, ...topic.secondary_references]) {
     const url = normalizeUrl(reference.url)
-    const source = url ? verifiedUrls.get(url) : undefined
-    if (!url || !source || seen.has(url)) continue
-    seen.add(url)
+    // The page decides the match, not the spelling, so the same article written back with http
+    // or with www still resolves. The URL kept is always the verified one, never the model's.
+    const source = url ? (verifiedUrls.get(url) ?? verifiedUrls.get(pageKey(url))) : undefined
+    if (!source || seen.has(source.url)) continue
+    seen.add(source.url)
     verified.push({
-      url,
+      url: source.url,
       title: reference.title.trim() || source.title,
-      source: reference.source.trim() || hostnameOf(url),
+      source: reference.source.trim() || hostnameOf(source.url),
     })
   }
   return verified
+}
+
+/**
+ * One line of a post as it will be published, with links and markdown marks taken out.
+ */
+function cleanPostLine(text: string): string {
+  return stripPostLinks(cleanPostText(text))
 }
 
 function titleKey(title: string): string {
@@ -73,13 +112,19 @@ function titleKey(title: string): string {
 }
 
 /**
- * Validates and normalizes model output: source and date verification, freshness,
- * list limits, deduplication of the same event, and the final topic cap.
+ * Validates and normalizes model output: source and date verification, freshness, one post
+ * format per topic, links stripped out of the post, list limits, deduplication of the same
+ * event, a post long enough to be worth publishing, and the final topic cap.
  */
 export function finalizeTopics(modelTopics: SynthesisTopic[], research: ResearchResult, now: Date): FinalizedTopics {
-  const verifiedUrls = new Map(research.sources.map((source) => [source.url, source]))
+  // Looked up by exact URL first, then by the page it points at
+  const verifiedUrls = new Map(research.sources.flatMap((source) => [
+    [source.url, source] as const,
+    [pageKey(source.url), source] as const,
+  ]))
   const notes = research.notes.toLowerCase()
   const seenEvents = new Set<string>()
+  const usedFormats = new Set<TrendingPostFormatId>()
   const topics: TrendingTopic[] = []
   const rejected: FinalizedTopics["rejected"] = []
 
@@ -101,11 +146,20 @@ export function finalizeTopics(modelTopics: SynthesisTopic[], research: Research
       reject("unverified_date")
       continue
     }
-    const hook = topic.post_hook.trim()
-    const body = topic.post_body.trim()
-    // A [bracket] means a hook pattern was copied instead of filled in
-    if (!title || queries.length === 0 || !hook || !body || containsPlaceholder(hook) || containsPlaceholder(body)) {
+    const hook = cleanPostLine(topic.post_hook)
+    const body = tidyPostBody(stripPostLinks(topic.post_body))
+    const cta = cleanPostLine(topic.post_cta)
+    // A [bracket] means a pattern was copied instead of filled in
+    if (!title || queries.length === 0 || !hook || !body || !cta || containsPlaceholder([hook, body, cta].join("\n"))) {
       reject("incomplete")
+      continue
+    }
+
+    const hashtags = cleanList(topic.suggested_hashtags, MAX_HASHTAGS, toHashtag)
+    const post = composeTrendingPost({ post_hook: hook, post_body: body, post_cta: cta, suggested_hashtags: hashtags })
+    // A post this short has nothing to rewrite; anything longer is expanded in the next step
+    if (post.length < POST_UNUSABLE_CHARS) {
+      reject("weak_post")
       continue
     }
 
@@ -126,14 +180,17 @@ export function finalizeTopics(modelTopics: SynthesisTopic[], research: Research
       freshness: describeFreshness(eventDate, now),
       event_date: eventDate,
       why_trending: topic.why_trending.trim(),
+      linkedin_angle: topic.linkedin_angle.trim(),
       discussion_potential: topic.discussion_potential,
       discussion_basis: topic.discussion_basis.trim(),
       confidence,
       linkedin_search_queries: queries,
       keywords: cleanList(topic.keywords, MAX_KEYWORDS),
-      suggested_hashtags: cleanList(topic.suggested_hashtags, MAX_HASHTAGS, toHashtag),
+      suggested_hashtags: hashtags,
+      post_format: assignFormat(topic.post_format, usedFormats),
       post_hook: hook,
       post_body: body,
+      post_cta: cta,
       primary_reference: primary,
       secondary_references: secondary.slice(0, MAX_SECONDARY_REFERENCES),
       screenshot_reference: {

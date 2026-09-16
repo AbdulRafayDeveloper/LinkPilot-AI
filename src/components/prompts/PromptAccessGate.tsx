@@ -13,13 +13,15 @@ import {
   PROMPT_PASSWORD_MAX_LENGTH,
 } from "@/constants/promptAccess"
 import type { ApiEnvelope } from "@/types/api"
+import { fetchWithRetry } from "@/lib/apiClient"
 import type { PromptAccessStatus } from "@/types/promptAccess"
 
 const CHECK_FAILED_MESSAGE = "Couldn't check prompt access. Please try again."
 
-// The access API answers with the current status even when it rejects a password
+// The access API answers with the current status even when it rejects a password. The status check
+// (GET) is retried on a dropped connection; a password (POST) never is, since every attempt counts.
 async function callAccessApi(init?: RequestInit): Promise<{ status: PromptAccessStatus | null; message: string | null }> {
-  const response = await fetch(PROMPT_ACCESS_ENDPOINT, { cache: "no-store", ...init })
+  const response = await fetchWithRetry(PROMPT_ACCESS_ENDPOINT, { cache: "no-store", ...init })
   const body = (await response.json().catch(() => null)) as ApiEnvelope<PromptAccessStatus> | null
   return { status: body?.data ?? null, message: body?.message ?? null }
 }

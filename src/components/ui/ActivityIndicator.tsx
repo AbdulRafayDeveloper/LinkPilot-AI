@@ -3,10 +3,10 @@
 import React from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
-import { LINKEDIN_TOOLS } from "@/constants/linkedinTools"
+import { APP_TOOLS } from "@/constants/linkedinTools"
 import { useToolActivity, type ToolActivity } from "@/lib/toolActivity"
 
-const titleOf = (href: string) => LINKEDIN_TOOLS.find((tool) => tool.href === href)?.title ?? "A tool"
+const titleOf = (href: string) => APP_TOOLS.find((tool) => tool.href === href)?.title ?? "A tool"
 
 const STYLE = {
   running: "border-primary/20 bg-primary-fixed/40 text-primary",

@@ -1,5 +1,5 @@
 import { SITE_DESCRIPTION, SITE_PURPOSE } from "@/config/site"
-import { LINKEDIN_TOOLS } from "./linkedinTools"
+import { APP_TOOLS } from "./linkedinTools"
 
 /**
  * Every page's search and sharing text in one place: the page metadata (lib/metadata.ts) and
@@ -61,6 +61,18 @@ const TOOL_SEO: Record<string, { title: string; description: string; keywords: s
       "Paste your previous LinkedIn conversation, choose a pitch or non-pitch follow-up and generate a natural next message.",
     keywords: ["LinkedIn follow-up message", "LinkedIn follow up after no response", "LinkedIn sales follow-up"],
   },
+  "client-messaging": {
+    title: "Client Update Message Writer",
+    description:
+      "Keep every client's own message format, then write formal updates for LinkedIn, Upwork, Fiverr, Slack, Discord, WhatsApp or email in seconds.",
+    keywords: ["client update message", "client communication template", "freelance client messages"],
+  },
+  "prompt-creator": {
+    title: "AI Prompt Generator for Coding Agents & Search",
+    description:
+      "Describe a task by voice or text and get a clear, detailed English prompt, shaped for a coding agent such as Cursor or Claude, or for ChatGPT and Gemini web search.",
+    keywords: ["AI prompt generator", "prompt for Cursor", "Claude prompt generator", "ChatGPT search prompt"],
+  },
   "conversation-reply": {
     title: "LinkedIn Conversation Reply Analyzer",
     description:
@@ -82,7 +94,7 @@ export const HOME_SEO: SeoPage = {
 
 export const SEO_PAGES: SeoPage[] = [
   HOME_SEO,
-  ...LINKEDIN_TOOLS.map((tool) => ({
+  ...APP_TOOLS.map((tool) => ({
     slug: tool.href.slice(1),
     path: tool.href,
     title: TOOL_SEO[tool.id]?.title ?? tool.title,

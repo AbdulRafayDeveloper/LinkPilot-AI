@@ -6,7 +6,7 @@ export { LINKEDIN_MESSAGE_MAX_CHARS } from "./linkedinLimits"
 
 /**
  * First Message's own tones, in recommended order (most effective first). Each tone owns
- * an independent, separately stored prompt (default template: src/prompts/first-message-<id>.md).
+ * an independent, separately stored prompt (prompt record: first-message-<id> in the prompts collection).
  * InMail keeps the shared outreach tunes.
  */
 export const FIRST_MESSAGE_TUNES = [
@@ -41,10 +41,6 @@ export const FIRST_MESSAGE_PROMPT_IDS = FIRST_MESSAGE_PROMPT_TABS.map((tab) => t
 
 export function getTuneLabel(tune: FirstMessageTuneId): string {
   return FIRST_MESSAGE_TUNES.find((entry) => entry.id === tune)?.label ?? tune
-}
-
-export function firstMessagePromptKey(tune: FirstMessageTuneId): string {
-  return `first_message_prompt:${tune}`
 }
 
 export function isAboutMeTab(id: FirstMessagePromptId): id is typeof ABOUT_ME_TAB_ID {

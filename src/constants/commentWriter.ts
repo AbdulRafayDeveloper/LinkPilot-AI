@@ -1,6 +1,6 @@
 /**
  * Tune registry. Each tune owns an independent, separately stored prompt
- * (default template: src/prompts/comment-writer-<id>.md). Adding a tune means adding
+ * (prompt record: comment-writer-<id> in the prompts collection). Adding a tune means adding
  * an entry here plus its default template; the generation pipeline stays unchanged.
  */
 export const COMMENT_TUNES = [
@@ -21,10 +21,6 @@ export const COMMENT_TUNE_IDS = COMMENT_TUNES.map((tune) => tune.id) as [Comment
 
 export function getTuneLabel(tune: CommentTuneId): string {
   return COMMENT_TUNES.find((entry) => entry.id === tune)?.label ?? tune
-}
-
-export function commentWriterPromptKey(tune: CommentTuneId): string {
-  return `comment_writer_prompt:${tune}`
 }
 
 // LinkedIn's maximum comment length

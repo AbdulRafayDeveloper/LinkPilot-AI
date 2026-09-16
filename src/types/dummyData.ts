@@ -1,6 +1,6 @@
 /**
- * One Dummy Data item (a sample profile, post, comment thread, conversation, ...) kept as
- * a markdown file, for filling a tool's inputs.
+ * One Dummy Data item (a sample profile, post, comment thread, conversation, ...) kept in
+ * the dummy_data collection, for filling a tool's inputs.
  */
 export interface DummyItem {
   id: string

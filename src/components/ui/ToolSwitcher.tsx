@@ -4,11 +4,11 @@ import React, { useId, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { CornerDownLeft, Search } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
-import { LINKEDIN_TOOLS } from "@/constants/linkedinTools"
+import { APP_TOOLS } from "@/constants/linkedinTools"
 import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 
 // Everything the sidebar links to, in sidebar order
-const DESTINATIONS = [...LINKEDIN_TOOLS, GLOBAL_PROMPTS_LINK]
+const DESTINATIONS = [...APP_TOOLS, GLOBAL_PROMPTS_LINK]
 
 const matches = (query: string) => {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)

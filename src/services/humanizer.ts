@@ -155,12 +155,12 @@ export async function humanizeTexts<Id extends string>({
   }
 
   try {
-    const instructions = await getActiveGlobalPrompt("humanization")
+    const [instructions, systemPrompt] = await Promise.all([getActiveGlobalPrompt("humanization"), loadPrompt("humanizer-system")])
     const rewrite = (subset: HumanizeField<Id>[], previousProblems: string[] = []) => {
       const user = composePromptMessage(instructions, [
         { variable: "text", tag: DRAFTS_TAG, label: "Texts to humanize", content: subset.map(describeDraft).join("\n\n") },
       ])
-      const messages = [new SystemMessage(loadPrompt("humanizer-system")), new HumanMessage(user)]
+      const messages = [new SystemMessage(systemPrompt), new HumanMessage(user)]
       if (previousProblems.length > 0) {
         messages.push(
           new HumanMessage(

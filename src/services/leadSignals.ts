@@ -75,7 +75,7 @@ export async function assessLeadSignals({ signalsPrompt, dataBlocks, signal }: A
     schema: LeadSignalsSchema,
     name: "lead_signals",
     messages: [
-      new SystemMessage(loadPrompt("lead-signals-system")),
+      new SystemMessage(await loadPrompt("lead-signals-system")),
       new HumanMessage(composePromptMessage(signalsPrompt, dataBlocks)),
     ],
     temperature: SIGNALS_TEMPERATURE,

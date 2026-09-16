@@ -33,7 +33,11 @@ function saveTonePrompt(tone: ConnectionNoteToneId, prompt: string) {
 const renderHint = () => (
   <p className="leading-relaxed">
     Variables: <code className={variableChip}>{"{{profile_data}}"}</code> inserts the pasted profile (it&apos;s added at
-    the end if you leave it out) · <code className={variableChip}>{"{{tone}}"}</code> inserts the tone name. The app
+    the end if you leave it out) · <code className={variableChip}>{"{{sender_profile}}"}</code> inserts your own profile
+    (About Me + Rafay Profile Info), only in prompts that use it ·{" "}
+    <code className={variableChip}>{"{{company_name}}"}</code> the company you type in (Recently Funded and Hiring
+    Startup only) · <code className={variableChip}>{"{{tone}}"}</code>{" "}
+    inserts the tone name. The app
     always keeps notes within LinkedIn&apos;s {CONNECTION_NOTE_MAX_CHARS}-character limit and treats the profile as
     untrusted text.
   </p>
@@ -45,7 +49,7 @@ interface ConnectionNotePromptsModalProps {
 }
 
 /**
- * Edits the four independent tone prompts. Saving one tone never changes the others.
+ * Edits the independent tone prompts, one per tone. Saving one tone never changes the others.
  */
 export const ConnectionNotePromptsModal: React.FC<ConnectionNotePromptsModalProps> = ({ initialTone, onClose }) => (
   <PromptTabsModal

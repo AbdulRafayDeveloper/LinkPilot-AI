@@ -11,6 +11,8 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
+import { EditableOutput } from "@/components/ui/EditableOutput"
+import { useEditableText } from "@/lib/outputEdits"
 import { getTuneLabel } from "@/constants/commentWriter"
 import type { CommentStageEntry, CommentWriterStatus } from "@/hooks/useCommentGenerator"
 import type { GeneratedComment } from "@/types/commentWriter"
@@ -63,6 +65,9 @@ export const CommentResult = React.forwardRef<HTMLElement, CommentResultProps>(f
   { status, result, stages, error, onRegenerate },
   ref
 ) {
+  // The comment as the user edits it; copy and the count follow the edits
+  const comment = useEditableText("comment-writer", result?.comment ?? "")
+
   return (
     <section
       ref={ref}
@@ -73,7 +78,7 @@ export const CommentResult = React.forwardRef<HTMLElement, CommentResultProps>(f
         <h2 id="comment-writer-result-title" className="text-sm font-bold text-on-surface">
           Generated Comment
         </h2>
-        {status === "success" && result && <CopyButton text={result.comment} label="Copy comment" showLabel />}
+        {status === "success" && result && <CopyButton text={comment.value} label="Copy comment" showLabel />}
       </div>
 
       {status === "idle" && (
@@ -107,13 +112,14 @@ export const CommentResult = React.forwardRef<HTMLElement, CommentResultProps>(f
 
       {status === "success" && result && (
         <div className="flex-1 min-h-0 flex flex-col gap-3">
-          <blockquote className="min-h-0 overflow-y-auto text-[15px] leading-relaxed text-on-surface whitespace-pre-wrap break-words border-l-2 border-primary bg-surface-container-lowest rounded-r-xl px-4 py-3">
-            {result.comment}
-          </blockquote>
+          <EditableOutput text={comment} label="Comment" />
 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-[11px] text-outline">
-              {result.characterCount.toLocaleString()} / {result.maxCharacters.toLocaleString()} characters ·{" "}
+              <span className={comment.value.length > result.maxCharacters ? "text-error font-semibold" : ""}>
+                {comment.value.length.toLocaleString()} / {result.maxCharacters.toLocaleString()} characters
+              </span>{" "}
+              ·{" "}
               {getTuneLabel(result.tune)} · Written with {PROVIDER_LABELS[result.provider]}
             </p>
             <button

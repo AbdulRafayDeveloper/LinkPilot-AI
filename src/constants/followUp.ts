@@ -2,7 +2,7 @@ import { LEAD_SIGNALS_PROMPT_ID, LEAD_SIGNALS_TAB_LABEL } from "./leadSignals"
 
 /**
  * Follow-up type registry. Each type owns an independent, separately stored prompt
- * (default template: src/prompts/follow-up-<id>.md). Adding a type means adding an
+ * (prompt record: follow-up-<id> in the prompts collection). Adding a type means adding an
  * entry here plus its default template; the generation pipeline stays unchanged.
  */
 export const FOLLOW_UP_TYPES = [
@@ -30,10 +30,6 @@ export const FOLLOW_UP_PROMPT_IDS = FOLLOW_UP_PROMPT_TABS.map((tab) => tab.id) a
 
 export function getFollowUpPromptLabel(id: FollowUpPromptId): string {
   return FOLLOW_UP_PROMPT_TABS.find((tab) => tab.id === id)?.label ?? id
-}
-
-export function followUpPromptKey(id: FollowUpPromptId): string {
-  return `follow_up_prompt:${id}`
 }
 
 export const CONVERSATION_MAX_LENGTH = 30000

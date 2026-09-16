@@ -23,7 +23,8 @@ export const ToneSelector: React.FC<ToneSelectorProps> = ({ value, onChange, dis
         return (
           <label
             key={tone.id}
-            className={`flex items-start gap-2 min-w-0 cursor-pointer rounded-xl border px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
+            // With an odd number of tones, the last card spans both columns instead of sitting alone
+            className={`flex items-start gap-2 min-w-0 cursor-pointer rounded-xl border px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-primary/40 odd:last:col-span-2 ${
               isSelected
                 ? "bg-primary-container border-primary-container text-on-primary-container"
                 : "bg-white border-outline-variant text-on-surface hover:bg-surface-container-low"

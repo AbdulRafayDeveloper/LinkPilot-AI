@@ -10,7 +10,8 @@ const BRAND_ASSETS =
 const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
+  // Prompt Creator records the spoken description in the page itself, so the microphone is allowed for this origin only
+  { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=(), browsing-topics=()" },
   // No other site may frame the app (clickjacking)
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
@@ -21,10 +22,9 @@ const SECURITY_HEADERS = [
 const nextConfig: NextConfig = {
   // No "X-Powered-By: Next.js" on responses
   poweredByHeader: false,
-  // Files read from disk at runtime ship with the routes that read them: prompt templates and
-  // dummy data for the API, the fonts and the logo for the social preview cards
+  // Files read from disk at runtime ship with the routes that read them: the fonts and the logo
+  // for the social preview cards (prompts and data all live in MongoDB)
   outputFileTracingIncludes: {
-    "/api/**/*": ["./src/prompts/**/*", "./src/data/**/*"],
     "/og/**/*": ["./src/assets/fonts/**/*", "./public/icon-256x256.png"],
   },
   // The dev-only Next.js badge would sit on the sidebar's pinned Global AI Prompts item

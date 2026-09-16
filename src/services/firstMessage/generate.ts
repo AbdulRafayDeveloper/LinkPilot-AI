@@ -50,7 +50,7 @@ function findUnusableReason(output: FirstMessageOutput): string | null {
 export async function generateFirstMessage({ profileData, tune, signal }: GenerateOptions): Promise<GeneratedFirstMessage> {
   const { tunePrompt, senderProfile } = await getGenerationInputs(tune)
 
-  const system = renderPrompt(loadPrompt("first-message-system"), { MAX_CHARS: LINKEDIN_MESSAGE_MAX_CHARS })
+  const system = renderPrompt(await loadPrompt("first-message-system"), { MAX_CHARS: LINKEDIN_MESSAGE_MAX_CHARS })
   const user = composePromptMessage(
     tunePrompt,
     [

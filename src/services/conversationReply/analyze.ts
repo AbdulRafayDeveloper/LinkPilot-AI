@@ -113,9 +113,9 @@ function buildBrief(output: AnalysisOutput, analysis: ConversationAnalysis): str
  * user's chosen strategy can't inflate the scores.
  */
 export async function analyzeConversation({ dataBlocks, signal }: AnalyzeOptions): Promise<AnalysisResult> {
-  const system = renderPrompt(loadPrompt("conversation-reply-analysis"), {
+  const system = renderPrompt(await loadPrompt("conversation-reply-analysis"), {
     CURRENT_DATE: new Date().toISOString().slice(0, 10),
-    CONVERSATION_READING_RULES: loadConversationReadingRules(),
+    CONVERSATION_READING_RULES: await loadConversationReadingRules(),
   })
   const user = composePromptMessage("Analyze this conversation.", dataBlocks)
 

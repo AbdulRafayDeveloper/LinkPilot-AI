@@ -5,6 +5,7 @@ import { createEventStream } from "@/lib/sse"
 import { parsePostInput } from "@/lib/validation/postInput"
 import { COMMENT_TUNE_IDS, COMMENT_WRITER_MESSAGES } from "@/constants/commentWriter"
 import { generateComment } from "@/services/commentWriter/generate"
+import { recordComment } from "@/services/generationRecords"
 import type { CommentStreamEvent } from "@/types/commentWriter"
 
 export const dynamic = "force-dynamic"
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
         signal: req.signal,
         onStage: (status, text) => send({ status, text }),
       })
+      await recordComment(post, result)
       send({ status: "COMPLETE", result })
     } catch (error: unknown) {
       if (!req.signal.aborted) {

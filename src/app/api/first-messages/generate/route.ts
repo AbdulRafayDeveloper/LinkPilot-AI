@@ -7,6 +7,7 @@ import {
   FIRST_MESSAGE_TUNE_IDS,
 } from "@/constants/firstMessage"
 import { generateFirstMessage } from "@/services/firstMessage/generate"
+import { recordFirstMessage } from "@/services/generationRecords"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await generateFirstMessage({ ...parsed.data, signal: req.signal })
+    await recordFirstMessage(parsed.data, result)
     return NextResponse.json({ success: true, message: "First message generated", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

@@ -9,6 +9,8 @@ import {
   UserPlus,
   type LucideIcon,
 } from "lucide-react"
+import { CLIENT_MESSAGING_TOOL } from "./clientMessaging"
+import { PROMPT_CREATOR_TOOL } from "./promptCreator"
 
 // What a tool helps with; the sidebar shows the tools under these headings, in this order
 export const TOOL_GROUPS = [
@@ -16,6 +18,10 @@ export const TOOL_GROUPS = [
   { id: "outreach", label: "Outreach" },
   { id: "engage", label: "Engage on posts" },
   { id: "conversations", label: "Conversations" },
+  // The Prompt Creator module, which writes prompts for other AI tools
+  { id: "build", label: "Build prompts" },
+  // Client Messaging, which writes updates to the people the work is for
+  { id: "clients", label: "Client work" },
 ] as const
 
 export type ToolGroupId = (typeof TOOL_GROUPS)[number]["id"]
@@ -43,3 +49,9 @@ export const LINKEDIN_TOOLS: LinkedInTool[] = [
   { id: "follow-up-message", title: "Follow-Up Message", description: "Pitch & non-pitch follow-ups", icon: Repeat, href: "/follow-up-message", group: "conversations" },
   { id: "conversation-reply", title: "Conversation Reply", description: "Next reply + deal signals", icon: MessagesSquare, href: "/conversation-reply", group: "conversations" },
 ]
+
+/**
+ * Everything the sidebar, the switcher and the sitemap list: the 8 LinkedIn tools plus the
+ * other modules, in that order.
+ */
+export const APP_TOOLS: LinkedInTool[] = [...LINKEDIN_TOOLS, PROMPT_CREATOR_TOOL, CLIENT_MESSAGING_TOOL]

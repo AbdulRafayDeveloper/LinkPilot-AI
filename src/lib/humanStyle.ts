@@ -2,8 +2,9 @@
  * The last guard on every generated text: marks and words that make copy read as AI-written
  * (em and en dashes used as pauses, colons, semicolons, "seamless", "robust"...) are rewritten
  * the way a person would type them. Every prompt already forbids them; this catches what
- * slips through. Links, hashtags, @mentions, times (10:30), ratios (3:1), hyphenated words and
- * number ranges are left as they are.
+ * slips through. Links, a label's colon right before a link ("My Portfolio: https://…"),
+ * hashtags, @mentions, times (10:30), ratios (3:1), hyphenated words and number ranges are
+ * left as they are.
  */
 
 // Only words with a plain swap that keeps the sentence grammatical; the prompts forbid the rest
@@ -29,8 +30,12 @@ export function findAiWords(text: string): string[] {
   return [...new Set((text.match(AI_WORDS) ?? []).map((word) => word.toLowerCase()))]
 }
 
-// Never rewritten: links, hashtags and @mentions
-const PROTECTED = /(https?:\/\/\S+|www\.\S+|[#@][\p{L}\p{N}_.-]+)/u
+const LINK = String.raw`https?:\/\/\S+|www\.\S+`
+// A label's colon right before a link ("My Portfolio: https://…") is how a person types it, so
+// that colon travels with the link instead of counting as a clause break
+const LABELLED_LINK = String.raw`:[ \t]*\n?[ \t]*(?:${LINK})`
+// Never rewritten: links (with a label's colon), hashtags and @mentions
+const PROTECTED = new RegExp(`(${LABELLED_LINK}|${LINK}|[#@][\\p{L}\\p{N}_.-]+)`, "u")
 // A range or a joined word: a dash between two numbers ("2–3 weeks") or an en dash between two letters ("pre–seed")
 const JOINING_DASH = /(?<=\p{N})[–—](?=\p{N})|(?<=\p{L})–(?=\p{L})/gu
 // A dash used as a pause: any other em or en dash, or a spaced hyphen between two words

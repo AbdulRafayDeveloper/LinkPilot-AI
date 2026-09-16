@@ -6,7 +6,7 @@ import { clearSavedTrendingResult, readSavedTrendingResult } from "@/services/tr
 export const dynamic = "force-dynamic"
 
 /**
- * GET: The latest search anyone ran (src/data/trending-topics/latest.md), or null after a Reset.
+ * GET: The latest search anyone ran that found topics (trending_searches), or null after a Reset.
  */
 export async function GET() {
   try {
@@ -19,7 +19,7 @@ export async function GET() {
 }
 
 /**
- * DELETE: Reset. Removes the saved topics for everyone.
+ * DELETE: Reset. Hides the saved topics for everyone; the search stays in the history.
  */
 export async function DELETE() {
   try {

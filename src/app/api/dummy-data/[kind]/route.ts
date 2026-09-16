@@ -33,7 +33,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 }
 
 /**
- * POST: Adds a new item as its own markdown file.
+ * POST: Adds a new item to the dummy_data collection.
  */
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const denied = await requirePromptAccess()

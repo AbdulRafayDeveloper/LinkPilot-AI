@@ -13,8 +13,8 @@ export const maxDuration = 300
 /**
  * POST: Runs a fresh live Trending Topics search and streams real pipeline stages
  * as Server-Sent Events, ending with a COMPLETE (validated result) or ERROR event.
- * A search that found topics replaces the saved topics everyone sees; one that found
- * none leaves the previous topics saved.
+ * Every search is added to the trending_searches history; one that found topics becomes
+ * the topics everyone sees, one that found none leaves the previous topics on show.
  */
 export async function POST(req: NextRequest) {
   return createEventStream<TrendingStreamEvent>(async (send) => {
@@ -23,12 +23,10 @@ export async function POST(req: NextRequest) {
         signal: req.signal,
         onStage: (status, text) => send({ status, text }),
       })
-      if (result.topics.length > 0) {
-        // The search still counts when saving fails; it just isn't shared
-        await saveTrendingResult(result).catch((error: unknown) => {
-          console.warn("⚠️ Couldn't save the Trending Topics:", error instanceof Error ? error.message : error)
-        })
-      }
+      // The search still counts when saving fails; it just isn't shared
+      await saveTrendingResult(result).catch((error: unknown) => {
+        console.warn("⚠️ Couldn't save the Trending Topics:", error instanceof Error ? error.message : error)
+      })
       send({ status: "COMPLETE", result })
     } catch (error: unknown) {
       if (!req.signal.aborted) {

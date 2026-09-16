@@ -1,12 +1,22 @@
 import { tools as openAITools } from "@langchain/openai"
 import type { AIMessage, BaseMessage } from "@langchain/core/messages"
-import { AI_PROVIDERS, createGeminiModel, createOpenAIModel, isProviderConfigured, type ModelProvider } from "@/services/ai"
+import {
+  AI_PROVIDERS,
+  createGeminiModel,
+  createOpenAIModel,
+  isProviderConfigured,
+  withProviderRetry,
+  type ModelProvider,
+} from "@/services/ai"
+import { withRetry } from "@/lib/retry"
+import { isTransientError } from "@/lib/transientErrors"
 import { loadPrompt, type PromptName } from "@/services/prompts"
 import { UserFacingError } from "@/lib/errors"
 import { hostnameOf, normalizeUrl } from "@/lib/url"
 
 const RESEARCH_TIMEOUT_MS = 120_000
-const RESEARCH_MAX_RETRIES = 1
+// Research passes are long, so a transient failure gets one retry (withProviderRetry) before the pass counts as failed
+const RESEARCH_RETRIES = 1
 const REDIRECT_RESOLVE_TIMEOUT_MS = 8_000
 const INLINE_URL_PATTERN = /https?:\/\/[^\s<>"'`\])]+/g
 // Gemini's built-in Google Search grounding: the model decides which searches to run
@@ -42,10 +52,10 @@ interface GroundingChunk {
 }
 
 /**
- * Loads subject-agnostic search angles from a prompt file with one "- " bullet per lens.
+ * Loads subject-agnostic search angles from a prompt with one "- " bullet per lens.
  */
-export function loadSearchLenses(templateName: PromptName): string[] {
-  return loadPrompt(templateName)
+export async function loadSearchLenses(templateName: PromptName): Promise<string[]> {
+  return (await loadPrompt(templateName))
     .split("\n")
     .filter((line) => line.startsWith("- "))
     .map((line) => line.slice(2).trim())
@@ -113,10 +123,11 @@ async function resolveGroundingSource(chunk: GroundingChunk, signal: AbortSignal
   const uri = chunk.web?.uri
   if (!uri) return null
   try {
-    const response = await fetch(uri, {
-      redirect: "manual",
-      signal: AbortSignal.any([signal, AbortSignal.timeout(REDIRECT_RESOLVE_TIMEOUT_MS)]),
-    })
+    // A dropped connection gets one quick retry; each attempt has its own timeout
+    const response = await withRetry(
+      () => fetch(uri, { redirect: "manual", signal: AbortSignal.any([signal, AbortSignal.timeout(REDIRECT_RESOLVE_TIMEOUT_MS)]) }),
+      { retries: 1, signal, shouldRetry: isTransientError, baseDelayMs: 250 }
+    )
     const url = normalizeUrl(response.headers.get("location") ?? uri)
     return url ? { url, title: chunk.web?.title?.trim() || hostnameOf(url) } : null
   } catch (error: unknown) {
@@ -130,11 +141,14 @@ async function resolveGroundingSource(chunk: GroundingChunk, signal: AbortSignal
  * writes into its text are not trusted.
  */
 async function runGeminiPass(messages: BaseMessage[], signal: AbortSignal): Promise<ResearchResult> {
-  const model = createGeminiModel({ maxRetries: RESEARCH_MAX_RETRIES })
-  const response = await model.invoke(messages, {
-    tools: [GOOGLE_SEARCH_TOOL],
-    signal: AbortSignal.any([signal, AbortSignal.timeout(RESEARCH_TIMEOUT_MS)]),
-  })
+  const model = createGeminiModel({ maxRetries: 0 })
+  const passSignal = AbortSignal.any([signal, AbortSignal.timeout(RESEARCH_TIMEOUT_MS)])
+  const response = await withProviderRetry(
+    "gemini",
+    () => model.invoke(messages, { tools: [GOOGLE_SEARCH_TOOL], signal: passSignal }),
+    passSignal,
+    RESEARCH_RETRIES
+  )
   const notes = readTextBlocks(response)
     .map((block) => block.text)
     .join("")
@@ -177,11 +191,16 @@ function searchWithGemini(passes: BaseMessage[][], signal: AbortSignal): Promise
 }
 
 function searchWithOpenAI(passes: BaseMessage[][], signal: AbortSignal): Promise<ResearchResult> {
-  const model = createOpenAIModel({ timeout: RESEARCH_TIMEOUT_MS, maxRetries: RESEARCH_MAX_RETRIES })
+  const model = createOpenAIModel({ timeout: RESEARCH_TIMEOUT_MS, maxRetries: 0 })
   const webSearch = openAITools.webSearch({ search_context_size: "high" })
   return runPasses("openai", passes, async (messages) => {
     // "required" stops the model from answering from memory without searching
-    const response = await model.invoke(messages, { tools: [webSearch], tool_choice: "required", signal })
+    const response = await withProviderRetry(
+      "openai",
+      () => model.invoke(messages, { tools: [webSearch], tool_choice: "required", signal }),
+      signal,
+      RESEARCH_RETRIES
+    )
     return extractOpenAIResearch(response)
   })
 }

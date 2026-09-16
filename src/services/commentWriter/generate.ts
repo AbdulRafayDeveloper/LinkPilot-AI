@@ -123,7 +123,7 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
   let messageData: MessageData = { postText, research, experience }
 
   onStage("WRITING", "Analyzing the post and writing your comment")
-  const systemPrompt = renderPrompt(loadPrompt("comment-writer-system"), {
+  const systemPrompt = renderPrompt(await loadPrompt("comment-writer-system"), {
     CURRENT_DATE: now.toISOString().slice(0, 10),
     MAX_CHARS: COMMENT_MAX_CHARS,
   })

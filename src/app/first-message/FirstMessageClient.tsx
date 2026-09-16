@@ -159,6 +159,8 @@ export default function FirstMessageClient() {
                 title="Generated First Message"
                 status={status}
                 text={result?.message ?? null}
+                editScope="first-message"
+                textLabel="First message"
                 error={error}
                 onRetry={submit}
                 idleIcon={Hand}
@@ -167,13 +169,7 @@ export default function FirstMessageClient() {
                 copyLabel="Copy first message"
                 copyButtonText="Copy Message"
                 warning={result?.warning}
-                meta={
-                  result && (
-                    <>
-                      {result.characterCount.toLocaleString()} characters · {getTuneLabel(result.tune)} tone
-                    </>
-                  )
-                }
+                meta={result && <>{getTuneLabel(result.tune)} tone</>}
               >
                 {result && !result.usedSenderProfile && (
                   <AboutMeNotice outputName="message" onOpenAboutMe={() => setPromptsTab(ABOUT_ME_TAB_ID)} />

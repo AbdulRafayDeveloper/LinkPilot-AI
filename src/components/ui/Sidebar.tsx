@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Loader2, X } from "lucide-react"
 import { BrandLogo } from "./BrandLogo"
-import { LINKEDIN_TOOLS, TOOL_GROUPS, type LinkedInTool } from "@/constants/linkedinTools"
+import { APP_TOOLS, TOOL_GROUPS, type LinkedInTool } from "@/constants/linkedinTools"
 import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 import { markToolSeen, useToolActivity, type ActivityState } from "@/lib/toolActivity"
 
@@ -183,7 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
               >
                 {group.label}
               </p>
-              <ul className="space-y-0.5">{LINKEDIN_TOOLS.filter((tool) => tool.group === group.id).map(renderLink)}</ul>
+              <ul className="space-y-0.5">{APP_TOOLS.filter((tool) => tool.group === group.id).map(renderLink)}</ul>
             </div>
           ))}
         </nav>

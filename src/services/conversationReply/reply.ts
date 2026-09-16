@@ -133,7 +133,7 @@ export async function writeReply({
   guardSenderClaims,
   signal,
 }: WriteReplyOptions): Promise<WrittenReply> {
-  const system = renderPrompt(loadPrompt("conversation-reply-system"), { MAX_CHARS: LINKEDIN_MESSAGE_MAX_CHARS })
+  const system = renderPrompt(await loadPrompt("conversation-reply-system"), { MAX_CHARS: LINKEDIN_MESSAGE_MAX_CHARS })
   const user = composePromptMessage(
     typePrompt,
     [

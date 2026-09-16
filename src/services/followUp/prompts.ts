@@ -1,33 +1,23 @@
-import { loadPrompt } from "@/services/prompts"
-import { getStoredPrompts, saveStoredPrompt, type PromptEntry } from "@/services/promptStore"
-import { senderProfileEntry, toSenderProfileText } from "@/services/senderProfile"
+import type { PromptName } from "@/services/prompts"
+import { getStoredPrompts, saveStoredPrompt } from "@/services/promptStore"
+import { SENDER_PROFILE_PROMPT, toSenderProfileText } from "@/services/senderProfile"
 import { LEAD_SIGNALS_PROMPT_ID } from "@/constants/leadSignals"
-import {
-  FOLLOW_UP_PROMPT_IDS,
-  followUpPromptKey,
-  type FollowUpPromptId,
-  type FollowUpTypeId,
-} from "@/constants/followUp"
+import { FOLLOW_UP_PROMPT_IDS, type FollowUpPromptId, type FollowUpTypeId } from "@/constants/followUp"
 import type { FollowUpPrompt } from "@/types/followUp"
 
 /**
- * Each prompt (Non-Pitch, Pitch, Lead Signals) has its own Setting record and its own
- * default template, so editing one can never change another.
+ * Each prompt (Non-Pitch, Pitch, Lead Signals) has its own prompt record, so editing one
+ * can never change another.
  */
-function promptEntry(id: FollowUpPromptId): PromptEntry {
-  return { key: followUpPromptKey(id), defaultPrompt: loadPrompt(`follow-up-${id}`) }
-}
+const promptName = (id: FollowUpPromptId): PromptName => `follow-up-${id}`
 
 export async function getFollowUpPrompts(): Promise<FollowUpPrompt[]> {
-  const entries = FOLLOW_UP_PROMPT_IDS.map((id) => ({ id, entry: promptEntry(id) }))
-  const stored = await getStoredPrompts(entries.map(({ entry }) => entry))
-  return entries.map(({ id, entry }, index) => ({ id, ...stored[index], defaultPrompt: entry.defaultPrompt }))
+  const stored = await getStoredPrompts(FOLLOW_UP_PROMPT_IDS.map(promptName))
+  return FOLLOW_UP_PROMPT_IDS.map((id, index) => ({ id, ...stored[index] }))
 }
 
 export async function saveFollowUpPrompt(id: FollowUpPromptId, prompt: string): Promise<FollowUpPrompt> {
-  const entry = promptEntry(id)
-  const saved = await saveStoredPrompt(entry, prompt)
-  return { id, ...saved, defaultPrompt: entry.defaultPrompt }
+  return { id, ...(await saveStoredPrompt(promptName(id), prompt)) }
 }
 
 export interface FollowUpGenerationInputs {
@@ -41,9 +31,9 @@ export interface FollowUpGenerationInputs {
  */
 export async function getGenerationInputs(type: FollowUpTypeId): Promise<FollowUpGenerationInputs> {
   const [typePrompt, signalsPrompt, senderProfile] = await getStoredPrompts([
-    promptEntry(type),
-    promptEntry(LEAD_SIGNALS_PROMPT_ID),
-    senderProfileEntry(),
+    promptName(type),
+    promptName(LEAD_SIGNALS_PROMPT_ID),
+    SENDER_PROFILE_PROMPT,
   ])
   return {
     typePrompt: typePrompt.prompt,
