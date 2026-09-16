@@ -14,17 +14,25 @@ export function daysSince(eventDate: string, now: Date): number {
 }
 
 /**
- * Ways a source or report can state a date: ISO, written out, or as a URL path segment.
+ * Ways a source or report can state a date: ISO, written out in full or abbreviated (including
+ * the AP style most outlets use), or as a URL path segment.
  */
 function dateEvidencePatterns(year: string, month: string, day: string): string[] {
   const monthName = MONTHS[Number(month) - 1]
   const dayNumber = String(Number(day))
+  const short = monthName.slice(0, 3)
   return [
     `${year}-${month}-${day}`,
+    `${year}/${month}/${day}`,
     `${monthName} ${dayNumber}, ${year}`,
-    `${monthName.slice(0, 3)} ${dayNumber}, ${year}`,
+    `${monthName} ${dayNumber} ${year}`,
+    `${short} ${dayNumber}, ${year}`,
+    // AP style, which reputable outlets use: Sept. 12, 2026
+    `${short}. ${dayNumber}, ${year}`,
     `${monthName.slice(0, 4)} ${dayNumber}, ${year}`,
+    `${monthName.slice(0, 4)}. ${dayNumber}, ${year}`,
     `${dayNumber} ${monthName} ${year}`,
+    `${dayNumber} ${short} ${year}`,
     `/${year}/${month}/${day}/`,
     `/${year}/${month}/${day}`,
   ].map((pattern) => pattern.toLowerCase())

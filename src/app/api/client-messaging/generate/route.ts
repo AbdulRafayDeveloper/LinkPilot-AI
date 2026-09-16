@@ -49,7 +49,13 @@ export async function POST(req: NextRequest) {
     }
     console.error("POST Client Message Exception:", error instanceof Error ? error.message : error)
     const message = toUserFacingMessage(error, CLIENT_MESSAGING_MESSAGES.generationFailed)
-    const isMissingClient = message === CLIENT_MESSAGING_MESSAGES.clientNotFound
-    return NextResponse.json({ success: false, message }, { status: isMissingClient ? 404 : 500 })
+    // 503 lets the browser retry a provider outage on its own (lib/apiClient.ts)
+    const status =
+      message === CLIENT_MESSAGING_MESSAGES.clientNotFound
+        ? 404
+        : message === CLIENT_MESSAGING_MESSAGES.providerUnavailable
+          ? 503
+          : 500
+    return NextResponse.json({ success: false, message }, { status })
   }
 }

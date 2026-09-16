@@ -9,6 +9,7 @@ import {
   FollowUpMessageRecord,
   InMailMessageRecord,
   PostCommentReplyRecord,
+  RewrittenMessageRecord,
 } from "@/models/GenerationRecords"
 import type { GeneratedConnectionNote } from "@/types/connectionNote"
 import type { GeneratedComment } from "@/types/commentWriter"
@@ -17,6 +18,7 @@ import type { GeneratedFollowUp } from "@/types/followUp"
 import type { GeneratedFirstMessage } from "@/types/firstMessage"
 import type { GeneratedInMail } from "@/types/inmail"
 import type { ConversationReplyResult } from "@/types/conversationReply"
+import type { MessageSource, RewrittenMessage } from "@/types/messageRewriter"
 
 /**
  * Saves every tool's output, with who it was for and what it was written from, to that tool's
@@ -133,6 +135,22 @@ export function recordConversationReply(
       profileData: input.profileData,
       reply: result.reply,
       strategyNote: result.strategyNote,
+      characterCount: result.characterCount,
+      result,
+    })
+  )
+}
+
+export function recordRewrittenMessage(
+  input: { message: string; source: MessageSource },
+  result: RewrittenMessage
+): Promise<void> {
+  return saveRecord("rewritten message", () =>
+    RewrittenMessageRecord.create({
+      source: input.source,
+      sourceLanguage: result.sourceLanguage,
+      original: input.message,
+      message: result.message,
       characterCount: result.characterCount,
       result,
     })

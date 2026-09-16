@@ -23,6 +23,8 @@ export type RejectionReason = "unverified_source" | "unverified_date" | "incompl
 export interface FinalizedTopics {
   topics: TrendingTopic[]
   rejected: Array<{ title: string; reason: RejectionReason }>
+  /** Topics whose format had to be changed, so the body still follows the shape it was written in */
+  reshape: Set<number>
 }
 
 function cleanList(values: string[], max: number, format: (value: string) => string = (value) => value): string[] {
@@ -56,12 +58,17 @@ function describeFreshness(eventDate: string, now: Date): string {
 
 /**
  * One format per topic, in rank order, so the six posts never read alike. The model's own
- * choice is kept while it is still free; otherwise the next unused format takes its place.
+ * choice is kept while it is still free; otherwise the next unused format takes its place, and
+ * the caller is told, because that body was written in a shape it no longer claims.
  */
-function assignFormat(requested: TrendingPostFormatId, used: Set<TrendingPostFormatId>): TrendingPostFormatId {
-  const format = used.has(requested) ? TRENDING_POST_FORMAT_IDS.find((id) => !used.has(id)) ?? requested : requested
+function assignFormat(
+  requested: TrendingPostFormatId,
+  used: Set<TrendingPostFormatId>
+): { format: TrendingPostFormatId; changed: boolean } {
+  const free = used.has(requested) ? TRENDING_POST_FORMAT_IDS.find((id) => !used.has(id)) : requested
+  const format = free ?? requested
   used.add(format)
-  return format
+  return { format, changed: format !== requested }
 }
 
 /**
@@ -126,6 +133,7 @@ export function finalizeTopics(modelTopics: SynthesisTopic[], research: Research
   const seenEvents = new Set<string>()
   const usedFormats = new Set<TrendingPostFormatId>()
   const topics: TrendingTopic[] = []
+  const reshape = new Set<number>()
   const rejected: FinalizedTopics["rejected"] = []
 
   for (const topic of [...modelTopics].sort((a, b) => a.rank - b.rank)) {
@@ -170,6 +178,8 @@ export function finalizeTopics(modelTopics: SynthesisTopic[], research: Research
     }
     eventKeys.forEach((key) => seenEvents.add(key))
 
+    // Assigned only once the topic is certain to be kept, so a rejected one never uses up a format
+    const { format, changed } = assignFormat(topic.post_format, usedFormats)
     const screenshotUrl = normalizeUrl(topic.screenshot_reference.url)
     // "high" means official plus independent coverage, which needs at least two verified sources
     const confidence = topic.confidence === "high" && secondary.length === 0 ? "medium" : topic.confidence
@@ -187,7 +197,7 @@ export function finalizeTopics(modelTopics: SynthesisTopic[], research: Research
       linkedin_search_queries: queries,
       keywords: cleanList(topic.keywords, MAX_KEYWORDS),
       suggested_hashtags: hashtags,
-      post_format: assignFormat(topic.post_format, usedFormats),
+      post_format: format,
       post_hook: hook,
       post_body: body,
       post_cta: cta,
@@ -199,8 +209,9 @@ export function finalizeTopics(modelTopics: SynthesisTopic[], research: Research
       },
     })
 
+    if (changed) reshape.add(topics.length - 1)
     if (topics.length === TRENDING_TOPIC_COUNT) break
   }
 
-  return { topics, rejected }
+  return { topics, rejected, reshape }
 }

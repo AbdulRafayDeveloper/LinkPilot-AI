@@ -1,10 +1,12 @@
 export const SITE_NAME = "LinkPilot AI"
 // The name where space is short: the home-screen label, the in-app wordmark
 export const SITE_SHORT_NAME = "LinkPilot"
-// What the app does, in a few words anyone understands; shown in the header of every page
-export const SITE_PURPOSE = "LinkedIn Writing Assistant"
+// What the app does, in a few words anyone understands; shown in the header of every page. It
+// covers the whole app, not only the LinkedIn tools, because the sidebar now spans client work,
+// meetings and the day's own workspace as well.
+export const SITE_PURPOSE = "Outreach & Client Workspace"
 export const SITE_DESCRIPTION =
-  "Eight AI tools for LinkedIn: trending topics, connection notes, comments, comment replies, follow-ups, first messages, InMails and conversation replies, all written in your voice."
+  "One workspace for LinkedIn outreach and the client work that follows: post ideas and images, connection notes, comments, replies and follow-ups, plus client updates, meeting minutes, notes, tasks and files."
 export const SITE_AUTHOR = "Abdul Rafay"
 
 // The brand mark: a violet tile with the guiding star and a gold spark. The SVG is the source and

@@ -83,6 +83,15 @@ export interface IClientMessageRecord extends RecordBase {
   characterCount: number
 }
 
+export interface IRewrittenMessageRecord extends RecordBase {
+  // Whether the original was typed or spoken
+  source: string
+  sourceLanguage: string
+  original: string
+  message: string
+  characterCount: number
+}
+
 const LeadSchema = new Schema<LeadInfo>(
   {
     name: { type: String, default: null },
@@ -233,5 +242,20 @@ export const ClientMessageRecord = recordModel(
       result: RESULT,
     },
     { timestamps: true, collection: "client_messages" }
+  )
+)
+
+export const RewrittenMessageRecord = recordModel(
+  "RewrittenMessageRecord",
+  new Schema<IRewrittenMessageRecord>(
+    {
+      source: TEXT,
+      sourceLanguage: TEXT,
+      original: TEXT,
+      message: TEXT,
+      characterCount: COUNT,
+      result: RESULT,
+    },
+    { timestamps: true, collection: "rewritten_messages" }
   )
 )

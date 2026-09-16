@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { Loader2, Mic, Square } from "lucide-react"
 import { requestApi } from "@/lib/apiClient"
-import { PROMPT_CREATOR_ENDPOINT, PROMPT_CREATOR_MESSAGES, VOICE_MAX_SECONDS } from "@/constants/promptCreator"
+import { TRANSCRIBE_ENDPOINT, VOICE_MAX_SECONDS, VOICE_MESSAGES } from "@/constants/voiceInput"
 
 type RecorderState = "idle" | "recording" | "transcribing"
 
@@ -26,14 +26,21 @@ interface VoiceRecorderProps {
   onTranscript: (text: string) => void
   onError: (message: string | null) => void
   disabled?: boolean
+  /** What speaking fills in on this page, for the button and the screen reader label */
+  what?: string
 }
 
 /**
- * Speak the task instead of typing it: records from the microphone, sends the recording to
- * /api/prompt-creator/transcribe and hands the text back. The recording stops itself at
+ * Speak instead of typing: records from the microphone, sends the recording to /api/transcribe
+ * and hands the text back, for any page with something to write. The recording stops itself at
  * VOICE_MAX_SECONDS, and the microphone is always released, including when the page changes.
  */
-export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, onError, disabled = false }) => {
+export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
+  onTranscript,
+  onError,
+  disabled = false,
+  what = "what you want done",
+}) => {
   const [state, setState] = useState<RecorderState>("idle")
   const [seconds, setSeconds] = useState(0)
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -64,7 +71,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, onEr
     async (audio: Blob) => {
       if (audio.size === 0) {
         setState("idle")
-        onError(PROMPT_CREATOR_MESSAGES.emptyRecording)
+        onError(VOICE_MESSAGES.emptyRecording)
         return
       }
       setState("transcribing")
@@ -73,7 +80,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, onEr
       try {
         // Reading a recording saves nothing, so a dropped upload is safe to send again
         const { data } = await requestApi<{ text: string }>(
-          `${PROMPT_CREATOR_ENDPOINT}/transcribe`,
+          TRANSCRIBE_ENDPOINT,
           { method: "POST", body: form },
           { retry: true }
         )
@@ -81,7 +88,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, onEr
         onError(null)
       } catch (error: unknown) {
         const message = error instanceof Error && !(error instanceof TypeError) ? error.message : ""
-        onError(message || PROMPT_CREATOR_MESSAGES.transcriptionFailed)
+        onError(message || VOICE_MESSAGES.transcriptionFailed)
       } finally {
         setState("idle")
       }
@@ -91,7 +98,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, onEr
 
   const start = async () => {
     if (!canRecord()) {
-      onError(PROMPT_CREATOR_MESSAGES.micUnavailable)
+      onError(VOICE_MESSAGES.micUnavailable)
       return
     }
     onError(null)
@@ -112,7 +119,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, onEr
       recorder.onerror = () => {
         releaseMicrophone()
         setState("idle")
-        onError(PROMPT_CREATOR_MESSAGES.recordingFailed)
+        onError(VOICE_MESSAGES.recordingFailed)
       }
       recorderRef.current = recorder
       setSeconds(0)
@@ -122,7 +129,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, onEr
       releaseMicrophone()
       setState("idle")
       const denied = error instanceof DOMException && ["NotAllowedError", "SecurityError"].includes(error.name)
-      onError(denied ? PROMPT_CREATOR_MESSAGES.micDenied : PROMPT_CREATOR_MESSAGES.recordingFailed)
+      onError(denied ? VOICE_MESSAGES.micDenied : VOICE_MESSAGES.recordingFailed)
     }
   }
 
@@ -139,7 +146,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, onEr
         type="button"
         onClick={isRecording ? stop : start}
         disabled={disabled || isTranscribing}
-        aria-label={isRecording ? "Stop recording and use what you said" : "Describe the task by speaking"}
+        aria-label={isRecording ? "Stop recording and use what you said" : `Say ${what} instead of typing it`}
         className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
           isRecording
             ? "border-error bg-error-container text-error"
@@ -158,7 +165,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, onEr
       {isRecording && (
         <span className="flex items-center gap-1.5 text-[11px] text-on-surface-variant" role="status">
           <span className="h-2 w-2 animate-pulse rounded-full bg-error" aria-hidden="true" />
-          Recording, say what you want done
+          Recording, say {what}
         </span>
       )}
     </div>

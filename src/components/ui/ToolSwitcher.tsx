@@ -4,16 +4,26 @@ import React, { useId, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { CornerDownLeft, Search } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
-import { APP_TOOLS } from "@/constants/linkedinTools"
+import { APP_TOOLS, TOOL_GROUPS, type ToolGroupId } from "@/constants/linkedinTools"
 import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 
-// Everything the sidebar links to, in sidebar order
-const DESTINATIONS = [...APP_TOOLS, GLOBAL_PROMPTS_LINK]
+// The sidebar heading a tool sits under, so both surfaces call the same thing by the same name
+const groupLabel = (id: ToolGroupId) => TOOL_GROUPS.find((group) => group.id === id)?.label ?? ""
+
+/**
+ * Everything the sidebar links to, in sidebar order, read from the same APP_TOOLS list, so a
+ * tool can never exist in one of the two and be missing from the other.
+ */
+const DESTINATIONS = [
+  ...APP_TOOLS.map((tool) => ({ ...tool, area: groupLabel(tool.group) })),
+  // Pinned below the groups in the sidebar rather than inside one
+  { ...GLOBAL_PROMPTS_LINK, area: "Shared prompts" },
+]
 
 const matches = (query: string) => {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
   return DESTINATIONS.filter((destination) => {
-    const text = `${destination.title} ${destination.description}`.toLowerCase()
+    const text = `${destination.title} ${destination.description} ${destination.area}`.toLowerCase()
     return words.every((word) => text.includes(word))
   })
 }
@@ -76,7 +86,7 @@ export const ToolSwitcher: React.FC<{ onClose: () => void }> = ({ onClose }) => 
           <p className="py-6 text-center text-sm text-on-surface-variant">No tool matches &ldquo;{query.trim()}&rdquo;.</p>
         ) : (
           <ul id={listId} role="listbox" aria-label="Tools" className="flex flex-col gap-1">
-            {results.map(({ id, title, description, icon: Icon, href }, index) => {
+            {results.map(({ id, title, description, area, icon: Icon, href }, index) => {
               const isActive = index === activeIndex
               const isCurrent = href === pathname
               return (
@@ -95,7 +105,7 @@ export const ToolSwitcher: React.FC<{ onClose: () => void }> = ({ onClose }) => 
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold leading-tight truncate">{title}</span>
                     <span className={`block text-xs leading-tight mt-0.5 truncate ${isActive ? "text-on-primary-container/80" : "text-outline"}`}>
-                      {description}
+                      {area} &middot; {description}
                     </span>
                   </span>
                   {isCurrent && (

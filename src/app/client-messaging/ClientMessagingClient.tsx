@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ResetButton } from "@/components/ui/ResetButton"
 import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
+import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
 import { ClientMessageResult } from "@/components/client-messaging/ClientMessageResult"
 import { ClientMessagePromptModal } from "@/components/client-messaging/ClientMessagePromptModal"
 import { ClientsModal } from "@/components/client-messaging/ClientsModal"
@@ -48,6 +49,7 @@ export default function ClientMessagingClient() {
   const [clients, setClients] = useState<Client[] | null>(null)
   const [clientsError, setClientsError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
   const { clientId, update, channel } = useToolStore(formStore)
   const updateInputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
@@ -77,6 +79,15 @@ export default function ClientMessagingClient() {
 
   const selectedClient = clients?.find((client) => client.id === clientId) ?? null
 
+  // What was spoken is added to whatever is already there, so several takes build one update,
+  // and it is cut to the same limit the typed field has
+  const addTranscript = useCallback((text: string) => {
+    formStore.update(({ update: current }) => ({
+      update: (current.trim() ? `${current.trim()}\n${text}` : text).slice(0, UPDATE_MAX_LENGTH),
+    }))
+    setFormError(null)
+  }, [])
+
   const submit = () => {
     if (isGenerating) return
     if (!clientId || !selectedClient) {
@@ -101,12 +112,14 @@ export default function ClientMessagingClient() {
     formStore.update({ clientId: client.id })
     reset()
     setFormError(null)
+    setVoiceError(null)
   }
 
   // Clears what you wanted to say and the message; the client and channel stay for the next one
   const resetTool = () => {
     formStore.update({ update: "" })
     setFormError(null)
+    setVoiceError(null)
     reset()
     updateInputRef.current?.focus()
   }
@@ -210,9 +223,17 @@ export default function ClientMessagingClient() {
 
                 {/* What to tell them */}
                 <div className="flex flex-col gap-2 min-h-0 flex-1">
-                  <label htmlFor="client-update" className="text-[10px] font-bold text-outline uppercase tracking-wider">
-                    What do you want to tell them
-                  </label>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label htmlFor="client-update" className="text-[10px] font-bold text-outline uppercase tracking-wider">
+                      What do you want to tell them
+                    </label>
+                    <VoiceRecorder
+                      onTranscript={addTranscript}
+                      onError={setVoiceError}
+                      disabled={isGenerating}
+                      what="what you want to tell them"
+                    />
+                  </div>
                   <textarea
                     id="client-update"
                     ref={updateInputRef}
@@ -224,7 +245,7 @@ export default function ClientMessagingClient() {
                     maxLength={UPDATE_MAX_LENGTH}
                     disabled={isGenerating}
                     aria-invalid={updateInvalid}
-                    placeholder="In your own words. Example: the payments page is done and on staging, the reports screen slipped to Friday because the API was late, and I need their logo files."
+                    placeholder="Type it, or press Speak instead. Example: the payments page is done and on staging, the reports screen slipped to Friday because the API was late, and I need their logo files."
                     className={`w-full flex-1 min-h-[160px] resize-none rounded-xl border bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
                       updateInvalid ? "border-error" : "border-outline-variant focus:border-primary/50"
                     }`}
@@ -232,6 +253,11 @@ export default function ClientMessagingClient() {
                   <p className="text-[11px] text-outline">
                     {update.length.toLocaleString()} / {UPDATE_MAX_LENGTH.toLocaleString()} characters
                   </p>
+                  {voiceError && (
+                    <p role="alert" className="rounded-xl border border-error/40 bg-error-container px-3 py-2 text-[12px] text-error">
+                      {voiceError}
+                    </p>
+                  )}
                 </div>
 
                 <RadioCardGroup

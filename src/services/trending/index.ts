@@ -72,7 +72,13 @@ export async function findTrendingTopics({ signal, onStage }: FindTrendingOption
   const { rejected } = finalized
 
   onStage("EXPANDING", "Filling out any post that came back too short")
-  const { topics: fullLength, expanded } = await expandShortPosts(finalized.topics, research.notes, signal)
+  const { topics: fullLength, expanded } = await expandShortPosts(
+    finalized.topics,
+    research.notes,
+    signal,
+    undefined,
+    finalized.reshape
+  )
 
   onStage("HUMANIZING", "Making the posts sound natural")
   const { topics: natural, humanized } = await humanizeTopicPosts(fullLength, signal)

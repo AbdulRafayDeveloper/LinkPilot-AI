@@ -12,7 +12,7 @@ import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
 import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
 import { CreatedPromptPanel } from "@/components/prompt-creator/CreatedPromptPanel"
 import { PromptCreatorPromptsModal } from "@/components/prompt-creator/PromptCreatorPromptsModal"
-import { VoiceRecorder } from "@/components/prompt-creator/VoiceRecorder"
+import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
@@ -155,7 +155,7 @@ export default function PromptCreatorClient() {
                     <label htmlFor="prompt-request" className="text-[10px] font-bold text-outline uppercase tracking-wider">
                       What do you want done
                     </label>
-                    <VoiceRecorder onTranscript={addTranscript} onError={setVoiceError} disabled={isGenerating} />
+                    <VoiceRecorder onTranscript={addTranscript} onError={setVoiceError} disabled={isGenerating} what="what you want done" />
                   </div>
                   <textarea
                     id="prompt-request"

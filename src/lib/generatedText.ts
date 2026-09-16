@@ -20,6 +20,15 @@ export function containsPlaceholder(text: string): boolean {
 }
 
 /**
+ * Every placeholder in the text. Tools whose own input may legitimately contain brackets (a
+ * technical note such as "[staging]") compare these against their sources, so only a slot the
+ * model invented counts as one.
+ */
+export function findPlaceholders(text: string): string[] {
+  return [...new Set(text.match(new RegExp(PLACEHOLDER, "g")) ?? [])]
+}
+
+/**
  * Removes markdown emphasis marks. Models fall back to them out of habit, and LinkedIn prints
  * them literally, so a "**step one**" would be posted with the asterisks showing.
  */

@@ -63,6 +63,12 @@ const config: Config = {
         "inverse-surface": "#2b2636",
         "inverse-on-surface": "#f4f1f9",
 
+        // Done: the green a ticked task turns
+        success: "#15803d",
+        "on-success": "#ffffff",
+        "success-container": "#dcfce7",
+        "on-success-container": "#14532d",
+
         // Errors
         error: "#ba1a1a",
         "on-error": "#ffffff",

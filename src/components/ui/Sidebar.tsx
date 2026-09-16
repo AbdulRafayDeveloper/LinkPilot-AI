@@ -54,8 +54,8 @@ interface SidebarLinkProps {
   onHint: (hint: RailHint | null) => void
 }
 
-// One navigation row: an icon tile, the name and a one-line description. Collapsed, only the
-// tile shows; the name stays for screen readers and appears in the rail tooltip.
+// One navigation row: an icon tile and the name, on a single line, so a long list of tools stays
+// scannable. The description is the row's tooltip, and the rail tooltip when collapsed.
 const SidebarLink: React.FC<SidebarLinkProps> = ({ link, isActive, isCollapsed, activity, onNavigate, onHint }) => {
   const { title, description, icon: Icon, href } = link
   const showHint = (event: React.SyntheticEvent<HTMLElement>) => {
@@ -66,35 +66,37 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ link, isActive, isCollapsed, 
 
   return (
     <li className="relative">
-      {isActive && <span className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary" aria-hidden="true" />}
+      {isActive && <span className="absolute -left-3 top-0.5 bottom-0.5 w-[3px] rounded-r-full bg-primary" aria-hidden="true" />}
       <Link
         href={href}
+        title={description}
         onClick={onNavigate}
         onMouseEnter={showHint}
         onFocus={showHint}
         onMouseLeave={() => onHint(null)}
         onBlur={() => onHint(null)}
         aria-current={isActive ? "page" : undefined}
-        className={`group flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${whenCollapsed(
+        className={`group flex items-center gap-2.5 rounded-lg px-2 py-[3px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${whenCollapsed(
           isCollapsed,
           "lg:justify-center lg:px-0"
         )} ${isActive ? "bg-primary-fixed/45" : "hover:bg-surface-container-low"}`}
       >
         <span
-          className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 ${
+          className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 ${
             isActive
               ? "bg-primary text-on-primary shadow-sm"
               : "bg-surface-container-low text-on-surface-variant group-hover:bg-surface-container-lowest group-hover:text-primary group-hover:shadow-sm"
           }`}
         >
-          <Icon size={16} aria-hidden="true" />
+          <Icon size={15} aria-hidden="true" />
           {activity && isCollapsed && <ActivityMark state={activity} className="absolute -right-1 -top-1 hidden lg:block" />}
         </span>
-        <span className={`min-w-0 flex-1 ${whenCollapsed(isCollapsed, "lg:sr-only")}`}>
-          <span className={`block truncate text-[13px] leading-tight ${isActive ? "font-semibold text-on-surface" : "font-medium text-on-surface"}`}>
-            {title}
-          </span>
-          <span className="mt-0.5 block truncate text-[11px] leading-tight text-outline">{description}</span>
+        <span
+          className={`min-w-0 flex-1 truncate text-[13px] leading-5 ${
+            isActive ? "font-semibold text-on-surface" : "font-medium text-on-surface-variant group-hover:text-on-surface"
+          } ${whenCollapsed(isCollapsed, "lg:sr-only")}`}
+        >
+          {title}
         </span>
         {activity && (
           <span className={`flex shrink-0 items-center ${whenCollapsed(isCollapsed, "lg:hidden")}`}>
@@ -108,8 +110,8 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ link, isActive, isCollapsed, 
 }
 
 /**
- * App navigation: the brand, the 8 LinkedIn tools grouped by what they help with, and Global
- * AI Prompts pinned at the bottom. A drawer on small screens; on desktop a full column that
+ * App navigation: the brand, every tool under the four headings in TOOL_GROUPS, and Global AI
+ * Prompts pinned at the bottom. A drawer on small screens; on desktop a full column that
  * collapses to an icon rail. Every tool shows when it's writing in the background or has a
  * result waiting.
  */
@@ -172,24 +174,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
         <nav
           aria-label="Main"
           onScroll={() => setHint(null)}
-          className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-4"
+          className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2"
         >
           {TOOL_GROUPS.map((group, index) => (
-            <div key={group.id} className={index > 0 ? "mt-4" : ""}>
+            <section key={group.id} aria-labelledby={`nav-group-${group.id}`} className={index > 0 ? "mt-3" : ""}>
               {/* Collapsed, a thin line separates the groups instead of their names */}
               {index > 0 && <div className={`mx-2 mb-3 hidden h-px bg-outline-variant/70 ${whenCollapsed(isCollapsed, "lg:block")}`} aria-hidden="true" />}
-              <p
-                className={`mb-1.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-outline ${whenCollapsed(isCollapsed, "lg:sr-only")}`}
+              <h2
+                id={`nav-group-${group.id}`}
+                className={`mb-1 px-2 text-[10px] font-semibold uppercase leading-4 tracking-[0.11em] text-outline ${whenCollapsed(isCollapsed, "lg:sr-only")}`}
               >
                 {group.label}
-              </p>
-              <ul className="space-y-0.5">{APP_TOOLS.filter((tool) => tool.group === group.id).map(renderLink)}</ul>
-            </div>
+              </h2>
+              <ul>{APP_TOOLS.filter((tool) => tool.group === group.id).map(renderLink)}</ul>
+            </section>
           ))}
         </nav>
 
         {/* Global AI Prompts: shared settings for every tool, not a LinkedIn tool */}
-        <div className="shrink-0 border-t border-outline-variant/80 px-3 py-3">
+        <div className="shrink-0 border-t border-outline-variant/80 px-3 py-2">
           <ul>{renderLink(GLOBAL_PROMPTS_LINK)}</ul>
         </div>
       </aside>

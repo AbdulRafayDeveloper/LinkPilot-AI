@@ -62,6 +62,9 @@ export async function humanizeTopicPosts(
   const bodyFloors = new Map(topics.map((topic, index) => [bodyId(index), topic.post_body.length * MIN_BODY_SHARE]))
   // Six hooks opening on the same word make the set look like one post six times, so a rewrite
   // may not move a hook onto an opening word another topic already uses
+  const draftQuestions = new Set(
+    topics.flatMap((topic, index) => (topic.post_hook.includes("?") ? [hookId(index)] : []))
+  )
   const draftOpeners = new Map(topics.map((topic, index) => [hookId(index), firstWord(topic.post_hook)]))
   const hookOpeners = new Map(
     topics.map((topic, index) => [
@@ -81,6 +84,8 @@ export async function humanizeTopicPosts(
       const takenOpeners = hookOpeners.get(id)
       if (takenOpeners && firstWord(text) !== draftOpeners.get(id) && takenOpeners.includes(firstWord(text)))
         return `${id}: another post already opens with "${firstWord(text)}", keep the first word you were given`
+      if (takenOpeners && text.includes("?") && !draftQuestions.has(id))
+        return `${id}: keep this hook a statement, the set already has its question`
       const floor = bodyFloors.get(id)
       if (floor !== undefined && text.length < floor) return `${id}: too short, keep roughly the draft's length`
       return null

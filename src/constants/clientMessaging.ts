@@ -9,9 +9,9 @@ export const MESSAGE_CHANNELS = [
   { id: "linkedin", label: "LinkedIn", description: "Direct message", maxChars: 1200, hasSubject: false },
   { id: "upwork", label: "Upwork", description: "Contract or job message", maxChars: 1500, hasSubject: false },
   { id: "fiverr", label: "Fiverr", description: "Order message", maxChars: 1200, hasSubject: false },
-  { id: "slack", label: "Slack", description: "Workspace message", maxChars: 800, hasSubject: false },
-  { id: "discord", label: "Discord", description: "Server or direct message", maxChars: 800, hasSubject: false },
-  { id: "whatsapp", label: "WhatsApp", description: "Phone message", maxChars: 700, hasSubject: false },
+  { id: "slack", label: "Slack", description: "Workspace message", maxChars: 1500, hasSubject: false },
+  { id: "discord", label: "Discord", description: "Server or direct message", maxChars: 1200, hasSubject: false },
+  { id: "whatsapp", label: "WhatsApp", description: "Phone message", maxChars: 1000, hasSubject: false },
   { id: "email", label: "Email", description: "With a subject line", maxChars: 2500, hasSubject: true },
 ] as const
 
@@ -39,7 +39,8 @@ export const MESSAGE_FORMAT_MAX_LENGTH = 2000
 export const SAMPLE_MESSAGE_MAX_LENGTH = 3000
 // Every client keeps this many reference messages, so the format is never guessed from one example
 export const SAMPLE_MESSAGE_COUNT = 2
-export const UPDATE_MAX_LENGTH = 3000
+// What you want to tell the client, typed or spoken
+export const UPDATE_MAX_LENGTH = 8000
 export const SUBJECT_MAX_LENGTH = 90
 
 export const CLIENT_MESSAGING_ENDPOINT = "/api/client-messaging"
@@ -51,6 +52,7 @@ export const CLIENT_MESSAGING_MESSAGES = {
   updateTooLong: `What you want to say must be under ${UPDATE_MAX_LENGTH.toLocaleString()} characters.`,
   missingChannel: "Choose where you are sending it.",
   generationFailed: "Couldn't write the message. Please try again.",
+  providerUnavailable: "The AI models did not answer just now. Please try again in a moment.",
   // Managing clients
   missingName: "Give the client a name.",
   nameTooLong: `The name must be under ${CLIENT_NAME_MAX_LENGTH} characters.`,
@@ -77,7 +79,7 @@ export const CLIENT_MESSAGING_TOOL: {
 } = {
   id: "client-messaging",
   title: "Client Messaging",
-  description: "Formal updates in each client's format",
+  description: "Updates in each client's format",
   icon: Users,
   href: "/client-messaging",
   group: "clients",

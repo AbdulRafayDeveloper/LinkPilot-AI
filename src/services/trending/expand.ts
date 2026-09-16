@@ -20,7 +20,9 @@ import type { TrendingTopic } from "./schema"
 
 // Rewriting to length is close to copy editing, so it stays near the writing temperature
 const EXPAND_TEMPERATURE = 0.6
-const EXPAND_TIMEOUT_MS = 60_000
+// A long body on the backup model can take a while, and a timeout is never retried, so the
+// post it belongs to would stay short
+const EXPAND_TIMEOUT_MS = 90_000
 const MAX_RESEARCH_CHARS = 16_000
 // Models undershoot the length and cling to an opening word, so anything still wrong is retried
 const MAX_ROUNDS = 3
@@ -29,12 +31,12 @@ const MAX_ROUNDS = 3
 const MAX_PARALLEL_REWRITES = 3
 // Endings that ask for nothing in particular, which is what a post gets no comments for
 const GENERIC_CTA =
-  /\bwhat do you think\b|\bthoughts\b|\bdo you agree\b|\bhow do you (?:see|think)\b|\bwhat .{0,25}tools (?:are|do) you\b|\bhow are you planning\b|\blet me know\b|\bcurious to hear\b|\bwhat .{0,25}could be automated\b|\bmost excited about\b|\bcaught your (?:eye|attention)\b|\bwhat steps are you taking\b|\bare you (?:excited|looking forward)\b/i
+  /\bwhat do you think\b|\bthoughts\b|\bdo you agree\b|\bhow do you (?:see|think)\b|\bwhat .{0,25}tools (?:are|do) you\b|\bhow are you planning\b|\blet me know\b|\bcurious to hear\b|\bwhat .{0,25}could be automated\b|\bmost excited\b|\bcaught your (?:eye|attention)\b|\bwhat steps are you taking\b|\bare you (?:excited|looking forward)\b/i
 // The reader is already on LinkedIn, so a post about LinkedIn reads like a report on the feed
 const MENTIONS_LINKEDIN = /\blinkedin\b/i
 // Stock phrases that make a post sound like every other post in the feed
 const CLICHES =
-  /\bchanged the game\b|\bgame changer\b|\bin a world where\b|\bin today's world\b|\bthe future is here\b|\bexciting times\b|\bat the end of the day\b|\btime is money\b|\btake it to the next level\b/gi
+  /\bchanged the (?:\w+ )?game\b|\bgame changer\b|\bin a world where\b|\bin today[’']s (?:\w+ )?world\b|\bthe future is here\b|\bexciting times\b|\bat the end of the day\b|\btime is money\b|\bspeed is key\b|\btake it to the next level\b/gi
 
 function findCliches(text: string): string[] {
   return [...new Set((text.match(CLICHES) ?? []).map((phrase) => phrase.toLowerCase()))]
@@ -71,11 +73,20 @@ interface PostProblems {
   aiWords: string[]
   cliches: string[]
   talksAboutLinkedIn: boolean
+  // Written in one format and published under another, so the body has to be rebuilt to match
+  wrongFormat: boolean
+  // A set where every hook asks something reads as a quiz, so only the first one may
+  needsStatementHook: boolean
 }
 
 const postText = (topic: TrendingTopic) => [topic.post_hook, topic.post_body, topic.post_cta].join("\n")
 
-function findProblems(topic: TrendingTopic, takenOpeners: string[]): PostProblems | null {
+function findProblems(
+  topic: TrendingTopic,
+  takenOpeners: string[],
+  wrongFormat: boolean,
+  questionHookTaken: boolean
+): PostProblems | null {
   const problems: PostProblems = {
     isShort: postLength(topic) < POST_TARGET_MIN_CHARS,
     hasGenericEnding: GENERIC_CTA.test(topic.post_cta),
@@ -83,6 +94,8 @@ function findProblems(topic: TrendingTopic, takenOpeners: string[]): PostProblem
     aiWords: findAiWords(postText(topic)),
     cliches: findCliches(postText(topic)),
     talksAboutLinkedIn: MENTIONS_LINKEDIN.test(postText(topic)),
+    wrongFormat,
+    needsStatementHook: questionHookTaken && topic.post_hook.includes("?"),
   }
   const needsWork =
     problems.isShort ||
@@ -90,7 +103,9 @@ function findProblems(topic: TrendingTopic, takenOpeners: string[]): PostProblem
     problems.takenOpeners.length > 0 ||
     problems.aiWords.length > 0 ||
     problems.cliches.length > 0 ||
-    problems.talksAboutLinkedIn
+    problems.talksAboutLinkedIn ||
+    problems.wrongFormat ||
+    problems.needsStatementHook
   return needsWork ? problems : null
 }
 
@@ -119,6 +134,9 @@ const SYSTEM = [
 function buildRequest(topic: TrendingTopic, problems: PostProblems, researchNotes: string): string {
   const format = getPostFormat(topic.post_format)
   const jobs = [
+    problems.wrongFormat
+      ? `This body was written in a different shape and now has to be a ${format.label}. Rebuild it to that shape, keeping the same facts.`
+      : null,
     problems.isShort ? `The body is only ${postLength(topic)} characters long. Make it 250 to 320 words.` : null,
     problems.hasGenericEnding ? "The closing line asks nothing specific. Replace it." : null,
     problems.aiWords.length > 0
@@ -130,8 +148,15 @@ function buildRequest(topic: TrendingTopic, problems: PostProblems, researchNote
     problems.talksAboutLinkedIn
       ? "The post talks about LinkedIn itself. The reader is already there, so write about the development and what it means for their work instead, and never name the platform."
       : null,
+    problems.needsStatementHook
+      ? "Another post in this set already opens on a question, so rewrite this hook as a statement that makes the same point."
+      : null,
     problems.takenOpeners.length > 0
-      ? `Another post already opens with the same word. Rewrite the hook so it starts with a different word, stays at most ${POST_HOOK_MAX_WORDS} words and keeps its meaning. These opening words are taken. ${problems.takenOpeners.join(", ")}.`
+      ? [
+          `Another post in this set already opens with the same word, so this hook has to start somewhere else.`,
+          `These opening words are taken and none of them may be the first word. ${problems.takenOpeners.join(", ")}.`,
+          `Start on a verb, a number, the specific product or company name, or the thing at stake. Keep the same meaning and stay at most ${POST_HOOK_MAX_WORDS} words.`,
+        ].join(" ")
       : "Return the hook exactly as it is.",
   ].filter(Boolean)
 
@@ -177,9 +202,12 @@ async function rewritePost(
   // The hook is judged on its own. A model that ignored the word limit, or clung to an opening
   // word another post has, loses only its hook, because the longer body is still worth keeping.
   const rewrittenHook = clean(result.data.post_hook)
-  const hookIsUsable = Boolean(rewrittenHook) && wordCount(rewrittenHook) <= POST_HOOK_MAX_WORDS
-  const openerStillTaken = !hookIsUsable || problems.takenOpeners.includes(firstWord(rewrittenHook))
-  const finalHook = openerStillTaken ? topic.post_hook : rewrittenHook
+  const hookIsUsable =
+    Boolean(rewrittenHook) &&
+    wordCount(rewrittenHook) <= POST_HOOK_MAX_WORDS &&
+    !problems.takenOpeners.includes(firstWord(rewrittenHook)) &&
+    !(problems.needsStatementHook && rewrittenHook.includes("?"))
+  const finalHook = hookIsUsable ? rewrittenHook : topic.post_hook
 
   const candidate = { ...topic, post_hook: finalHook, post_body: body, post_cta: cta }
   // A rewrite that brings in new AI-sounding words or starts talking about the platform is no gain
@@ -187,13 +215,15 @@ async function rewritePost(
   if (findCliches(postText(candidate)).length > problems.cliches.length) return null
   if (!problems.talksAboutLinkedIn && MENTIONS_LINKEDIN.test(postText(candidate))) return null
   const isLonger = postLength(candidate) > postLength(topic)
+  const fixesFormat = problems.wrongFormat
   const fixesEnding = problems.hasGenericEnding && !GENERIC_CTA.test(cta)
-  const fixesOpener = problems.takenOpeners.length > 0 && !openerStillTaken
+  const fixesOpener = problems.takenOpeners.length > 0 && hookIsUsable
+  const fixesHookQuestion = problems.needsStatementHook && hookIsUsable
   const fixesWords =
     findAiWords(postText(candidate)).length < problems.aiWords.length ||
     findCliches(postText(candidate)).length < problems.cliches.length
   const fixesPlatform = problems.talksAboutLinkedIn && !MENTIONS_LINKEDIN.test(postText(candidate))
-  return isLonger || fixesEnding || fixesOpener || fixesWords || fixesPlatform ? candidate : null
+  return isLonger || fixesEnding || fixesOpener || fixesWords || fixesPlatform || fixesFormat || fixesHookQuestion ? candidate : null
 }
 
 /**
@@ -208,7 +238,8 @@ export async function expandShortPosts(
   topics: TrendingTopic[],
   researchNotes: string,
   signal: AbortSignal,
-  maxRounds: number = MAX_ROUNDS
+  maxRounds: number = MAX_ROUNDS,
+  reshape: ReadonlySet<number> = new Set()
 ): Promise<{ topics: TrendingTopic[]; expanded: number }> {
   const current = [...topics]
   const improved = new Set<number>()
@@ -216,9 +247,11 @@ export async function expandShortPosts(
   for (let round = 0; round < maxRounds; round++) {
     // An opening word belongs to the first post that used it; later posts have to move
     const openers: string[] = []
+    let questionHookTaken = false
     const pending = current.flatMap((topic, index) => {
-      const problems = findProblems(topic, [...openers])
+      const problems = findProblems(topic, [...openers], round === 0 && reshape.has(index), questionHookTaken)
       openers.push(firstWord(topic.post_hook))
+      questionHookTaken = questionHookTaken || topic.post_hook.includes("?")
       return problems ? [{ index, problems }] : []
     })
     if (pending.length === 0) break

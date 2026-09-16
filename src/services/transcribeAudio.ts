@@ -9,7 +9,7 @@ import {
 import { loadPrompt } from "@/services/prompts"
 import { UserFacingError } from "@/lib/errors"
 import type { VerifiedAudio } from "@/lib/audioType"
-import { PROMPT_CREATOR_MESSAGES } from "@/constants/promptCreator"
+import { VOICE_MESSAGES } from "@/constants/voiceInput"
 
 // A transcript must be literal, never invented
 const TRANSCRIPTION_TEMPERATURE = 0
@@ -52,12 +52,12 @@ async function readWithGemini(audio: VerifiedAudio, signal: AbortSignal): Promis
 }
 
 /**
- * Turns a recording into text, Gemini first and OpenAI's transcription model (from ENV) as the
+ * Turns a recording into text for whichever page recorded it, Gemini first and OpenAI's transcription model (from ENV) as the
  * fallback, so a spoken description still works when Gemini is unconfigured, failing or out of
  * quota. Whatever the provider hands back is only the words that were said; the rest of the
  * module works from that plain text.
  */
-export async function transcribeRequest({ audio, signal }: TranscribeOptions): Promise<string> {
+export async function transcribeRecording({ audio, signal }: TranscribeOptions): Promise<string> {
   const canFallBack = isTranscriptionConfigured()
   let transcript: string | null = null
 
@@ -69,7 +69,7 @@ export async function transcribeRequest({ audio, signal }: TranscribeOptions): P
       console.warn("⚠️ gemini could not read the recording, falling back to openai:", error instanceof Error ? error.message : error)
     }
   } else if (!canFallBack) {
-    throw new UserFacingError(PROMPT_CREATOR_MESSAGES.voiceUnavailable)
+    throw new UserFacingError(VOICE_MESSAGES.voiceUnavailable)
   }
 
   // Gemini failed, or heard nothing at all, so OpenAI reads the same recording
@@ -77,12 +77,12 @@ export async function transcribeRequest({ audio, signal }: TranscribeOptions): P
     transcript = await transcribeWithOpenAI(audio, signal).catch((error: unknown) => {
       if (signal.aborted) throw error
       console.error("❌ openai could not read the recording:", error instanceof Error ? error.message : error)
-      throw new UserFacingError(PROMPT_CREATOR_MESSAGES.transcriptionFailed)
+      throw new UserFacingError(VOICE_MESSAGES.transcriptionFailed)
     })
   }
 
   const written = (transcript ?? "").trim()
   // "Nothing was said" is a valid answer about the recording, not a provider failure
-  if (written.length < MIN_TRANSCRIPT_LENGTH) throw new UserFacingError(PROMPT_CREATOR_MESSAGES.unclearAudio)
+  if (written.length < MIN_TRANSCRIPT_LENGTH) throw new UserFacingError(VOICE_MESSAGES.unclearAudio)
   return written
 }

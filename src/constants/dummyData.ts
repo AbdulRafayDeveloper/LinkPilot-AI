@@ -1,6 +1,7 @@
 import { PROFILE_DATA_MAX_LENGTH } from "@/constants/connectionNote"
 import { POST_TEXT_MAX_LENGTH } from "@/constants/postInput"
 import { REQUEST_MAX_LENGTH } from "@/constants/promptCreator"
+import { MESSAGE_MAX_LENGTH } from "@/constants/messageRewriter"
 import { REPLY_COMMENTS_MAX_LENGTH } from "@/constants/postCommentReplies"
 import { CONVERSATION_MAX_LENGTH, FOLLOW_UP_PROFILE_MAX_LENGTH } from "@/constants/followUp"
 import {
@@ -138,6 +139,21 @@ export const DUMMY_DATA_KINDS = {
         label: "Task description",
         placeholder: "Describe the task the prompt should cover...",
         maxLength: REQUEST_MAX_LENGTH,
+        required: true,
+      },
+    ],
+  },
+  "messages-to-rewrite": {
+    item: "message",
+    description:
+      "Sample messages for Message Rewriter, in any language. Saved for everyone: edit, add or remove them here, copy one, or use it to fill the message.",
+    namePlaceholder: "e.g. Urdu update about a late API",
+    fields: [
+      {
+        key: "message",
+        label: "Message",
+        placeholder: "Paste a message in any language, tidy or not...",
+        maxLength: MESSAGE_MAX_LENGTH,
         required: true,
       },
     ],

@@ -32,15 +32,12 @@ export function getPromptTargetLabel(target: PromptTargetId): string {
 
 export const PROMPT_TARGET_TABS = PROMPT_TARGETS.map((target) => ({ id: target.id, label: target.shortLabel }))
 
-// What the user describes, by voice or by typing
+// What the user describes, by voice (constants/voiceInput.ts) or by typing
 export const REQUEST_MAX_LENGTH = 8000
 // The name the model writes for the prompt, and the user can rewrite
 export const CREATED_NAME_MAX_LENGTH = 80
 // The finished prompt
 export const CREATED_PROMPT_MAX_LENGTH = 20000
-// One recording; roughly 10 minutes of speech
-export const VOICE_MAX_BYTES = 12 * 1024 * 1024
-export const VOICE_MAX_SECONDS = 300
 
 export const PROMPT_CREATOR_ENDPOINT = "/api/prompt-creator"
 
@@ -54,17 +51,6 @@ export const PROMPT_CREATOR_MESSAGES = {
   emptyPrompt: "The prompt can't be empty.",
   saveFailed: "Couldn't save your changes. Please try again.",
   notFound: "That saved prompt no longer exists.",
-  // Voice input
-  micDenied: "Microphone access was blocked. Allow it in your browser, or type the description instead.",
-  micUnavailable: "This browser can't record audio. Please type the description instead.",
-  recordingFailed: "The recording didn't work. Please try again, or type the description.",
-  emptyRecording: "Nothing was recorded. Please try again.",
-  audioTooLarge: "That recording is too long. Please keep it under 5 minutes.",
-  unsupportedAudio: "That audio format isn't supported. Please record again.",
-  unclearAudio: "Couldn't make out any speech. Please record again in a quieter place, or type the description.",
-  transcriptionFailed: "Couldn't turn the recording into text. Please try again, or type the description.",
-  voiceUnavailable:
-    "Speaking needs an AI provider that can read audio. Set GOOGLE_API_KEY, or OPENAI_API_KEY with OPENAI_TRANSCRIPTION_MODEL, in .env.local.",
 } as const
 
 // The module's sidebar entry, listed after the LinkedIn tools
@@ -74,12 +60,12 @@ export const PROMPT_CREATOR_TOOL: {
   description: string
   icon: LucideIcon
   href: string
-  group: "build"
+  group: "writing"
 } = {
   id: "prompt-creator",
   title: "Prompt Creator",
   description: "Turn a task into an AI prompt",
   icon: Wand2,
   href: "/prompt-creator",
-  group: "build",
+  group: "writing",
 }

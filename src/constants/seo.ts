@@ -67,11 +67,58 @@ const TOOL_SEO: Record<string, { title: string; description: string; keywords: s
       "Keep every client's own message format, then write formal updates for LinkedIn, Upwork, Fiverr, Slack, Discord, WhatsApp or email in seconds.",
     keywords: ["client update message", "client communication template", "freelance client messages"],
   },
+  meetings: {
+    title: "Meeting Minutes & Action Items from a Transcript",
+    description:
+      "Paste a whole meeting, however long, and get the participants, the decisions, your own tasks and a short summary to send the client.",
+    keywords: ["meeting minutes generator", "meeting transcript analysis", "action items from meeting"],
+  },
+  "quick-notes": {
+    title: "Quick Notes, Save Text to Reuse",
+    description: "Paste or write anything worth keeping, save it in one click, and copy it back whenever you need it.",
+    keywords: ["save text notes", "copy paste notes", "reusable snippets"],
+  },
+  "daily-tasks": {
+    title: "Daily Tasks, a Simple Day Checklist",
+    description:
+      "Write the day's tasks in one go, tick them off as you finish, and see at a glance what is still open from the last seven days.",
+    keywords: ["daily task list", "daily checklist", "to-do list for work", "track daily tasks"],
+  },
+  "meeting-planner": {
+    title: "Meeting Planner & Client Meeting Preparation",
+    description:
+      "Put a client meeting in the calendar, then have the profile and your conversation so far turned into a read of the person and a plan for the call.",
+    keywords: ["meeting preparation", "client meeting planner", "sales call preparation", "discovery call plan"],
+  },
   "prompt-creator": {
     title: "AI Prompt Generator for Coding Agents & Search",
     description:
       "Describe a task by voice or text and get a clear, detailed English prompt, shaped for a coding agent such as Cursor or Claude, or for ChatGPT and Gemini web search.",
     keywords: ["AI prompt generator", "prompt for Cursor", "Claude prompt generator", "ChatGPT search prompt"],
+  },
+  "message-rewriter": {
+    title: "Message Rewriter and Shortener, Any Language to English",
+    description:
+      "Say or paste a message in any language and get it back as a short, clear English message that keeps what you meant, ready to edit and send.",
+    keywords: ["message rewriter", "message shortener", "translate message to English", "make my message clearer"],
+  },
+  "important-files": {
+    title: "Important Files and Assets Manager",
+    description:
+      "Keep the images, PDFs, Word files, text files, videos and audio you reuse, under names you choose, with search, type filters, preview and download.",
+    keywords: ["file manager", "asset library", "store important files", "upload large video"],
+  },
+  "client-voices": {
+    title: "Client Voice Messages to Transcript and Task List",
+    description:
+      "Paste or drop up to 15 client voice messages, read each one back as English text, and get one clear list of the work the client asked for.",
+    keywords: ["voice message to text", "client voice notes", "transcribe WhatsApp voice", "voice to task list"],
+  },
+  "post-image-creator": {
+    title: "On-Brand Post Image Creator",
+    description:
+      "Make a clean post image in your own brand colours, with your own photo in it, from whatever the post is about.",
+    keywords: ["post image generator", "LinkedIn post image", "brand image creator", "AI post graphic"],
   },
   "conversation-reply": {
     title: "LinkedIn Conversation Reply Analyzer",
@@ -86,9 +133,9 @@ export const HOME_SEO: SeoPage = {
   path: "/",
   title: SITE_PURPOSE,
   description: SITE_DESCRIPTION,
-  keywords: ["LinkedIn writing assistant", "AI LinkedIn tools", "LinkedIn outreach tools"],
+  keywords: ["LinkedIn writing assistant", "AI LinkedIn tools", "LinkedIn outreach tools", "client work assistant"],
   heading: SITE_PURPOSE,
-  subheading: "8 AI tools for notes, comments, replies and follow-ups",
+  subheading: "9 LinkedIn tools, plus client work, meetings and your workspace",
   indexable: true,
 }
 
@@ -104,6 +151,16 @@ export const SEO_PAGES: SeoPage[] = [
     subheading: tool.description,
     indexable: true,
   })),
+  {
+    slug: "post-image-creator/history",
+    path: "/post-image-creator/history",
+    title: "Generated Post Images",
+    description: "Every post image you have made, with the colours, photo and content it was made from.",
+    keywords: ["generated post images", "post image history", "brand image gallery"],
+    heading: "Generated Posts",
+    subheading: "Every post image you have made",
+    indexable: false,
+  },
   {
     slug: "global-prompts",
     path: "/global-prompts",

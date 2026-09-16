@@ -5,6 +5,7 @@ import type { CommentTuneId } from "@/constants/commentWriter"
 import type { FirstMessageTuneId } from "@/constants/firstMessage"
 import type { InMailTuneId } from "@/constants/inmail"
 import type { ReplyContextId, ReplyStyleId } from "@/constants/postCommentReplies"
+import type { MeetingPlannerPromptId } from "@/constants/meetingPlanner"
 import type { ConversationReplyOwnPromptId } from "@/constants/conversationReply"
 import type { GlobalPromptId } from "@/constants/globalPrompts"
 import type { PromptTargetId } from "@/constants/promptCreator"
@@ -44,6 +45,17 @@ export type PromptName =
   | `prompt-creator-${PromptTargetId}`
   | "client-message-system"
   | "client-message"
+  | "meeting-prep-system"
+  | `meeting-prep-${MeetingPlannerPromptId}`
+  | "meeting-system"
+  | "meeting-chunk"
+  | "meeting-synthesis"
+  | "message-rewriter-system"
+  | "message-rewriter"
+  | "client-voice-tasks-system"
+  | "client-voice-tasks"
+  | "post-image-system"
+  | "post-image"
 
 /**
  * Loads a prompt template from the prompts collection. A missing template fails loudly
