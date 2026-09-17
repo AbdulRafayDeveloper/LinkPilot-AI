@@ -4,7 +4,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { AlertTriangle, ArrowUp, Bot, Loader2, Maximize2, MessageSquare, Minimize2, Square, Trash2, User } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
+import { CopyButton } from "@/components/ui/CopyButton"
+import { RichTextView } from "@/components/ui/RichTextView"
+import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
 import { requestApi } from "@/lib/apiClient"
+import { appendSpokenText } from "@/lib/spokenText"
 import { readSSEStream } from "@/lib/sse"
 import { MEETING_CHAT_MESSAGES, MEETING_PLANNER_ENDPOINT_CHAT, QUESTION_MAX_LENGTH } from "@/constants/meetingChat"
 import { AI_PROVIDER_LABELS, type AiProviderId } from "@/constants/aiProviders"
@@ -23,20 +27,32 @@ const Bubble: React.FC<{ message: MeetingChatMessage; isStreaming?: boolean }> =
       >
         {isYou ? <User size={14} /> : <Bot size={14} />}
       </span>
-      <div className={`flex min-w-0 max-w-[85%] flex-col gap-1 ${isYou ? "items-end" : "items-start"}`}>
+      <div className={`group flex min-w-0 max-w-[85%] flex-col gap-1 ${isYou ? "items-end" : "items-start"}`}>
         <div
-          className={`whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-[14px] leading-relaxed ${
-            isYou ? "bg-primary text-white" : "bg-surface-container-lowest text-on-surface ring-1 ring-outline-variant"
+          className={`break-words rounded-2xl px-3.5 py-2.5 text-[14px] leading-relaxed ${
+            isYou ? "whitespace-pre-wrap bg-primary text-white" : "bg-surface-container-lowest text-on-surface ring-1 ring-outline-variant"
           }`}
         >
-          {message.text}
-          {isStreaming && <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-primary align-middle" aria-hidden="true" />}
+          {isYou ? (
+            message.text
+          ) : (
+            <>
+              {/* Bold, italics, bullets and numbered steps are shown as formatting, not as the marks around them */}
+              <RichTextView text={message.text} className="!gap-2 !text-[14px] !text-on-surface" />
+              {isStreaming && <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-primary align-middle" aria-hidden="true" />}
+            </>
+          )}
         </div>
-        {!isYou && !isStreaming && (
-          <p className="px-1 text-[11px] text-outline">
-            {message.fromMeeting ? `From this meeting: ${message.sources.slice(0, 3).join(", ")}` : "Not in the meeting notes, answered from general knowledge"}
-            {message.provider && ` · ${AI_PROVIDER_LABELS[message.provider as AiProviderId] ?? message.provider}`}
-          </p>
+        {!isStreaming && (
+          <div className={`flex items-center gap-1.5 px-1 ${isYou ? "flex-row-reverse" : ""}`}>
+            <CopyButton text={message.text} label={isYou ? "Copy your question" : "Copy this answer"} />
+            {!isYou && (
+              // Which model wrote it is in the tooltip rather than on the line, to keep the chat plain
+              <p className="text-[11px] text-outline" title={message.provider ? `Answered by ${AI_PROVIDER_LABELS[message.provider as AiProviderId] ?? message.provider}` : undefined}>
+                {message.fromMeeting ? `Read from: ${message.sources.slice(0, 2).join(", ")}` : "Not saved on this meeting, explained for you"}
+              </p>
+            )}
+          </div>
         )}
       </div>
     </li>
@@ -181,8 +197,7 @@ export const MeetingChatPanel: React.FC<{ meetingId: string; meetingName: string
             Ask this meeting
           </h2>
           <p className="mt-0.5 text-[12px] text-on-surface-variant">
-            Answers from everything saved on {personName || meetingName}
-            {pieces ? ` · ${pieces} pieces searched` : ""}
+            Answers from everything saved on {personName || meetingName}. Ask anything you want to understand before the call.
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -249,6 +264,18 @@ export const MeetingChatPanel: React.FC<{ meetingId: string; meetingName: string
           placeholder="Ask anything about this meeting..."
           aria-label="Your question about this meeting"
           className="custom-scrollbar max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-outline-variant bg-white px-3 py-2.5 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+        />
+        <VoiceRecorder
+          transcribeFor="meeting-planner"
+          what="what you want to ask"
+          showSource={false}
+          disabled={isAnswering}
+          onError={setError}
+          onTranscript={(spoken) => {
+            const { text } = appendSpokenText(question, spoken, QUESTION_MAX_LENGTH)
+            setQuestion(text)
+            input.current?.focus()
+          }}
         />
         {isAnswering ? (
           <button
