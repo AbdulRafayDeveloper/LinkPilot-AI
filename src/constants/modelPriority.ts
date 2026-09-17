@@ -23,6 +23,9 @@ export const AI_MODULE_IDS = [
 ] as const
 export type AiModuleId = (typeof AI_MODULE_IDS)[number]
 
+// Modules whose AI calls are counted and attributed but have only one provider, so no order to choose (OpenAI images)
+export type UsageOnlyModuleId = "post-image-creator"
+
 // What each module asks of a provider beyond writing text, so the page can say which providers can't help it
 export type AiNeed = "web-search" | "screenshots" | "speech"
 export const AI_MODULE_NEEDS: Record<AiModuleId, readonly AiNeed[]> = {
@@ -48,10 +51,15 @@ export const VOICE_MODULE_IDS = ["prompt-creator", "client-messaging", "message-
 export type VoiceModuleId = (typeof VOICE_MODULE_IDS)[number]
 
 export const MODEL_PRIORITY_ENDPOINT = "/api/admin/model-priority"
+export const AI_USAGE_ENDPOINT = "/api/admin/ai-usage"
+// The windows the usage summary offers, in days
+export const AI_USAGE_DAYS = [1, 7, 30] as const
 
 export const MODEL_PRIORITY_MESSAGES = {
   loadFailed: "Couldn't load the model priorities. Please try again.",
   saveFailed: "Couldn't save that order. Please try again.",
   badOrder: "List every provider exactly once.",
   unknownModule: "That module doesn't use an AI model.",
+  usageFailed: "Couldn't load the AI usage. Please try again.",
+  badUsageRange: "Choose 1, 7 or 30 days.",
 } as const

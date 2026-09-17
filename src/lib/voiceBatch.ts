@@ -8,6 +8,7 @@ import {
   TRANSCRIBE_ENDPOINT,
   VOICE_MAX_BYTES,
 } from "@/constants/clientVoices"
+import type { AiText } from "@/types/ai"
 
 /**
  * Running one batch of voice messages from the browser.
@@ -38,18 +39,18 @@ export function checkAudioFile(file: File): string | null {
  * Sends one voice to be written out. The file goes as the body of its own request and is never
  * held anywhere after the answer comes back.
  */
-export async function transcribeVoice(file: File, signal: AbortSignal): Promise<string> {
+export async function transcribeVoice(file: File, signal: AbortSignal): Promise<AiText> {
   const form = new FormData()
   form.append("audio", file, file.name || "voice")
   // Read in Client Voices' own provider order
   form.append("for", "client-voices")
   // Writing out a recording stores nothing, so a dropped request is safe to send again
-  const { data } = await requestApi<{ text: string }>(
+  const { data } = await requestApi<AiText>(
     TRANSCRIBE_ENDPOINT,
     { method: "POST", body: form, signal },
     { retry: true }
   )
-  return data.text
+  return { text: data.text, provider: data.provider }
 }
 
 interface RunOptions<T> {

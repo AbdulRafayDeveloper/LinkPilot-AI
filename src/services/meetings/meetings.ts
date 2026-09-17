@@ -7,6 +7,7 @@ import { MEETINGS_PAGE_SIZE, type MeetingStatusId } from "@/constants/meetings"
 import type { Meeting, MeetingAnalysis, MeetingInput, MeetingSummary, MeetingsPage } from "@/types/meetings"
 import type { Viewer } from "@/types/auth"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
+import type { AiSource } from "@/types/ai"
 
 /**
  * Meetings in the database. The history list never reads a transcript: a card needs a title, a
@@ -61,6 +62,7 @@ function toMeeting(record: StoredMeeting): Meeting {
     // An analysis built from a different transcript than the one saved now is out of date
     isAnalysisStale: Boolean(record.analyzedHash) && record.analyzedHash !== record.transcriptHash,
     analyzedAt: record.analyzedAt ? record.analyzedAt.toISOString() : null,
+    analysisSource: { provider: (record.analysisProvider as AiSource["provider"]) ?? null, providers: (record.analysisProviders ?? []) as AiSource["providers"] },
   }
 }
 

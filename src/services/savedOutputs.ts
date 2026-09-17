@@ -223,6 +223,7 @@ function toSavedOutput(tool: SavedOutputTool, reader: OutputReader, row: Row): S
     texts: reader.texts(row),
     characterCount: typeof row.characterCount === "number" ? row.characterCount : null,
     sourceLabel: text(row[reader.source.field]) ? reader.source.label : null,
+    provider: text(row.provider) || null,
   }
 }
 

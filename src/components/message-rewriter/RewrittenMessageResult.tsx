@@ -8,6 +8,7 @@ import { EditableOutput } from "@/components/ui/EditableOutput"
 import { useEditableText } from "@/lib/outputEdits"
 import type { GenerationStatus } from "@/hooks/useGenerationRequest"
 import type { RewrittenMessage } from "@/types/messageRewriter"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 interface RewrittenMessageResultProps {
   status: GenerationStatus
@@ -44,6 +45,7 @@ export const RewrittenMessageResult: React.FC<RewrittenMessageResultProps> = ({ 
             {message.value.length.toLocaleString()} characters, from {result.originalCharacters.toLocaleString()}
             {saved > 0 && ` · ${saved.toLocaleString()} shorter`}
             {result.sourceLanguage.toLowerCase() !== "english" && ` · translated from ${result.sourceLanguage}`}
+            <AiSourceLabel source={result} />
           </p>
         </div>
       )}

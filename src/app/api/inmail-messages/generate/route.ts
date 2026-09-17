@@ -5,8 +5,7 @@ import { INMAIL_MESSAGES, INMAIL_PROFILE_MAX_LENGTH, INMAIL_TUNE_IDS } from "@/c
 import { generateInMail } from "@/services/inmail/generate"
 import { recordInMail } from "@/services/generationRecords"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -37,7 +36,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const result = await withModelOrder(await modelOrderFor(auth.viewer, "inmail-composer"), () => generateInMail({ ...parsed.data, signal: req.signal }))
+    const result = withSource(await runAiRequest(auth.viewer, "inmail-composer", () => generateInMail({ ...parsed.data, signal: req.signal })))
     await recordInMail(auth.viewer, parsed.data, result)
     return NextResponse.json({ success: true, message: "InMail generated", data: result })
   } catch (error: unknown) {

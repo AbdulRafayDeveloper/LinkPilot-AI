@@ -24,6 +24,9 @@ export interface IMeeting {
   analyzedChunks: number
   analysis: unknown
   analyzedAt: Date | null
+  // Who wrote the analysis: the last provider that answered and every provider that did, over all its calls
+  analysisProvider: string | null
+  analysisProviders: string[]
   createdAt: Date
   updatedAt: Date
 }
@@ -44,6 +47,8 @@ const MeetingSchema = new Schema<IMeeting>(
     // The whole MeetingAnalysis, validated against its schema before it is written
     analysis: { type: Schema.Types.Mixed, default: null },
     analyzedAt: { type: Date, default: null },
+    analysisProvider: { type: String, default: null },
+    analysisProviders: { type: [String], default: [] },
   },
   { timestamps: true, collection: "meetings" }
 )

@@ -1,5 +1,6 @@
 import type { AssetPoseId, ImageSizeId } from "@/constants/postImages"
 import type { EditablePrompt } from "./prompts"
+import type { WithAiSource } from "./ai"
 
 /** One reusable photo kept in the brand defaults. The key stays on the server. */
 export interface BrandAsset {
@@ -49,7 +50,7 @@ export interface GenerateImageInput {
  * time, not a pointer at the current defaults, so an old image still says how it was made after
  * the defaults change.
  */
-export interface PostImage {
+export interface PostImage extends WithAiSource {
   id: string
   // A signed link, made fresh on every read; the bucket stays private
   imageUrl: string | null

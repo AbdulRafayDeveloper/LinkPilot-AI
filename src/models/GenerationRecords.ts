@@ -11,6 +11,8 @@ interface RecordBase {
   ownerId: string | null
   // The full result object, stored as is
   result: unknown
+  // Which AI provider wrote it (the result's own `provider`), kept beside the result so a list can show it without reading the result
+  provider: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -117,6 +119,12 @@ const RESULT = { type: Schema.Types.Mixed, required: true }
 
 function recordModel<T>(name: string, schema: Schema<T>): Model<T> {
   schema.index({ createdAt: -1 })
+  // Copied from the result as the record is written, so every tool's record says who wrote it without its own code
+  schema.path("provider", { type: String, default: null })
+  schema.pre("validate", function () {
+    const result = this.get("result") as { provider?: unknown } | null
+    if (!this.get("provider") && typeof result?.provider === "string") this.set("provider", result.provider)
+  })
   return (mongoose.models[name] as Model<T> | undefined) ?? mongoose.model<T>(name, schema)
 }
 

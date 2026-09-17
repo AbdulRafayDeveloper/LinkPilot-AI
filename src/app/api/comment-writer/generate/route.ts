@@ -8,8 +8,7 @@ import { generateComment } from "@/services/commentWriter/generate"
 import { recordComment } from "@/services/generationRecords"
 import type { CommentStreamEvent } from "@/types/commentWriter"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 // Reading a screenshot, live web research and writing can take a couple of minutes together
@@ -40,12 +39,12 @@ export async function POST(req: NextRequest) {
 
   return createEventStream<CommentStreamEvent>(async (send) => {
     try {
-      const result = await withModelOrder(await modelOrderFor(auth.viewer, "comment-writer"), () => generateComment({
+      const result = withSource(await runAiRequest(auth.viewer, "comment-writer", () => generateComment({
         tune: tune.data,
         post,
         signal: req.signal,
         onStage: (status, text) => send({ status, text }),
-      }))
+      })))
       await recordComment(auth.viewer, post, result)
       send({ status: "COMPLETE", result })
     } catch (error: unknown) {

@@ -10,8 +10,7 @@ import {
 import { generateConnectionNote } from "@/services/connectionNote/generate"
 import { recordConnectionNote } from "@/services/generationRecords"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -49,7 +48,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const result = await withModelOrder(await modelOrderFor(auth.viewer, "connection-note"), () => generateConnectionNote({ ...parsed.data, signal: req.signal }))
+    const result = withSource(await runAiRequest(auth.viewer, "connection-note", () => generateConnectionNote({ ...parsed.data, signal: req.signal })))
     await recordConnectionNote(auth.viewer, parsed.data, result)
     return NextResponse.json({ success: true, message: "Connection note generated", data: result })
   } catch (error: unknown) {

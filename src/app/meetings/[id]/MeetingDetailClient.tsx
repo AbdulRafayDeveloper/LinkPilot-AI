@@ -16,6 +16,7 @@ import { useMeetingRun } from "@/hooks/useMeetingRun"
 import { requestApi } from "@/lib/apiClient"
 import { MEETINGS_ENDPOINT, MEETING_MESSAGES, TRANSCRIPT_PREVIEW_CHARS } from "@/constants/meetings"
 import type { Meeting, MeetingInput } from "@/types/meetings"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -179,6 +180,7 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                       {meeting.progress.totalChunks.toLocaleString()} parts
                       {meeting.analyzedAt && ` · analyzed ${when(meeting.analyzedAt)}`}
                       {meeting.isTitleGenerated && " · name written by the analysis"}
+                      {meeting.analysis && <AiSourceLabel source={meeting.analysisSource} />}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 sm:shrink-0">

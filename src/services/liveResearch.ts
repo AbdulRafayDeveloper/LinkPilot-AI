@@ -1,7 +1,8 @@
 import Groq from "groq-sdk"
 import { tools as openAITools } from "@langchain/openai"
 import type { AIMessage, BaseMessage } from "@langchain/core/messages"
-import { createOpenAIModel, isProviderConfigured, withGroqKey, withProviderRetry } from "@/services/ai"
+import { createOpenAIModel, isProviderConfigured, modelNameOf, withGroqKey, withProviderRetry } from "@/services/ai"
+import { recordAiUsage } from "@/services/aiUsage"
 import { env } from "@/config/env"
 import { currentModelOrder } from "@/lib/modelOrder"
 import { loadPrompt, type PromptName } from "@/services/prompts"
@@ -117,20 +118,23 @@ async function runGroqPass(messages: BaseMessage[], signal: AbortSignal): Promis
     role: GROQ_ROLES[message.getType() as keyof typeof GROQ_ROLES] ?? "user",
     content: typeof message.content === "string" ? message.content : readTextBlocks(message as AIMessage).map((block) => block.text).join("\n"),
   }))
-  const response = await withProviderRetry(
+  const { response, keyNumber } = await withProviderRetry(
     "groq",
     () =>
       withGroqKey(
-        (apiKey) =>
-          new Groq({ apiKey, maxRetries: 0 }).chat.completions.create(
+        async (apiKey, keyNumber) => ({
+          response: await new Groq({ apiKey, maxRetries: 0 }).chat.completions.create(
             { model, messages: conversation, tools: [{ type: "browser_search" }], tool_choice: "required" },
             { signal: passSignal }
           ),
+          keyNumber,
+        }),
         passSignal
       ),
     passSignal,
     RESEARCH_RETRIES
   )
+  await recordAiUsage({ provider: "groq", model, kind: "web-search", usage: response.usage, keyNumber })
   const message = response.choices[0]?.message
   const sources = (message?.executed_tools ?? [])
     .flatMap((tool) => tool.search_results?.results ?? [])
@@ -184,6 +188,7 @@ function searchWithOpenAI(passes: BaseMessage[][], signal: AbortSignal): Promise
       signal,
       RESEARCH_RETRIES
     )
+    await recordAiUsage({ provider: "openai", model: modelNameOf("openai"), kind: "web-search", usage: response.usage_metadata })
     return extractOpenAIResearch(response)
   })
 }

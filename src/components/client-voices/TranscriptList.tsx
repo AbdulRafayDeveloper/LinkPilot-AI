@@ -4,6 +4,7 @@ import React from "react"
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import type { VoiceEntry } from "@/types/clientVoices"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 interface TranscriptListProps {
   voices: VoiceEntry[]
@@ -46,7 +47,12 @@ export const TranscriptList: React.FC<TranscriptListProps> = ({ voices, isProces
         <p className="mt-1 truncate text-[11px] text-outline">{voice.name}</p>
 
         {voice.status === "done" && (
-          <p className="mt-2 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-on-surface">{voice.transcript}</p>
+          <>
+            <p className="mt-2 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-on-surface">{voice.transcript}</p>
+            <p className="mt-1 text-[11px] text-outline">
+              <AiSourceLabel source={{ provider: voice.transcribedBy ?? null }} prefix="" />
+            </p>
+          </>
         )}
 
         {voice.status === "transcribing" && (

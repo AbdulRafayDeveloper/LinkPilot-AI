@@ -1,12 +1,13 @@
 import type { FollowUpPromptId, FollowUpTypeId } from "@/constants/followUp"
 import type { LeadSignals } from "./leadSignals"
 import type { EditablePrompt } from "./prompts"
+import type { WithAiSource } from "./ai"
 
 export interface FollowUpPrompt extends EditablePrompt {
   id: FollowUpPromptId
 }
 
-export interface GeneratedFollowUp {
+export interface GeneratedFollowUp extends WithAiSource {
   message: string
   type: FollowUpTypeId
   characterCount: number

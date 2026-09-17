@@ -6,6 +6,7 @@ import { splitTranscript } from "@/lib/transcriptChunks"
 import { CHUNKS_PER_REQUEST, CHUNK_CONCURRENCY } from "@/constants/meetings"
 import type { MeetingRunState } from "@/types/meetings"
 import { analyzeChunk, ChunkResultSchema, synthesizeMeeting, type ChunkResult } from "./analysis"
+import type { AiSource } from "@/types/ai"
 
 /**
  * Running the analysis of one meeting, a bit at a time.
@@ -148,9 +149,16 @@ export async function resetAnalysis(id: string): Promise<boolean> {
   await MeetingChunk.deleteMany({ meetingId: meeting._id })
   await MeetingModel.updateOne(
     { _id: meeting._id },
-    { status: "saved", statusMessage: null, analyzedChunks: 0, totalChunks: splitTranscript(meeting.transcript).length }
+    { status: "saved", statusMessage: null, analyzedChunks: 0, totalChunks: splitTranscript(meeting.transcript).length, analysisProvider: null, analysisProviders: [] }
   )
   return true
+}
+
+/** Adds one call's source to the meeting's analysis: the last provider to answer, and every provider that has. */
+export async function noteAnalysisSource(id: string, source: AiSource): Promise<void> {
+  if (!source.provider) return
+  await connectDatabase()
+  await MeetingModel.updateOne({ _id: id }, { $set: { analysisProvider: source.provider }, $addToSet: { analysisProviders: { $each: source.providers } } })
 }
 
 export const isRunning = (status: string) => (runningStates as readonly string[]).includes(status)

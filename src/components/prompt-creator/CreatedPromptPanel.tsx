@@ -10,8 +10,9 @@ import {
   PROMPT_CREATOR_MESSAGES,
   getPromptTargetLabel,
 } from "@/constants/promptCreator"
-import { describeProviders } from "@/constants/aiProviders"
+import { describeSource } from "@/constants/aiProviders"
 import type { CreatedPrompt } from "@/types/promptCreator"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 // Typing pauses this long before the change is saved
 const SAVE_DELAY_MS = 900
@@ -147,10 +148,10 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
         <p className="text-[11px] text-outline">
           {prompt.length.toLocaleString()} characters · {getPromptTargetLabel(created.target)} · click the text to edit
         </p>
-        {created.provider && (
+        {describeSource(created) && (
           <p className="flex items-center gap-1.5 text-[12px] text-on-surface-variant">
             <Cpu size={13} className="shrink-0 text-primary" aria-hidden="true" />
-            Written by <span className="font-semibold text-on-surface">{describeProviders([created.provider])}</span>
+            <AiSourceLabel source={created} prefix="" className="font-semibold text-on-surface" />
           </p>
         )}
         {problem && (

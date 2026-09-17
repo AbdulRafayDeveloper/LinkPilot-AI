@@ -1,13 +1,14 @@
 import { connectDatabase } from "@/lib/db"
-import { resolveModelOrder } from "@/lib/modelOrder"
+import { currentSource, resolveModelOrder, withModelOrder } from "@/lib/modelOrder"
 import { ModelPriority, type IModelPriority } from "@/models/ModelPriority"
 import { AI_PROVIDER_LABELS, DEFAULT_MODEL_ORDER, MODEL_PROVIDERS, type AiProviderId } from "@/constants/aiProviders"
-import { AI_MODULE_IDS, AI_MODULE_NEEDS, type AiModuleId } from "@/constants/modelPriority"
+import { AI_MODULE_IDS, AI_MODULE_NEEDS, type AiModuleId, type UsageOnlyModuleId } from "@/constants/modelPriority"
 import { APP_TOOLS } from "@/constants/linkedinTools"
 import { isGroqTranscriptionConfigured, isProviderConfigured, isTranscriptionConfigured } from "@/services/ai"
 import { accountNames } from "@/services/auth/accounts"
 import type { Viewer } from "@/types/auth"
 import type { ModelPriorityOverview, ModelProviderStatus } from "@/types/modelPriority"
+import type { AiSource } from "@/types/ai"
 
 /**
  * AI Model Priority. Every module tries the providers in DEFAULT_MODEL_ORDER (Groq first). An admin
@@ -22,6 +23,27 @@ export async function modelOrderFor(viewer: Viewer, module: AiModuleId): Promise
   const saved = (await ModelPriority.findOne({ module }, { order: 1 }).lean()) as Pick<IModelPriority, "order"> | null
   return resolveModelOrder(viewer.role, saved?.order)
 }
+
+/**
+ * Runs one AI request for a module: in the provider order this account gets for it, with usage recorded
+ * against the module and the account, and returns what the work produced together with its source (which
+ * provider wrote it, and every provider that answered). Every AI route runs its service through this, so a
+ * new module or provider is attributed and counted without code of its own.
+ */
+export async function runAiRequest<T>(viewer: Viewer, module: AiModuleId | UsageOnlyModuleId, run: () => Promise<T>): Promise<{ result: T; source: AiSource }> {
+  const order = module === "post-image-creator" ? DEFAULT_MODEL_ORDER : await modelOrderFor(viewer, module)
+  return withModelOrder(
+    order,
+    async () => {
+      const result = await run()
+      return { result, source: currentSource() }
+    },
+    { module, ownerId: viewer.id }
+  )
+}
+
+/** A result with its source attached, the shape every AI route answers with. */
+export const withSource = <T extends object>({ result, source }: { result: T; source: AiSource }): T & AiSource => ({ ...result, ...source })
 
 function providerStatuses(): ModelProviderStatus[] {
   return MODEL_PROVIDERS.map((id) => ({

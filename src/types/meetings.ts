@@ -1,3 +1,4 @@
+import type { AiSource, WithAiSource } from "./ai"
 import type { MeetingStatusId } from "@/constants/meetings"
 
 /**
@@ -83,6 +84,8 @@ export interface Meeting extends MeetingSummary {
   // True when the transcript was edited after the analysis was made
   isAnalysisStale: boolean
   analyzedAt: string | null
+  // Who wrote the analysis, over every call that built it
+  analysisSource: AiSource
 }
 
 export interface MeetingsPage {
@@ -96,7 +99,7 @@ export interface MeetingInput {
   transcript: string
 }
 
-export interface MeetingRunState {
+export interface MeetingRunState extends WithAiSource {
   status: MeetingStatusId
   statusMessage: string | null
   progress: MeetingProgress

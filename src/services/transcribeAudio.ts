@@ -8,6 +8,7 @@ import { UserFacingError } from "@/lib/errors"
 import { currentModelOrder } from "@/lib/modelOrder"
 import { describeProviderFailure, type ProviderNames } from "@/lib/providerErrors"
 import type { VerifiedAudio } from "@/lib/audioType"
+import type { AiText } from "@/types/ai"
 import { VOICE_MESSAGES, type TranscriptionProvider } from "@/constants/voiceInput"
 
 const MIN_TRANSCRIPT_LENGTH = 3
@@ -28,7 +29,7 @@ export interface Transcript {
 interface Reader {
   isConfigured: () => boolean
   // Null means it heard no speech at all, so the next provider listens too
-  read: (audio: VerifiedAudio, signal: AbortSignal) => Promise<string | null>
+  read: (audio: VerifiedAudio, signal: AbortSignal) => Promise<AiText | null>
   // What to name in a failure: the provider and the variables to check
   names: ProviderNames
 }
@@ -62,9 +63,9 @@ export async function transcribeRecording({ audio, signal, providers = currentMo
   // Why each provider gave up, so a failure names what to change
   const failures: string[] = []
   for (const [index, provider] of usable.entries()) {
-    let text: string | null
+    let answer: AiText | null
     try {
-      text = await READERS[provider].read(audio, signal)
+      answer = await READERS[provider].read(audio, signal)
     } catch (error: unknown) {
       if (signal.aborted) throw error
       const next = usable[index + 1]
@@ -73,9 +74,9 @@ export async function transcribeRecording({ audio, signal, providers = currentMo
       continue
     }
     // Nobody spoke, as far as this provider could tell, so the next one listens too
-    if (text === null) continue
+    if (answer === null) continue
 
-    const written = text.trim()
+    const written = answer.text.trim()
     // "Nothing was said" is a valid answer about the recording, not a provider failure
     if (written.length < MIN_TRANSCRIPT_LENGTH) throw new UserFacingError(VOICE_MESSAGES.unclearAudio)
     return { text: written, provider }

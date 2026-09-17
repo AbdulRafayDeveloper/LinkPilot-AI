@@ -146,9 +146,9 @@ export default function ClientVoicesClient() {
         if (controller.signal.aborted) return
         update(voice.id, { status: "transcribing" })
         try {
-          const transcript = await transcribeVoice(voice.file, controller.signal)
+          const { text: transcript, provider } = await transcribeVoice(voice.file, controller.signal)
           transcriptsRef.current.set(voice.id, transcript)
-          update(voice.id, { status: "done", transcript, error: null })
+          update(voice.id, { status: "done", transcript, transcribedBy: provider, error: null })
         } catch (error: unknown) {
           if (controller.signal.aborted) return
           const message = error instanceof Error && !(error instanceof TypeError) ? error.message : ""

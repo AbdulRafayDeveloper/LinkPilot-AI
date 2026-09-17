@@ -1,5 +1,6 @@
 import type { EditablePrompt } from "./prompts"
 import type { RequestSource } from "./promptCreator"
+import type { WithAiSource } from "./ai"
 
 // The message was typed or spoken, the same two ways the Prompt Creator takes its description
 export type MessageSource = RequestSource
@@ -7,7 +8,7 @@ export type MessageSource = RequestSource
 /**
  * One rewritten message, as the page shows it.
  */
-export interface RewrittenMessage {
+export interface RewrittenMessage extends WithAiSource {
   // The short English message, ready to send
   message: string
   // The language the original was written in, named in English ("Urdu"), or "English"

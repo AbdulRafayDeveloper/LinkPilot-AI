@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { MEETING_MESSAGES } from "@/constants/meetings"
-import { resetAnalysis, runAnalysis } from "@/services/meetings/run"
+import { noteAnalysisSource, resetAnalysis, runAnalysis } from "@/services/meetings/run"
 import { getMeeting } from "@/services/meetings/meetings"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 // One call reads a handful of chunks and then answers; the page calls again while there is more
@@ -37,9 +36,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (!reset) return NextResponse.json({ success: false, message: MEETING_MESSAGES.notFound }, { status: 404 })
     }
 
-    const state = await withModelOrder(await modelOrderFor(auth.viewer, "meetings"), () => runAnalysis(id, { signal: req.signal }))
+    const { result: state, source } = await runAiRequest(auth.viewer, "meetings", () => runAnalysis(id, { signal: req.signal }))
+    if (state) await noteAnalysisSource(id, source)
     if (!state) return NextResponse.json({ success: false, message: MEETING_MESSAGES.notFound }, { status: 404 })
-    return NextResponse.json({ success: true, message: "Analysis moved on", data: state })
+    return NextResponse.json({ success: true, message: "Analysis moved on", data: { ...state, ...source } })
   } catch (error: unknown) {
     if (req.signal.aborted) {
       // The browser went away; what was read is saved, so the next call carries on

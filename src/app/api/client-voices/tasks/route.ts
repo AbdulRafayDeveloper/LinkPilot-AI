@@ -4,8 +4,7 @@ import { TranscriptBatchSchema } from "@/lib/validation/clientVoices"
 import { CLIENT_VOICES_MESSAGES } from "@/constants/clientVoices"
 import { extractTasks } from "@/services/clientVoices/tasks"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -30,7 +29,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { voices, missingVoices } = parsed.data
-    const result = await withModelOrder(await modelOrderFor(auth.viewer, "client-voices"), () => extractTasks({ voices, missingVoices, signal: req.signal }))
+    const result = withSource(await runAiRequest(auth.viewer, "client-voices", () => extractTasks({ voices, missingVoices, signal: req.signal })))
     return NextResponse.json({ success: true, message: "Tasks ready", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

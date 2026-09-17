@@ -23,6 +23,8 @@ export interface SavedOutput {
   // What it was written from ("Profile", "Conversation", "Post"), when there is one. The text itself
   // is read one record at a time, because a pasted profile or conversation can be very long
   sourceLabel: string | null
+  // Which AI provider wrote it, for records saved since attribution existed
+  provider?: string | null
 }
 
 /** One record with the whole text it was written from. */

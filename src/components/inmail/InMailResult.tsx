@@ -11,6 +11,7 @@ import { AboutMeNotice, AnalysisDetails } from "@/components/outreach/OutreachRe
 import { getInMailTuneLabel } from "@/constants/inmail"
 import type { GenerationStatus } from "@/hooks/useGenerationRequest"
 import type { GeneratedInMail } from "@/types/inmail"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 interface InMailResultProps {
   status: GenerationStatus
@@ -72,6 +73,7 @@ export const InMailResult: React.FC<InMailResultProps> = ({ status, result, erro
                 {message.value.length.toLocaleString()} / {result.messageMaxCharacters.toLocaleString()} characters
               </span>{" "}
               · {getInMailTuneLabel(result.tune)} tone
+              <AiSourceLabel source={result} />
             </p>
           </div>
 

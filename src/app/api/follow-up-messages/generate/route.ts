@@ -10,8 +10,7 @@ import {
 import { generateFollowUp } from "@/services/followUp/generate"
 import { recordFollowUp } from "@/services/generationRecords"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -50,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { conversation, profileData, followUpType } = parsed.data
-    const result = await withModelOrder(await modelOrderFor(auth.viewer, "follow-up-message"), () => generateFollowUp({ conversation, profileData, type: followUpType, signal: req.signal }))
+    const result = withSource(await runAiRequest(auth.viewer, "follow-up-message", () => generateFollowUp({ conversation, profileData, type: followUpType, signal: req.signal })))
     await recordFollowUp(auth.viewer, { conversation, profileData }, result)
     return NextResponse.json({ success: true, message: "Follow-up message generated", data: result })
   } catch (error: unknown) {

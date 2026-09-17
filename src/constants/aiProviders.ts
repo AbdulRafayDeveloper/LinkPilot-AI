@@ -26,3 +26,16 @@ export function describeProviders(used: readonly string[], order: readonly AiPro
     .map((provider) => (provider === order[0] ? AI_PROVIDER_LABELS[provider] : `${AI_PROVIDER_LABELS[provider]} (backup)`))
     .join(" and ")
 }
+
+/**
+ * What a page shows for where an AI result came from: "Source: Groq", or "Source: OpenAI (Groq also
+ * answered)" when a fallback wrote part of it. Null when there is no known provider to name.
+ */
+export function describeSource(source: { provider?: string | null; providers?: readonly string[] } | null | undefined): string | null {
+  const provider = source?.provider
+  if (!provider || !isProviderId(provider)) return null
+  const others = (source?.providers ?? []).filter((entry): entry is AiProviderId => entry !== provider && isProviderId(entry))
+  const also = others.length > 0 ? ` (${others.map((entry) => AI_PROVIDER_LABELS[entry]).join(" and ")} also answered)` : ""
+  return `Source: ${AI_PROVIDER_LABELS[provider]}${also}`
+}
+

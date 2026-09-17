@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { SortableList } from "@/components/ui/SortableList"
 import { dateTime } from "@/components/admin/AdminParts"
+import { AiUsagePanel } from "@/components/admin/AiUsagePanel"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { AI_PROVIDER_LABELS, type AiProviderId } from "@/constants/aiProviders"
@@ -168,6 +169,8 @@ export default function ModelPriorityClient() {
                 everyone else always uses the default{defaultOrder ? `: ${defaultOrder}` : ""}. Groq tries each of its keys before the next model.
               </p>
             </div>
+
+            <AiUsagePanel />
 
             {overview && (
               <div className="flex flex-wrap gap-2" aria-label="Models on this deployment">

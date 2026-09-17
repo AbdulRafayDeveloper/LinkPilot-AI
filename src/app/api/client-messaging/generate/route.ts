@@ -10,8 +10,7 @@ import { requireClient } from "@/services/clientMessaging/clients"
 import { generateClientMessage } from "@/services/clientMessaging/generate"
 import { saveClientMessage } from "@/services/clientMessaging/records"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -45,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     const { clientId, update, channel } = parsed.data
     const client = await requireClient(auth.viewer, clientId)
-    const result = await withModelOrder(await modelOrderFor(auth.viewer, "client-messaging"), () => generateClientMessage({ client, update, channel, signal: req.signal }))
+    const result = withSource(await runAiRequest(auth.viewer, "client-messaging", () => generateClientMessage({ client, update, channel, signal: req.signal })))
     const saved = await saveClientMessage(auth.viewer, client, update, result)
     return NextResponse.json({ success: true, message: "Message written", data: saved })
   } catch (error: unknown) {

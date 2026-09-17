@@ -13,6 +13,7 @@ import {
 } from "@/constants/postCommentReplies"
 import type { ReplyGenerationStatus } from "@/hooks/usePostCommentReplyGenerator"
 import type { GeneratedReply } from "@/types/postCommentReplies"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 interface ReplyResultProps {
   status: ReplyGenerationStatus
@@ -87,6 +88,7 @@ export const ReplyResult: React.FC<ReplyResultProps> = ({ status, stage, result,
               {reply.value.length.toLocaleString()} / {result.maxCharacters.toLocaleString()} characters
             </span>{" "}
             · {getReplyContextLabel(result.context)} · {getReplyStyleLabel(result.style)}
+            <AiSourceLabel source={result} />
           </p>
           {result.warning && !reply.isEdited && (
             <p className="flex items-start gap-2 bg-secondary-fixed/40 border border-secondary-fixed-dim text-on-secondary-fixed-variant rounded-xl px-3 py-2 text-[12px]">

@@ -9,8 +9,7 @@ import {
 import { generateFirstMessage } from "@/services/firstMessage/generate"
 import { recordFirstMessage } from "@/services/generationRecords"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -41,7 +40,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const result = await withModelOrder(await modelOrderFor(auth.viewer, "first-message"), () => generateFirstMessage({ ...parsed.data, signal: req.signal }))
+    const result = withSource(await runAiRequest(auth.viewer, "first-message", () => generateFirstMessage({ ...parsed.data, signal: req.signal })))
     await recordFirstMessage(auth.viewer, parsed.data, result)
     return NextResponse.json({ success: true, message: "First message generated", data: result })
   } catch (error: unknown) {

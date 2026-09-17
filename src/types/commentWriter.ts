@@ -1,6 +1,7 @@
 import type { AiProviderId } from "@/constants/aiProviders"
 import type { CommentTuneId } from "@/constants/commentWriter"
 import type { EditablePrompt } from "./prompts"
+import type { WithAiSource } from "./ai"
 
 export interface CommentTunePrompt extends EditablePrompt {
   tune: CommentTuneId
@@ -12,7 +13,7 @@ export interface CommentReference {
   source: string
 }
 
-export interface GeneratedComment {
+export interface GeneratedComment extends Pick<WithAiSource, "providers"> {
   comment: string
   tune: CommentTuneId
   characterCount: number

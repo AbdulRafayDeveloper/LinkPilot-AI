@@ -13,8 +13,7 @@ import { generatePostCommentReply, type ReplyInput } from "@/services/postCommen
 import { recordPostCommentReply } from "@/services/generationRecords"
 import type { ReplyStreamEvent } from "@/types/postCommentReplies"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 // Reading a screenshot, optional live research (only when a prompt uses {{web_research}}) and a possible fallback call
@@ -64,11 +63,11 @@ export async function POST(req: NextRequest) {
 
   return createEventStream<ReplyStreamEvent>(async (send) => {
     try {
-      const result = await withModelOrder(await modelOrderFor(auth.viewer, "post-comment-replies"), () => generatePostCommentReply({
+      const result = withSource(await runAiRequest(auth.viewer, "post-comment-replies", () => generatePostCommentReply({
         input,
         signal: req.signal,
         onStage: (status) => send({ status }),
-      }))
+      })))
       await recordPostCommentReply(auth.viewer, input, result)
       send({ status: "COMPLETE", result })
     } catch (error: unknown) {

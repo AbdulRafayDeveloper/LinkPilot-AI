@@ -7,6 +7,7 @@ import { ResultCard } from "@/components/ui/ResultCard"
 import { EditableOutput } from "@/components/ui/EditableOutput"
 import { useEditableText } from "@/lib/outputEdits"
 import type { GenerationStatus } from "@/hooks/useGenerationRequest"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 interface GeneratedResultPanelProps {
   title: string
@@ -25,6 +26,8 @@ interface GeneratedResultPanelProps {
   copyButtonText: string
   // Shown after the character count, e.g. the tone
   meta?: React.ReactNode
+  // Which AI provider wrote the text, shown last on the same line ("Source: Groq")
+  source?: { provider?: string | null; providers?: readonly string[] } | null
   warning?: string | null
   children?: React.ReactNode
 }
@@ -48,6 +51,7 @@ export const GeneratedResultPanel: React.FC<GeneratedResultPanelProps> = ({
   copyLabel,
   copyButtonText,
   meta,
+  source,
   warning,
   children,
 }) => {
@@ -68,6 +72,7 @@ export const GeneratedResultPanel: React.FC<GeneratedResultPanelProps> = ({
       <p className="text-[11px] text-outline">
         {editable.value.length.toLocaleString()} characters
         {meta && <> · {meta}</>}
+        <AiSourceLabel source={source} />
       </p>
       {warning && !editable.isEdited && <ResultWarning text={warning} />}
       {children}

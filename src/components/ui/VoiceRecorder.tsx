@@ -13,6 +13,7 @@ import {
   type TranscriptionProvider,
 } from "@/constants/voiceInput"
 import type { VoiceModuleId } from "@/constants/modelPriority"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 type RecorderState = "idle" | "recording" | "transcribing" | "failed"
 
@@ -64,6 +65,8 @@ interface VoiceRecorderProps {
   what?: string
   /** The module recording, so the speech is read in that module's provider order (constants/modelPriority.ts) */
   transcribeFor?: VoiceModuleId
+  /** Show "Source: Groq" after a recording is written out; off where the page names the source itself */
+  showSource?: boolean
 }
 
 /**
@@ -79,8 +82,11 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   disabled = false,
   what = "what you want done",
   transcribeFor,
+  showSource = true,
 }) => {
   const [state, setState] = useState<RecorderState>("idle")
+  // Who wrote out the last recording, shown beside the button until the next one starts
+  const [lastProviders, setLastProviders] = useState<TranscriptionProvider[]>([])
   const [seconds, setSeconds] = useState(0)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [stoppedAtLimit, setStoppedAtLimit] = useState(false)
@@ -156,6 +162,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     onError(null)
     // Each provider once, in the order the parts were written out
     const providers = [...new Set(kept.providers.filter((provider): provider is TranscriptionProvider => provider !== null))]
+    setLastProviders(providers)
     onTranscript(text, providers)
   }, [onError, onTranscript, transcribeFor])
 
@@ -212,6 +219,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       recorderRef.current = recorder
       setSeconds(0)
       recorder.start()
+      setLastProviders([])
       setState("recording")
     } catch (error: unknown) {
       releaseMicrophone()
@@ -248,7 +256,12 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
           {VOICE_MESSAGES.stoppedAtLimit}
         </span>
       )}
-      {state === "idle" && <span className="text-[11px] text-outline">{VOICE_MESSAGES.limit}</span>}
+      {state === "idle" && (
+        <span className="text-[11px] text-outline">
+          {VOICE_MESSAGES.limit}
+          {showSource && <AiSourceLabel source={{ provider: lastProviders.at(-1) ?? null, providers: lastProviders }} />}
+        </span>
+      )}
       {state === "failed" && (
         <button
           type="button"

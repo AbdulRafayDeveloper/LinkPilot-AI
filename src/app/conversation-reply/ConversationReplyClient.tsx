@@ -244,6 +244,7 @@ export default function ConversationReplyClient() {
                     loadingText={LOADING_TEXT}
                     copyLabel="Copy suggested reply"
                     copyButtonText="Copy Reply"
+                    source={result}
                     warning={result?.warning}
                     meta={
                       result && (

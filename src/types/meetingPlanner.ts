@@ -1,4 +1,5 @@
 import type { MeetingPlanStatusId, PrepStatusId } from "@/constants/meetingPlanner"
+import type { WithAiSource } from "./ai"
 
 /**
  * Whether the model read something the user supplied, or worked it out from what was supplied.
@@ -52,7 +53,7 @@ export interface DealPath {
   natural_next_step: string
 }
 
-export interface MeetingPrep {
+export interface MeetingPrep extends WithAiSource {
   lead_analysis: LeadAnalysis
   discussion_topics: DiscussionTopic[]
   conversation_plan: ConversationStage[]

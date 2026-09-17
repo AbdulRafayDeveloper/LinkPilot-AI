@@ -10,6 +10,7 @@ import { useEditableText } from "@/lib/outputEdits"
 import { SUBJECT_MAX_LENGTH, getChannelLabel } from "@/constants/clientMessaging"
 import type { GenerationStatus } from "@/hooks/useGenerationRequest"
 import type { GeneratedClientMessage } from "@/types/clientMessaging"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 interface ClientMessageResultProps {
   status: GenerationStatus
@@ -72,6 +73,7 @@ export const ClientMessageResult: React.FC<ClientMessageResultProps> = ({ status
                 {message.value.length.toLocaleString()} / {result.maxCharacters.toLocaleString()} characters
               </span>{" "}
               · {getChannelLabel(result.channel)} · saved for {result.clientName}
+              <AiSourceLabel source={result} />
             </p>
           </div>
 

@@ -1,4 +1,5 @@
 import type { EditablePrompt } from "./prompts"
+import type { WithAiSource } from "./ai"
 
 /**
  * Where one voice message has got to. Every voice the user added holds one of these until the
@@ -21,6 +22,8 @@ export interface VoiceEntry {
   source: VoiceSource
   status: VoiceStatus
   transcript: string
+  // Which provider wrote the transcript out
+  transcribedBy?: string | null
   error: string | null
 }
 
@@ -35,7 +38,7 @@ export interface ClientTask {
 }
 
 /** What the task step returns: the list, and whether it had every voice to work from. */
-export interface TaskExtraction {
+export interface TaskExtraction extends WithAiSource {
   tasks: ClientTask[]
   // Voices that had no transcript to give it, so the page can say the list is partial
   missingVoices: number[]

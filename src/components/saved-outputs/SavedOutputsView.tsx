@@ -23,6 +23,8 @@ import {
   type SavedOutputToolId,
 } from "@/constants/savedOutputs"
 import type { SavedOutput, SavedOutputDetail, SavedOutputsPage } from "@/types/savedOutputs"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
+import { describeSource } from "@/constants/aiProviders"
 
 interface FilterState {
   search: string
@@ -64,7 +66,7 @@ const toolbarButton =
 
 /** The choices a record was written with (violet) and the facts about it (neutral). */
 const RecordTags: React.FC<{ item: SavedOutput }> = ({ item }) =>
-  item.choices.length + item.details.length === 0 ? (
+  item.choices.length + item.details.length === 0 && !describeSource(item) ? (
     <span className="text-[12px] text-outline">None</span>
   ) : (
     <ul className="flex flex-wrap gap-1" aria-label="Written with">
@@ -78,6 +80,11 @@ const RecordTags: React.FC<{ item: SavedOutput }> = ({ item }) =>
           {label}
         </li>
       ))}
+      {describeSource(item) && (
+        <li className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">
+          <AiSourceLabel source={item} prefix="" />
+        </li>
+      )}
     </ul>
   )
 

@@ -2,21 +2,59 @@ import { AsyncLocalStorage } from "node:async_hooks"
 import { DEFAULT_MODEL_ORDER, type AiProviderId } from "@/constants/aiProviders"
 import type { UserRole } from "@/constants/auth"
 import { ModelOrderSchema } from "@/lib/validation/modelPriority"
+import type { AiSource } from "@/types/ai"
 
 /**
- * The provider order for the request being handled. A route resolves it once, for the module and the
+ * The AI request being handled. A route resolves the provider order once, for the module and the
  * account asking (services/modelPriority.ts), and runs its work inside withModelOrder; every AI call
- * made during that work, however deep (humanizing, lead signals, research, rewrites), reads it here
- * instead of each function passing it down. Outside a request it is the default order.
+ * made during that work, however deep (humanizing, lead signals, research, rewrites), reads the order
+ * here instead of each function passing it down, and notes here which provider answered it. That
+ * note is what the route attaches to the response (currentSource) and what usage is recorded against
+ * (services/aiUsage.ts), so a module or a provider added later is attributed without extra code.
+ * Outside a request the order is the default and nothing is noted.
  */
-const requestOrder = new AsyncLocalStorage<readonly AiProviderId[]>()
+interface AiRequest {
+  order: readonly AiProviderId[]
+  // The tool id the request belongs to (constants/linkedinTools.ts)
+  module: string | null
+  ownerId: string | null
+  // Every provider that answered a call, in the order the calls finished
+  answered: AiProviderId[]
+}
 
-export function withModelOrder<T>(order: readonly AiProviderId[], run: () => T): T {
-  return requestOrder.run(order, run)
+const currentRequest = new AsyncLocalStorage<AiRequest>()
+
+export function withModelOrder<T>(order: readonly AiProviderId[], run: () => T, details: { module?: string; ownerId?: string } = {}): T {
+  return currentRequest.run({ order, module: details.module ?? null, ownerId: details.ownerId ?? null, answered: [] }, run)
 }
 
 export function currentModelOrder(): readonly AiProviderId[] {
-  return requestOrder.getStore() ?? DEFAULT_MODEL_ORDER
+  return currentRequest.getStore()?.order ?? DEFAULT_MODEL_ORDER
+}
+
+/** The module and account the running AI request belongs to, for usage records. */
+export function currentAiRequest(): { module: string | null; ownerId: string | null } {
+  const request = currentRequest.getStore()
+  return { module: request?.module ?? null, ownerId: request?.ownerId ?? null }
+}
+
+/** Notes that a provider answered one call in the running request. */
+export function noteProviderAnswered(provider: AiProviderId): void {
+  currentRequest.getStore()?.answered.push(provider)
+}
+
+/**
+ * Who a set of answers came from: `provider` is the provider of the last answer (the one that wrote
+ * what is shown, since rewriting and humanizing come last), `providers` every provider that answered,
+ * each once in order of first use. Null and empty when nothing answered.
+ */
+export function sourceFrom(answered: readonly AiProviderId[]): AiSource {
+  return { provider: answered.at(-1) ?? null, providers: [...new Set(answered)] }
+}
+
+/** The source of the running request so far. */
+export function currentSource(): AiSource {
+  return sourceFrom(currentRequest.getStore()?.answered ?? [])
 }
 
 /**

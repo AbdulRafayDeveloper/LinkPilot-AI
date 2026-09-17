@@ -4,6 +4,8 @@ import React from "react"
 import { AlertTriangle, ListChecks, Loader2 } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import type { TaskExtraction } from "@/types/clientVoices"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
+import { describeSource } from "@/constants/aiProviders"
 
 interface TaskListPanelProps {
   result: TaskExtraction | null
@@ -60,6 +62,12 @@ export const TaskListPanel: React.FC<TaskListPanelProps> = ({ result, isWorking,
       {result && result.tasks.length === 0 && !isWorking && (
         <p className="text-[12px] text-on-surface-variant">
           The client did not ask for anything that reads as work in these voices.
+        </p>
+      )}
+
+      {result && describeSource(result) && (
+        <p className="text-[11px] text-outline">
+          <AiSourceLabel source={result} prefix="" />
         </p>
       )}
 

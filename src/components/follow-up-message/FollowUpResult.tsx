@@ -8,6 +8,7 @@ import { useEditableText } from "@/lib/outputEdits"
 import { getFollowUpTypeLabel } from "@/constants/followUp"
 import type { GenerationStatus } from "@/hooks/useGenerationRequest"
 import type { GeneratedFollowUp } from "@/types/followUp"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 interface FollowUpResultProps {
   status: GenerationStatus
@@ -75,6 +76,7 @@ export const FollowUpResult: React.FC<FollowUpResultProps> = ({ status, result, 
           <p className="text-[11px] text-outline">
             {message.value.length.toLocaleString()} characters · {getFollowUpTypeLabel(result.type)}
             {result.usedProfile && " · Personalized with profile"}
+            <AiSourceLabel source={result} />
           </p>
         </div>
       )}

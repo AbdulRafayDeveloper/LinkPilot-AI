@@ -4,8 +4,7 @@ import { MEETING_PLANNER_MESSAGES } from "@/constants/meetingPlanner"
 import { claimPrepRun, failPrep, getMeeting, savePrep } from "@/services/meetingPlanner/plans"
 import { prepareMeeting } from "@/services/meetingPlanner/prepare"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 // Reading a profile, a conversation and writing a whole meeting plan takes longer than a message
@@ -39,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     try {
-      const prep = await withModelOrder(await modelOrderFor(auth.viewer, "meeting-planner"), () => prepareMeeting(claimed, req.signal))
+      const prep = withSource(await runAiRequest(auth.viewer, "meeting-planner", () => prepareMeeting(claimed, req.signal)))
       const saved = await savePrep(id, prep)
       if (!saved) {
         return NextResponse.json({ success: false, message: MEETING_PLANNER_MESSAGES.notFound }, { status: 404 })

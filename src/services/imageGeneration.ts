@@ -4,6 +4,7 @@ import { UserFacingError } from "@/lib/errors"
 import { describeProviderFailure } from "@/lib/providerErrors"
 import { withProviderRetry } from "@/services/ai"
 import { POST_IMAGES_MESSAGES } from "@/constants/postImages"
+import { recordAiUsage } from "@/services/aiUsage"
 
 /**
  * Drawing pictures, through the OpenAI Images API.
@@ -58,6 +59,8 @@ export interface GeneratedImage {
   data: Buffer
   contentType: string
   model: string
+  // Who drew it; the images API is OpenAI's
+  provider: "openai"
 }
 
 // The provider says so in the message when a parameter is not supported by the chosen model
@@ -117,7 +120,8 @@ export async function generateImage({ prompt, size, photo, signal }: ImageReques
     )
   })
 
+  await recordAiUsage({ provider: "openai", model, kind: "image", usage: answer.usage })
   const encoded = answer.data?.[0]?.b64_json
   if (!encoded) throw new UserFacingError(POST_IMAGES_MESSAGES.generationFailed)
-  return { data: Buffer.from(encoded, "base64"), contentType: "image/png", model }
+  return { data: Buffer.from(encoded, "base64"), contentType: "image/png", model, provider: "openai" }
 }

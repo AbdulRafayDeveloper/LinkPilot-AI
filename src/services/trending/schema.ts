@@ -101,6 +101,9 @@ export const TrendingResultSchema = z.object({
     sources_checked: z.number().int().nonnegative(),
     candidates_evaluated: z.number().int().nonnegative(),
   }),
+  // Who wrote the topics (the last provider that answered) and every provider that answered; searches saved before this have neither
+  provider: z.string().nullable().optional(),
+  providers: z.array(z.string()).optional(),
 })
 
 export type SynthesisOutput = z.infer<typeof SynthesisOutputSchema>

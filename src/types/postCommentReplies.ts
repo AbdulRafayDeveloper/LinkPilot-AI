@@ -1,6 +1,7 @@
 import type { ReplyContextId, ReplyStage, ReplyStyleId } from "@/constants/postCommentReplies"
 import type { PostInputMode } from "@/constants/postInput"
 import type { EditablePrompt } from "./prompts"
+import type { WithAiSource } from "./ai"
 
 export interface ReplyPrompt extends EditablePrompt {
   context: ReplyContextId
@@ -22,7 +23,7 @@ export interface GenerateReplyRequest {
   postImage: File | null
 }
 
-export interface GeneratedReply {
+export interface GeneratedReply extends WithAiSource {
   reply: string
   context: ReplyContextId
   style: ReplyStyleId

@@ -26,6 +26,7 @@ import { requestApi } from "@/lib/apiClient"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import { MEETING_PLANNER_ENDPOINT, MEETING_PLANNER_MESSAGES } from "@/constants/meetingPlanner"
 import type { MeetingPlanDetail } from "@/types/meetingPlanner"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 /** One of the three things the user pasted, shown only when there is something to show. */
 const SuppliedText: React.FC<{ title: string; text: string | null }> = ({ title, text }) =>
@@ -279,6 +280,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                                   minute: "2-digit",
                                 })}`
                               : "Ready to prepare."}
+                      {meeting.prepEnabled && meeting.prepStatus === "ready" && !isPreparing && <AiSourceLabel source={meeting.prep} />}
                     </p>
                     {meeting.prepEnabled && (
                       <button

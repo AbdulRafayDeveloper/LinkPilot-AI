@@ -1,6 +1,7 @@
 import type { InMailTuneId } from "@/constants/inmail"
+import type { WithAiSource } from "./ai"
 
-export interface GeneratedInMail {
+export interface GeneratedInMail extends WithAiSource {
   subject: string
   message: string
   tune: InMailTuneId

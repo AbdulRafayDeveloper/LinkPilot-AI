@@ -6,6 +6,7 @@ import { ResultCard } from "@/components/ui/ResultCard"
 import { getPoseLabel, POST_IMAGES_MESSAGES } from "@/constants/postImages"
 import type { GenerationStatus } from "@/hooks/useGenerationRequest"
 import type { PostImage } from "@/types/postImages"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 interface PostImageResultProps {
   status: GenerationStatus
@@ -116,6 +117,7 @@ export const PostImageResult: React.FC<PostImageResultProps> = ({ status, image,
             </span>
             <span>·</span>
             <span>{image.model}</span>
+            <AiSourceLabel source={image} prefix="" />
             {image.assetName && (
               <>
                 <span>·</span>

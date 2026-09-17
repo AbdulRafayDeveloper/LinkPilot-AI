@@ -7,6 +7,7 @@ import type {
 import type { ConversationParties } from "./conversation"
 import type { LeadSignals } from "./leadSignals"
 import type { EditablePrompt } from "./prompts"
+import type { WithAiSource } from "./ai"
 
 export interface ConversationReplyPrompt extends EditablePrompt {
   id: ConversationReplyPromptId
@@ -47,7 +48,7 @@ export interface ConversationAnalysis {
   overallAssessment: string
 }
 
-export interface ConversationReplyResult {
+export interface ConversationReplyResult extends WithAiSource {
   reply: string
   replyType: ConversationReplyTypeId
   strategyNote: string

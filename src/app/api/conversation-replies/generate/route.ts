@@ -10,8 +10,7 @@ import {
 import { analyzeAndReply } from "@/services/conversationReply"
 import { recordConversationReply } from "@/services/generationRecords"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 // Analysis and reply run one after the other, each trying the module's providers in order (Groq first)
@@ -50,7 +49,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const result = await withModelOrder(await modelOrderFor(auth.viewer, "conversation-reply"), () => analyzeAndReply({ ...parsed.data, signal: req.signal }))
+    const result = withSource(await runAiRequest(auth.viewer, "conversation-reply", () => analyzeAndReply({ ...parsed.data, signal: req.signal })))
     await recordConversationReply(auth.viewer, parsed.data, result)
     return NextResponse.json({ success: true, message: "Conversation analyzed and reply generated", data: result })
   } catch (error: unknown) {

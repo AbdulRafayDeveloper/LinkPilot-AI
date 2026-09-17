@@ -8,6 +8,7 @@ import { useEditableText } from "@/lib/outputEdits"
 import { getToneLabel } from "@/constants/connectionNote"
 import type { GenerationStatus } from "@/hooks/useGenerationRequest"
 import type { GeneratedConnectionNote } from "@/types/connectionNote"
+import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 interface NoteResultProps {
   status: GenerationStatus
@@ -77,6 +78,7 @@ export const NoteResult: React.FC<NoteResultProps> = ({ status, result, error, o
               {note.value.length} / {result.maxCharacters} characters
             </span>{" "}
             · {getToneLabel(result.tone)} tone
+            <AiSourceLabel source={result} />
           </p>
           {result.warning && !note.isEdited && (
             <p className="flex items-start gap-2 bg-secondary-fixed/40 border border-secondary-fixed-dim text-on-secondary-fixed-variant rounded-xl px-3 py-2 text-[12px]">

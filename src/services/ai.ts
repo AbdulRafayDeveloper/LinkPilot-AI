@@ -12,6 +12,8 @@ import { currentModelOrder } from "@/lib/modelOrder"
 import { withRetry } from "@/lib/retry"
 import { isTransientError, retryAfterOf } from "@/lib/transientErrors"
 import { AI_PROVIDER_LABELS, MODEL_PROVIDERS, type AiProviderId } from "@/constants/aiProviders"
+import { recordAiUsage } from "@/services/aiUsage"
+import type { AiText } from "@/types/ai"
 
 /**
  * Every provider the app can call, in the default order: Groq, then an open-source model on an
@@ -91,6 +93,13 @@ export function isProviderConfigured(provider: ModelProvider, input: ModelInput 
   return providerSettings(provider, input).required.every((entry) => entry.isSet)
 }
 
+/** The model a provider answers with, as usage records it. */
+export function modelNameOf(provider: ModelProvider, input: ModelInput = "text"): string {
+  if (provider === "groq") return (input === "image" ? env.GROQ_VISION_MODEL : env.GROQ_MODEL) ?? "unknown"
+  if (provider === "open-source") return env.OPEN_SOURCE_MODEL ?? "unknown"
+  return env.OPENAI_LIGHTWEIGHT_MODEL ?? "unknown"
+}
+
 function requireModel(model: string | undefined, variable: string): string {
   if (!model) {
     throw new UserFacingError(`${variable} is not set. Set it where the app runs (.env.local here, Environment Variables on the host).`)
@@ -106,11 +115,11 @@ const restingGroqKeys = new Map<number, number>()
  * hands the same call to the next key (lib/keyRotation.ts), so up to five keys cover for each other;
  * only when every key has failed does the error reach the caller, and the next provider takes over.
  */
-export function withGroqKey<T>(call: (apiKey: string) => Promise<T>, signal?: AbortSignal): Promise<T> {
+export function withGroqKey<T>(call: (apiKey: string, keyNumber: number) => Promise<T>, signal?: AbortSignal): Promise<T> {
   if (GROQ_API_KEYS.length === 0) {
     return Promise.reject(new UserFacingError(`Groq is not configured. Set ${GROQ_KEY_VARIABLES} where the app runs.`))
   }
-  return withKeyRotation(GROQ_API_KEYS, (apiKey) => call(apiKey), {
+  return withKeyRotation(GROQ_API_KEYS, (apiKey, index) => call(apiKey, index + 1), {
     isKeyError: isKeyLimitError,
     restMs: (error) => keyRestMs(error, retryAfterOf(error)),
     resting: restingGroqKeys,
@@ -169,7 +178,7 @@ const AUDIO_EXTENSIONS: Record<string, string> = {
  * Writes out a recording with OpenAI's transcription model from ENV (OPENAI_TRANSCRIPTION_MODEL),
  * through OpenAI's own transcription endpoint, retried on transient failures like every other call.
  */
-export async function transcribeWithOpenAI(audio: { data: Buffer; mimeType: string }, signal: AbortSignal): Promise<string> {
+export async function transcribeWithOpenAI(audio: { data: Buffer; mimeType: string }, signal: AbortSignal): Promise<AiText> {
   const apiKey = env.OPENAI_API_KEY
   const model = env.OPENAI_TRANSCRIPTION_MODEL
   if (!apiKey || !model) {
@@ -179,13 +188,14 @@ export async function transcribeWithOpenAI(audio: { data: Buffer; mimeType: stri
 
   const client = new OpenAI({ apiKey, maxRetries: 0 })
   const file = await toFile(audio.data, `recording.${AUDIO_EXTENSIONS[audio.mimeType] ?? "webm"}`, { type: audio.mimeType })
-  // response_format "text" answers with the transcript itself, which every model supports
-  const text = await withProviderRetry(
+  // "json" is a format every transcription model supports, and the newer ones report usage in it
+  const transcription = await withProviderRetry(
     "openai",
-    () => client.audio.transcriptions.create({ file, model, response_format: "text" }, { signal }),
+    () => client.audio.transcriptions.create({ file, model, response_format: "json" }, { signal }),
     signal
   )
-  return String(text)
+  await recordAiUsage({ provider: "openai", model, kind: "speech", usage: (transcription as { usage?: unknown }).usage })
+  return { text: transcription.text, provider: "openai" }
 }
 
 /** Whether Groq can read recordings: a key and a Whisper model (GROQ_TRANSCRIPTION_MODEL) are both set in ENV. */
@@ -197,24 +207,27 @@ export function isGroqTranscriptionConfigured(): boolean {
  * Writes out a recording with Whisper on Groq (GROQ_TRANSCRIPTION_MODEL), through Groq's own SDK:
  * LangChain has no speech-to-text interface. Every key is tried before it fails.
  */
-export async function transcribeWithGroq(audio: { data: Buffer; mimeType: string }, signal: AbortSignal): Promise<string> {
+export async function transcribeWithGroq(audio: { data: Buffer; mimeType: string }, signal: AbortSignal): Promise<AiText> {
   const model = env.GROQ_TRANSCRIPTION_MODEL
   if (GROQ_API_KEYS.length === 0 || !model) {
     const missing = [GROQ_API_KEYS.length === 0 && GROQ_KEY_VARIABLES, !model && "GROQ_TRANSCRIPTION_MODEL"].filter(Boolean).join(" and ")
     throw new UserFacingError(`Reading recordings with Groq needs ${missing}.`)
   }
 
-  const transcription = await withProviderRetry(
+  const { transcription, keyNumber } = await withProviderRetry(
     "groq",
     () =>
-      withGroqKey(async (apiKey) => {
+      withGroqKey(async (apiKey, keyNumber) => {
         const client = new Groq({ apiKey, maxRetries: 0 })
         const file = await toGroqFile(audio.data, `recording.${AUDIO_EXTENSIONS[audio.mimeType] ?? "webm"}`, { type: audio.mimeType })
-        return client.audio.transcriptions.create({ file, model, response_format: "json", temperature: 0 }, { signal })
+        // verbose_json also says how long the recording was, which is what Groq bills speech by
+        const answer = await client.audio.transcriptions.create({ file, model, response_format: "verbose_json", temperature: 0 }, { signal })
+        return { transcription: answer as typeof answer & { duration?: number }, keyNumber }
       }, signal),
     signal
   )
-  return transcription.text
+  await recordAiUsage({ provider: "groq", model, kind: "speech", keyNumber, audioSeconds: transcription.duration ?? null })
+  return { text: transcription.text, provider: "groq" }
 }
 
 const DEFAULT_GENERATION_TIMEOUT_MS = 45_000
@@ -260,23 +273,46 @@ export interface StructuredGeneration<T> {
   provider: ModelProvider
 }
 
-function invokeStructured<T extends Record<string, unknown>>(
+// With includeRaw, a structured call answers with the model's message (which carries the token usage)
+// beside the parsed output; an output that doesn't parse comes back as parsingError instead of a throw
+interface RawStructured<T> {
+  raw: { usage_metadata?: unknown }
+  parsed: T | null
+  parsingError?: unknown
+}
+
+function parsedOf<T>(answer: RawStructured<T>): T {
+  if (answer.parsed === null || answer.parsed === undefined) {
+    throw answer.parsingError instanceof Error ? answer.parsingError : new Error("StructuredOutputException: the model's answer did not match the schema")
+  }
+  return answer.parsed
+}
+
+async function invokeStructured<T extends Record<string, unknown>>(
   provider: ModelProvider,
   { schema, name, messages, temperature = DEFAULT_TEMPERATURE, input = "text" }: StructuredGenerationOptions<T>,
   signal: AbortSignal
 ): Promise<T> {
   const modelOptions = { temperature, maxRetries: 0 }
+  const kind = input === "image" ? "screenshot" : "text"
+  const model = modelNameOf(provider, input)
   if (provider === "groq") {
-    return withGroqKey(
-      (apiKey) => createGroqModel(apiKey, modelOptions, input).withStructuredOutput(schema, { name }).invoke(messages, { signal }),
-      signal
-    )
+    return withGroqKey(async (apiKey, keyNumber) => {
+      const answer = (await createGroqModel(apiKey, modelOptions, input)
+        .withStructuredOutput(schema, { name, includeRaw: true })
+        .invoke(messages, { signal })) as RawStructured<T>
+      await recordAiUsage({ provider, model, kind, usage: answer.raw.usage_metadata, keyNumber })
+      return parsedOf(answer)
+    }, signal)
   }
-  if (provider === "open-source") {
-    // Tool calling is what OpenAI-compatible servers support most widely for a structured answer
-    return createOpenSourceModel(modelOptions).withStructuredOutput(schema, { name, method: "functionCalling" }).invoke(messages, { signal })
-  }
-  return createOpenAIModel(modelOptions).withStructuredOutput(schema, { name, strict: true }).invoke(messages, { signal })
+  const answer = (
+    provider === "open-source"
+      ? // Tool calling is what OpenAI-compatible servers support most widely for a structured answer
+        await createOpenSourceModel(modelOptions).withStructuredOutput(schema, { name, method: "functionCalling", includeRaw: true }).invoke(messages, { signal })
+      : await createOpenAIModel(modelOptions).withStructuredOutput(schema, { name, strict: true, includeRaw: true }).invoke(messages, { signal })
+  ) as RawStructured<T>
+  await recordAiUsage({ provider, model, kind, usage: answer.raw.usage_metadata })
+  return parsedOf(answer)
 }
 
 /** Which variables each unconfigured provider is waiting for, named one provider at a time. */

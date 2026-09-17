@@ -5,8 +5,7 @@ import { MESSAGE_MAX_LENGTH, MESSAGE_REWRITER_MESSAGES } from "@/constants/messa
 import { rewriteMessage } from "@/services/messageRewriter/generate"
 import { recordRewrittenMessage } from "@/services/generationRecords"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -39,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { message, source } = parsed.data
-    const result = await withModelOrder(await modelOrderFor(auth.viewer, "message-rewriter"), () => rewriteMessage({ message, source, signal: req.signal }))
+    const result = withSource(await runAiRequest(auth.viewer, "message-rewriter", () => rewriteMessage({ message, source, signal: req.signal })))
     await recordRewrittenMessage(auth.viewer, { message, source }, result)
     return NextResponse.json({ success: true, message: "Message rewritten", data: result })
   } catch (error: unknown) {

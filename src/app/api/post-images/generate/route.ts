@@ -4,6 +4,7 @@ import { GenerateImageSchema } from "@/lib/validation/postImages"
 import { POST_IMAGES_MESSAGES } from "@/constants/postImages"
 import { createPostImage } from "@/services/postImages/generate"
 import { requireViewer } from "@/services/auth/viewer"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 // Drawing an image takes far longer than writing text, and the whole picture comes back at once
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const image = await createPostImage({ ...parsed.data, viewer: auth.viewer, signal: req.signal })
+    const image = withSource(await runAiRequest(auth.viewer, "post-image-creator", () => createPostImage({ ...parsed.data, viewer: auth.viewer, signal: req.signal })))
     return NextResponse.json({ success: true, message: POST_IMAGES_MESSAGES.generated, data: image }, { status: 201 })
   } catch (error: unknown) {
     if (req.signal.aborted) {

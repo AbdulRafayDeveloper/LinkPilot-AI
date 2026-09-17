@@ -170,6 +170,7 @@ export default function FirstMessageClient() {
                 copyButtonText="Copy Message"
                 warning={result?.warning}
                 meta={result && <>{getTuneLabel(result.tune)} tone</>}
+                source={result}
               >
                 {result && !result.usedSenderProfile && (
                   <AboutMeNotice outputName="message" onOpenAboutMe={() => setPromptsTab(ABOUT_ME_TAB_ID)} />

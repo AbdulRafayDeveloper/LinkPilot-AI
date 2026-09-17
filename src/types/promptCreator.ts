@@ -22,6 +22,7 @@ export interface CreatedPrompt {
   requestSource: RequestSource
   // Who wrote it (Groq, or OpenAI as the fallback); prompts saved before this was kept have none
   provider: AiProviderId | null
+  providers?: AiProviderId[]
   createdAt: string
   updatedAt: string
 }

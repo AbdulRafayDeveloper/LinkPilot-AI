@@ -1,5 +1,6 @@
 import type { MessageChannelId } from "@/constants/clientMessaging"
 import type { EditablePrompt } from "./prompts"
+import type { WithAiSource } from "./ai"
 
 /**
  * One client the user writes to: who they are, the format their messages follow, and the
@@ -24,7 +25,7 @@ export interface ClientInput {
   sampleMessages: string[]
 }
 
-export interface GeneratedClientMessage {
+export interface GeneratedClientMessage extends WithAiSource {
   // The saved record, so later edits go back to the same row
   id: string
   message: string

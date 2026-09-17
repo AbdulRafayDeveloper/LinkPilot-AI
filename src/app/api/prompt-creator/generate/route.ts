@@ -5,8 +5,7 @@ import { PROMPT_CREATOR_MESSAGES, PROMPT_TARGET_IDS, REQUEST_MAX_LENGTH } from "
 import { createPrompt } from "@/services/promptCreator/generate"
 import { saveCreatedPrompt } from "@/services/promptCreator/records"
 import { requireViewer } from "@/services/auth/viewer"
-import { withModelOrder } from "@/lib/modelOrder"
-import { modelOrderFor } from "@/services/modelPriority"
+import { runAiRequest, withSource } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -40,7 +39,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { request, target, requestSource } = parsed.data
-    const created = await withModelOrder(await modelOrderFor(auth.viewer, "prompt-creator"), () => createPrompt({ request, target, requestSource, signal: req.signal }))
+    const created = withSource(await runAiRequest(auth.viewer, "prompt-creator", () => createPrompt({ request, target, requestSource, signal: req.signal })))
     const saved = await saveCreatedPrompt(auth.viewer, created, { text: request, source: requestSource })
     return NextResponse.json({ success: true, message: "Prompt created", data: saved })
   } catch (error: unknown) {

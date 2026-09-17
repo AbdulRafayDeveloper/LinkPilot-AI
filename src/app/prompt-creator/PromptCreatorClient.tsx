@@ -175,6 +175,7 @@ export default function PromptCreatorClient() {
                       disabled={isGenerating}
                       what="what you want done"
                       transcribeFor="prompt-creator"
+                      showSource={false}
                     />
                   </div>
                   <textarea
