@@ -449,7 +449,7 @@ Every collection has `createdAt` / `updatedAt` (Mongoose `timestamps`) and an ex
   4. A name that survives every rewrite is removed in code (`removeNames`), and the result carries a warning to read it once before sending.
   - A draft counts as unusable only when it is empty or invents a `[placeholder]` that appears nowhere in the client's format, samples or the update: client updates are technical, so brackets the user wrote themselves are kept (`findPlaceholders` in `lib/generatedText.ts`).
   - When every attempt fails the route answers **503**, so the browser's own retry policy (`lib/apiClient.ts`) tries again before the user sees "the AI models did not answer".
-- What you want to tell the client can be **typed or spoken** (the shared recorder, see Voice input; several takes build one update) and is capped at `UPDATE_MAX_LENGTH` (8000) in the field and in the API.
+- What you want to tell the client can be **typed or spoken** (the shared recorder, see Voice input; several takes build one update) and is capped at `UPDATE_MAX_LENGTH` (12,000, the same ceiling as the other spoken fields, so a whole six-minute recording fits) in the field and in the API.
 - Channels (`constants/clientMessaging.ts` `MESSAGE_CHANNELS`): LinkedIn, Upwork, Fiverr, Slack, Discord, WhatsApp and Email. Each sets the length the message is written to; only Email has a subject (`hasSubject`), and every other channel returns `subject: null`. Adding a channel = an entry here.
 - Every message is saved to `client_messages` with the client it went to, and the result carries that record's id. Its output is a formal client message, not LinkedIn copy, so it does not run through the humanizer.
 

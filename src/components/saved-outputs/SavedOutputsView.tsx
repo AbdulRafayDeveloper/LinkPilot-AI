@@ -7,7 +7,14 @@ import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
 import { Pagination } from "@/components/ui/Pagination"
-import { DateRangeFilters, FilterPanel, SearchFilter, SelectFilter, historyLabelClass } from "@/components/history/HistoryFilters"
+import {
+  DateRangeFilters,
+  FilterPanel,
+  SearchFilter,
+  SearchableSelectFilter,
+  SelectFilter,
+  historyLabelClass,
+} from "@/components/history/HistoryFilters"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
@@ -24,7 +31,7 @@ import {
 } from "@/constants/savedOutputs"
 import type { SavedOutput, SavedOutputDetail, SavedOutputsPage } from "@/types/savedOutputs"
 import type { PromptFolder } from "@/types/promptFolders"
-import { PROMPT_FOLDER_MESSAGES, UNFILED_FOLDER } from "@/constants/promptFolders"
+import { IN_ANY_FOLDER, PROMPT_FOLDER_MESSAGES, UNFILED_FOLDER } from "@/constants/promptFolders"
 import { usePromptFolders } from "@/hooks/usePromptFolders"
 import { MoveToFolderDialog } from "./MoveToFolderDialog"
 import { FoldersDialog } from "./FoldersDialog"
@@ -65,11 +72,18 @@ function queryString(filters: FilterState, search: string, page: number): string
 }
 
 // Long enough to be cut in the table: past the preview length, or more than a few lines
+/** "In a folder", with how many prompts are filed once the folders have loaded. */
+const filedLabel = (folders: PromptFolder[] | null): string => {
+  const filed = (folders ?? []).reduce((total, folder) => total + folder.promptCount, 0)
+  return folders && folders.length > 0 ? `${PROMPT_FOLDER_MESSAGES.inAnyFolder} (${filed})` : PROMPT_FOLDER_MESSAGES.inAnyFolder
+}
+
 const isLong = (item: SavedOutput) =>
   item.texts.some((part) => part.text.length > SAVED_OUTPUT_TEXT_PREVIEW_CHARS || part.text.split("\n").length > 3)
 
+// Tall enough to tap comfortably until the table takes over on a wide screen
 const actionButton =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-outline transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+  "inline-flex min-h-8 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-outline xl:min-h-0 transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
 const toolbarButton =
   "inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
@@ -496,7 +510,7 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
       className={
         layout === "grid"
           ? "grid grid-cols-1 justify-items-start gap-y-0.5 2xl:grid-cols-2 2xl:gap-x-2"
-          : "flex flex-wrap items-center justify-end gap-0.5"
+          : "flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5"
       }
     >
       <button type="button" onClick={() => setViewing(item)} aria-label={`View details for ${item.title}`} className={`${actionButton} hover:text-primary`}>
@@ -601,13 +615,23 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                 />
               ))}
               {tool.folders && (
-                <SelectFilter
+                // Searched rather than scrolled, because a hundred folders is a long list to open
+                <SearchableSelectFilter
                   label={tool.folders.label}
                   allLabel={PROMPT_FOLDER_MESSAGES.allFolders}
+                  searchPlaceholder={PROMPT_FOLDER_MESSAGES.searchFolders}
+                  emptyLabel={PROMPT_FOLDER_MESSAGES.noFolderMatch}
                   value={filters.folder}
                   options={[
+                    // Everything that is filed, whichever folder it is in, before the folders themselves
+                    { id: IN_ANY_FOLDER, label: filedLabel(folders.folders) },
                     { id: UNFILED_FOLDER, label: PROMPT_FOLDER_MESSAGES.unfiled },
-                    ...(folders.folders ?? []).map((folder) => ({ id: folder.id, label: `${folder.name} (${folder.promptCount})` })),
+                    // Typing matches the folder's name, never the count beside it
+                    ...(folders.folders ?? []).map((folder) => ({
+                      id: folder.id,
+                      label: `${folder.name} (${folder.promptCount})`,
+                      searchText: folder.name,
+                    })),
                   ]}
                   onChange={(value) => updateFilter("folder", value)}
                 />
@@ -731,7 +755,8 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                       <TextsCell tool={tool} item={item} isOpen={isOpen(item.id)} onToggle={() => toggleRow(item.id)} />
                       <div className="flex flex-col gap-1 border-t border-outline-variant/70 pt-2">
                         <span className="text-[11px] text-outline">{writtenOn(item.createdAt)}</span>
-                        <div className="-mx-2">{actions(item, "row")}</div>
+                        {/* Pulled left only, so a long action never hangs over the right edge of the card */}
+                        <div className="-ml-2">{actions(item, "row")}</div>
                       </div>
                     </li>
                   ))}

@@ -39,8 +39,9 @@ export const MESSAGE_FORMAT_MAX_LENGTH = 2000
 export const SAMPLE_MESSAGE_MAX_LENGTH = 3000
 // Every client keeps this many reference messages, so the format is never guessed from one example
 export const SAMPLE_MESSAGE_COUNT = 2
-// What you want to tell the client, typed or spoken
-export const UPDATE_MAX_LENGTH = 8000
+// What you want to tell the client, typed or spoken. The same ceiling as the other spoken fields
+// (REQUEST_MAX_LENGTH), so a whole six-minute recording fits
+export const UPDATE_MAX_LENGTH = 12000
 export const SUBJECT_MAX_LENGTH = 90
 
 export const CLIENT_MESSAGING_ENDPOINT = "/api/client-messaging"
