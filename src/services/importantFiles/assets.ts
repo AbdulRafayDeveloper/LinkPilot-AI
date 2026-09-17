@@ -21,6 +21,7 @@ import {
   completeMultipartUpload,
   deleteObject,
   headObject,
+  getObjectBytes,
   presignDownload,
   presignParts,
   presignUpload,
@@ -303,8 +304,7 @@ export async function assetText(viewer: Viewer, id: string, maxBytes: number): P
   const record = await findReady(viewer, id)
   if (!record || record.category !== "text") return null
   if (record.size > maxBytes) return null
-  const url = await presignDownload(record.storageKey, record.contentType)
-  const response = await fetch(url)
-  if (!response.ok) return null
-  return response.text()
+  // Read through the SDK, which retries a failed read, rather than fetching a signed link once
+  const bytes = await getObjectBytes(record.storageKey)
+  return bytes ? bytes.toString("utf8") : null
 }

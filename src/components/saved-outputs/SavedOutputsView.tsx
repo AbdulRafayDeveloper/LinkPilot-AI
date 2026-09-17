@@ -441,10 +441,17 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
   const isOpen = (id: string) => allOpen !== flipped.has(id)
   const canOpenAny = tool.hideTexts || visibleItems.some(isLong)
 
-  // Two by two in the table: View details and Delete always on the first line, then every copy the
-  // tool offers (what was written, then what it was written from), so rows line up however many there are
+  // In the table: View details and Delete always first, then every copy the tool offers (what was written,
+  // then what it was written from), so rows line up however many there are. One column on a laptop, where
+  // the table has about 936px beside the sidebar, and two by two from 2xl. One row on a card
   const actions = (item: SavedOutput, layout: "grid" | "row") => (
-    <div className={layout === "grid" ? "grid grid-cols-2 justify-items-start gap-x-2 gap-y-0.5" : "flex flex-wrap items-center justify-end gap-0.5"}>
+    <div
+      className={
+        layout === "grid"
+          ? "grid grid-cols-1 justify-items-start gap-y-0.5 2xl:grid-cols-2 2xl:gap-x-2"
+          : "flex flex-wrap items-center justify-end gap-0.5"
+      }
+    >
       <button type="button" onClick={() => setViewing(item)} aria-label={`View details for ${item.title}`} className={`${actionButton} hover:text-primary`}>
         <FileText size={13} aria-hidden="true" />
         View details
@@ -591,8 +598,9 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                   </div>
                 )}
 
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm md:block">
-                  <table className="w-full min-w-[980px] border-collapse text-left">
+                {/* The table from xl, where it fits beside the open sidebar without scrolling sideways; cards below */}
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+                  <table className="w-full min-w-[900px] border-collapse text-left [overflow-wrap:anywhere]">
                     <caption className="sr-only">
                       {tool.heading}, page {page} of {totalPages}
                     </caption>
@@ -608,27 +616,28 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                     <tbody>
                       {visibleItems.map((item) => (
                         <tr key={item.id} className="border-b border-outline-variant/60 align-top last:border-b-0 hover:bg-surface-container-lowest">
-                          <td className="w-[230px] max-w-[250px] px-3 py-2.5">
+                          <td className="w-[190px] max-w-[220px] px-3 py-2.5 2xl:w-[230px] 2xl:max-w-[250px]">
                             <p className="break-words text-[13px] font-semibold text-on-surface">{item.title}</p>
                             {item.subtitle && <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-on-surface-variant">{item.subtitle}</p>}
                           </td>
-                          <td className="w-[170px] max-w-[190px] px-3 py-2.5">
+                          <td className="w-[140px] max-w-[170px] px-3 py-2.5 2xl:w-[170px] 2xl:max-w-[190px]">
                             <RecordTags item={item} />
                           </td>
-                          <td className="min-w-[260px] px-3 py-2">
+                          <td className="min-w-[220px] px-3 py-2 2xl:min-w-[260px]">
                             <TextsCell tool={tool} item={item} isOpen={isOpen(item.id)} onToggle={() => toggleRow(item.id)} />
                           </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-[12px] text-on-surface-variant">{writtenOn(item.createdAt)}</td>
-                          <td className="w-[250px] px-3 py-2">{actions(item, "grid")}</td>
+                          <td className="w-[104px] px-3 py-2.5 text-[12px] text-on-surface-variant 2xl:w-auto 2xl:whitespace-nowrap">{writtenOn(item.createdAt)}</td>
+                          <td className="w-[190px] px-3 py-2 2xl:w-[270px]">{actions(item, "grid")}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
 
-                <ul className="flex flex-col gap-2 md:hidden">
+                {/* Cards on a phone, two to a row on a tablet or a narrow laptop */}
+                <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {visibleItems.map((item) => (
-                    <li key={item.id} className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                    <li key={item.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
                       <div className="min-w-0">
                         <p className="break-words text-[14px] font-semibold text-on-surface">{item.title}</p>
                         {item.subtitle && <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-on-surface-variant">{item.subtitle}</p>}

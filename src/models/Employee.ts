@@ -17,6 +17,8 @@ export interface IEmployee {
   // YYYY-MM-DD, compared as text like every other day in the app
   joiningDate: string
   status: EmployeeStatus
+  // Where they sit in the team list, set by dragging; ties (employees from before positions) list newest first
+  position: number
   // The employee's own link to their daily plan (lib/planLink.ts). The link is signed with this
   // version, so replacing it (a new version) stops every earlier link working
   planLinkActive: boolean
@@ -55,6 +57,7 @@ const EmployeeSchema = new Schema<IEmployee>(
     role: { type: String, required: true, trim: true },
     joiningDate: { type: String, required: true },
     status: { type: String, enum: EMPLOYEE_STATUS_IDS, required: true, default: "active" },
+    position: { type: Number, required: true, default: 0 },
     planLinkActive: { type: Boolean, default: false },
     planLinkVersion: { type: Number, default: 0 },
     planItems: { type: [PlanTaskSchema], default: [] },
@@ -65,7 +68,8 @@ const EmployeeSchema = new Schema<IEmployee>(
   { timestamps: true, collection: "employees" }
 )
 // Newest first with a stable tie-break, for the cursor-paged list
-EmployeeSchema.index({ createdAt: -1, _id: -1 })
+// The team list, in the order it was dragged into, newest first where no order was set
+EmployeeSchema.index({ position: 1, createdAt: -1, _id: -1 })
 
 export const EmployeeModel = (mongoose.models.Employee as Model<IEmployee> | undefined) ?? mongoose.model<IEmployee>("Employee", EmployeeSchema)
 

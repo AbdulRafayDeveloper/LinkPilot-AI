@@ -1,10 +1,11 @@
 "use client"
 
 import React, { useMemo } from "react"
-import { CalendarDays, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Sparkles } from "lucide-react"
 import { DAY_CELL_MAX_MEETINGS } from "@/constants/meetingPlanner"
 import { WEEKDAY_LABELS, calendarDays, dayOfMonth, formatTime, monthLabel, monthOf } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
+import { prepStateOf } from "./PrepBadge"
 
 interface MonthCalendarProps {
   month: string
@@ -85,6 +86,14 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
         </div>
       </div>
 
+      <p className="-mt-1 flex items-center gap-1.5 text-[11px] text-on-surface-variant">
+        <span className="inline-flex items-center gap-0.5 rounded bg-primary-fixed px-1 py-0.5 text-[10px] text-on-primary-fixed-variant ring-1 ring-primary/50" aria-hidden="true">
+          <Sparkles size={9} className="text-primary" />
+          10:00
+        </span>
+        A spark on a meeting means its preparation is written.
+      </p>
+
       <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wider text-outline">
         {WEEKDAY_LABELS.map((label) => (
           <span key={label}>{label}</span>
@@ -118,19 +127,28 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
                 {dayOfMonth(date)}
               </span>
               <span className="flex min-w-0 flex-col gap-0.5">
-                {shown.map((meeting) => (
-                  <span
-                    key={meeting.id}
-                    title={`${formatTime(meeting.meetingTime)} ${meeting.name}`}
-                    className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${
-                      meeting.status === "completed"
-                        ? "bg-success-container text-on-success-container"
-                        : "bg-primary-fixed text-on-primary-fixed-variant"
-                    }`}
-                  >
-                    <span className="font-bold tabular-nums">{formatTime(meeting.meetingTime)}</span> {meeting.name}
-                  </span>
-                ))}
+                {shown.map((meeting) => {
+                  const hasPrep = prepStateOf(meeting) === "ready"
+                  return (
+                    <span
+                      key={meeting.id}
+                      title={`${formatTime(meeting.meetingTime)} ${meeting.name}${hasPrep ? " · preparation ready" : ""}`}
+                      className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${
+                        meeting.status === "completed"
+                          ? "bg-success-container text-on-success-container"
+                          : "bg-primary-fixed text-on-primary-fixed-variant"
+                      } ${hasPrep ? "ring-1 ring-primary/50" : ""}`}
+                    >
+                      {hasPrep && (
+                        <>
+                          <Sparkles size={9} className="mr-0.5 inline-block align-[-1px] text-primary" aria-hidden="true" />
+                          <span className="sr-only">Preparation ready: </span>
+                        </>
+                      )}
+                      <span className="font-bold tabular-nums">{formatTime(meeting.meetingTime)}</span> {meeting.name}
+                    </span>
+                  )
+                })}
                 {hidden > 0 && <span className="px-1 text-[10px] font-bold text-primary">+{hidden} more</span>}
               </span>
             </button>

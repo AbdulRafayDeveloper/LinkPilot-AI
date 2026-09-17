@@ -51,7 +51,7 @@ export const UserMenu: React.FC = () => {
   const signOut = async () => {
     setIsSigningOut(true)
     try {
-      await requestApi(AUTH_ENDPOINTS.logout, { method: "POST" })
+      await requestApi(AUTH_ENDPOINTS.logout, { method: "POST" }, { retry: true })
     } finally {
       clearAllToolState()
       window.location.assign(LOGIN_PATH)

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useEffect, useRef, useState } from "react"
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { AlertCircle, Check, Loader2, Plus, Repeat, RefreshCw, Trash2 } from "lucide-react"
 import { SortableList } from "@/components/ui/SortableList"
 import { fetchWithRetry, requestApi } from "@/lib/apiClient"
@@ -30,6 +30,56 @@ const toInput = (today: string, draft: Pick<Draft, "items" | "notes">): Employee
   notes: draft.notes,
 })
 const getId = (item: PlanItem) => item.id
+
+/**
+ * A task's text, edited in place. It wraps onto as many lines as the task needs and grows to fit,
+ * so a long task is always shown in full rather than cut off at the edge of its row. It refits when
+ * the text changes and when the row gets wider or narrower. A task stays one task: Enter adds no
+ * line break, and pasted line breaks become spaces.
+ */
+const PlanItemText: React.FC<{ value: string; isDone: boolean; onChange: (text: string) => void }> = ({ value, isDone, onChange }) => {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  const fit = useCallback(() => {
+    const element = ref.current
+    if (!element) return
+    element.style.height = "auto"
+    element.style.height = `${element.scrollHeight}px`
+  }, [])
+
+  useLayoutEffect(fit, [value, fit])
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element || typeof ResizeObserver === "undefined") return
+    let width = element.clientWidth
+    // Only a change of width can change how the text wraps; the height it sets itself is ignored
+    const observer = new ResizeObserver(() => {
+      if (element.clientWidth === width) return
+      width = element.clientWidth
+      fit()
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [fit])
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      maxLength={PLAN_ITEM_MAX_LENGTH}
+      onChange={(event) => onChange(event.target.value.replace(/\s*[\r\n]+\s*/g, " "))}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.preventDefault()
+      }}
+      aria-label="Plan item"
+      className={`min-w-0 flex-1 resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent py-1.5 text-[14px] leading-5 focus:outline-none ${
+        isDone ? "text-outline line-through" : "text-on-surface"
+      }`}
+    />
+  )
+}
 const getLabel = (item: PlanItem) => item.text || "empty task"
 
 /**
@@ -304,25 +354,24 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
             label="Plan items"
             className="flex flex-col gap-1.5"
             renderItem={(item, handle) => (
-              <div className="group flex items-center gap-2 rounded-xl border border-outline-variant/70 bg-surface-container-lowest py-1.5 pl-1 pr-2">
+              // Aligned to the top, so the handle, the checkbox and delete stay by the first line of a long task
+              <div className="group flex items-start gap-2 rounded-xl border border-outline-variant/70 bg-surface-container-lowest py-1.5 pl-1 pr-2">
                 {handle}
                 <input
                   type="checkbox"
                   checked={item.done}
                   onChange={(event) => void tick(item, event.target.checked)}
                   aria-label={`Mark "${item.text}" as ${item.done ? "not done" : "done"} today`}
-                  className="h-4 w-4 shrink-0 accent-primary"
+                  className="mt-2 h-4 w-4 shrink-0 accent-primary"
                 />
-                <input
+                <PlanItemText
                   value={item.text}
-                  maxLength={PLAN_ITEM_MAX_LENGTH}
-                  onChange={(event) =>
-                    edit((latest) => ({ items: latest.items.map((entry) => (entry.id === item.id ? { ...entry, text: event.target.value } : entry)), notes: latest.notes }))
+                  isDone={item.done}
+                  onChange={(text) =>
+                    edit((latest) => ({ items: latest.items.map((entry) => (entry.id === item.id ? { ...entry, text } : entry)), notes: latest.notes }))
                   }
-                  aria-label="Plan item"
-                  className={`min-w-0 flex-1 bg-transparent py-1 text-[14px] focus:outline-none ${item.done ? "text-outline line-through" : "text-on-surface"}`}
                 />
-                {item.completedAt && <span className="hidden shrink-0 text-[11px] text-outline sm:inline">Done {tickTime(item.completedAt)}</span>}
+                {item.completedAt && <span className="mt-2 hidden shrink-0 text-[11px] text-outline sm:inline">Done {tickTime(item.completedAt)}</span>}
                 <button
                   type="button"
                   onClick={() => edit((latest) => ({ items: latest.items.filter((entry) => entry.id !== item.id), notes: latest.notes }))}

@@ -11,6 +11,7 @@ import { generateFollowUp } from "@/services/followUp/generate"
 import { recordFollowUp } from "@/services/generationRecords"
 import { requireViewer } from "@/services/auth/viewer"
 import { runAiRequest, withSource } from "@/services/modelPriority"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -35,7 +36,7 @@ const GenerateSchema = z.object({
  * POST: Generates one follow-up from the pasted conversation (plus optional profile)
  * using the latest saved prompt for the selected type (the module's provider order, Groq first).
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -63,3 +64,6 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("follow-up-messages:generate", handlePost)

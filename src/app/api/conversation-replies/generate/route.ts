@@ -11,6 +11,7 @@ import { analyzeAndReply } from "@/services/conversationReply"
 import { recordConversationReply } from "@/services/generationRecords"
 import { requireViewer } from "@/services/auth/viewer"
 import { runAiRequest, withSource } from "@/services/modelPriority"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 // Analysis and reply run one after the other, each trying the module's providers in order (Groq first)
@@ -36,7 +37,7 @@ const GenerateSchema = z.object({
  * POST: Analyzes the pasted conversation and writes the next reply with the latest saved
  * prompt for the selected reply type (the module's provider order, Groq first).
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -63,3 +64,6 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("conversation-replies:generate", handlePost)

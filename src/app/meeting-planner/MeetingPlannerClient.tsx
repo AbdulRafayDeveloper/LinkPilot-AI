@@ -116,7 +116,7 @@ export default function MeetingPlannerClient() {
   const runPreparation = async (meeting: MeetingPlanDetail) => {
     setPreparingName(meeting.name)
     try {
-      await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${meeting.id}/prepare`, { method: "POST" })
+      await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${meeting.id}/prepare`, { method: "POST" }, { retry: true })
       setNotice(`Preparation ready for "${meeting.name}".`)
     } catch (error: unknown) {
       setNotice(
@@ -148,7 +148,7 @@ export default function MeetingPlannerClient() {
           conversationHistory: values.conversationHistory || null,
           additionalInfo: values.additionalInfo || null,
         }),
-      })
+      }, { idempotent: true })
       setIsFormOpen(false)
       setSelectedDate(data.meetingDate)
       if (monthOf(data.meetingDate) !== month) setMonth(monthOf(data.meetingDate))
@@ -236,7 +236,7 @@ export default function MeetingPlannerClient() {
                 <button
                   type="button"
                   onClick={() => openForm(selectedDate)}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant sm:flex-none"
+                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant sm:flex-none"
                 >
                   <CalendarPlus size={16} aria-hidden="true" />
                   New meeting

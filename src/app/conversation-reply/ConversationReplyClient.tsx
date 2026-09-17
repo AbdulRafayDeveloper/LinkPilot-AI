@@ -112,9 +112,9 @@ export default function ConversationReplyClient() {
         />
 
         <main className="flex-1 overflow-y-auto bg-background overflow-x-hidden">
-          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:h-full">
+          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:h-full short:py-4 short:gap-3">
             {/* Page header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 shrink-0">
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
                   <MessagesSquare size={24} className="text-primary shrink-0" aria-hidden="true" />
@@ -124,13 +124,13 @@ export default function ConversationReplyClient() {
                   Decide what to reply next and see how valuable the conversation really is.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 sm:shrink-0">
+              <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
                 <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
                 <button
                   type="button"
                   onClick={() => setPromptsTab(replyType)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
                 >
                   <FilePenLine size={16} aria-hidden="true" />
                   Update Prompt
@@ -138,7 +138,7 @@ export default function ConversationReplyClient() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0 short:gap-4">
               {/* Input */}
               <form
                 noValidate
@@ -146,7 +146,7 @@ export default function ConversationReplyClient() {
                   event.preventDefault()
                   submit()
                 }}
-                className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-h-0 lg:overflow-y-auto"
+                className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-h-0 lg:overflow-y-auto short:p-4 short:gap-3"
               >
                 {/* The fields grow into spare height but never shrink below their textarea's minimum */}
                 <div className="flex flex-col flex-[3]">
@@ -170,7 +170,7 @@ export default function ConversationReplyClient() {
                     placeholder="Paste the complete conversation here..."
                     aria-invalid={isConversationMissing}
                     aria-describedby={isConversationMissing ? FORM_ERROR_ID : undefined}
-                    className={`${textareaClass} min-h-[200px] lg:min-h-[96px] ${
+                    className={`${textareaClass} min-h-[200px] lg:min-h-[96px] short:min-h-[72px] ${
                       isConversationMissing ? "border-error" : "border-outline-variant"
                     }`}
                   />
@@ -191,7 +191,7 @@ export default function ConversationReplyClient() {
                     onChange={(event) => formStore.update({ profileData: event.target.value })}
                     maxLength={CONVERSATION_REPLY_PROFILE_MAX_LENGTH}
                     placeholder="Paste the person's LinkedIn profile information here if available..."
-                    className={`${textareaClass} min-h-[110px] lg:min-h-[64px] border-outline-variant`}
+                    className={`${textareaClass} min-h-[110px] lg:min-h-[64px] short:min-h-[48px] border-outline-variant`}
                   />
                 </div>
 
@@ -201,6 +201,7 @@ export default function ConversationReplyClient() {
                   options={CONVERSATION_REPLY_TYPES}
                   columnsClassName="grid-cols-2 md:grid-cols-3"
                   wrapLabels
+                  compactOnShortScreens
                   value={replyType}
                   onChange={(nextType) => formStore.update({ replyType: nextType })}
                   disabled={isGenerating}
@@ -217,7 +218,7 @@ export default function ConversationReplyClient() {
                   type="submit"
                   disabled={isGenerating}
                   aria-busy={isGenerating}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-semibold shadow-sm active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed shrink-0"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 short:py-2.5 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-semibold shadow-sm active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed shrink-0"
                 >
                   {isGenerating ? (
                     <Loader2 size={16} className="animate-spin" aria-hidden="true" />

@@ -4,6 +4,7 @@ import { ReferenceItemSchema } from "@/lib/validation/referenceItem"
 import { REFERENCE_CONTENT_MESSAGES, REFERENCE_SEARCH_MAX_LENGTH } from "@/constants/referenceContent"
 import { createItem, listItems } from "@/services/referenceContent/items"
 import { requireViewer } from "@/services/auth/viewer"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
 /**
  * POST: Saves one new piece of reference content.
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -53,3 +54,6 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("reference-content", handlePost)

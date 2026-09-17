@@ -21,6 +21,9 @@ interface RadioCardGroupProps<Id extends string> {
   columnsClassName?: string
   // Wrap long option labels onto a second line instead of truncating them
   wrapLabels?: boolean
+  // On a short laptop window (the `short` screen), show each card's label only, with its description as a
+  // tooltip, so the whole tool fits without scrolling
+  compactOnShortScreens?: boolean
 }
 
 /**
@@ -37,17 +40,19 @@ export function RadioCardGroup<Id extends string>({
   invalid = false,
   columnsClassName = "grid-cols-1 sm:grid-cols-2",
   wrapLabels = false,
+  compactOnShortScreens = false,
 }: RadioCardGroupProps<Id>) {
   return (
     <fieldset disabled={disabled} aria-invalid={invalid} className="min-w-0">
-      <legend className="text-[10px] font-bold text-outline uppercase tracking-wider mb-2">{legend}</legend>
+      <legend className={`text-[10px] font-bold text-outline uppercase tracking-wider mb-2 ${compactOnShortScreens ? "short:mb-1.5" : ""}`}>{legend}</legend>
       <div className={`grid ${columnsClassName} gap-2`}>
         {options.map((option) => {
           const isSelected = value === option.id
           return (
             <label
               key={option.id}
-              className={`relative flex items-start gap-2 min-w-0 cursor-pointer rounded-xl border px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
+              title={compactOnShortScreens ? option.description : undefined}
+              className={`relative flex items-start gap-2 min-w-0 cursor-pointer rounded-xl border px-3 py-2 ${compactOnShortScreens ? "short:items-center short:py-1.5" : ""} transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
                 isSelected
                   ? "bg-primary-container border-primary-container text-on-primary-container"
                   : `bg-white text-on-surface hover:bg-surface-container-low ${invalid ? "border-error" : "border-outline-variant"}`
@@ -66,7 +71,7 @@ export function RadioCardGroup<Id extends string>({
                   {option.label}
                 </span>
                 <span
-                  className={`block text-[11px] leading-tight mt-0.5 truncate ${
+                  className={`block text-[11px] leading-tight mt-0.5 truncate ${compactOnShortScreens ? "short:hidden" : ""} ${
                     isSelected ? "text-on-primary-container/80" : "text-outline"
                   }`}
                 >

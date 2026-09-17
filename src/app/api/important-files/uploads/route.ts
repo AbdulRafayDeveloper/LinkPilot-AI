@@ -4,6 +4,7 @@ import { UploadRequestSchema } from "@/lib/validation/importantFile"
 import { IMPORTANT_FILES_MESSAGES } from "@/constants/importantFiles"
 import { planUpload } from "@/services/importantFiles/assets"
 import { requireViewer } from "@/services/auth/viewer"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic"
  * for a small file or in parts for a large one. Only this small JSON passes through the app.
  * The file's bytes go straight from the browser to S3, so nothing here is near a request limit.
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -40,3 +41,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message }, { status: isRefused ? 400 : isUnconfigured ? 503 : 500 })
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("important-files:uploads", handlePost)

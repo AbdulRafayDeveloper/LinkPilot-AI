@@ -114,7 +114,7 @@ export default function DailyTasksClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ today, taskDate, contents }),
-      })
+      }, { idempotent: true })
       const saved = data.tasks.length
       const dropped = contents.length - saved
       const isOlder = page ? taskDate < page.windowStart : false
@@ -187,7 +187,7 @@ export default function DailyTasksClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ today, taskDate: date, contents: [content] }),
-      })
+      }, { idempotent: true })
       const added = data.tasks[0]
       if (!added) return false
       setPage((current) =>
@@ -351,7 +351,7 @@ export default function DailyTasksClient() {
                     setIsConfirmingCleanup(true)
                   }}
                   disabled={olderTaskCount === 0 || isDeleting}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-error/40 text-error rounded-xl text-sm font-semibold transition-colors hover:bg-error/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-error/40 text-error rounded-xl text-sm font-semibold transition-colors hover:bg-error/5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Trash2 size={16} aria-hidden="true" />
                   Delete data older than one week

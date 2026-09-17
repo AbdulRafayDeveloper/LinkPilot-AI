@@ -24,7 +24,8 @@ interface ReplyResultProps {
 }
 
 const TITLE_ID = "post-comment-reply-result-title"
-const centeredState = "flex-1 flex flex-col items-center justify-center text-center gap-3 px-4 py-6"
+// Less padding on a short laptop window, so the reply card is no taller than the style card beside it
+const centeredState = "flex-1 flex flex-col items-center justify-center text-center gap-3 px-4 py-6 short:gap-2 short:py-2"
 
 export const ReplyResult: React.FC<ReplyResultProps> = ({ status, stage, result, error, onRetry }) => {
   // The reply as the user edits it; copy and the count follow the edits
@@ -33,7 +34,7 @@ export const ReplyResult: React.FC<ReplyResultProps> = ({ status, stage, result,
   return (
     <section
       aria-labelledby={TITLE_ID}
-      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-3 min-h-[220px] lg:min-h-[180px] lg:flex-1"
+      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-3 min-h-[220px] lg:min-h-[180px] lg:flex-1 short:p-4 short:gap-2"
     >
       <div className="flex items-center justify-between gap-2 min-h-[26px]">
         <h2 id={TITLE_ID} className="text-sm font-bold text-on-surface">

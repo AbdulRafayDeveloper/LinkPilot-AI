@@ -33,6 +33,8 @@ export const EMPLOYEE_NAME_MAX_LENGTH = 100
 export const EMPLOYEE_CITY_MAX_LENGTH = 80
 export const EMPLOYEE_ROLE_MAX_LENGTH = 80
 export const PLAN_ITEM_MAX_LENGTH = 300
+// The whole team loads at once so it can be put in order by dragging; a team larger than this pages
+export const EMPLOYEES_LIST_MAX = 500
 export const PLAN_MAX_ITEMS = 50
 export const PLAN_NOTES_MAX_LENGTH = 4000
 // Changes to a plan are saved once typing settles for this long
@@ -64,6 +66,9 @@ export const EMPLOYEE_MESSAGES = {
   itemNotFound: "That task is no longer on today's plan.",
   orderChanged: "The plan changed while you were moving tasks. It has been reloaded; try again.",
   orderFailed: "Couldn't save the new order. Please try again.",
+  teamOrderChanged: "The team changed while you were moving someone (added or removed in another tab). It has been reloaded; try again.",
+  teamOrderFailed: "Couldn't save the new order of the team, so it is back how it was. Please try again.",
+  reorderNeedsAll: "Clear the search and the status filter to put the team in order.",
   tooManyItems: `A plan holds up to ${PLAN_MAX_ITEMS} items.`,
   itemTooLong: `Keep each plan item under ${PLAN_ITEM_MAX_LENGTH} characters.`,
   notesTooLong: `Keep the notes under ${PLAN_NOTES_MAX_LENGTH.toLocaleString()} characters.`,

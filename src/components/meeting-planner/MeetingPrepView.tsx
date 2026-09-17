@@ -1,8 +1,35 @@
 "use client"
 
-import React from "react"
-import { CircleHelp, Compass, Handshake, ListChecks, ShieldAlert, Target, UserSearch } from "lucide-react"
-import type { Evidence, LeadObservation, MeetingPrep } from "@/types/meetingPlanner"
+import React, { useMemo, useState } from "react"
+import {
+  CircleHelp,
+  Compass,
+  FolderOpen,
+  Handshake,
+  ListChecks,
+  Maximize2,
+  MessageSquareQuote,
+  Pencil,
+  ShieldAlert,
+  Signpost,
+  Target,
+  UserSearch,
+} from "lucide-react"
+import { CopyButton } from "@/components/ui/CopyButton"
+import { requestApi } from "@/lib/apiClient"
+import { conversationOf, projectLinksOf, projectsOf } from "@/lib/meetingScript"
+import { ProjectsToShowPanel } from "./ProjectsToShowPanel"
+import { MEETING_PLANNER_ENDPOINT, MEETING_PLANNER_MESSAGES } from "@/constants/meetingPlanner"
+import type { Evidence, LeadObservation, MeetingPlanDetail, MeetingPrep, MeetingSituation, ScriptStage } from "@/types/meetingPlanner"
+import { ConversationScript } from "./ConversationScript"
+import { ConversationEditor, endConversationEdit, startConversationEdit, useConversationDraft } from "./ConversationEditor"
+import { ConversationFullView } from "./ConversationFullView"
+
+const SITUATION_LABELS: Record<MeetingSituation, string> = {
+  they_asked_for_a_project: "They brought a project",
+  you_reached_out: "You reached out to them",
+  unclear: "Not clear yet, find out early",
+}
 
 /** Whether the model read this in what was supplied, or worked it out from it. */
 const EvidenceTag: React.FC<{ evidence: Evidence }> = ({ evidence }) => (
@@ -16,19 +43,23 @@ const EvidenceTag: React.FC<{ evidence: Evidence }> = ({ evidence }) => (
   </span>
 )
 
-const Section: React.FC<{ icon: React.ElementType; title: string; subtitle?: string; children: React.ReactNode }> = ({
-  icon: Icon,
-  title,
-  subtitle,
-  children,
-}) => (
+const Section: React.FC<{
+  icon: React.ElementType
+  title: string
+  subtitle?: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}> = ({ icon: Icon, title, subtitle, action, children }) => (
   <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
       <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
         <Icon size={16} className="text-primary" aria-hidden="true" />
         {title}
       </h2>
-      {subtitle && <p className="text-[11px] text-outline">{subtitle}</p>}
+      <div className="flex items-center gap-2">
+        {subtitle && <p className="text-[11px] text-outline">{subtitle}</p>}
+        {action}
+      </div>
     </div>
     {children}
   </section>
@@ -64,15 +95,68 @@ const Heading: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <h3 className="text-[10px] font-bold uppercase tracking-wider text-outline">{children}</h3>
 )
 
+interface MeetingPrepViewProps {
+  prep: MeetingPrep
+  meetingId: string
+  meetingName: string
+  // A new preparation is being written, which would replace an edit made now
+  isPreparing: boolean
+  onMeetingSaved: (meeting: MeetingPlanDetail) => void
+}
+
 /**
  * The saved preparation, laid out to be read a few minutes before the call and glanced at
- * during it: who they are, what to talk about, and the conversation stage by stage.
+ * during it: why the meeting exists, who they are, what to talk about, what to show them, the
+ * introduction, and the conversation stage by stage. Preparations written before the context,
+ * projects and introduction existed simply leave those sections out. The conversation can be
+ * edited in place (ConversationEditor) and opened on its own to read during the call.
  */
-export const MeetingPrepView: React.FC<{ prep: MeetingPrep }> = ({ prep }) => {
-  const { lead_analysis: lead, discussion_topics: topics, conversation_plan: plan, deal_path: deal, cautions } = prep
+export const MeetingPrepView: React.FC<MeetingPrepViewProps> = ({ prep, meetingId, meetingName, isPreparing, onMeetingSaved }) => {
+  const { lead_analysis: lead, discussion_topics: topics, deal_path: deal, cautions } = prep
+  // An older preparation is read as a script once, so its stage and step ids stay put between renders
+  const stages = useMemo(() => conversationOf(prep), [prep])
+  const draft = useConversationDraft()
+  const isEditing = draft.meetingId === meetingId
+  const [isFullView, setIsFullView] = useState(false)
+  const [isSavingConversation, setIsSavingConversation] = useState(false)
+  const [conversationError, setConversationError] = useState<string | null>(null)
+
+  const saveConversation = async (next: ScriptStage[]) => {
+    setIsSavingConversation(true)
+    setConversationError(null)
+    try {
+      const { data } = await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${meetingId}/conversation`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stages: next }),
+      })
+      onMeetingSaved(data)
+      endConversationEdit()
+    } catch (error: unknown) {
+      setConversationError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.conversationSaveFailed)
+    } finally {
+      setIsSavingConversation(false)
+    }
+  }
+  const context = prep.meeting_context
+  // Read once per preparation, so projects saved before they had ids keep the same ids between renders
+  const projects = useMemo(() => projectsOf(prep), [prep])
+  const projectLinks = useMemo(() => projectLinksOf(projects), [projects])
+  const intro = prep.your_intro?.trim()
 
   return (
     <div className="flex flex-col gap-5">
+      {context && (
+        <Section icon={Signpost} title="What this meeting is about">
+          <div className="flex flex-col items-start gap-2">
+            <span className="rounded-full bg-primary-fixed px-2.5 py-0.5 text-[11px] font-bold text-on-primary-fixed-variant">
+              {SITUATION_LABELS[context.situation]}
+            </span>
+            <p className="text-[13px] leading-relaxed text-on-surface">{context.what_it_is_about}</p>
+          </div>
+        </Section>
+      )}
+
       <Section icon={UserSearch} title="Who you are meeting" subtitle="From what you supplied, nothing else">
         <div className="flex flex-col gap-3">
           <p className="text-[13px] leading-relaxed text-on-surface">{lead.who_they_are}</p>
@@ -147,44 +231,71 @@ export const MeetingPrepView: React.FC<{ prep: MeetingPrep }> = ({ prep }) => {
         </Section>
       )}
 
-      {plan.length > 0 && (
-        <Section icon={Compass} title="The conversation, start to finish" subtitle="A guide, not a script">
-          <ol className="space-y-3">
-            {plan.map((stage, index) => (
-              <li key={stage.stage} className="rounded-xl border border-outline-variant bg-surface-container-lowest p-4">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white tabular-nums">
-                    {index + 1}
-                  </span>
-                  <h3 className="text-[13px] font-bold text-on-surface">{stage.stage}</h3>
-                  <span className="text-[11px] text-outline">{stage.goal}</span>
-                </div>
-                <p className="mt-2 text-[13px] leading-relaxed text-on-surface">{stage.what_to_say}</p>
-                {stage.questions.length > 0 && (
-                  <div className="mt-2">
-                    <Heading>Ask</Heading>
-                    <ul className="mt-1 space-y-1 text-[13px] leading-relaxed text-on-surface">
-                      {stage.questions.map((question) => (
-                        <li key={question} className="border-l-2 border-primary/30 pl-2.5 italic">
-                          {question}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {stage.transition && (
-                  <p className="mt-2 text-[12px] leading-relaxed text-on-surface-variant">
-                    <span className="font-semibold text-on-surface">Then: </span>
-                    {stage.transition}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ol>
+      <Section icon={FolderOpen} title="Projects to show them" subtitle="Have these open before the call, in the order you'll show them">
+        <ProjectsToShowPanel meetingId={meetingId} projects={projects} disabled={isPreparing} onMeetingSaved={onMeetingSaved} />
+      </Section>
+
+      {intro && (
+        <Section
+          icon={MessageSquareQuote}
+          title="Your introduction"
+          subtitle="Say this after the greeting"
+          action={<CopyButton text={intro} label="Copy your introduction" showLabel />}
+        >
+          <blockquote className="rounded-xl border-l-4 border-primary bg-primary/5 px-4 py-3 text-[14px] leading-relaxed text-on-surface">
+            {intro}
+          </blockquote>
         </Section>
       )}
 
-      <Section icon={Handshake} title="Towards a project" subtitle="Only once the fit is clear">
+      {stages.length > 0 || isEditing ? (
+        <Section
+          icon={Compass}
+          title="The conversation, start to finish"
+          subtitle={isEditing ? "Drag to reorder; numbers follow" : prep.conversation_edited_at ? "Edited by you" : "Say, ask, listen and show, in order"}
+          action={
+            !isEditing && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsFullView(true)}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-white px-2.5 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                >
+                  <Maximize2 size={13} aria-hidden="true" />
+                  Full view
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startConversationEdit(meetingId, stages)}
+                  disabled={isPreparing}
+                  title={isPreparing ? "Wait for the preparation to finish" : "Edit the conversation"}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-white px-2.5 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Pencil size={13} aria-hidden="true" />
+                  Edit
+                </button>
+              </div>
+            )
+          }
+        >
+          {isEditing ? (
+            <ConversationEditor
+              projects={projects.map((entry) => entry.project)}
+              isSaving={isSavingConversation}
+              error={conversationError}
+              onSave={saveConversation}
+              onCancel={() => {
+                endConversationEdit()
+                setConversationError(null)
+              }}
+            />
+          ) : (
+            <ConversationScript stages={stages} projectLinks={projectLinks} />
+          )}
+        </Section>
+      ) : null}
+
+      <Section icon={Handshake} title="Winning the work" subtitle="Only once the fit is clear">
         <div className="flex flex-col gap-3">
           {deal.signals_to_listen_for.length > 0 && (
             <div>
@@ -219,6 +330,7 @@ export const MeetingPrepView: React.FC<{ prep: MeetingPrep }> = ({ prep }) => {
           <Points items={cautions} />
         </Section>
       )}
+      {isFullView && <ConversationFullView title={meetingName} stages={stages} projectLinks={projectLinks} onClose={() => setIsFullView(false)} />}
     </div>
   )
 }

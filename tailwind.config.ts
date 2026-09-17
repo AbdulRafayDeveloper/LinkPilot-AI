@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss"
+import plugin from "tailwindcss/plugin"
 
 const config: Config = {
   darkMode: "class",
@@ -104,6 +105,13 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `short:` is a short laptop window: wide enough for the desktop layout, not tall enough for its full
+    // spacing, so tools compact their option cards and spacing there to fit without scrolling. It is a
+    // variant, not a `screens` entry: a raw screen would switch off the min-[…] and max-[…] width variants
+    plugin(({ addVariant }) => {
+      addVariant("short", "@media (min-width: 1024px) and (max-height: 860px)")
+    }),
+  ],
 }
 export default config

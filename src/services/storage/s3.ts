@@ -26,6 +26,9 @@ import { IMPORTANT_FILES_MESSAGES, SIGNED_URL_TTL_SECONDS } from "@/constants/im
  * assembled by S3 only once every part has landed.
  */
 
+// Attempts per S3 call, the first one included
+const STORAGE_MAX_ATTEMPTS = 3
+
 // Everything this app stores lives under one folder in the bucket, away from anything else in it
 const KEY_PREFIX = "LinkPilot/important-files"
 
@@ -45,6 +48,10 @@ function s3(): S3Client {
   if (!isStorageConfigured()) throw new UserFacingError(IMPORTANT_FILES_MESSAGES.storageUnavailable)
   client ??= new S3Client({
     region: env.AWS_REGION as string,
+    // Every S3 call retries on its own: throttling, 5xx and dropped connections, with backoff and
+    // jitter (the SDK's standard mode), so nothing in this module needs a retry loop of its own
+    maxAttempts: STORAGE_MAX_ATTEMPTS,
+    retryMode: "standard",
     credentials: {
       accessKeyId: env.AWS_ACCESS_KEY_ID as string,
       secretAccessKey: env.AWS_SECRET_ACCESS_KEY as string,
@@ -154,6 +161,21 @@ export async function headObject(key: string): Promise<{ size: number; contentTy
  * A link that opens the file for a short while. `downloadAs` makes the browser save it under the
  * user's own name for it instead of showing it.
  */
+/**
+ * The bytes of one stored object, read on the server through the SDK (so it is retried like every
+ * other S3 call), or null when the object is missing. For the app's own reads; the browser still
+ * gets a signed link.
+ */
+export async function getObjectBytes(key: string, signal?: AbortSignal): Promise<Buffer | null> {
+  try {
+    const answer = await s3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }), { abortSignal: signal })
+    return answer.Body ? Buffer.from(await answer.Body.transformToByteArray()) : null
+  } catch (error: unknown) {
+    if (error instanceof Error && (error.name === "NoSuchKey" || error.name === "NotFound")) return null
+    throw error
+  }
+}
+
 export function presignDownload(key: string, contentType: string, downloadAs?: string): Promise<string> {
   return getSignedUrl(
     s3(),

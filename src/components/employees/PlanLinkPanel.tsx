@@ -29,7 +29,7 @@ export const PlanLinkPanel: React.FC<{ employee: Employee; onChange: (employee: 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
-      })
+      }, { idempotent: true })
       onChange(data)
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : EMPLOYEE_MESSAGES.linkFailed)

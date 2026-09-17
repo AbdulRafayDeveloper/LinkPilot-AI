@@ -5,6 +5,7 @@ import { Download, Loader2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { assetCategory } from "@/constants/importantFiles"
 import type { Asset } from "@/types/importantFiles"
+import { fetchWithRetry } from "@/lib/apiClient"
 
 interface AssetViewerDialogProps {
   asset: Asset
@@ -27,7 +28,7 @@ export const AssetViewerDialog: React.FC<AssetViewerDialogProps> = ({ asset, onD
   useEffect(() => {
     if (asset.category !== "text" || !asset.previewUrl) return
     const controller = new AbortController()
-    fetch(asset.previewUrl, { signal: controller.signal })
+    fetchWithRetry(asset.previewUrl, { signal: controller.signal })
       .then((response) => (response.ok ? response.text() : Promise.reject(new Error("unavailable"))))
       .then((content) => setText(content))
       .catch(() => {

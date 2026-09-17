@@ -1,6 +1,7 @@
 "use client"
 
 import { requestApi } from "@/lib/apiClient"
+import { withRetry } from "@/lib/retry"
 import {
   IMPORTANT_FILES_ENDPOINT,
   IMPORTANT_FILES_MESSAGES,
@@ -25,6 +26,16 @@ interface UploadHandlers {
   signal: AbortSignal
 }
 
+// S3 answers these when trying again may work: a timeout, throttling or a problem on its side
+const RETRYABLE_STORAGE_STATUS = new Set([408, 429, 500, 502, 503, 504])
+
+/** A failed PUT, with the status S3 answered (0 when the connection dropped before any answer). */
+class StorageUploadError extends Error {
+  constructor(readonly status: number) {
+    super(status === 0 ? "The connection to storage dropped" : `Storage refused the upload (${status})`)
+  }
+}
+
 /** One PUT to a signed URL, with progress. Resolves only when S3 has taken the bytes. */
 function putToStorage(url: string, body: Blob, contentType: string, onBytes: (bytes: number) => void, signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
@@ -36,8 +47,8 @@ function putToStorage(url: string, body: Blob, contentType: string, onBytes: (by
     request.onload = () =>
       request.status >= 200 && request.status < 300
         ? resolve()
-        : reject(new Error(`Storage refused the upload (${request.status})`))
-    request.onerror = () => reject(new Error("The connection to storage dropped"))
+        : reject(new StorageUploadError(request.status))
+    request.onerror = () => reject(new StorageUploadError(0))
     request.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"))
     signal.addEventListener("abort", abort, { once: true })
     request.onloadend = () => signal.removeEventListener("abort", abort)
@@ -47,7 +58,11 @@ function putToStorage(url: string, body: Blob, contentType: string, onBytes: (by
 
 const isAbort = (error: unknown) => error instanceof DOMException && error.name === "AbortError"
 
-/** Sends one part, trying again after a failure that is not a cancellation. */
+/**
+ * Sends one part (or a whole small file), trying again with backoff after a dropped connection or an
+ * answer that may change (lib/retry.ts). A refusal that won't change, such as an expired link, and a
+ * cancellation fail at once. Every attempt PUTs the same bytes to the same key, so a repeat is safe.
+ */
 async function sendPart(
   url: string,
   body: Blob,
@@ -55,17 +70,18 @@ async function sendPart(
   onBytes: (bytes: number) => void,
   signal: AbortSignal
 ): Promise<void> {
-  for (let attempt = 0; ; attempt++) {
-    try {
+  await withRetry(
+    async (attempt) => {
+      // A retried part starts again from nothing, so its progress does too
+      if (attempt > 0) onBytes(0)
       await putToStorage(url, body, contentType, onBytes, signal)
-      return
-    } catch (error: unknown) {
-      if (isAbort(error) || attempt >= UPLOAD_PART_RETRIES) throw error
-      // The part starts again from nothing, so its progress does too
-      onBytes(0)
-      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)))
+    },
+    {
+      retries: UPLOAD_PART_RETRIES,
+      signal,
+      shouldRetry: (error) => !isAbort(error) && error instanceof StorageUploadError && (error.status === 0 || RETRYABLE_STORAGE_STATUS.has(error.status)),
     }
-  }
+  )
 }
 
 /** Tells the app to abort the multipart upload and drop the record it made. */
@@ -94,12 +110,12 @@ export async function uploadAsset(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
     signal,
-  })
+  }, { idempotent: true })
 
   try {
     onStage("uploading")
     if (plan.mode === "single") {
-      await putToStorage(plan.url, file, file.type, (bytes) => onProgress(Math.round((bytes / file.size) * 100)), signal)
+      await sendPart(plan.url, file, file.type, (bytes) => onProgress(Math.round((bytes / file.size) * 100)), signal)
     } else {
       // Every part's own progress is kept, so the total never jumps backwards on a retry
       const sent = new Array<number>(plan.urls.length).fill(0)
@@ -125,7 +141,7 @@ export async function uploadAsset(
     onStage("finishing")
     const { data: asset } = await requestApi<Asset>(`${IMPORTANT_FILES_ENDPOINT}/uploads/${plan.assetId}`, {
       method: "POST",
-    })
+    }, { retry: true })
     onProgress(100)
     return asset
   } catch (error: unknown) {

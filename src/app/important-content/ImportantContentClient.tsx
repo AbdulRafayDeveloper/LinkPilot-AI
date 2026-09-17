@@ -1,23 +1,29 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import { AlertTriangle, ChevronLeft, ChevronRight, FileKey2, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { AlertTriangle, ChevronLeft, ChevronRight, Eye, FileKey2, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { FilterPanel, SearchFilter, SelectFilter, historyLabelClass } from "@/components/history/HistoryFilters"
 import { ContentDialog } from "@/components/important-content/ContentDialog"
+import { ContentDetailsDialog } from "@/components/important-content/ContentDetailsDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { requestApi } from "@/lib/apiClient"
+import { toPlainText } from "@/lib/richText"
 import { HISTORY_DEBOUNCE_MS } from "@/constants/historyFilters"
 import { CONTENT_PREVIEW_MAX_LENGTH, IMPORTANT_CONTENT_ENDPOINT, IMPORTANT_CONTENT_MESSAGES } from "@/constants/importantContent"
 import type { ImportantContent, ImportantContentPage } from "@/types/importantContent"
 
 const savedOn = (iso: string) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
-const preview = (text: string) => (text.length > CONTENT_PREVIEW_MAX_LENGTH ? `${text.slice(0, CONTENT_PREVIEW_MAX_LENGTH).trimEnd()}...` : text)
+// The table shows the words, not the formatting marks; View details shows the formatting
+const preview = (description: string) => {
+  const text = toPlainText(description)
+  return text.length > CONTENT_PREVIEW_MAX_LENGTH ? `${text.slice(0, CONTENT_PREVIEW_MAX_LENGTH).trimEnd()}...` : text
+}
 
 // Copy takes the saved text; an entry with no description copies its name
 const copyText = (entry: ImportantContent) => entry.description || entry.name
@@ -25,7 +31,7 @@ const copyText = (entry: ImportantContent) => entry.description || entry.name
 const pagerButton =
   "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
 const actionButton =
-  "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-outline transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-outline transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
 const TypeBadge: React.FC<{ type: string }> = ({ type }) => (
   <span className="inline-flex max-w-full truncate rounded-full bg-primary-fixed/70 px-2 py-0.5 text-[11px] font-semibold text-on-primary-fixed-variant">{type}</span>
@@ -46,6 +52,8 @@ export default function ImportantContentClient() {
   const [answered, setAnswered] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [dialog, setDialog] = useState<{ entry: ImportantContent | null } | null>(null)
+  // The entry opened in full; its description comes with the list, so opening it asks for nothing
+  const [viewing, setViewing] = useState<ImportantContent | null>(null)
   const [deleting, setDeleting] = useState<ImportantContent | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -115,6 +123,10 @@ export default function ImportantContentClient() {
 
   const actions = (entry: ImportantContent) => (
     <div className="flex items-center justify-end gap-0.5">
+      <button type="button" onClick={() => setViewing(entry)} aria-label={`View details of ${entry.name}`} className={`${actionButton} hover:text-primary`}>
+        <Eye size={13} aria-hidden="true" />
+        View details
+      </button>
       <CopyButton text={copyText(entry)} label={`Copy ${entry.name}`} showLabel />
       <button type="button" onClick={() => setDialog({ entry })} aria-label={`Edit ${entry.name}`} className={`${actionButton} hover:text-primary`}>
         <Pencil size={13} aria-hidden="true" />
@@ -221,7 +233,8 @@ export default function ImportantContentClient() {
                   </p>
                 )}
 
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm md:block">
+                {/* The table from xl, where it fits beside the open sidebar; cards below, two to a row on a tablet */}
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
                   <table className="w-full min-w-[820px] border-collapse text-left">
                     <caption className="sr-only">Important content, page {page} of {totalPages}</caption>
                     <thead className="bg-surface-container-lowest">
@@ -258,9 +271,9 @@ export default function ImportantContentClient() {
                   </table>
                 </div>
 
-                <ul className="flex flex-col gap-2 md:hidden">
+                <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {items.map((entry) => (
-                    <li key={entry.id} className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                    <li key={entry.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="break-words text-[14px] font-semibold text-on-surface">{entry.name}</p>
@@ -271,8 +284,8 @@ export default function ImportantContentClient() {
                       {entry.description && (
                         <p className="line-clamp-4 whitespace-pre-wrap break-words font-code text-[12px] leading-relaxed text-on-surface-variant">{preview(entry.description)}</p>
                       )}
-                      <div className="flex items-center justify-between gap-2 border-t border-outline-variant/70 pt-2">
-                        <span className="text-[11px] text-outline">{savedOn(entry.updatedAt)}</span>
+                      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant/70 pt-2">
+                        <span className="whitespace-nowrap text-[11px] text-outline">{savedOn(entry.updatedAt)}</span>
                         {actions(entry)}
                       </div>
                     </li>
@@ -298,6 +311,17 @@ export default function ImportantContentClient() {
           </div>
         </main>
       </div>
+
+      {viewing && (
+        <ContentDetailsDialog
+          entry={viewing}
+          onClose={() => setViewing(null)}
+          onEdit={() => {
+            setViewing(null)
+            setDialog({ entry: viewing })
+          }}
+        />
+      )}
 
       {dialog && <ContentDialog entry={dialog.entry} knownTypes={result?.types ?? []} onClose={() => setDialog(null)} onSaved={saved} />}
 

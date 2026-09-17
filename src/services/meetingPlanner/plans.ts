@@ -3,7 +3,7 @@ import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { MeetingPlan as MeetingPlanModel, type IMeetingPlan } from "@/models/MeetingPlan"
 import { monthEnd, monthStart } from "@/lib/meetingDates"
-import type { MeetingPlan, MeetingPlanDetail, MeetingPlannerPage, MeetingPrep } from "@/types/meetingPlanner"
+import type { MeetingPlan, MeetingPlanDetail, MeetingPlannerPage, MeetingPrep, ProjectToShow, ScriptStage } from "@/types/meetingPlanner"
 import type { Viewer } from "@/types/auth"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { STALE_PREP_MS, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
@@ -146,6 +146,46 @@ export async function deleteMeeting(viewer: Viewer, id: string): Promise<boolean
   await connectDatabase()
   const { deletedCount } = await MeetingPlanModel.deleteOne(filter)
   return deletedCount > 0
+}
+
+export type SavePrepPartResult =
+  | { outcome: "saved"; meeting: MeetingPlanDetail }
+  | { outcome: "not-found" | "no-prep" | "busy" }
+
+/**
+ * Changes one part of a saved preparation the user edits by hand, leaving the rest as written.
+ * Refused while a new preparation is being written, because that run would overwrite the edit a
+ * moment later.
+ */
+async function savePrepPart(viewer: Viewer, id: string, update: Record<string, Record<string, unknown>>): Promise<SavePrepPartResult> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return { outcome: "not-found" }
+  await connectDatabase()
+  const record = await MeetingPlanModel.findOneAndUpdate(
+    { ...filter, prep: { $ne: null }, prepStatus: { $ne: "generating" } },
+    update,
+    { new: true, lean: true }
+  )
+  if (record) return { outcome: "saved", meeting: toDetail(record as unknown as StoredPlan) }
+  const current = await MeetingPlanModel.findOne(filter, "prep prepStatus").lean()
+  if (!current) return { outcome: "not-found" }
+  return { outcome: current.prep ? "busy" : "no-prep" }
+}
+
+/**
+ * Replaces the preparation's conversation with the user's edited script. An old plan-shaped
+ * conversation is dropped once a script replaces it.
+ */
+export function saveConversation(viewer: Viewer, id: string, stages: ScriptStage[]): Promise<SavePrepPartResult> {
+  return savePrepPart(viewer, id, {
+    $set: { "prep.conversation": stages, "prep.conversation_edited_at": new Date().toISOString() },
+    $unset: { "prep.conversation_plan": "" },
+  })
+}
+
+/** Replaces the projects to show with the user's list: added, edited, removed or reordered. */
+export function saveProjectsToShow(viewer: Viewer, id: string, projects: ProjectToShow[]): Promise<SavePrepPartResult> {
+  return savePrepPart(viewer, id, { $set: { "prep.projects_to_show": projects } })
 }
 
 /**

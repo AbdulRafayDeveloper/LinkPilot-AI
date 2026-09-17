@@ -4,6 +4,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { NOTE_MAX_LENGTH, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
 import { clearNotes, listNotes, saveNote } from "@/services/quickNotes/notes"
 import { requireViewer } from "@/services/auth/viewer"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 /**
  * POST: Saves one note. Saving the same text again keeps both, newest first.
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -79,3 +80,6 @@ export async function DELETE() {
     )
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("quick-notes", handlePost)

@@ -118,8 +118,7 @@ export default function ReferenceContentClient() {
           method: isEdit ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(input),
-        }
-      )
+        }, { idempotent: true })
       setEditing(null)
       setNotice(message || (isEdit ? REFERENCE_CONTENT_MESSAGES.updated : REFERENCE_CONTENT_MESSAGES.created))
       if (isEdit) {
@@ -186,7 +185,7 @@ export default function ReferenceContentClient() {
                     setSaveError(null)
                     setEditing({ mode: "new" })
                   }}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
                 >
                   <Plus size={16} aria-hidden="true" />
                   Add Content

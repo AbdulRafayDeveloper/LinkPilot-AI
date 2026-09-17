@@ -39,7 +39,7 @@ export default function TrendingTopicsClient() {
         <main className="flex-1 overflow-y-auto bg-background overflow-x-hidden">
           <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-6">
             {/* Page header & controls */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
                   <Flame size={24} className="text-secondary shrink-0" aria-hidden="true" />
@@ -50,12 +50,12 @@ export default function TrendingTopicsClient() {
                 </p>
               </div>
 
-              <div className="flex gap-2 sm:shrink-0">
+              <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={() => void reset()} disabled={status === "idle" || status === "checking"} />
                 <button
                   type="button"
                   onClick={() => setIsPromptEditorOpen(true)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
                 >
                   <FilePenLine size={16} aria-hidden="true" />
                   Update Prompt
@@ -65,7 +65,7 @@ export default function TrendingTopicsClient() {
                   onClick={() => void search()}
                   disabled={isLoading}
                   aria-busy={isLoading}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-semibold shadow-sm active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-semibold shadow-sm active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100"
                 >
                   {isLoading ? (
                     <Loader2 size={16} className="animate-spin" aria-hidden="true" />

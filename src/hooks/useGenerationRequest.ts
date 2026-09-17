@@ -49,7 +49,8 @@ export function createGenerationRequest<TPayload, TResult>(
     store.update({ status: "loading", result: null, error: null })
 
     try {
-      // Generating changes nothing on the server, so a dropped request is safe to send again
+      // Generating saves a record (and costs an AI call), so the request carries an idempotency key: a retry
+      // after a lost response gets the first result back from the route instead of generating again
       const { data } = await requestApi<TResult>(
         endpoint,
         {
@@ -58,7 +59,7 @@ export function createGenerationRequest<TPayload, TResult>(
           body: JSON.stringify(payload),
           signal: current.signal,
         },
-        { retry: true }
+        { idempotent: true }
       )
       if (current.signal.aborted) return
       store.update({ status: "success", result: data })

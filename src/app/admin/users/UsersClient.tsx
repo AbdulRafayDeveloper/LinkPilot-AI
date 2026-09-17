@@ -292,8 +292,9 @@ export default function UsersClient() {
               <p className="py-16 text-center text-sm text-on-surface-variant">No accounts match these filters.</p>
             ) : (
               <div className={`flex flex-col gap-3 transition-opacity ${list.isLoading ? "opacity-60" : ""}`} aria-busy={list.isLoading}>
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm md:block">
-                  <table className="w-full min-w-[1000px] border-collapse text-left">
+                {/* The table from xl, where it fits beside the open sidebar; cards below, two to a row on a tablet */}
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+                  <table className="w-full min-w-[900px] border-collapse text-left">
                     <caption className="sr-only">Accounts, newest first</caption>
                     <thead className="bg-surface-container-lowest">
                       <tr className="border-b border-outline-variant">
@@ -331,7 +332,7 @@ export default function UsersClient() {
                               <button
                                 type="button"
                                 onClick={() => setOpen(user)}
-                                className="rounded-lg border border-outline-variant px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                                className="whitespace-nowrap rounded-lg border border-outline-variant px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                               >
                                 View activity
                               </button>
@@ -354,7 +355,7 @@ export default function UsersClient() {
                   </table>
                 </div>
 
-                <ul className="flex flex-col gap-2 md:hidden">
+                <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {list.items.map((user) => (
                     <li key={user.id}>
                       <button type="button" onClick={() => setOpen(user)} className="flex w-full flex-col gap-1.5 rounded-2xl border border-outline-variant bg-white p-3 text-left shadow-sm">

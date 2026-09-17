@@ -113,7 +113,7 @@ export default function PublicPlanClient({ token }: { token: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ today: plan.today.date }),
-      })
+      }, { retry: true })
       setToday(data)
       setIsResetOpen(false)
     } catch (reason: unknown) {

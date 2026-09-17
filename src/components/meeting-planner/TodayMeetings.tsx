@@ -2,11 +2,12 @@
 
 import React from "react"
 import Link from "next/link"
-import { CalendarCheck, ChevronRight, Sparkles, Sun } from "lucide-react"
+import { CalendarCheck, ChevronRight, Sun } from "lucide-react"
 import { MEETING_PLANNER_MESSAGES } from "@/constants/meetingPlanner"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
 import { MeetingStatusButton } from "./MeetingStatusButton"
+import { PrepBadge } from "./PrepBadge"
 
 interface TodayMeetingsProps {
   meetings: MeetingPlan[]
@@ -69,12 +70,10 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
               >
                 <span className="flex min-w-0 items-center gap-1 text-[13px] font-semibold text-on-surface group-hover:text-primary">
                   <span className="truncate">{meeting.name}</span>
-                  {meeting.prepEnabled && meeting.prepStatus === "ready" && (
-                    <Sparkles size={12} className="shrink-0 text-primary" aria-label="Preparation ready" />
-                  )}
                   <ChevronRight size={13} className="shrink-0 text-outline" aria-hidden="true" />
                 </span>
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
+                <PrepBadge meeting={meeting} className="mt-1" />
               </Link>
               <MeetingStatusButton
                 meeting={meeting}

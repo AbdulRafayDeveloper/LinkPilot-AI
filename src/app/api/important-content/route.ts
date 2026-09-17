@@ -4,6 +4,7 @@ import { ImportantContentQuerySchema, ImportantContentSchema } from "@/lib/valid
 import { IMPORTANT_CONTENT_MESSAGES } from "@/constants/importantContent"
 import { createEntry, listEntries } from "@/services/importantContent/entries"
 import { requireViewer } from "@/services/auth/viewer"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
 }
 
 /** POST: Saves one entry to this account. */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   const parsed = ImportantContentSchema.safeParse(await req.json().catch(() => null))
@@ -40,3 +41,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_CONTENT_MESSAGES.saveFailed) }, { status: 500 })
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("important-content", handlePost)

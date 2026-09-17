@@ -10,7 +10,7 @@ import { EditAssetDialog } from "@/components/important-files/EditAssetDialog"
 import { DeleteAssetDialog } from "@/components/important-files/DeleteAssetDialog"
 import { AssetViewerDialog } from "@/components/important-files/AssetViewerDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
-import { requestApi } from "@/lib/apiClient"
+import { requestApi, fetchWithRetry } from "@/lib/apiClient"
 import { uploadAsset } from "@/lib/assetUpload"
 import {
   ASSET_FILTERS,
@@ -223,7 +223,7 @@ export default function ImportantFilesClient() {
         return true
       }
       if (asset.contentType === "image/png" && asset.previewUrl) {
-        const blob = await (await fetch(asset.previewUrl)).blob()
+        const blob = await (await fetchWithRetry(asset.previewUrl)).blob()
         await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
         return true
       }

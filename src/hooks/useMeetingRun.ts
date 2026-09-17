@@ -42,7 +42,7 @@ export function useMeetingRun(onProgress: (state: MeetingRunState) => void) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ restart }),
-        })
+        }, { retry: true })
         restart = false
         progressRef.current(data)
         if (!data.hasMore || data.status === "failed") break

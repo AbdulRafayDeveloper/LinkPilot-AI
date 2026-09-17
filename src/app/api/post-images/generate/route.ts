@@ -5,6 +5,7 @@ import { POST_IMAGES_MESSAGES } from "@/constants/postImages"
 import { createPostImage } from "@/services/postImages/generate"
 import { requireViewer } from "@/services/auth/viewer"
 import { runAiRequest, withSource } from "@/services/modelPriority"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 // Drawing an image takes far longer than writing text, and the whole picture comes back at once
@@ -14,7 +15,7 @@ export const maxDuration = 300
  * POST: Draws one post image from the saved brand defaults and the post content, stores it, and
  * writes the record that says how it was made. Nothing is written until the image exists.
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -42,3 +43,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message }, { status: isUnconfigured ? 503 : isRefused ? 400 : 500 })
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("post-images:generate", handlePost)

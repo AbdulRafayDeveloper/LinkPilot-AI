@@ -3,6 +3,7 @@
 import React, { useId, useRef, useState } from "react"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
+import { RichTextEditor } from "@/components/ui/RichTextEditor"
 import { requestApi } from "@/lib/apiClient"
 import {
   CONTENT_DESCRIPTION_MAX_LENGTH,
@@ -36,6 +37,7 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
   const [isSaving, setIsSaving] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
   const typeListId = useId()
+  const descriptionId = useId()
   // A message about the last attempt stops being true once the form changes
   const update = (key: keyof ImportantContentInput, value: string) => {
     setForm((current) => ({ ...current, [key]: value }))
@@ -52,7 +54,7 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
         method: entry ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
-      })
+      }, { idempotent: true })
       onSaved(data)
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : IMPORTANT_CONTENT_MESSAGES.saveFailed)
@@ -124,25 +126,25 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
             </datalist>
           </label>
         </div>
-        <label className="flex flex-col gap-1.5">
+        {/* Not a <label> around the field: the toolbar's buttons can't sit inside one */}
+        <div className="flex flex-col gap-1.5">
           <span className="flex items-baseline justify-between gap-2">
-            <span className={labelClass}>
+            <label htmlFor={descriptionId} className={labelClass}>
               Description <span className="font-normal text-outline">(optional)</span>
-            </span>
+            </label>
             <span className="text-[11px] text-outline">
               {form.description.length.toLocaleString()} / {CONTENT_DESCRIPTION_MAX_LENGTH.toLocaleString()}
             </span>
           </span>
-          <textarea
-            name="description"
+          <RichTextEditor
+            id={descriptionId}
             value={form.description}
             maxLength={CONTENT_DESCRIPTION_MAX_LENGTH}
-            onChange={(event) => update("description", event.target.value)}
-            rows={10}
-            placeholder="The text you want to keep: a login, a link, steps, anything"
-            className={`${fieldClass} resize-y py-2.5 font-code text-[13px] leading-relaxed`}
+            onChange={(value) => update("description", value)}
+            rows={12}
+            placeholder="The text you want to keep: a login, a link, steps, anything. Use the buttons above for bold, lists and more."
           />
-        </label>
+        </div>
         {error && (
           <p role="alert" className="flex gap-2 rounded-xl bg-error-container px-3 py-2.5 text-[13px] text-error">
             <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />

@@ -1,12 +1,16 @@
 import type { ApiEnvelope } from "@/types/api"
 import { parseRetryAfter, withRetry } from "@/lib/retry"
 import { AUTH_REQUIRED_HEADER, LOGIN_PATH } from "@/constants/auth"
+import { IDEMPOTENCY_HEADER } from "@/constants/idempotency"
 
 /**
  * Browser → our API routes. Retries follow the HTTP rules for when a repeat is safe:
  * - GET, HEAD, PUT and DELETE are idempotent, so they're retried by default.
- * - POST is retried only when the caller says a repeat is harmless (the generators, which
- *   change nothing), never for the password check or "create", which would double-count or duplicate.
+ * - POST is retried when the caller says a repeat is harmless (`retry: true`: a request that saves
+ *   nothing, or one the server already makes safe to repeat), or when it is sent with an idempotency
+ *   key (`idempotent: true`: a create or a generator whose route runs withIdempotency, so a repeat
+ *   gets the first answer back instead of saving a second copy). Never the password check or sign-in,
+ *   which would double-count a wrong attempt.
  * Only failures that may clear in a moment are retried: a dropped connection and 408, 429,
  * 502, 503 and 504 answers. A 500 is a real server error (the generators already fell back
  * between AI providers), so it's returned at once. Aborting stops everything.
@@ -18,6 +22,14 @@ const CLIENT_RETRIES = 2
 export interface RetryPolicy {
   // Force retries on (a POST that is safe to repeat) or off; defaults to the method's safety
   retry?: boolean
+  // Sends one Idempotency-Key for this call, the same on every retry, and retries it (services/idempotency.ts)
+  idempotent?: boolean
+}
+
+// A random key for one request; crypto.randomUUID needs a secure context, which localhost and https both are
+function newIdempotencyKey(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID()
+  return Array.from(crypto.getRandomValues(new Uint8Array(18)), (byte) => byte.toString(16).padStart(2, "0")).join("")
 }
 
 // A retryable answer, carried through withRetry so the last one can still be read
@@ -41,9 +53,16 @@ function sendToSignIn(response: Response) {
   window.location.assign(`${LOGIN_PATH}?next=${encodeURIComponent(next)}`)
 }
 
-export async function fetchWithRetry(url: string, init: RequestInit = {}, { retry }: RetryPolicy = {}): Promise<Response> {
-  const method = (init.method ?? "GET").toUpperCase()
-  const retries = (retry ?? IDEMPOTENT_METHODS.has(method)) ? CLIENT_RETRIES : 0
+export async function fetchWithRetry(url: string, requestInit: RequestInit = {}, { retry, idempotent = false }: RetryPolicy = {}): Promise<Response> {
+  const method = (requestInit.method ?? "GET").toUpperCase()
+  const retries = (retry ?? (idempotent || IDEMPOTENT_METHODS.has(method))) ? CLIENT_RETRIES : 0
+  // The key is made once, outside the retries, so every attempt of this call carries the same one
+  let init = requestInit
+  if (idempotent) {
+    const headers = new Headers(requestInit.headers)
+    headers.set(IDEMPOTENCY_HEADER, newIdempotencyKey())
+    init = { ...requestInit, headers }
+  }
   try {
     return await withRetry(
       async () => {

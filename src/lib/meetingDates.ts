@@ -88,11 +88,27 @@ export const dayOfMonth = (date: string): number => Number(date.slice(8, 10))
  * fixed and read back in UTC, so the hour shown is always the hour that was saved.
  */
 export function formatTime(time: string): string {
-  return new Date(`2000-01-01T${time}:00Z`).toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "UTC",
-  })
+  const { hour, minute, period } = toTwelveHour(time)
+  return `${hour}:${minute} ${period}`
+}
+
+export type DayPeriod = "AM" | "PM"
+
+/**
+ * A saved HH:mm as the 12-hour clock people say it: "20:30" is 8, "30", PM and "00:15" is 12, "15",
+ * AM. Meetings are always saved as 24-hour HH:mm, so the calendar sorts them correctly; only what the
+ * user reads and picks is on the 12-hour clock.
+ */
+export function toTwelveHour(time: string): { hour: number; minute: string; period: DayPeriod } {
+  const [hours, minutes] = time.split(":")
+  const hour24 = Number(hours)
+  return { hour: hour24 % 12 === 0 ? 12 : hour24 % 12, minute: minutes, period: hour24 < 12 ? "AM" : "PM" }
+}
+
+/** The HH:mm a 12-hour choice is saved as: 12 AM is 00, 12 PM is 12. */
+export function fromTwelveHour(hour: number, minute: string, period: DayPeriod): string {
+  const hour24 = (hour % 12) + (period === "PM" ? 12 : 0)
+  return `${`${hour24}`.padStart(2, "0")}:${minute}`
 }
 
 /** The next half hour on the user's own clock, as a sensible default for a new meeting. */

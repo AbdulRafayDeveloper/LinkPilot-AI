@@ -14,6 +14,7 @@ import {
 } from "@/constants/meetingPlanner"
 import { createMeeting, listMonth } from "@/services/meetingPlanner/plans"
 import { requireViewer } from "@/services/auth/viewer"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
@@ -100,7 +101,7 @@ export async function GET(req: NextRequest) {
  * on the meeting is saved as "generating" and the page asks for the preparation next, so a slow
  * or failing model can never cost the meeting itself.
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -121,3 +122,6 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("meeting-planner", handlePost)

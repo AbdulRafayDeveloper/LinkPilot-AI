@@ -3,7 +3,7 @@
 import React, { useRef, useState } from "react"
 import { ImagePlus, Loader2, Plus, Save, Trash2, X } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
-import { requestApi } from "@/lib/apiClient"
+import { requestApi, fetchWithRetry } from "@/lib/apiClient"
 import {
   ASSET_CONTENT_TYPES,
   ASSET_MAX_BYTES,
@@ -134,8 +134,8 @@ export const BrandSettingsDialog: React.FC<BrandSettingsDialogProps> = ({ settin
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ contentType: asset.contentType, size: asset.size }),
-          })
-          const put = await fetch(plan.url, {
+          }, { retry: true })
+          const put = await fetchWithRetry(plan.url, {
             method: "PUT",
             headers: { "Content-Type": asset.contentType },
             body: asset.file,

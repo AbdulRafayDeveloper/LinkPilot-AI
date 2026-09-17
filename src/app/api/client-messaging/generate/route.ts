@@ -11,6 +11,7 @@ import { generateClientMessage } from "@/services/clientMessaging/generate"
 import { saveClientMessage } from "@/services/clientMessaging/records"
 import { requireViewer } from "@/services/auth/viewer"
 import { runAiRequest, withSource } from "@/services/modelPriority"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -29,7 +30,7 @@ const GenerateSchema = z.object({
  * POST: Writes one formal message for a client, in that client's own format and shaped for the
  * chosen channel, and saves it with the client it was written for.
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -63,3 +64,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message }, { status })
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("client-messaging:generate", handlePost)

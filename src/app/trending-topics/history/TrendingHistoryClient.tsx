@@ -299,7 +299,8 @@ export default function TrendingHistoryClient() {
                 )}
 
                 {/* A table where there is room for one */}
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm md:block">
+                {/* The table from 2xl, where its 1080px fit beside the open sidebar; cards below */}
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm 2xl:block">
                   <table className="w-full min-w-[1080px] border-collapse text-left">
                     <caption className="sr-only">Saved trending topics, page {page} of {totalPages}</caption>
                     <thead className="bg-surface-container-lowest">
@@ -344,7 +345,7 @@ export default function TrendingHistoryClient() {
                 </div>
 
                 {/* Cards on a phone, with the same fields */}
-                <ul className="flex flex-col gap-3 md:hidden">
+                <ul className="flex flex-col gap-3 2xl:hidden">
                   {visibleItems.map((topic) => (
                     <li key={topicKey(topic)} className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
                       <div className="flex items-start justify-between gap-2">

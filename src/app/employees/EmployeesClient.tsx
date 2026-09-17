@@ -5,6 +5,7 @@ import { AlertTriangle, Briefcase, CalendarDays, Contact, Loader2, MapPin, Penci
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
+import { SortableList } from "@/components/ui/SortableList"
 import { FilterPanel, SearchFilter, SelectFilter } from "@/components/history/HistoryFilters"
 import { LoadMore } from "@/components/history/LoadMore"
 import { EmployeeDialog } from "@/components/employees/EmployeeDialog"
@@ -19,6 +20,7 @@ import { EMPLOYEES_ENDPOINT, EMPLOYEE_MESSAGES, EMPLOYEE_STATUSES } from "@/cons
 import type { Employee, EmployeesPage } from "@/types/employees"
 
 const idOf = (employee: Employee) => employee.id
+const nameOf = (employee: Employee) => employee.name
 
 const initialsOf = (name: string) =>
   name
@@ -56,8 +58,9 @@ const StatusBadge: React.FC<{ status: Employee["status"] }> = ({ status }) => (
 )
 
 /**
- * Employees Management: the team on the left (searched and filtered, 50 at a time), the chosen
- * employee on the right with their details, their plan link and their daily plan with its history.
+ * Employees Management: the team on the left (searched and filtered, and put in order by dragging),
+ * the chosen employee on the right with their details, their plan link and their daily plan with its
+ * history. The first employee is open when the page loads, so there is always someone to look at.
  */
 export default function EmployeesClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -70,6 +73,9 @@ export default function EmployeesClient() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
+  const [orderError, setOrderError] = useState<string | null>(null)
+  // Orders are saved one after another, so two quick drags land in the order they were made
+  const orderQueue = useRef<Promise<void>>(Promise.resolve())
 
   const settledSearch = useDebouncedValue(search.trim(), HISTORY_DEBOUNCE_MS)
   const params = new URLSearchParams()
@@ -85,6 +91,33 @@ export default function EmployeesClient() {
   })
   const counts = list.latest?.counts ?? { active: 0, inactive: 0 }
   const hasFilters = Boolean(search || status)
+  // Nobody chosen yet (a fresh load, or the chosen one was deleted): the first employee is open
+  const current = selected ?? list.items[0] ?? null
+  // Dragging puts the whole team in order, so it needs the whole team on screen and no filter
+  const canReorder = !hasFilters && list.hasAnswer && list.items.length > 1 && list.items.length === list.total
+
+  const reorderTeam = (orderedIds: string[]) => {
+    setOrderError(null)
+    // The employee open by default stays open: moving someone to the top must not switch the details to them
+    if (!selected && current) setSelected(current)
+    list.update((items) => {
+      const byId = new Map(items.map((item) => [item.id, item]))
+      return orderedIds.map((id) => byId.get(id)).filter((item): item is Employee => Boolean(item))
+    })
+    orderQueue.current = orderQueue.current.then(async () => {
+      try {
+        await requestApi(`${EMPLOYEES_ENDPOINT}/order`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderedIds }),
+        })
+      } catch (reason: unknown) {
+        setOrderError(reason instanceof Error ? reason.message : EMPLOYEE_MESSAGES.teamOrderFailed)
+        // The server's order is the truth once a save fails
+        list.retry()
+      }
+    })
+  }
 
   const choose = (employee: Employee) => {
     setSelected(employee)
@@ -115,7 +148,7 @@ export default function EmployeesClient() {
     try {
       await requestApi(`${EMPLOYEES_ENDPOINT}/${deleting.id}`, { method: "DELETE" })
       list.update((items) => items.filter((item) => item.id !== deleting.id), -1)
-      if (selected?.id === deleting.id) setSelected(null)
+      if (current?.id === deleting.id) setSelected(null)
       setDeleting(null)
       list.retry()
     } catch (reason: unknown) {
@@ -197,18 +230,34 @@ export default function EmployeesClient() {
                   </div>
                 ) : (
                   <div className={`flex flex-col gap-2 transition-opacity ${list.isLoading ? "opacity-60" : ""}`} aria-busy={list.isLoading}>
-                    <ul className="flex flex-col gap-2" aria-label="Employees">
-                      {list.items.map((employee) => {
-                        const isSelected = selected?.id === employee.id
+                    {orderError && (
+                      <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
+                        {orderError}
+                      </p>
+                    )}
+                    {hasFilters && list.items.length > 1 && <p className="px-1 text-[12px] text-outline">{EMPLOYEE_MESSAGES.reorderNeedsAll}</p>}
+                    <SortableList
+                      items={list.items}
+                      getId={idOf}
+                      getLabel={nameOf}
+                      onReorder={reorderTeam}
+                      label="Employees"
+                      className="flex flex-col gap-2"
+                      disabled={!canReorder}
+                      renderItem={(employee, handle) => {
+                        const isSelected = current?.id === employee.id
                         return (
-                          <li key={employee.id}>
+                          <div
+                            className={`flex items-center rounded-2xl border pl-1.5 transition-colors ${
+                              isSelected ? "border-primary bg-primary-fixed/40" : "border-outline-variant bg-white hover:bg-surface-container-lowest"
+                            }`}
+                          >
+                            {handle}
                             <button
                               type="button"
                               onClick={() => choose(employee)}
                               aria-current={isSelected ? "true" : undefined}
-                              className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-                                isSelected ? "border-primary bg-primary-fixed/40" : "border-outline-variant bg-white hover:bg-surface-container-lowest"
-                              }`}
+                              className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-3 pl-1.5 pr-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                             >
                               <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${isSelected ? "bg-primary text-white" : "bg-primary-fixed text-on-primary-fixed-variant"}`}>
                                 {initialsOf(employee.name)}
@@ -222,10 +271,10 @@ export default function EmployeesClient() {
                               </span>
                               <StatusBadge status={employee.status} />
                             </button>
-                          </li>
+                          </div>
                         )
-                      })}
-                    </ul>
+                      }}
+                    />
                     <LoadMore hasMore={list.hasMore} isLoadingMore={list.isLoadingMore} error={list.moreError} onLoadMore={list.loadMore} doneText="That is the whole team." />
                   </div>
                 )}
@@ -233,24 +282,24 @@ export default function EmployeesClient() {
 
               {/* The chosen employee */}
               <div ref={detailRef} className="flex scroll-mt-4 flex-col gap-4">
-                {selected ? (
+                {current ? (
                   <>
                     <section aria-label="Employee details" className="rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex min-w-0 items-center gap-3">
-                          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-white">{initialsOf(selected.name)}</span>
+                          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-white">{initialsOf(current.name)}</span>
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h2 className="truncate text-xl font-bold text-on-surface">{selected.name}</h2>
-                              <StatusBadge status={selected.status} />
+                              <h2 className="truncate text-xl font-bold text-on-surface">{current.name}</h2>
+                              <StatusBadge status={current.status} />
                             </div>
-                            {selected.owner && <p className="text-[12px] text-outline">Added by {selected.owner}</p>}
+                            {current.owner && <p className="text-[12px] text-outline">Added by {current.owner}</p>}
                           </div>
                         </div>
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => setDialog({ employee: selected })}
+                            onClick={() => setDialog({ employee: current })}
                             className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                           >
                             <Pencil size={14} aria-hidden="true" />
@@ -260,7 +309,7 @@ export default function EmployeesClient() {
                             type="button"
                             onClick={() => {
                               setDeleteError(null)
-                              setDeleting(selected)
+                              setDeleting(current)
                             }}
                             className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant px-3 py-2 text-[13px] font-semibold text-outline transition-colors hover:border-error/40 hover:text-error"
                           >
@@ -271,9 +320,9 @@ export default function EmployeesClient() {
                       </div>
                       <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-outline-variant/70 pt-4 sm:grid-cols-3">
                         {[
-                          { icon: Briefcase, label: "Role", value: selected.role },
-                          { icon: MapPin, label: "City", value: selected.city },
-                          { icon: CalendarDays, label: "Joined", value: `${joinedOn(selected.joiningDate)} (${tenure(selected.joiningDate)})` },
+                          { icon: Briefcase, label: "Role", value: current.role },
+                          { icon: MapPin, label: "City", value: current.city },
+                          { icon: CalendarDays, label: "Joined", value: `${joinedOn(current.joiningDate)} (${tenure(current.joiningDate)})` },
                         ].map(({ icon: Icon, label, value }) => (
                           <div key={label} className="flex gap-2.5">
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container-low text-primary">
@@ -286,9 +335,9 @@ export default function EmployeesClient() {
                           </div>
                         ))}
                       </dl>
-                      <PlanLinkPanel employee={selected} onChange={linkChanged} />
+                      <PlanLinkPanel employee={current} onChange={linkChanged} />
                     </section>
-                    <PlanEditor key={selected.id} employee={selected} />
+                    <PlanEditor key={current.id} employee={current} />
                   </>
                 ) : (
                   <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-16 text-center">

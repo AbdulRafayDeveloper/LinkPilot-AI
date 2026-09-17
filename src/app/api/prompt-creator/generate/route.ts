@@ -6,6 +6,7 @@ import { createPrompt } from "@/services/promptCreator/generate"
 import { saveCreatedPrompt } from "@/services/promptCreator/records"
 import { requireViewer } from "@/services/auth/viewer"
 import { runAiRequest, withSource } from "@/services/modelPriority"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -25,7 +26,7 @@ const GenerateSchema = z.object({
  * POST: Writes one ready-to-paste prompt from the described task, using the latest saved
  * prompt for the chosen target, and saves it with its auto-written name.
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -53,3 +54,6 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("prompt-creator:generate", handlePost)

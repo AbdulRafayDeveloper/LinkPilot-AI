@@ -19,7 +19,9 @@ import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
 import { MeetingStatusButton } from "@/components/meeting-planner/MeetingStatusButton"
+import { PrepBadge } from "@/components/meeting-planner/PrepBadge"
 import { MeetingPrepView } from "@/components/meeting-planner/MeetingPrepView"
+import { endConversationEdit, useConversationDraft } from "@/components/meeting-planner/ConversationEditor"
 import { MeetingFormModal, formValuesOf, type MeetingFormValues } from "@/components/meeting-planner/MeetingFormModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
@@ -54,6 +56,9 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
   const [editError, setEditError] = useState<string | null>(null)
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isConfirmingPrepare, setIsConfirmingPrepare] = useState(false)
+  // A new preparation replaces the conversation, so an edited or half-edited one is confirmed first
+  const draft = useConversationDraft()
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
 
   // The meeting, including any preparation already written, is read from the database. Nothing
@@ -105,12 +110,14 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
   // Only ever on request: a failed run can be tried again, and a finished one rewritten
   const runPreparation = async () => {
     if (!meeting || isPreparing) return
+    setIsConfirmingPrepare(false)
+    if (draft.meetingId === meeting.id) endConversationEdit()
     setIsPreparing(true)
     setActionError(null)
     try {
       const { data } = await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${meeting.id}/prepare`, {
         method: "POST",
-      })
+      }, { retry: true })
       setMeeting(data)
     } catch (error: unknown) {
       setActionError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.prepFailed)
@@ -118,6 +125,12 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
     } finally {
       setIsPreparing(false)
     }
+  }
+
+  const requestPreparation = () => {
+    const hasOwnConversation = Boolean(meeting?.prep?.conversation_edited_at) || draft.meetingId === meeting?.id
+    if (hasOwnConversation) setIsConfirmingPrepare(true)
+    else void runPreparation()
   }
 
   const saveEdit = async (values: MeetingFormValues) => {
@@ -212,7 +225,10 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                 <section className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h1 className="text-xl font-bold text-on-surface md:text-2xl">{meeting.name}</h1>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h1 className="text-xl font-bold text-on-surface md:text-2xl">{meeting.name}</h1>
+                        <PrepBadge meeting={isPreparing ? { prepEnabled: true, prepStatus: "generating" } : meeting} />
+                      </div>
                       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-on-surface-variant">
                         <span className="inline-flex items-center gap-1.5">
                           <CalendarDays size={14} className="text-outline" aria-hidden="true" />
@@ -285,7 +301,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                     {meeting.prepEnabled && (
                       <button
                         type="button"
-                        onClick={runPreparation}
+                        onClick={requestPreparation}
                         disabled={isPreparing}
                         className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
                       >
@@ -306,7 +322,15 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                   </div>
                 </section>
 
-                {meeting.prep && <MeetingPrepView prep={meeting.prep} />}
+                {meeting.prep && (
+                  <MeetingPrepView
+                    prep={meeting.prep}
+                    meetingId={meeting.id}
+                    meetingName={meeting.name}
+                    isPreparing={isPreparing || meeting.prepStatus === "generating"}
+                    onMeetingSaved={setMeeting}
+                  />
+                )}
 
                 {hasSupplied && (
                   <div className="flex flex-col gap-5">
@@ -336,6 +360,38 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
             setEditError(null)
           }}
         />
+      )}
+
+      {isConfirmingPrepare && meeting && (
+        <Modal
+          title="Prepare this meeting again?"
+          description="A new preparation replaces the conversation, including the changes you made to it."
+          onClose={() => setIsConfirmingPrepare(false)}
+          size="compact"
+          footer={
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsConfirmingPrepare(false)}
+                className="inline-flex items-center justify-center rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+              >
+                Keep my conversation
+              </button>
+              <button
+                type="button"
+                onClick={() => void runPreparation()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+              >
+                <RefreshCw size={16} aria-hidden="true" />
+                Prepare again
+              </button>
+            </div>
+          }
+        >
+          <p className="text-sm leading-relaxed text-on-surface-variant">
+            Your edits to the conversation can&apos;t be brought back afterwards.
+          </p>
+        </Modal>
       )}
 
       {isConfirmingDelete && meeting && (

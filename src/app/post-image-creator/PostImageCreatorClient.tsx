@@ -111,7 +111,7 @@ export default function PostImageCreatorClient() {
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
           <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:h-full lg:p-8">
             {/* Page header */}
-            <div className="flex shrink-0 flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div className="flex shrink-0 flex-col justify-between gap-3 xl:flex-row xl:items-center">
               <div className="min-w-0">
                 <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
                   <ImagePlus size={24} className="shrink-0 text-primary" aria-hidden="true" />
@@ -121,10 +121,10 @@ export default function PostImageCreatorClient() {
                   A picture for your post, in your own colours, with your own photo in it when you want one.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 sm:shrink-0">
+              <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <Link
                   href={POST_IMAGES_HISTORY_HREF}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
+                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
                 >
                   <GalleryHorizontalEnd size={16} aria-hidden="true" />
                   Generated Posts
@@ -132,7 +132,7 @@ export default function PostImageCreatorClient() {
                 <button
                   type="button"
                   onClick={() => setIsSettingsOpen(true)}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
+                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
                 >
                   <Settings2 size={16} aria-hidden="true" />
                   Default Settings
@@ -140,7 +140,7 @@ export default function PostImageCreatorClient() {
                 <button
                   type="button"
                   onClick={() => setIsPromptOpen(true)}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
+                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
                 >
                   <FilePenLine size={16} aria-hidden="true" />
                   Update Prompt
@@ -163,7 +163,7 @@ export default function PostImageCreatorClient() {
                     <button
                       type="button"
                       onClick={() => setIsSettingsOpen(true)}
-                      className="text-[11px] font-semibold text-primary hover:underline"
+                      className="-my-1.5 -mr-1.5 inline-flex min-h-7 items-center rounded-md px-1.5 text-[11px] font-semibold text-primary hover:underline"
                     >
                       {hasDefaults ? "Change" : "Set them up"}
                     </button>

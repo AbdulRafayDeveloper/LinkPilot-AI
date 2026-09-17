@@ -52,7 +52,7 @@ export const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ employee, onClos
         method: employee ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
-      })
+      }, { idempotent: true })
       onSaved(data)
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : EMPLOYEE_MESSAGES.saveFailed)

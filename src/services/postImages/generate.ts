@@ -3,7 +3,7 @@ import { connectDatabase } from "@/lib/db"
 import { UserFacingError } from "@/lib/errors"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { generateImage } from "@/services/imageGeneration"
-import { deleteObject, presignDownload, putObject } from "@/services/storage/s3"
+import { deleteObject, getObjectBytes, putObject } from "@/services/storage/s3"
 import { PostImageModel, type IPostImage } from "@/models/PostImage"
 import {
   POST_IMAGES_MESSAGES,
@@ -103,17 +103,13 @@ export async function createPostImage({ viewer, postContent, assetId, pose, size
   })
 
   // The photo is read back from storage here, so the browser never has to send it again
-  const photo = asset
-    ? await fetch(await presignDownload(asset.storageKey, asset.contentType))
-        .then(async (response) => {
-          if (!response.ok) throw new UserFacingError(POST_IMAGES_MESSAGES.assetUploadFailed)
-          return {
-            data: Buffer.from(await response.arrayBuffer()),
-            contentType: asset.contentType,
-            fileName: `${asset.id}.${asset.contentType.split("/")[1] || "png"}`,
-          }
-        })
-    : null
+  // Read through the SDK, which retries a failed read, rather than fetching a signed link once
+  const photoBytes = asset ? await getObjectBytes(asset.storageKey, signal) : null
+  if (asset && !photoBytes) throw new UserFacingError(POST_IMAGES_MESSAGES.assetUploadFailed)
+  const photo =
+    asset && photoBytes
+      ? { data: photoBytes, contentType: asset.contentType, fileName: `${asset.id}.${asset.contentType.split("/")[1] || "png"}` }
+      : null
 
   const shape = imageSize(size)
   const started = Date.now()

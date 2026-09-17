@@ -4,10 +4,11 @@ import { EmployeeSchema, EmployeesQuerySchema } from "@/lib/validation/employees
 import { EMPLOYEE_MESSAGES } from "@/constants/employees"
 import { createEmployee, listEmployees } from "@/services/employees/employees"
 import { requireViewer } from "@/services/auth/viewer"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
-/** GET (?cursor=&search=&status=): One batch of employees, newest first, 50 at a time, with the active and inactive counts. */
+/** GET (?search=&status=): The whole team (up to EMPLOYEES_LIST_MAX) in its dragged order, newest first where no order was set, with the active and inactive counts. */
 export async function GET(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
 }
 
 /** POST: Adds an employee to this account. */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   const parsed = EmployeeSchema.safeParse(await req.json().catch(() => null))
@@ -40,3 +41,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: toUserFacingMessage(error, EMPLOYEE_MESSAGES.saveFailed) }, { status: 500 })
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("employees", handlePost)

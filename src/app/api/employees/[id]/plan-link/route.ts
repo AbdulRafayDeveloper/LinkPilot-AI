@@ -4,6 +4,7 @@ import { PlanLinkSchema } from "@/lib/validation/employees"
 import { EMPLOYEE_MESSAGES } from "@/constants/employees"
 import { setPlanLink } from "@/services/employees/employees"
 import { requireViewer } from "@/services/auth/viewer"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic"
  * them a new one (the old one stops working) or turns it off. Answers with the employee, whose
  * `planLink` is the token to share, or null while the link is off.
  */
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePost(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   const parsed = PlanLinkSchema.safeParse(await req.json().catch(() => null))
@@ -28,3 +29,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ success: false, message: toUserFacingMessage(error, EMPLOYEE_MESSAGES.linkFailed) }, { status: 500 })
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("employees:plan-link", handlePost)

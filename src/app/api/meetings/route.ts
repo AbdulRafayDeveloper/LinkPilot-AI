@@ -5,6 +5,7 @@ import { MeetingSchema } from "@/lib/validation/meeting"
 import { MEETING_MESSAGES, MEETING_SEARCH_MAX_LENGTH, MEETING_STATUS_IDS } from "@/constants/meetings"
 import { createMeeting, listMeetings } from "@/services/meetings/meetings"
 import { requireViewer } from "@/services/auth/viewer"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
  * POST: Saves the meeting and answers at once. Nothing is analyzed here: the page starts the
  * analysis with its own calls, so a five hour transcript never rides on one request.
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -55,3 +56,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: toUserFacingMessage(error, MEETING_MESSAGES.saveFailed) }, { status: 500 })
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("meetings", handlePost)

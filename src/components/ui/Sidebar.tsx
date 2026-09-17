@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useEffect, useId, useState } from "react"
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { ChevronDown, Loader2, X } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { ChevronDown, Loader2, Search, X } from "lucide-react"
 import { BrandLogo } from "./BrandLogo"
 import { TOOL_GROUPS, toolsFor, type LinkedInTool, type ToolLink } from "@/constants/linkedinTools"
 import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
@@ -64,6 +64,25 @@ const titleClass = (isCollapsed: boolean, isActive: boolean) =>
   `min-w-0 flex-1 truncate text-[13px] leading-5 ${
     isActive ? "font-semibold text-on-surface" : "font-medium text-on-surface-variant group-hover:text-on-surface"
   } ${whenCollapsed(isCollapsed, "lg:sr-only")}`
+
+// Every page draws its own sidebar, so how far the list was scrolled is kept for this browser tab
+// and put back on the next page, instead of the list jumping to the top on every click
+const SCROLL_KEY = "linkpilot:sidebarScroll"
+
+const readSavedScroll = () => {
+  try {
+    return Number(window.sessionStorage.getItem(SCROLL_KEY)) || 0
+  } catch {
+    return 0
+  }
+}
+
+// Every word typed must appear in the name, in any order, ignoring case: "note conn" finds Connection Note
+const matchesSearch = (name: string, query: string) => {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const haystack = name.toLowerCase()
+  return words.every((word) => haystack.includes(word))
+}
 
 const ActiveBar = () => <span className="absolute -left-3 top-0.5 bottom-0.5 w-[3px] rounded-r-full bg-primary" aria-hidden="true" />
 
@@ -224,7 +243,57 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
   // The admin area appears only once the account is known to be an admin, never flashing for a user
   const tools = toolsFor(useIsAdmin())
   const [hint, setHint] = useState<RailHint | null>(null)
+  const [query, setQuery] = useState("")
+  const router = useRouter()
+  const searchId = useId()
   const activityOf = (href: string) => activity.find((entry) => entry.href === href)?.state
+  const isSearching = query.trim().length > 0
+  const navRef = useRef<HTMLElement>(null)
+  const saveFrame = useRef<number | null>(null)
+
+  // Back to where the list was on the previous page, before it is painted, and once more on the
+  // next frame in case the remembered dropdowns opened after the first paint and made it taller
+  useLayoutEffect(() => {
+    const saved = readSavedScroll()
+    if (!saved || !navRef.current) return
+    navRef.current.scrollTop = saved
+    const frame = window.requestAnimationFrame(() => {
+      if (navRef.current && navRef.current.scrollTop !== saved) navRef.current.scrollTop = saved
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (saveFrame.current !== null) window.cancelAnimationFrame(saveFrame.current)
+    },
+    []
+  )
+
+  const handleNavScroll = () => {
+    setHint(null)
+    // A search makes the list shorter for a moment; that position isn't the one to come back to
+    if (isSearching || saveFrame.current !== null) return
+    saveFrame.current = window.requestAnimationFrame(() => {
+      saveFrame.current = null
+      try {
+        window.sessionStorage.setItem(SCROLL_KEY, String(Math.round(navRef.current?.scrollTop ?? 0)))
+      } catch {
+        // The position simply isn't remembered
+      }
+    })
+  }
+
+  // What a search leaves: a tool whose name matches keeps all its pages; otherwise a dropdown
+  // stays only for the pages whose own names match, and shows just those
+  const visibleTools = tools.flatMap((tool) => {
+    if (!isSearching || matchesSearch(tool.title, query)) return [tool]
+    const links = tool.links?.filter((link) => matchesSearch(link.title, query))
+    return links && links.length > 0 ? [{ ...tool, links }] : []
+  })
+  const showGlobalPrompts = !isSearching || matchesSearch(GLOBAL_PROMPTS_LINK.title, query)
+  const firstMatch = visibleTools[0]?.links?.[0]?.href ?? visibleTools[0]?.href ?? (showGlobalPrompts ? GLOBAL_PROMPTS_LINK.href : undefined)
+  const matchCount = visibleTools.length + (isSearching && showGlobalPrompts ? 1 : 0)
 
   // Opening a tool means its finished result has been seen
   useEffect(() => {
@@ -253,7 +322,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
         links={tool.links}
         pathname={pathname}
         isCollapsed={isCollapsed}
-        isOpen={open}
+        // While searching, every dropdown that matched is open so its pages can be seen; the saved choice is untouched
+        isOpen={isSearching || open}
         onToggle={() => dropdowns.setOpen(tool.id, !open)}
         activityOf={activityOf}
         onNavigate={onClose}
@@ -295,12 +365,63 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
           </button>
         </div>
 
+        {/* Search: outside the scrolling list, so it stays put however far the tools are scrolled.
+            The icon rail has no room for it; Ctrl/⌘+K opens the tool switcher there */}
+        <div role="search" className={`shrink-0 px-3 pb-1 pt-2 ${whenCollapsed(isCollapsed, "lg:hidden")}`}>
+          <label htmlFor={searchId} className="sr-only">
+            Search tools
+          </label>
+          <div className="relative">
+            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-outline" aria-hidden="true" />
+            <input
+              id={searchId}
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && query) {
+                  event.preventDefault()
+                  setQuery("")
+                } else if (event.key === "Enter" && isSearching && firstMatch) {
+                  event.preventDefault()
+                  setQuery("")
+                  onClose()
+                  router.push(firstMatch)
+                }
+              }}
+              placeholder="Search tools"
+              autoComplete="off"
+              spellCheck={false}
+              aria-controls="sidebar-tools"
+              className="h-8 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-8 pr-7 text-[13px] text-on-surface placeholder:text-outline transition-colors focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 [&::-webkit-search-cancel-button]:hidden"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-outline hover:bg-surface-container-high hover:text-on-surface"
+              >
+                <X size={13} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+          <span className="sr-only" aria-live="polite">
+            {isSearching ? `${matchCount} ${matchCount === 1 ? "tool" : "tools"} found` : ""}
+          </span>
+        </div>
+
         <nav
+          ref={navRef}
+          id="sidebar-tools"
           aria-label="Main"
-          onScroll={() => setHint(null)}
+          onScroll={handleNavScroll}
           className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-1.5"
         >
-          {TOOL_GROUPS.map((group, index) => (
+          {isSearching && matchCount === 0 && (
+            <p className={`px-2 py-3 text-[12px] text-outline ${whenCollapsed(isCollapsed, "lg:hidden")}`}>No tool matches &ldquo;{query.trim()}&rdquo;.</p>
+          )}
+          {TOOL_GROUPS.filter((group) => visibleTools.some((tool) => tool.group === group.id)).map((group, index) => (
             <section key={group.id} aria-labelledby={`nav-group-${group.id}`} className={index > 0 ? "mt-1" : ""}>
               {/* Collapsed, a thin line separates the groups instead of their names */}
               {index > 0 && <div className={`mx-2 mb-3 hidden h-px bg-outline-variant/70 ${whenCollapsed(isCollapsed, "lg:block")}`} aria-hidden="true" />}
@@ -310,15 +431,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
               >
                 {group.label}
               </h2>
-              <ul>{tools.filter((tool) => tool.group === group.id).map(renderTool)}</ul>
+              <ul>{visibleTools.filter((tool) => tool.group === group.id).map(renderTool)}</ul>
             </section>
           ))}
         </nav>
 
         {/* Global AI Prompts: shared settings for every tool, not a LinkedIn tool */}
-        <div className="shrink-0 border-t border-outline-variant/80 px-3 py-2">
-          <ul>{renderLink(GLOBAL_PROMPTS_LINK)}</ul>
-        </div>
+        {showGlobalPrompts && (
+          <div className="shrink-0 border-t border-outline-variant/80 px-3 py-2">
+            <ul>{renderLink(GLOBAL_PROMPTS_LINK)}</ul>
+          </div>
+        )}
       </aside>
 
       {/* The collapsed rail's tooltip, outside the scrolling list so it's never clipped */}

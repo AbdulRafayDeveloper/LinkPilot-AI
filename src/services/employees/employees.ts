@@ -1,9 +1,8 @@
 import { connectDatabase } from "@/lib/db"
-import { allOf, olderThanCursor, searchCondition, toCursor } from "@/lib/listQuery"
+import { allOf, searchCondition } from "@/lib/listQuery"
 import { planLinkMatches, planLinkToken, readPlanLinkToken } from "@/lib/planLink"
 import { EmployeeModel, EmployeePlanModel, type IEmployee, type IEmployeePlan, type IPlanItem, type IPlanTask } from "@/models/Employee"
-import { HISTORY_PAGE_SIZE } from "@/constants/historyFilters"
-import { PLAN_HISTORY_DAYS, PLAN_PERIOD, type EmployeeStatus } from "@/constants/employees"
+import { EMPLOYEES_LIST_MAX, PLAN_HISTORY_DAYS, PLAN_PERIOD, type EmployeeStatus } from "@/constants/employees"
 import type {
   Employee,
   EmployeeInput,
@@ -59,20 +58,15 @@ export async function listEmployees(
   const scope = visibleTo(viewer)
   const matching = allOf([scope, searchCondition(filters.search, ["name", "city", "role"]), filters.status ? { status: filters.status } : null])
   const [records, total, active, inactive] = await Promise.all([
-    EmployeeModel.find(allOf([matching, olderThanCursor(filters.cursor)]))
-      .sort({ createdAt: -1, _id: -1 })
-      // One extra row answers "is there more?" without a second query
-      .limit(HISTORY_PAGE_SIZE + 1)
-      .lean(),
+    // The whole team at once, in the order it was dragged into, so it can be reordered as one list
+    EmployeeModel.find(matching).sort({ position: 1, createdAt: -1, _id: -1 }).limit(EMPLOYEES_LIST_MAX).lean(),
     EmployeeModel.countDocuments(matching),
     EmployeeModel.countDocuments({ ...scope, status: "active" }),
     EmployeeModel.countDocuments({ ...scope, status: "inactive" }),
   ])
-  const stored = records as unknown as StoredEmployee[]
-  const batch = stored.slice(0, HISTORY_PAGE_SIZE)
   return {
-    items: await withOwners(viewer, batch),
-    nextCursor: stored.length > HISTORY_PAGE_SIZE && batch.length > 0 ? toCursor(batch[batch.length - 1]) : null,
+    items: await withOwners(viewer, records as unknown as StoredEmployee[]),
+    nextCursor: null,
     total,
     counts: { active, inactive },
   }
@@ -88,8 +82,27 @@ export async function getEmployee(viewer: Viewer, id: string): Promise<Employee 
 
 export async function createEmployee(viewer: Viewer, input: EmployeeInput): Promise<Employee> {
   await connectDatabase()
-  const record = await EmployeeModel.create({ ownerId: viewer.id, ...input })
+  // A new employee goes to the top of the team, above anyone already placed there
+  const first = await EmployeeModel.findOne(visibleTo(viewer), { position: 1 }).sort({ position: 1 }).lean()
+  const record = await EmployeeModel.create({ ownerId: viewer.id, ...input, position: first ? first.position - 1 : 0 })
   return (await withOwners(viewer, [record.toObject() as unknown as StoredEmployee]))[0]
+}
+
+/**
+ * Puts the team in a new order: `orderedIds` is every employee the viewer may see, top to bottom.
+ * An order that doesn't name exactly those employees (one was added or removed in another tab) is
+ * refused as "changed" rather than guessed at. The positions are written in one bulk write.
+ */
+export async function reorderEmployees(viewer: Viewer, orderedIds: string[]): Promise<"saved" | "changed"> {
+  await connectDatabase()
+  const team = await EmployeeModel.find(visibleTo(viewer), { _id: 1 }).lean()
+  const ids = new Set(team.map((record) => String(record._id)))
+  if (ids.size !== orderedIds.length || orderedIds.some((id) => !ids.has(id))) return "changed"
+  await EmployeeModel.bulkWrite(
+    orderedIds.map((id, position) => ({ updateOne: { filter: { _id: id, ...visibleTo(viewer) }, update: { $set: { position } } } })),
+    { ordered: false }
+  )
+  return "saved"
 }
 
 /** Replaces an employee's details. Null when they no longer exist, or belong to another account. */

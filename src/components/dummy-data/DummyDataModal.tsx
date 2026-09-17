@@ -142,7 +142,7 @@ const DummyDataEditor: React.FC<DummyDataModalProps> = ({ kind, onUse, onClose }
       const headers = { "Content-Type": "application/json" }
       const { data, message } = active.saved
         ? await requestApi<DummyItem>(`${endpoint}/${active.id}`, { method: "PUT", headers, body })
-        : await requestApi<DummyItem>(endpoint, { method: "POST", headers, body })
+        : await requestApi<DummyItem>(endpoint, { method: "POST", headers, body }, { idempotent: true })
       setEntries((current) => current?.map((entry) => (entry.id === active.id ? toEntry(data) : entry)) ?? current)
       setActiveId(data.id)
       setFeedback({ type: "success", message: message || `${capitalize(config.item)} saved.` })

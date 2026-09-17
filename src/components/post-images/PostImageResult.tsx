@@ -7,6 +7,7 @@ import { getPoseLabel, POST_IMAGES_MESSAGES } from "@/constants/postImages"
 import type { GenerationStatus } from "@/hooks/useGenerationRequest"
 import type { PostImage } from "@/types/postImages"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
+import { fetchWithRetry } from "@/lib/apiClient"
 
 interface PostImageResultProps {
   status: GenerationStatus
@@ -26,12 +27,12 @@ export async function copyImageToClipboard(url: string): Promise<boolean> {
   try {
     // The fetch is handed to ClipboardItem rather than awaited first, because the permission a
     // click grants runs out while a megabyte of image is still downloading
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": fetch(url).then((response) => response.blob()) })])
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": fetchWithRetry(url).then((response) => response.blob()) })])
     return true
   } catch {
     // A browser that only takes a finished blob gets one
     try {
-      const blob = await (await fetch(url)).blob()
+      const blob = await (await fetchWithRetry(url)).blob()
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
       return true
     } catch {

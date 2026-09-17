@@ -56,6 +56,35 @@ export const STALE_PREP_MS = 6 * 60_000
 
 export const MEETING_PLANNER_ENDPOINT = "/api/meeting-planner"
 
+/**
+ * The conversation is a script: stages in order, each an ordered list of steps. A step is one
+ * thing to do on the call, so the page can say plainly when to talk, when to ask, when to stop and
+ * listen, and when to open a project and show it.
+ */
+export const SCRIPT_STEP_KINDS = [
+  { id: "say", label: "Say", hint: "Words to say" },
+  { id: "ask", label: "Ask", hint: "A question to ask them" },
+  { id: "listen", label: "Listen", hint: "Stop talking and let them speak" },
+  { id: "show_project", label: "Show project", hint: "Open one of your projects and show it" },
+  { id: "note", label: "Note", hint: "A reminder for you, not said aloud" },
+] as const
+export type ScriptStepKindId = (typeof SCRIPT_STEP_KINDS)[number]["id"]
+export const SCRIPT_STEP_KIND_IDS = SCRIPT_STEP_KINDS.map((kind) => kind.id) as [ScriptStepKindId, ...ScriptStepKindId[]]
+
+// Limits for an edited conversation, generous for a real call and small enough to stay one document
+export const SCRIPT_MAX_STAGES = 25
+export const SCRIPT_MAX_STEPS_PER_STAGE = 40
+export const SCRIPT_TITLE_MAX_LENGTH = 160
+export const SCRIPT_TEXT_MAX_LENGTH = 4_000
+export const SCRIPT_MAX_FEATURES = 15
+export const SCRIPT_FEATURE_MAX_LENGTH = 300
+export const SCRIPT_MAX_MINUTES = 60
+
+// The projects to show: a handful is what a call has time for, with room to keep a few spare
+export const MAX_PROJECTS_TO_SHOW = 12
+export const PROJECT_NOTE_MAX_LENGTH = 1_000
+export const PROJECT_LINK_MAX_LENGTH = 2_000
+
 // The preparation prompt the user can edit, in the shared prompts modal
 export const MEETING_PLANNER_PROMPT_TABS = [{ id: "preparation", label: "Meeting preparation" }] as const
 export type MeetingPlannerPromptId = (typeof MEETING_PLANNER_PROMPT_TABS)[number]["id"]
@@ -86,6 +115,15 @@ export const MEETING_PLANNER_MESSAGES = {
   prepRunning: "Preparation is already running for this meeting.",
   prepOff: "Preparation is switched off for this meeting.",
   prepReady: "Preparation ready.",
+  conversationSaved: "Conversation saved.",
+  conversationSaveFailed: "Couldn't save the conversation. Your changes are still here, so try again.",
+  conversationInvalid: "The conversation couldn't be saved as it is. Check each stage has a title.",
+  conversationNoPrep: "This meeting has no preparation to edit yet.",
+  conversationBusy: "The preparation is being written again right now. Save once it has finished.",
+  projectsSaved: "Projects saved.",
+  projectsSaveFailed: "Couldn't save the projects. Please try again.",
+  projectNameMissing: "Give the project a name.",
+  projectLinkInvalid: "The link must be a web address, such as https://example.com.",
   emptyToday: "Nothing scheduled today.",
   emptyMonth: "No meetings this month.",
   emptyDay: "Nothing scheduled on this day.",

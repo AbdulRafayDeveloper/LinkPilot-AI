@@ -2,11 +2,12 @@
 
 import React from "react"
 import Link from "next/link"
-import { AlertTriangle, CalendarPlus, ChevronRight, Loader2, Sparkles } from "lucide-react"
+import { CalendarPlus, ChevronRight } from "lucide-react"
 import { MEETING_PLANNER_MESSAGES } from "@/constants/meetingPlanner"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
 import { MeetingStatusButton } from "./MeetingStatusButton"
+import { PrepBadge } from "./PrepBadge"
 
 interface DayMeetingsPanelProps {
   date: string
@@ -14,21 +15,6 @@ interface DayMeetingsPanelProps {
   savingIds: ReadonlySet<string>
   onToggleStatus: (meeting: MeetingPlan) => void
   onAddMeeting: (date: string) => void
-}
-
-/** How the preparation is doing, shown next to the meeting name. */
-const PrepMark: React.FC<{ meeting: MeetingPlan }> = ({ meeting }) => {
-  if (!meeting.prepEnabled) return null
-  if (meeting.prepStatus === "generating") {
-    return <Loader2 size={12} className="shrink-0 animate-spin text-primary" aria-label="Preparation running" />
-  }
-  if (meeting.prepStatus === "failed") {
-    return <AlertTriangle size={12} className="shrink-0 text-error" aria-label="Preparation failed" />
-  }
-  if (meeting.prepStatus === "ready") {
-    return <Sparkles size={12} className="shrink-0 text-primary" aria-label="Preparation ready" />
-  }
-  return null
 }
 
 /**
@@ -73,9 +59,9 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                 href={`/meeting-planner/${meeting.id}`}
                 className="group min-w-0 flex-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
-                <span className="flex items-center gap-1.5">
+                <span className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[13px] font-bold tabular-nums text-primary">{formatTime(meeting.meetingTime)}</span>
-                  <PrepMark meeting={meeting} />
+                  <PrepBadge meeting={meeting} />
                 </span>
                 <span className="mt-0.5 flex items-center gap-1 text-[13px] font-semibold text-on-surface group-hover:text-primary">
                   <span className="truncate">{meeting.name}</span>
@@ -93,7 +79,7 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
     <button
       type="button"
       onClick={() => onAddMeeting(date)}
-      className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+      className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
     >
       <CalendarPlus size={16} aria-hidden="true" />
       Add a meeting on this day

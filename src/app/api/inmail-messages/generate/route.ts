@@ -6,6 +6,7 @@ import { generateInMail } from "@/services/inmail/generate"
 import { recordInMail } from "@/services/generationRecords"
 import { requireViewer } from "@/services/auth/viewer"
 import { runAiRequest, withSource } from "@/services/modelPriority"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -23,7 +24,7 @@ const GenerateSchema = z.object({
  * POST: Generates one InMail (separate subject and message) from raw profile text using
  * the latest saved prompt for the selected tune (the module's provider order, Groq first).
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -50,3 +51,6 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("inmail-messages:generate", handlePost)

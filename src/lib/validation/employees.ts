@@ -5,6 +5,7 @@ import {
   EMPLOYEE_NAME_MAX_LENGTH,
   EMPLOYEE_ROLE_MAX_LENGTH,
   EMPLOYEE_STATUS_IDS,
+  EMPLOYEES_LIST_MAX,
   PLAN_ITEM_MAX_LENGTH,
   PLAN_MAX_ITEMS,
   PLAN_NOTES_MAX_LENGTH,
@@ -33,6 +34,15 @@ export const EmployeeSchema = z.object({
     // Someone starting next month can be added now; a date years away is a typo
     .refine((value) => value <= shiftDate(new Date().toISOString().slice(0, 10), 366), EMPLOYEE_MESSAGES.futureJoiningDate),
   status: z.enum(EMPLOYEE_STATUS_IDS, { error: EMPLOYEE_MESSAGES.badStatus }),
+})
+
+// The team in its new order after a drag: every employee the page shows, top to bottom, each once
+export const EmployeeOrderSchema = z.object({
+  orderedIds: z
+    .array(z.string().regex(/^[0-9a-f]{24}$/, EMPLOYEE_MESSAGES.teamOrderChanged))
+    .min(1, EMPLOYEE_MESSAGES.teamOrderChanged)
+    .max(EMPLOYEES_LIST_MAX, EMPLOYEE_MESSAGES.teamOrderChanged)
+    .refine((ids) => new Set(ids).size === ids.length, EMPLOYEE_MESSAGES.teamOrderChanged),
 })
 
 export const EmployeesQuerySchema = z.object({

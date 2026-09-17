@@ -10,6 +10,7 @@ import {
   PREP_INPUT_MAX_LENGTH,
 } from "@/constants/meetingPlanner"
 import type { MeetingPlanDetail } from "@/types/meetingPlanner"
+import { TimeField } from "./TimeField"
 
 export interface MeetingFormValues {
   name: string
@@ -141,7 +142,7 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label htmlFor="meeting-date" className={labelClass}>
               Date
@@ -155,20 +156,13 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
               className={fieldClass}
             />
           </div>
-          <div>
-            <label htmlFor="meeting-time" className={labelClass}>
-              Time
-            </label>
-            <input
-              id="meeting-time"
-              type="time"
-              value={values.meetingTime}
-              onChange={(event) => set("meetingTime", event.target.value)}
-              disabled={isSaving}
-              className={fieldClass}
-            />
-          </div>
-          <div>
+          <TimeField
+            value={values.meetingTime}
+            onChange={(time) => set("meetingTime", time)}
+            disabled={isSaving}
+            labelClass={labelClass}
+          />
+          <div className="sm:col-span-2">
             <label htmlFor="meeting-person" className={labelClass}>
               Person <span className="normal-case tracking-normal">(optional)</span>
             </label>

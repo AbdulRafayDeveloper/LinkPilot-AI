@@ -147,7 +147,7 @@ export default function MeetingsClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
-      })
+      }, { idempotent: true })
       setIsCreating(false)
       router.push(`/meetings/${data.id}`)
     } catch (error: unknown) {
@@ -187,7 +187,7 @@ export default function MeetingsClient() {
                 <button
                   type="button"
                   onClick={() => setPromptTab("chunk")}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <FilePenLine size={16} aria-hidden="true" />
                   Update Prompt
@@ -198,7 +198,7 @@ export default function MeetingsClient() {
                     setSaveError(null)
                     setIsCreating(true)
                   }}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
                 >
                   <Plus size={16} aria-hidden="true" />
                   New Meeting

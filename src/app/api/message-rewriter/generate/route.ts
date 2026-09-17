@@ -6,6 +6,7 @@ import { rewriteMessage } from "@/services/messageRewriter/generate"
 import { recordRewrittenMessage } from "@/services/generationRecords"
 import { requireViewer } from "@/services/auth/viewer"
 import { runAiRequest, withSource } from "@/services/modelPriority"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -24,7 +25,7 @@ const RewriteSchema = z.object({
  * POST: Rewrites one message, in any language, into a short and clear English message that
  * says what the user meant, humanized like every other written result, and saves it.
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -52,3 +53,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message }, { status })
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("message-rewriter:generate", handlePost)

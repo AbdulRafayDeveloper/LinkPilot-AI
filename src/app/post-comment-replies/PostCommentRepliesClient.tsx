@@ -58,7 +58,7 @@ const formStore = createToolStore(
 )
 
 // Compact cards so the Generate button is on screen without scrolling on laptop-height windows
-const cardClass = "bg-white border border-outline-variant rounded-2xl shadow-sm p-4 flex flex-col gap-3"
+const cardClass = "bg-white border border-outline-variant rounded-2xl shadow-sm p-4 flex flex-col gap-3 short:p-3 short:gap-2"
 const labelClass = "text-[10px] font-bold text-outline uppercase tracking-wider"
 
 export default function PostCommentRepliesClient() {
@@ -126,9 +126,9 @@ export default function PostCommentRepliesClient() {
         />
 
         <main className="flex-1 overflow-y-auto bg-background overflow-x-hidden">
-          <div className="max-w-[1400px] mx-auto p-4 md:px-6 md:py-5 lg:px-8 flex flex-col gap-4">
+          <div className="max-w-[1400px] mx-auto p-4 md:px-6 md:py-5 lg:px-8 flex flex-col gap-4 short:py-3 short:gap-3">
             {/* Page header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 shrink-0">
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
                   <Reply size={24} className="text-primary shrink-0" aria-hidden="true" />
@@ -138,13 +138,13 @@ export default function PostCommentRepliesClient() {
                   Write a natural reply to a comment on your post or in someone else&apos;s thread.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 sm:shrink-0">
+              <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
                 <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
                 <button
                   type="button"
                   onClick={() => setIsPromptsOpen(true)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
                 >
                   <FilePenLine size={16} aria-hidden="true" />
                   Update Prompt
@@ -158,7 +158,7 @@ export default function PostCommentRepliesClient() {
                 event.preventDefault()
                 submit()
               }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-4"
+              className="grid grid-cols-1 lg:grid-cols-2 gap-4 short:gap-3"
             >
               {/* Comments: what to reply to, pasted separately from the post */}
               <section aria-label="Comments" className={cardClass}>
@@ -190,7 +190,7 @@ export default function PostCommentRepliesClient() {
                     placeholder={COMMENTS_PLACEHOLDER}
                     aria-invalid={formError === missingComment}
                     aria-describedby={formError === missingComment ? `${COMMENTS_HINT_ID} ${FORM_ERROR_ID}` : COMMENTS_HINT_ID}
-                    className="flex-1 w-full min-h-[140px] resize-none rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary disabled:opacity-70"
+                    className="flex-1 w-full min-h-[140px] short:min-h-[80px] resize-none rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary disabled:opacity-70"
                   />
                   <p id={COMMENTS_HINT_ID} className="text-[11px] text-outline mt-1.5">
                     Paste one comment or a whole thread. Press Ctrl + Enter to generate.
@@ -209,6 +209,7 @@ export default function PostCommentRepliesClient() {
                   onChange={(nextContext) => formStore.update({ context: nextContext })}
                   disabled={isGenerating}
                   columnsClassName="grid-cols-1 min-[440px]:grid-cols-2"
+                  compactOnShortScreens
                 />
                 <PostInput
                   idPrefix={ID_PREFIX}
@@ -243,6 +244,7 @@ export default function PostCommentRepliesClient() {
                   disabled={isGenerating}
                   columnsClassName="grid-cols-2 min-[480px]:grid-cols-3"
                   wrapLabels
+                  compactOnShortScreens
                 />
 
                 {formError && (
@@ -253,7 +255,7 @@ export default function PostCommentRepliesClient() {
                 )}
 
                 {/* The card's footer sticks to the bottom of the window on short screens, so Generate is always one click away */}
-                <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-auto px-4 pb-4 pt-3 bg-white rounded-b-2xl border-t border-outline-variant/50">
+                <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-auto px-4 pb-4 pt-3 short:-mx-3 short:-mb-3 short:px-3 short:pb-3 short:pt-2 bg-white rounded-b-2xl border-t border-outline-variant/50">
                   <button
                     type="submit"
                     disabled={isGenerating}

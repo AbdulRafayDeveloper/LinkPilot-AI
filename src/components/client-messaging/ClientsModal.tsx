@@ -194,7 +194,7 @@ const ClientsEditor: React.FC<ClientsModalProps> = ({ onUse, onChanged, onClose 
       const headers = { "Content-Type": "application/json" }
       const { data, message } = active.saved
         ? await requestApi<Client>(`${ENDPOINT}/${active.id}`, { method: "PUT", headers, body })
-        : await requestApi<Client>(ENDPOINT, { method: "POST", headers, body })
+        : await requestApi<Client>(ENDPOINT, { method: "POST", headers, body }, { idempotent: true })
       const next = entries?.map((entry) => (entry.id === active.id ? toEntry(data) : entry)) ?? [toEntry(data)]
       setEntries(next)
       setActiveId(data.id)

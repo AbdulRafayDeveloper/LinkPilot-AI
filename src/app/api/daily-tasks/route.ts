@@ -5,6 +5,7 @@ import { DAILY_TASKS_MESSAGES, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/c
 import { IsoDate, TodaySchema } from "@/lib/validation/dailyTasks"
 import { createTasks, deleteTasksBeforeWindow, listTasks } from "@/services/dailyTasks/tasks"
 import { requireViewer } from "@/services/auth/viewer"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
  * POST: adds a day's tasks in one go. Empty rows are ignored, so the composer can keep spare
  * rows on screen, and a row repeated in the same submission is saved once.
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
@@ -112,3 +113,6 @@ export async function DELETE(req: NextRequest) {
     )
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("daily-tasks", handlePost)

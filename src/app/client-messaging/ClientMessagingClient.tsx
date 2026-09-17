@@ -145,9 +145,9 @@ export default function ClientMessagingClient() {
         />
 
         <main className="flex-1 overflow-y-auto bg-background overflow-x-hidden">
-          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:h-full">
+          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 xl:h-full short:py-4 short:gap-3">
             {/* Page header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 shrink-0">
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
                   <Users size={24} className="text-primary shrink-0" aria-hidden="true" />
@@ -157,12 +157,12 @@ export default function ClientMessagingClient() {
                   Write a formal message in your client&apos;s own format, ready to paste into the channel you send it on.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 sm:shrink-0">
+              <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
                 <button
                   type="button"
                   onClick={() => setIsClientsOpen(true)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
                 >
                   <UserPlus size={16} aria-hidden="true" />
                   Clients
@@ -170,7 +170,7 @@ export default function ClientMessagingClient() {
                 <button
                   type="button"
                   onClick={() => setIsPromptOpen(true)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
                 >
                   <FilePenLine size={16} aria-hidden="true" />
                   Update Prompt
@@ -178,9 +178,12 @@ export default function ClientMessagingClient() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0">
-              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-h-0">
-                {/* Who the message is for */}
+            {/* Side by side from xl, where the form still has room for its channel cards; stacked below. The row
+                fills the screen but never shrinks under the form, so a short laptop screen scrolls instead of overlapping */}
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 xl:flex-1 short:gap-4">
+              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 short:p-4 short:gap-3">
+                {/* Who the message is for, and on a short laptop window the channel beside it */}
+                <div className="flex flex-col gap-4 short:grid short:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] short:items-start short:gap-3">
                 <div className="flex flex-col gap-1.5 shrink-0">
                   <label htmlFor="client-select" className="text-[10px] font-bold text-outline uppercase tracking-wider">
                     Client
@@ -213,7 +216,7 @@ export default function ClientMessagingClient() {
                   {clients !== null && !hasClients && !clientsError && (
                     <p className="text-[12px] text-on-surface-variant">
                       {CLIENT_MESSAGING_MESSAGES.noClients}{" "}
-                      <button type="button" onClick={() => setIsClientsOpen(true)} className="font-semibold text-primary hover:underline">
+                      <button type="button" onClick={() => setIsClientsOpen(true)} className="rounded py-[3px] font-semibold text-primary hover:underline">
                         Add your first client
                       </button>
                     </p>
@@ -226,8 +229,36 @@ export default function ClientMessagingClient() {
                   )}
                 </div>
 
+                {/* A short laptop window has no room for seven channel cards, so the same choice is a list here */}
+                <div className="hidden flex-col gap-1.5 short:flex">
+                  <label htmlFor="channel-select" className="text-[10px] font-bold text-outline uppercase tracking-wider">
+                    Send it on
+                  </label>
+                  <select
+                    id="channel-select"
+                    value={channel ?? ""}
+                    onChange={(event) => {
+                      formStore.update({ channel: event.target.value as MessageChannelId })
+                      if (formError === CLIENT_MESSAGING_MESSAGES.missingChannel) setFormError(null)
+                    }}
+                    disabled={isGenerating}
+                    aria-invalid={formError === CLIENT_MESSAGING_MESSAGES.missingChannel}
+                    className={`w-full rounded-xl border bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
+                      formError === CLIENT_MESSAGING_MESSAGES.missingChannel ? "border-error" : "border-outline-variant focus:border-primary/50"
+                    }`}
+                  >
+                    {!channel && <option value="">Choose a channel</option>}
+                    {MESSAGE_CHANNELS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label} · {option.description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                </div>
+
                 {/* What to tell them */}
-                <div className="flex flex-col gap-2 min-h-0 flex-1">
+                <div className="flex flex-col gap-2 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label htmlFor="client-update" className="text-[10px] font-bold text-outline uppercase tracking-wider">
                       What do you want to tell them
@@ -252,7 +283,7 @@ export default function ClientMessagingClient() {
                     disabled={isGenerating}
                     aria-invalid={updateInvalid}
                     placeholder="Type it, or press Speak instead. Example: the payments page is done and on staging, the reports screen slipped to Friday because the API was late, and I need their logo files."
-                    className={`w-full flex-1 min-h-[160px] resize-none rounded-xl border bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
+                    className={`w-full flex-1 min-h-[160px] short:min-h-[96px] resize-none rounded-xl border bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
                       updateInvalid ? "border-error" : "border-outline-variant focus:border-primary/50"
                     }`}
                   />
@@ -271,6 +302,8 @@ export default function ClientMessagingClient() {
                   )}
                 </div>
 
+                {/* The channel cards, on every screen but a short laptop window (the list above takes their place there) */}
+                <div className="short:hidden">
                 <RadioCardGroup
                   name="message-channel"
                   legend="Send it on"
@@ -282,8 +315,10 @@ export default function ClientMessagingClient() {
                   }}
                   disabled={isGenerating}
                   invalid={formError === CLIENT_MESSAGING_MESSAGES.missingChannel}
-                  columnsClassName="grid-cols-2 sm:grid-cols-3"
+                  // Two across in the narrower side-by-side form (xl), three wherever the form has the width for their descriptions
+                  columnsClassName="grid-cols-2 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3"
                 />
+                </div>
 
                 {formError && (
                   <p role="alert" className="text-[12px] text-error">

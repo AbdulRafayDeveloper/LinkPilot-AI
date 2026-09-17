@@ -109,7 +109,7 @@ export default function QuickNotesClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
-      })
+      }, { idempotent: true })
       draftStore.update({ content: "" })
       setSaveState({ type: "saved", message: message || QUICK_NOTES_MESSAGES.saved })
       // The list starts again from the newest note, so the one just saved is at the top
@@ -194,7 +194,7 @@ export default function QuickNotesClient() {
                     setIsConfirmingClear(true)
                   }}
                   disabled={!hasNotes || isClearing}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-error/40 text-error rounded-xl text-sm font-semibold transition-colors hover:bg-error/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-error/40 text-error rounded-xl text-sm font-semibold transition-colors hover:bg-error/5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Trash2 size={16} aria-hidden="true" />
                   Clear All

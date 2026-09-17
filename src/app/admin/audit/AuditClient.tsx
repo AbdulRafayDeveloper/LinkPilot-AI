@@ -132,7 +132,8 @@ export default function AuditClient() {
               <p className="py-16 text-center text-sm text-on-surface-variant">{hasFilters ? "No events match these filters." : "Nothing recorded yet."}</p>
             ) : (
               <div className={`flex flex-col gap-3 transition-opacity ${list.isLoading ? "opacity-60" : ""}`} aria-busy={list.isLoading}>
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm md:block">
+                {/* The table from xl, where it fits beside the open sidebar; cards below, two to a row on a tablet */}
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
                   <table className="w-full min-w-[880px] border-collapse text-left">
                     <caption className="sr-only">Sign-in activity, newest first</caption>
                     <thead className="bg-surface-container-lowest">
@@ -169,9 +170,9 @@ export default function AuditClient() {
                   </table>
                 </div>
 
-                <ul className="flex flex-col gap-2 md:hidden">
+                <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {list.items.map((entry) => (
-                    <li key={entry.id} className="flex flex-col gap-1.5 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                    <li key={entry.id} className="flex min-w-0 flex-col gap-1.5 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-[13px] font-semibold text-on-surface">{entry.name ?? "No such account"}</p>

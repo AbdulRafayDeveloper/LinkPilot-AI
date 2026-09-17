@@ -5,6 +5,7 @@ import { DUMMY_DATA_KINDS } from "@/constants/dummyData"
 import { createDummyItem, listDummyItems } from "@/services/dummyData"
 import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
+import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
@@ -38,7 +39,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 /**
  * POST: Adds a new item to the dummy_data collection.
  */
-export async function POST(req: NextRequest, { params }: RouteContext) {
+async function handlePost(req: NextRequest, { params }: RouteContext) {
   const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
@@ -61,3 +62,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     )
   }
 }
+
+// A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
+export const POST = withIdempotency("dummy-data", handlePost)
