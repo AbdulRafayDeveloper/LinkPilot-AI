@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { AArrowDown, AArrowUp, Maximize, Minimize, X } from "lucide-react"
+import { AArrowDown, AArrowUp, X } from "lucide-react"
 import type { ScriptStage } from "@/types/meetingPlanner"
 import { ConversationScript, type ScriptTextSize } from "./ConversationScript"
 
@@ -18,15 +18,13 @@ const readSize = (): ScriptTextSize => {
   }
 }
 
-const subscribeToFullscreen = (listener: () => void) => {
-  document.addEventListener("fullscreenchange", listener)
-  return () => document.removeEventListener("fullscreenchange", listener)
-}
-
 /**
- * The conversation on its own, filling the screen, for reading during the call: larger text (three
- * sizes, remembered in this browser), a stage picker to jump straight to a stage, and the
- * browser's own full screen where it allows it. Escape or Close returns to the meeting page.
+ * The conversation on its own, for reading during the call: it opens straight into the browser's own
+ * full screen (the click that opened it is what allows that; a browser that refuses still gets the
+ * whole window), with larger text in three sizes, remembered in this browser. There is no header
+ * bar, so every line of the screen is the conversation and a long line stays on one line; the only
+ * controls float over the top corner. The view is the full screen, so leaving full screen closes it:
+ * one press of Escape is enough, and so is the cross.
  */
 export const ConversationFullView: React.FC<{
   title: string
@@ -42,11 +40,6 @@ export const ConversationFullView: React.FC<{
   const [size, setSize] = useState<ScriptTextSize>(readSize)
   const panel = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
-  const isFullscreen = useSyncExternalStore(
-    subscribeToFullscreen,
-    () => Boolean(document.fullscreenElement),
-    () => false
-  )
 
   const changeSize = (step: number) => {
     const next = SIZES[Math.min(SIZES.length - 1, Math.max(0, SIZES.indexOf(size) + step))]
@@ -63,35 +56,36 @@ export const ConversationFullView: React.FC<{
     onClose()
   }, [onClose])
 
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
-    else void panel.current?.requestFullscreen?.().catch(() => undefined)
-  }
-
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null
+    // Full screen straight away, on the activation of the click that opened this. A browser that
+    // refuses simply leaves the view filling the window, which is what it already does
+    if (!document.fullscreenElement) void panel.current?.requestFullscreen?.().catch(() => undefined)
     // Focus on the reading area, so the arrow keys, Page Down and Space scroll it straight away
     scroller.current?.focus()
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
     const onKey = (event: KeyboardEvent) => {
-      // In the browser's own full screen, Escape leaves full screen first and the view stays open
+      // Outside full screen (a browser that refused it, or one already left) Escape closes the view
       if (event.key === "Escape" && !document.fullscreenElement) close()
     }
+    // Inside full screen the browser takes Escape to leave it; since the view is the full screen,
+    // leaving it closes the view too, so one press is always enough
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) close()
+    }
     window.addEventListener("keydown", onKey)
+    document.addEventListener("fullscreenchange", onFullscreenChange)
     return () => {
       window.removeEventListener("keydown", onKey)
+      document.removeEventListener("fullscreenchange", onFullscreenChange)
       document.body.style.overflow = previousOverflow
       previousFocus?.focus()
     }
   }, [close])
 
-  const jumpTo = (id: string) => {
-    document.getElementById(`full-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }
-
   const iconButton =
-    "flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-40"
+    "flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-40"
 
   return createPortal(
     <div
@@ -101,64 +95,28 @@ export const ConversationFullView: React.FC<{
       aria-label={`Conversation: ${title}`}
       className="fixed inset-0 z-[80] flex flex-col bg-background"
     >
-      <div className="flex flex-wrap items-center gap-2 border-b border-outline-variant bg-white px-3 py-2 sm:px-5">
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-outline">Conversation</p>
-          <h2 className="truncate text-[15px] font-bold text-on-surface">{title}</h2>
-        </div>
-        {stages.length > 1 && (
-          <select
-            aria-label="Jump to a stage"
-            defaultValue=""
-            onChange={(event) => {
-              if (event.target.value) jumpTo(event.target.value)
-              event.target.value = ""
-            }}
-            className="max-w-[45vw] rounded-lg border border-outline-variant bg-white px-2 py-1.5 text-[13px] font-semibold text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
-          >
-            <option value="">Jump to stage</option>
-            {stages.map((stage, index) => (
-              <option key={stage.id} value={stage.id}>
-                {index + 1}. {stage.title}
-              </option>
-            ))}
-          </select>
-        )}
-        <div className="flex items-center">
-          <button type="button" onClick={() => changeSize(-1)} disabled={size === SIZES[0]} aria-label="Smaller text" title="Smaller text" className={iconButton}>
-            <AArrowDown size={18} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={() => changeSize(1)}
-            disabled={size === SIZES[SIZES.length - 1]}
-            aria-label="Larger text"
-            title="Larger text"
-            className={iconButton}
-          >
-            <AArrowUp size={18} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            aria-label={isFullscreen ? "Leave full screen" : "Full screen"}
-            title={isFullscreen ? "Leave full screen" : "Full screen"}
-            className={`${iconButton} hidden sm:flex`}
-          >
-            {isFullscreen ? <Minimize size={17} aria-hidden="true" /> : <Maximize size={17} aria-hidden="true" />}
-          </button>
-          <button
-            type="button"
-            onClick={close}
-            className="ml-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-          >
-            <X size={15} aria-hidden="true" />
-            Close
-          </button>
-        </div>
+      {/* Floating over the conversation, so the controls cost the reading area no height at all */}
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-xl border border-outline-variant/70 bg-white/85 p-0.5 opacity-50 shadow-sm backdrop-blur-sm transition-opacity hover:opacity-100 focus-within:opacity-100 sm:right-3 sm:top-3">
+        <button type="button" onClick={() => changeSize(-1)} disabled={size === SIZES[0]} aria-label="Smaller text" title="Smaller text" className={iconButton}>
+          <AArrowDown size={18} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={() => changeSize(1)}
+          disabled={size === SIZES[SIZES.length - 1]}
+          aria-label="Larger text"
+          title="Larger text"
+          className={iconButton}
+        >
+          <AArrowUp size={18} aria-hidden="true" />
+        </button>
+        <button type="button" onClick={close} aria-label="Close the conversation (Escape)" title="Close (Escape)" className={iconButton}>
+          <X size={18} aria-hidden="true" />
+        </button>
       </div>
       <div ref={scroller} tabIndex={-1} className="custom-scrollbar flex-1 overflow-y-auto overscroll-contain focus:outline-none">
-        <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+        {/* The whole width, less a small margin, so a long line stays on one line */}
+        <div className="px-2 py-3 sm:px-4 sm:py-4">
           <ConversationScript stages={stages} size={size} anchorPrefix="full" projectLinks={projectLinks} />
           <p className="py-8 text-center text-[12px] text-outline">End of the conversation</p>
         </div>

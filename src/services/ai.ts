@@ -2,6 +2,7 @@ import OpenAI, { toFile } from "openai"
 import Groq, { toFile as toGroqFile } from "groq-sdk"
 import { ChatOpenAI } from "@langchain/openai"
 import { ChatGroq } from "@langchain/groq"
+import { Embeddings } from "@langchain/core/embeddings"
 import type { BaseMessage } from "@langchain/core/messages"
 import type { InteropZodType } from "@langchain/core/utils/types"
 import { env, GROQ_API_KEYS } from "@/config/env"
@@ -228,6 +229,112 @@ export async function transcribeWithGroq(audio: { data: Buffer; mimeType: string
   )
   await recordAiUsage({ provider: "groq", model, kind: "speech", keyNumber, audioSeconds: transcription.duration ?? null })
   return { text: transcription.text, provider: "groq" }
+}
+
+/** Whether text can be turned into vectors here: OpenAI's key and an embedding model are both set. */
+export function isEmbeddingConfigured(): boolean {
+  return Boolean(env.OPENAI_API_KEY && env.OPENAI_EMBEDDING_MODEL)
+}
+
+/**
+ * Turning text into vectors, as LangChain expects it (so it plugs straight into the vector store),
+ * through OpenAI's embeddings endpoint, because Groq has no embedding model. Every call is counted
+ * like any other (services/aiUsage.ts). Documents go in batches; a question is one call.
+ */
+export class OpenAIEmbeddings extends Embeddings {
+  private readonly client: OpenAI
+  private readonly model: string
+
+  constructor(private readonly signal?: AbortSignal) {
+    super({ maxRetries: 0 })
+    const apiKey = env.OPENAI_API_KEY
+    const model = env.OPENAI_EMBEDDING_MODEL
+    if (!apiKey || !model) {
+      const missing = [!apiKey && "OPENAI_API_KEY", !model && "OPENAI_EMBEDDING_MODEL"].filter(Boolean).join(" and ")
+      throw new UserFacingError(`Turning text into vectors needs ${missing} where the app runs.`)
+    }
+    this.client = new OpenAI({ apiKey, maxRetries: 0 })
+    this.model = model
+  }
+
+  private async embed(input: string[]): Promise<number[][]> {
+    const answer = await withProviderRetry("openai", () => this.client.embeddings.create({ model: this.model, input }, { signal: this.signal }), this.signal ?? new AbortController().signal)
+    await recordAiUsage({ provider: "openai", model: this.model, kind: "embedding", usage: answer.usage })
+    return answer.data.map((entry) => entry.embedding)
+  }
+
+  async embedDocuments(texts: string[]): Promise<number[][]> {
+    if (texts.length === 0) return []
+    return this.embed(texts)
+  }
+
+  async embedQuery(text: string): Promise<number[]> {
+    const [vector] = await this.embed([text])
+    return vector
+  }
+}
+
+export interface StreamedText {
+  text: string
+  provider: ModelProvider
+}
+
+interface StreamOptions {
+  messages: BaseMessage[]
+  // Called with each piece of the answer as it arrives, so a page can show it being written
+  onToken: (text: string) => void
+  providers?: readonly ModelProvider[]
+  temperature?: number
+  maxTokens?: number
+  signal: AbortSignal
+}
+
+/**
+ * One answer in plain text, streamed as it is written, through the request's providers in order
+ * (Groq first by default, every Groq key before the next provider). A provider that fails before it
+ * has written anything hands over to the next; once text has been sent to the page, that provider's
+ * answer is what is used. Used by the meeting chat, where reading the answer appear is the point.
+ */
+export async function streamTextWithFallback({ messages, onToken, providers, temperature = 0.2, maxTokens, signal }: StreamOptions): Promise<StreamedText> {
+  const order = (providers ?? currentModelOrder()).filter((provider) => isProviderConfigured(provider))
+  if (order.length === 0) {
+    throw new UserFacingError(`No AI provider is configured. ${missingConfiguration().join(" ")}`)
+  }
+
+  const failures: string[] = []
+  for (const [index, provider] of order.entries()) {
+    // streamUsage asks the provider to report the tokens on the last chunk, so a streamed answer is counted too
+    const options = { temperature, maxRetries: 0, streamUsage: true, ...(maxTokens ? { maxTokens } : {}) }
+    let text = ""
+    try {
+      const run = async (model: ChatGroq | ChatOpenAI, keyNumber?: number) => {
+        let usage: unknown
+        for await (const chunk of await model.stream(messages, { signal })) {
+          const piece = typeof chunk.content === "string" ? chunk.content : chunk.content.map((part) => ("text" in part && typeof part.text === "string" ? part.text : "")).join("")
+          if (piece) {
+            text += piece
+            onToken(piece)
+          }
+          // OpenAI reports the tokens as usage_metadata, Groq on the answer's own metadata; lib/aiUsage.ts reads both shapes
+          if (chunk.usage_metadata) usage = chunk.usage_metadata
+          else if (chunk.response_metadata?.usage) usage = chunk.response_metadata.usage
+        }
+        await recordAiUsage({ provider, model: modelNameOf(provider), kind: "text", usage, keyNumber })
+      }
+      if (provider === "groq") await withGroqKey((apiKey, keyNumber) => run(createGroqModel(apiKey, options), keyNumber), signal)
+      else if (provider === "open-source") await run(createOpenSourceModel(options))
+      else await run(createOpenAIModel(options))
+      if (!text.trim()) throw new Error("EmptyAnswerException: the model answered with nothing")
+      return { text, provider }
+    } catch (error: unknown) {
+      if (signal.aborted || text.trim()) throw error
+      failures.push(describeProviderFailure(error, providerNames(provider)))
+      const next = order[index + 1]
+      console.warn(`⚠️ ${provider} answer failed${next ? `, falling back to ${next}` : ""}:`, error instanceof Error ? error.message : error)
+    }
+  }
+  console.error("❌ Every AI provider failed to answer:", failures.join(" "))
+  throw new UserFacingError(failures.join(" "))
 }
 
 const DEFAULT_GENERATION_TIMEOUT_MS = 45_000

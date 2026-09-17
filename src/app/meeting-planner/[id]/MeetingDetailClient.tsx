@@ -21,6 +21,7 @@ import { Modal } from "@/components/ui/Modal"
 import { MeetingStatusButton } from "@/components/meeting-planner/MeetingStatusButton"
 import { PrepBadge } from "@/components/meeting-planner/PrepBadge"
 import { MeetingPrepView } from "@/components/meeting-planner/MeetingPrepView"
+import { MeetingChatPanel } from "@/components/meeting-planner/MeetingChatPanel"
 import { endConversationEdit, useConversationDraft } from "@/components/meeting-planner/ConversationEditor"
 import { MeetingFormModal, formValuesOf, type MeetingFormValues } from "@/components/meeting-planner/MeetingFormModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -321,6 +322,8 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                     )}
                   </div>
                 </section>
+
+                {meeting.prep && <MeetingChatPanel meetingId={meeting.id} meetingName={meeting.name} personName={meeting.personName} />}
 
                 {meeting.prep && (
                   <MeetingPrepView

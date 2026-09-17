@@ -7,6 +7,8 @@ import type { MeetingPlan, MeetingPlanDetail, MeetingPlannerPage, MeetingPrep, P
 import type { Viewer } from "@/types/auth"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { STALE_PREP_MS, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
+import { deleteMeetingVectors } from "@/services/meetingPlanner/vectors"
+import { clearMeetingChat } from "@/services/meetingPlanner/chatHistory"
 
 /**
  * Meetings live in the meeting_plans collection. The app has no accounts, so they belong to
@@ -145,6 +147,8 @@ export async function deleteMeeting(viewer: Viewer, id: string): Promise<boolean
   if (!filter) return false
   await connectDatabase()
   const { deletedCount } = await MeetingPlanModel.deleteOne(filter)
+  // The meeting's vectors and its chat go with it; neither means anything without the meeting
+  if (deletedCount > 0) await Promise.all([deleteMeetingVectors(id), clearMeetingChat(id)])
   return deletedCount > 0
 }
 

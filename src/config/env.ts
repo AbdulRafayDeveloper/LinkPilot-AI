@@ -14,12 +14,13 @@ const envSchema = z.object({
   AUTH_SECRET: z.string({ error: "is required" }).min(32, { error: "must be at least 32 characters" }),
   // "true" lets anyone create a user account at /signup; anything else leaves accounts to the scripts in scripts/
   ALLOW_SIGNUP: z.enum(["true", "false"], { error: 'must be "true" or "false"' }).optional(),
-  // Unlocks every Update Prompt editor; when unset, prompt editing stays locked for everyone
-  PROMPT_EDITOR_PASSWORD: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_LIGHTWEIGHT_MODEL: z.string().optional(),
   // Reads recordings when Groq cannot (voice input); OpenAI's transcription model
   OPENAI_TRANSCRIPTION_MODEL: z.string().optional(),
+  // Turns text into vectors for the meeting chat (e.g. text-embedding-3-small). Groq has no embedding
+  // model, so this is OpenAI's; without it a meeting cannot be asked questions
+  OPENAI_EMBEDDING_MODEL: z.string().optional(),
   // Groq, the first provider everywhere. Up to five API keys, tried in order: a key that is rejected or
   // rate limited hands the call to the next one (services/ai.ts withGroqKey)
   GROQ_API_KEY_1: z.string().optional(),

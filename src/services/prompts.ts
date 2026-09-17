@@ -45,6 +45,7 @@ export type PromptName =
   | "client-message-system"
   | "client-message"
   | "meeting-prep-system"
+  | "meeting-chat-system"
   | `meeting-prep-${MeetingPlannerPromptId}`
   | "meeting-system"
   | "meeting-chunk"

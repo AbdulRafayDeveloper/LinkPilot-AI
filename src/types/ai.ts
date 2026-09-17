@@ -20,7 +20,7 @@ export interface AiText {
   provider: AiProviderId
 }
 
-export type AiUsageKind = "text" | "screenshot" | "web-search" | "speech" | "image"
+export type AiUsageKind = "text" | "screenshot" | "web-search" | "speech" | "image" | "embedding"
 
 /** What one successful AI call used, as recorded for budget tracking (services/aiUsage.ts). */
 export interface AiUsage {
