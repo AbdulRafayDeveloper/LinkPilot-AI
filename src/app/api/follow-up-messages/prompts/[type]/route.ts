@@ -4,7 +4,6 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { FOLLOW_UP_PROMPT_IDS, getFollowUpPromptLabel } from "@/constants/followUp"
 import { saveFollowUpPrompt } from "@/services/followUp/prompts"
-import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
@@ -18,9 +17,6 @@ const PromptIdSchema = z.enum(FOLLOW_UP_PROMPT_IDS)
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ type: string }> }) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const id = PromptIdSchema.safeParse((await params).type)
     if (!id.success) {

@@ -13,6 +13,8 @@ export interface ICreatedPrompt {
   target: string
   request: string
   requestSource: "text" | "voice"
+  // The folder it is filed in (models/PromptFolder.ts), null for a prompt in no folder
+  folderId: string | null
   provider: string
   // When the user last changed the name or the prompt by hand
   editedAt: Date | null
@@ -28,6 +30,7 @@ const CreatedPromptSchema = new Schema<ICreatedPrompt>(
     target: { type: String, required: true, index: true },
     request: { type: String, required: true },
     requestSource: { type: String, enum: ["text", "voice"], required: true },
+    folderId: { type: String, default: null, index: true },
     provider: { type: String, default: null },
     editedAt: { type: Date, default: null },
   },

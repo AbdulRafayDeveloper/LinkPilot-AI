@@ -3,7 +3,6 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { DummyDataKindSchema, dummyItemInputSchema } from "@/lib/validation/dummyData"
 import { DUMMY_DATA_KINDS, dummyDataMessages } from "@/constants/dummyData"
 import { deleteDummyItem, updateDummyItem } from "@/services/dummyData"
-import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
@@ -18,9 +17,6 @@ const unknownKind = () => NextResponse.json({ success: false, message: "Unknown 
 export async function PUT(req: NextRequest, { params }: RouteContext) {
   const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   const { kind: rawKind, id } = await params
   const kind = DummyDataKindSchema.safeParse(rawKind)
   if (!kind.success) return unknownKind()
@@ -49,9 +45,6 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   const { kind: rawKind, id } = await params
   const kind = DummyDataKindSchema.safeParse(rawKind)
   if (!kind.success) return unknownKind()

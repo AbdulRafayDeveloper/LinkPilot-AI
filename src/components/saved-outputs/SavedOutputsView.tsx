@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, Check, ChevronsDownUp, ChevronsUpDown, Copy, Eye, EyeOff, FileText, History, Loader2, RefreshCw, SquarePlus, Trash2 } from "lucide-react"
+import { AlertTriangle, Check, ChevronsDownUp, ChevronsUpDown, Copy, Eye, EyeOff, FileText, Folder, FolderCog, FolderInput, History, Loader2, RefreshCw, SquarePlus, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
@@ -23,6 +23,11 @@ import {
   type SavedOutputToolId,
 } from "@/constants/savedOutputs"
 import type { SavedOutput, SavedOutputDetail, SavedOutputsPage } from "@/types/savedOutputs"
+import type { PromptFolder } from "@/types/promptFolders"
+import { PROMPT_FOLDER_MESSAGES, UNFILED_FOLDER } from "@/constants/promptFolders"
+import { usePromptFolders } from "@/hooks/usePromptFolders"
+import { MoveToFolderDialog } from "./MoveToFolderDialog"
+import { FoldersDialog } from "./FoldersDialog"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 import { describeSource } from "@/constants/aiProviders"
 
@@ -30,11 +35,13 @@ interface FilterState {
   search: string
   option: string
   context: string
+  // Only a tool with folders uses this; for the others it stays empty and is never sent
+  folder: string
   fromDay: string
   toDay: string
 }
 
-const NO_FILTERS: FilterState = { search: "", option: "", context: "", fromDay: "", toDay: "" }
+const NO_FILTERS: FilterState = { search: "", option: "", context: "", folder: "", fromDay: "", toDay: "" }
 
 const writtenOn = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -45,6 +52,7 @@ const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slic
 const COLUMNS: Record<number, string> = {
   1: "lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_repeat(2,minmax(0,0.9fr))]",
   2: "lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]",
+  3: "lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]",
 }
 
 function queryString(filters: FilterState, search: string, page: number): string {
@@ -52,6 +60,7 @@ function queryString(filters: FilterState, search: string, page: number): string
   if (search) params.set("search", search)
   if (filters.option) params.set("option", filters.option)
   if (filters.context) params.set("context", filters.context)
+  if (filters.folder) params.set("folder", filters.folder)
   return appendDayRange(params, filters.fromDay, filters.toDay).toString()
 }
 
@@ -64,12 +73,19 @@ const actionButton =
 const toolbarButton =
   "inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
-/** The choices a record was written with (violet) and the facts about it (neutral). */
+/** The choices a record was written with (violet), the facts about it (neutral) and its folder. */
 const RecordTags: React.FC<{ item: SavedOutput }> = ({ item }) =>
-  item.choices.length + item.details.length === 0 && !describeSource(item) ? (
+  item.choices.length + item.details.length === 0 && !describeSource(item) && !item.folder ? (
     <span className="text-[12px] text-outline">None</span>
   ) : (
     <ul className="flex flex-wrap gap-1" aria-label="Written with">
+      {item.folder && (
+        <li className="inline-flex max-w-full items-center gap-1 rounded-full bg-secondary-fixed px-2 py-0.5 text-[11px] font-semibold text-on-surface">
+          <Folder size={11} className="shrink-0 text-secondary-container" aria-hidden="true" />
+          <span className="truncate">{item.folder.name}</span>
+          <span className="sr-only">folder</span>
+        </li>
+      )}
       {item.choices.map((label) => (
         <li key={`choice-${label}`} className="rounded-full bg-primary-fixed/60 px-2 py-0.5 text-[11px] font-semibold text-on-primary-fixed-variant">
           {label}
@@ -329,8 +345,13 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
   // Records deleted on this page: they leave the list at once, before the server answers
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set())
   const [actionError, setActionError] = useState<string | null>(null)
+  // The record being filed in a folder, and the folder manager
+  const [moving, setMoving] = useState<SavedOutput | null>(null)
+  const [isManagingFolders, setIsManagingFolders] = useState(false)
   // What a record was written from is read once per page load, whether it was opened or copied first
   const details = useRef(new Map<string, Promise<SavedOutputDetail>>())
+  // Only a tool with folders loads any of this; for the others the hook does nothing
+  const folders = usePromptFolders(tool?.folders?.endpoint)
 
   const endpoint = `${SAVED_OUTPUTS_ENDPOINT}/${toolId}`
   const badDateRange = isBackwardsRange(filters.fromDay, filters.toDay)
@@ -429,6 +450,32 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
     setReloadAttempt((attempt) => attempt + 1)
   }
 
+  /**
+   * Files one record in a folder, or takes it out of one. The row shows its new folder at once and
+   * the counts follow; a record that no longer matches the folder being filtered leaves the list,
+   * so the page is read again. A failure is thrown back to the dialog, which says so and stays open.
+   */
+  const moveRecord = async (item: SavedOutput, folder: PromptFolder | null) => {
+    const recordEndpoint = tool?.folders?.recordEndpoint
+    if (!recordEndpoint) return
+    setActionError(null)
+    const from = item.folder?.id ?? null
+    await requestApi<unknown>(`${recordEndpoint}/${item.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderId: folder?.id ?? null }),
+    })
+    folders.countMoved(from, folder?.id ?? null)
+    // The folder comes back from the dialog, so one just created is named here without waiting for the list
+    setResult((current) =>
+      current
+        ? { ...current, items: current.items.map((row) => (row.id === item.id ? { ...row, folder: folder ? { id: folder.id, name: folder.name } : null } : row)) }
+        : current
+    )
+    // With a folder filter on, the record may no longer belong on this page
+    if (filters.folder) setReloadAttempt((attempt) => attempt + 1)
+  }
+
   const items = result?.items ?? []
   const visibleItems = items.filter((item) => !removed.has(item.id))
   // Deleted rows still waiting for the page to be read again are already out of the count
@@ -460,6 +507,17 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
         <Trash2 size={13} aria-hidden="true" />
         Delete
       </button>
+      {tool.folders && (
+        <button
+          type="button"
+          onClick={() => setMoving(item)}
+          aria-label={`Move ${item.title} to a folder`}
+          className={`${actionButton} hover:text-primary`}
+        >
+          <FolderInput size={13} aria-hidden="true" />
+          {item.folder ? "Move" : "Add to folder"}
+        </button>
+      )}
       {item.texts.map((part) => (
         <CopyTextButton key={part.label} text={part.text} buttonText={`Copy ${part.label.toLowerCase()}`} label={`Copy the ${part.label.toLowerCase()} for ${item.title}`} />
       ))}
@@ -501,6 +559,21 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
               </Link>
             </div>
 
+            {tool.folders && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => setIsManagingFolders(true)} className={toolbarButton}>
+                  <FolderCog size={15} aria-hidden="true" />
+                  Folders
+                  {folders.folders && folders.folders.length > 0 && <span className="text-outline">({folders.folders.length})</span>}
+                </button>
+                {folders.error && (
+                  <p role="alert" className="text-[12px] text-error">
+                    {folders.error}
+                  </p>
+                )}
+              </div>
+            )}
+
             <FilterPanel
               columnsClassName={COLUMNS[tool.filters.length] ?? COLUMNS[1]}
               canClear={hasFilters}
@@ -527,6 +600,18 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                   onChange={(value) => updateFilter(filter.key, value)}
                 />
               ))}
+              {tool.folders && (
+                <SelectFilter
+                  label={tool.folders.label}
+                  allLabel={PROMPT_FOLDER_MESSAGES.allFolders}
+                  value={filters.folder}
+                  options={[
+                    { id: UNFILED_FOLDER, label: PROMPT_FOLDER_MESSAGES.unfiled },
+                    ...(folders.folders ?? []).map((folder) => ({ id: folder.id, label: `${folder.name} (${folder.promptCount})` })),
+                  ]}
+                  onChange={(value) => updateFilter("folder", value)}
+                />
+              )}
               <DateRangeFilters
                 fromLabel="Written from"
                 toLabel="Written to"
@@ -660,6 +745,30 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
       </div>
 
       {viewing && <RecordDialog item={viewing} loadDetail={loadDetail} onClose={() => setViewing(null)} />}
+      {moving && (
+        <MoveToFolderDialog
+          title={moving.title}
+          folders={folders.folders}
+          currentFolderId={moving.folder?.id ?? null}
+          onMove={(folder) => moveRecord(moving, folder)}
+          onCreate={folders.create}
+          onClose={() => setMoving(null)}
+        />
+      )}
+      {isManagingFolders && (
+        <FoldersDialog
+          folders={folders.folders}
+          onCreate={folders.create}
+          onRename={folders.rename}
+          onDelete={async (id) => {
+            await folders.remove(id)
+            // Records that were in it are now in none, and the filter can no longer point at it
+            if (filters.folder === id) updateFilter("folder", "")
+            else setReloadAttempt((attempt) => attempt + 1)
+          }}
+          onClose={() => setIsManagingFolders(false)}
+        />
+      )}
     </div>
   )
 }

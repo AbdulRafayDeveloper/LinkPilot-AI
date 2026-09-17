@@ -6,15 +6,16 @@ import { SortableList } from "@/components/ui/SortableList"
 import { fetchWithRetry, requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
 import { EMPLOYEES_ENDPOINT, EMPLOYEE_MESSAGES, PLAN_ITEM_MAX_LENGTH, PLAN_MAX_ITEMS, PLAN_NOTES_MAX_LENGTH, PLAN_SAVE_DELAY_MS } from "@/constants/employees"
-import type { Employee, EmployeePlan, EmployeePlanInput, PlanHistoryPage, PlanItem } from "@/types/employees"
-import { PlanHistory, dayHeading, mergeHistory, tickTime } from "./PlanHistory"
+import type { Employee, EmployeePlan, EmployeePlanInput, PlanHistoryDay, PlanHistoryPage, PlanItem } from "@/types/employees"
+import { PlanHistory, dayHeading, mergeHistory, replaceHistoryDay, tickTime } from "./PlanHistory"
+import { TaskReason } from "./TaskReason"
 
 const newItemId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.round(Math.random() * 1e6)}`)
 
 type SaveState = "saved" | "pending" | "saving" | "failed"
 
 interface Draft {
-  // Which employee and day this is, so a late answer for another one is never applied
+  // Which employee this is, so a late answer for another one is never applied
   key: string
   items: PlanItem[]
   notes: string
@@ -24,8 +25,9 @@ interface Draft {
 }
 
 const planUrl = (employeeId: string) => `${EMPLOYEES_ENDPOINT}/${employeeId}/plans`
-const toInput = (today: string, draft: Pick<Draft, "items" | "notes">): EmployeePlanInput => ({
-  today,
+// Every call names the day this browser is on; the day it is written to is the employee's own
+const toInput = (draft: Pick<Draft, "items" | "notes">): EmployeePlanInput => ({
+  today: todayIso(),
   items: draft.items.map(({ id, text }) => ({ id, text })),
   notes: draft.notes,
 })
@@ -74,7 +76,7 @@ const PlanItemText: React.FC<{ value: string; isDone: boolean; onChange: (text: 
         if (event.key === "Enter") event.preventDefault()
       }}
       aria-label="Plan item"
-      className={`min-w-0 flex-1 resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent py-1.5 text-[14px] leading-5 focus:outline-none ${
+      className={`w-full min-w-0 flex-1 resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent py-1.5 text-[14px] leading-5 focus:outline-none ${
         isDone ? "text-outline line-through" : "text-on-surface"
       }`}
     />
@@ -84,13 +86,18 @@ const getLabel = (item: PlanItem) => item.text || "empty task"
 
 /**
  * One employee's daily plan: **one** list of tasks that repeats every day. Add a task with Enter,
- * reword it in place, drag it up or down, remove it; the change applies from today on and saves
- * itself once typing settles. Ticks belong to today: each is saved on its own, straight away, with
- * the time it was ticked, and tomorrow starts from the same tasks with nothing ticked. Earlier days,
- * with what was finished on them, are in the history underneath.
+ * reword it in place, drag it up or down, remove it; the change applies from the day they are on and
+ * saves itself once typing settles. Ticks belong to a day: each is saved on its own, straight away,
+ * with the time it was ticked.
+ *
+ * The day shown is the employee's own, not the calendar's. It never turns over at midnight: it moves
+ * on only when they start a new day from their link, and the day they leave behind joins the history
+ * underneath, where its tasks can still be ticked off.
  */
 export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
-  const [today, setToday] = useState(todayIso)
+  // The day the employee is working on, as their own record has it: it moves on only when they start
+  // a new day from their link, so it can still be yesterday's while they are finishing it
+  const [day, setDay] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [loadError, setLoadError] = useState<{ key: string; message: string } | null>(null)
   const [saveState, setSaveState] = useState<SaveState>("saved")
@@ -100,16 +107,16 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
   const [history, setHistory] = useState<PlanHistoryPage | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
-  const key = `${employee.id}|${today}`
+  const key = employee.id
   const pendingRef = useRef<{ employeeId: string; body: EmployeePlanInput } | null>(null)
-  const isLoaded = draft?.key === key
+  const isLoaded = draft?.key === key && day !== null
 
-  // Load the plan (and, with it, today's ticks) whenever the employee or the day changes
+  // Load the plan, the ticks on the day the employee is working on, and which day that is
   useEffect(() => {
     const controller = new AbortController()
-    const [employeeId, day] = key.split("|")
-    requestApi<EmployeePlan>(`${planUrl(employeeId)}?today=${day}`, { signal: controller.signal })
+    requestApi<EmployeePlan>(`${planUrl(key)}?today=${todayIso()}`, { signal: controller.signal })
       .then(({ data }) => {
+        setDay(data.date)
         setDraft({ key, items: data.items, notes: data.notes, updatedAt: data.updatedAt, version: 0 })
         setSaveState("saved")
         setLoadError(null)
@@ -121,10 +128,11 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
     return () => controller.abort()
   }, [key, attempt])
 
-  // The days before today
+  // The days before the one they are on
   useEffect(() => {
+    if (!day) return
     const controller = new AbortController()
-    requestApi<PlanHistoryPage>(`${planUrl(employee.id)}/history?before=${today}`, { signal: controller.signal })
+    requestApi<PlanHistoryPage>(`${planUrl(employee.id)}/history?before=${day}`, { signal: controller.signal })
       .then(({ data }) => {
         setHistory(data)
         setHistoryError(null)
@@ -133,18 +141,18 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
         if (!controller.signal.aborted) setHistoryError(reason instanceof Error ? reason.message : EMPLOYEE_MESSAGES.historyFailed)
       })
     return () => controller.abort()
-  }, [employee.id, today, attempt])
+  }, [employee.id, day, attempt])
 
-  // Coming back to the tab picks up a new day, and the employee's ticks and moves, unless an edit is waiting
+  // Coming back to the tab picks up the employee's ticks, their moves and a day they have started,
+  // unless an edit is waiting
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState !== "visible" || pendingRef.current) return
-      if (todayIso() !== today) setToday(todayIso())
-      else setAttempt((count) => count + 1)
+      setAttempt((count) => count + 1)
     }
     document.addEventListener("visibilitychange", refresh)
     return () => document.removeEventListener("visibilitychange", refresh)
-  }, [today])
+  }, [])
 
   const loadOlderHistory = async (before: string) => {
     setIsLoadingHistory(true)
@@ -174,7 +182,8 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
         const ticks = new Map(data.items.map((item) => [item.id, item]))
         const items = latest.items.map((item) => {
           const saved = ticks.get(item.id)
-          return saved ? { ...item, done: saved.done, completedAt: saved.completedAt } : item
+          // Ticks and the employee's reasons both come from the server; the wording being typed doesn't
+          return saved ? { ...item, done: saved.done, completedAt: saved.completedAt, reason: saved.reason } : item
         })
         return { ...latest, items, updatedAt: data.updatedAt }
       })
@@ -216,7 +225,7 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
     setDraft((latest) => {
       if (!latest || latest.key !== key) return latest
       const next = { ...latest, ...change(latest), version: latest.version + 1 }
-      pendingRef.current = { employeeId: employee.id, body: toInput(today, next) }
+      pendingRef.current = { employeeId: employee.id, body: toInput(next) }
       return next
     })
     setSaveState("pending")
@@ -243,7 +252,7 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
       const { data } = await requestApi<EmployeePlan>(planUrl(employee.id), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ today, itemId: item.id, done }),
+        body: JSON.stringify({ today: todayIso(), itemId: item.id, done }),
       })
       const saved = data.items.find((entry) => entry.id === item.id)
       if (saved) setLocal(saved.done, saved.completedAt)
@@ -253,10 +262,25 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
     }
   }
 
+  /** A tick on a day already in the history: it stays open, so a task finished late can be ticked off. */
+  const tickHistory = async (historyDay: PlanHistoryDay, item: PlanItem, done: boolean) => {
+    setTickError(null)
+    try {
+      const { data } = await requestApi<PlanHistoryDay>(planUrl(employee.id), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ today: todayIso(), date: historyDay.date, itemId: item.id, done }),
+      })
+      setHistory((current) => replaceHistoryDay(current, data))
+    } catch (reason: unknown) {
+      setTickError(reason instanceof Error ? reason.message : EMPLOYEE_MESSAGES.tickFailed)
+    }
+  }
+
   const addItem = () => {
     const text = newItem.trim()
     if (!text || !draft || draft.items.length >= PLAN_MAX_ITEMS) return
-    edit((latest) => ({ items: [...latest.items, { id: newItemId(), text, done: false, completedAt: null }], notes: latest.notes }))
+    edit((latest) => ({ items: [...latest.items, { id: newItemId(), text, done: false, completedAt: null, reason: "" }], notes: latest.notes }))
     setNewItem("")
   }
 
@@ -277,7 +301,7 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
           <h2 className="text-[15px] font-bold text-on-surface">Daily plan</h2>
           <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-on-surface-variant">
             <Repeat size={13} className="text-primary" aria-hidden="true" />
-            Repeats every day. Ticks start fresh each morning; earlier days stay in the history.
+            Repeats every day. A new day starts when the employee starts one from their link; earlier days stay in the history.
           </p>
         </div>
         <span className="flex items-center gap-1.5 text-[12px] text-outline" aria-live="polite">
@@ -327,7 +351,12 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <p className="text-[13px] font-semibold text-on-surface">Today, {dayHeading(today)}</p>
+            <p className="text-[13px] font-semibold text-on-surface">{day === todayIso() ? "Today, " : ""}{dayHeading(day as string)}</p>
+            {day !== todayIso() && (
+              <p className="basis-full text-[12px] text-on-surface-variant">
+                {employee.name.split(" ")[0]} is still on this day. It moves into the history when they start a new day from their link.
+              </p>
+            )}
             {items.length > 0 && (
               <div className="flex min-w-[220px] flex-1 items-center gap-3">
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-container-high" aria-hidden="true">
@@ -364,13 +393,17 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
                   aria-label={`Mark "${item.text}" as ${item.done ? "not done" : "done"} today`}
                   className="mt-2 h-4 w-4 shrink-0 accent-primary"
                 />
-                <PlanItemText
-                  value={item.text}
-                  isDone={item.done}
-                  onChange={(text) =>
-                    edit((latest) => ({ items: latest.items.map((entry) => (entry.id === item.id ? { ...entry, text } : entry)), notes: latest.notes }))
-                  }
-                />
+                <div className="min-w-0 flex-1">
+                  <PlanItemText
+                    value={item.text}
+                    isDone={item.done}
+                    onChange={(text) =>
+                      edit((latest) => ({ items: latest.items.map((entry) => (entry.id === item.id ? { ...entry, text } : entry)), notes: latest.notes }))
+                    }
+                  />
+                  {/* What the employee said about this task; only they can write or change it */}
+                  <TaskReason reason={item.reason} taskText={item.text} isDone={item.done} />
+                </div>
                 {item.completedAt && <span className="mt-2 hidden shrink-0 text-[11px] text-outline sm:inline">Done {tickTime(item.completedAt)}</span>}
                 <button
                   type="button"
@@ -425,7 +458,13 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
       )}
 
       <div className="border-t border-outline-variant/70 pt-4">
-        <PlanHistory history={history} error={historyError} isLoadingMore={isLoadingHistory} onLoadMore={() => history?.nextBefore && void loadOlderHistory(history.nextBefore)} />
+        <PlanHistory
+          history={history}
+          error={historyError}
+          isLoadingMore={isLoadingHistory}
+          onLoadMore={() => history?.nextBefore && void loadOlderHistory(history.nextBefore)}
+          onTick={tickHistory}
+        />
       </div>
     </section>
   )

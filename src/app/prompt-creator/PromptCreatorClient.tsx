@@ -99,7 +99,7 @@ export default function PromptCreatorClient() {
   }
 
   // The page keeps the created prompt exactly as it was saved
-  const applyChanges = useCallback((changes: { name?: string; prompt?: string }) => {
+  const applyChanges = useCallback((changes: { name?: string; prompt?: string; folderId?: string | null }) => {
     generation.store.update((state) => (state.result ? { result: { ...state.result, ...changes } } : {}))
   }, [])
 

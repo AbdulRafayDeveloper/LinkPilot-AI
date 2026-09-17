@@ -13,6 +13,8 @@ import {
   RewrittenMessageRecord,
 } from "@/models/GenerationRecords"
 import { CreatedPromptModel } from "@/models/CreatedPrompt"
+import { UNFILED_FOLDER } from "@/constants/promptFolders"
+import { folderNames } from "@/services/promptCreator/folders"
 import { HISTORY_PAGE_SIZE } from "@/constants/historyFilters"
 import type { SavedOutputTool, SavedOutputToolId } from "@/constants/savedOutputs"
 import type {
@@ -39,6 +41,8 @@ type Row = Record<string, unknown> & { _id: { toString: () => string }; createdA
 
 interface OutputReader {
   collection: () => Collection
+  // The field naming the folder a record is filed in, for a tool whose records have folders
+  folderField?: string
   // The field holding the tone, tune, type or style, and for replies the field holding the context
   optionField: string
   contextField?: string
@@ -167,6 +171,7 @@ const READERS: Record<SavedOutputToolId, OutputReader> = {
   "prompt-creator": {
     collection: () => CreatedPromptModel.collection,
     optionField: "target",
+    folderField: "folderId",
     contextField: "requestSource",
     searchFields: ["name", "prompt", "request"],
     source: { field: "request", label: "Description" },
@@ -207,7 +212,7 @@ function choiceLabel(tool: SavedOutputTool, key: "option" | "context", id: unkno
 const fieldValue = (row: Row, field: string): unknown =>
   field.split(".").reduce<unknown>((value, key) => (value && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined), row)
 
-function toSavedOutput(tool: SavedOutputTool, reader: OutputReader, row: Row): SavedOutput {
+function toSavedOutput(tool: SavedOutputTool, reader: OutputReader, row: Row, folders?: Map<string, string>): SavedOutput {
   const heading = reader.heading(row)
   const choices = [
     choiceLabel(tool, "context", reader.contextField ? fieldValue(row, reader.contextField) : null),
@@ -224,7 +229,16 @@ function toSavedOutput(tool: SavedOutputTool, reader: OutputReader, row: Row): S
     characterCount: typeof row.characterCount === "number" ? row.characterCount : null,
     sourceLabel: text(row[reader.source.field]) ? reader.source.label : null,
     provider: text(row.provider) || null,
+    // A folder that was deleted while the page was open reads as no folder rather than as a gap
+    ...(reader.folderField ? { folder: folderOf(row, reader.folderField, folders) } : {}),
   }
+}
+
+// Which folder a record is in, with the name to show for it
+function folderOf(row: Row, field: string, folders?: Map<string, string>): { id: string; name: string } | null {
+  const id = text(row[field])
+  const name = id ? folders?.get(id) : undefined
+  return id && name ? { id, name } : null
 }
 
 // One record the viewer may see, matched by its ObjectId in the tool's own collection
@@ -250,13 +264,15 @@ export async function listSavedOutputs(viewer: Viewer, tool: SavedOutputTool, fi
     searchCondition(filters.search, reader.searchFields),
     filters.option ? { [reader.optionField]: filters.option } : null,
     filters.context && reader.contextField ? { [reader.contextField]: filters.context } : null,
+    folderCondition(reader, filters.folder),
     createdBetween(filters.from, filters.to),
   ])
 
   const serverFilter = tool.filters.find((filter) => filter.fromServer)
-  const [total, recordChoices] = await Promise.all([
+  const [total, recordChoices, folders] = await Promise.all([
     collection.countDocuments(matching),
     serverFilter && reader.recordChoices ? reader.recordChoices(collection, scope) : Promise.resolve(null),
+    reader.folderField ? folderNames(viewer) : Promise.resolve(undefined),
   ])
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const page = Math.min(Math.max(1, filters.page), totalPages)
@@ -268,13 +284,19 @@ export async function listSavedOutputs(viewer: Viewer, tool: SavedOutputTool, fi
     .toArray()) as unknown as Row[]
 
   return {
-    items: rows.map((row) => toSavedOutput(tool, reader, row)),
+    items: rows.map((row) => toSavedOutput(tool, reader, row, folders)),
     page,
     pageSize,
     total,
     totalPages,
     choices: serverFilter && recordChoices ? { [serverFilter.key]: recordChoices } : {},
   }
+}
+
+/** Which records a folder filter keeps: one folder, the ones in none, or every record. */
+function folderCondition(reader: OutputReader, folder: string): Record<string, unknown> | null {
+  if (!reader.folderField || !folder) return null
+  return folder === UNFILED_FOLDER ? { [reader.folderField]: null } : { [reader.folderField]: folder }
 }
 
 /** One record with the whole text it was written from. Null when it's gone or belongs to another account. */
@@ -285,7 +307,8 @@ export async function getSavedOutput(viewer: Viewer, tool: SavedOutputTool, id: 
   await connectDatabase()
   const row = (await reader.collection().findOne(filter, { projection: { result: 0 } })) as unknown as Row | null
   if (!row) return null
-  return { ...toSavedOutput(tool, reader, row), source: text(row[reader.source.field]) }
+  const folders = reader.folderField ? await folderNames(viewer) : undefined
+  return { ...toSavedOutput(tool, reader, row, folders), source: text(row[reader.source.field]) }
 }
 
 /** Deletes one record. False when it's gone or belongs to another account. */

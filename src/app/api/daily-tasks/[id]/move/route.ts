@@ -9,8 +9,10 @@ export const dynamic = "force-dynamic"
 
 /**
  * PUT (body: { today, taskDate, orderedIds }): a task dragged to a new place, on its own day or
- * another. `orderedIds` is that day's whole new order. A task that is gone answers 404; an order
- * that no longer matches the day (changed in another tab) answers 409, and the page reloads.
+ * another, with `id` the task that was dragged. `orderedIds` is that day's whole new order, so it
+ * says for itself what moved: every id in it that is on another day now arrives on this one. One
+ * task and a whole picked group are therefore the same request. A task that is gone answers 404; an
+ * order that no longer matches the day (changed in another tab) answers 409, and the page reloads.
  * Sending the same move again lands on the same order.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

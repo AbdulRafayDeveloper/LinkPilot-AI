@@ -9,6 +9,7 @@ import {
   PLAN_ITEM_MAX_LENGTH,
   PLAN_MAX_ITEMS,
   PLAN_NOTES_MAX_LENGTH,
+  PLAN_REASON_MAX_LENGTH,
   PLAN_TODAY_DRIFT_DAYS,
 } from "@/constants/employees"
 import { shiftDate } from "@/lib/taskDates"
@@ -84,9 +85,33 @@ export const PlanSchema = z.object({
   notes: z.string().max(PLAN_NOTES_MAX_LENGTH, EMPLOYEE_MESSAGES.notesTooLong),
 })
 
-/** Ticks or unticks one of today's tasks, from the manager's page or the employee's link. */
-export const TickSchema = z.object({ today: TodaySchema, itemId: ItemId, done: z.boolean() })
-export const ResetSchema = z.object({ today: TodaySchema })
+/**
+ * Ticks or unticks a task, from the manager's page or the employee's link. Without a `date` it is
+ * the day being worked on; with one it is that day in the history, which stays tickable so a task
+ * finished late can still be ticked off.
+ */
+export const TickSchema = z.object({ today: TodaySchema, date: Day.optional(), itemId: ItemId, done: z.boolean() })
+
+/**
+ * Why a task wasn't finished, written by the employee on their link, for the day they are on or for
+ * a day in their history. An empty reason removes the one that was there.
+ */
+export const ReasonSchema = z.object({
+  today: TodaySchema,
+  date: Day.optional(),
+  itemId: ItemId,
+  reason: z.string().trim().max(PLAN_REASON_MAX_LENGTH, EMPLOYEE_MESSAGES.reasonTooLong),
+})
+
+/**
+ * What the employee's link does to their day: clear today's ticks, finish this day and open the
+ * next one, or cancel this day and go back to the day before it. Only "start-new-day" moves the day
+ * on, so nothing rolls over at midnight by itself, and only "cancel-day" moves it back.
+ */
+export const DayActionSchema = z.object({
+  today: TodaySchema,
+  action: z.enum(["reset", "start-new-day", "cancel-day"]).default("reset"),
+})
 
 /** A new order for the plan's tasks: the same tasks, each once, nothing added or left out. */
 export const OrderSchema = z.object({

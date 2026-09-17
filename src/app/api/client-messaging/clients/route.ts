@@ -3,7 +3,6 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { ClientSchema } from "@/lib/validation/client"
 import { CLIENT_MESSAGING_MESSAGES } from "@/constants/clientMessaging"
 import { createClient, listClients } from "@/services/clientMessaging/clients"
-import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
 import { withIdempotency } from "@/services/idempotency"
 
@@ -12,7 +11,7 @@ export const dynamic = "force-dynamic"
 /**
  * GET: Every client, oldest first, with their message format and sample messages. Open like
  * the generation routes, because the page needs the list to write a message at all; adding,
- * changing and removing clients stays behind the prompt password.
+ * changing and removing them needs a signed-in account, like every other route.
  */
 export async function GET() {
   const auth = await requireViewer()
@@ -35,9 +34,6 @@ export async function GET() {
 async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const body = await req.json().catch(() => null)
     const parsed = ClientSchema.safeParse(body)

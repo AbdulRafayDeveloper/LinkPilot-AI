@@ -2,7 +2,6 @@
 
 import React, { useEffect, useId, useState } from "react"
 import { Modal } from "@/components/ui/Modal"
-import { PromptAccessGate } from "./PromptAccessGate"
 import { PromptEditorField } from "./PromptEditorField"
 import { PromptTabStrip, type PromptTab } from "./PromptTabStrip"
 import { PromptLoadFailed, PromptLoading, PromptModalFooter, type PromptFeedback } from "./PromptModalParts"
@@ -30,14 +29,10 @@ interface PromptTabsModalProps<Id extends string> {
 /**
  * The Update Prompt modal every tool uses (Connection Note's pattern, in a large dialog):
  * a tab per independent prompt, the editor filling the rest of the dialog, and the shared
- * footer. It opens only after the prompt password check (PromptAccessGate).
+ * footer. Signing in is all it needs; prompts are shared by every account.
  */
 export function PromptTabsModal<Id extends string>(props: PromptTabsModalProps<Id>) {
-  return (
-    <PromptAccessGate onClose={props.onClose}>
-      <PromptTabsEditor {...props} />
-    </PromptAccessGate>
-  )
+  return <PromptTabsEditor {...props} />
 }
 
 // Drafts are kept per tab while the editor is open; Save stores every tab that was edited

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { getPostImagePrompt, savePostImagePrompt } from "@/services/postImages/prompts"
-import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
@@ -13,9 +12,6 @@ export const dynamic = "force-dynamic"
 export async function GET() {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const prompt = await getPostImagePrompt()
     return NextResponse.json({ success: true, message: "Post image prompt retrieved", data: prompt })
@@ -35,9 +31,6 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const body = await req.json().catch(() => null)
     const parsed = PromptUpdateSchema.safeParse(body)

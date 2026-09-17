@@ -17,8 +17,8 @@ interface GlobalPromptCardProps {
 }
 
 /**
- * One global prompt on the module page. Its text stays behind the prompt password,
- * so the card shows what the prompt is for and opens the editor on its tab.
+ * One global prompt on the module page. The card shows what the prompt is for and opens the
+ * editor on its tab, where its text is read and changed.
  */
 export const GlobalPromptCard: React.FC<GlobalPromptCardProps> = ({ id, label, description, onEdit }) => {
   const Icon = PROMPT_ICONS[id]

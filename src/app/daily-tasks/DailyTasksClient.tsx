@@ -208,25 +208,37 @@ export default function DailyTasksClient() {
   }
 
   /**
-   * A task dragged to a new place. The page shows it there at once; the move is then saved after
-   * any move still being saved. If saving fails the list goes back to how it was and is read again
-   * from the server, so it never shows an order the database doesn't have.
+   * Tasks dragged to a new place: the one under the pointer, or every task that was picked to travel
+   * with it. The page shows them there at once; the move is then saved after any move still being
+   * saved. The new order of the day they landed on is what the server is sent, and it says for
+   * itself which tasks arrived from another day, so one task and a whole group are the same request.
+   * If saving fails the list goes back to how it was and is read again from the server, so it never
+   * shows an order the database doesn't have.
    */
-  const moveTask = ({ task, toDate, orderedIds, days }: TaskMove) => {
+  const moveTask = ({ tasks, dragged, toDate, orderedIds, days }: TaskMove) => {
     setTaskError(null)
     const snapshot = page
-    const wasOverdue = !task.isCompleted && task.taskDate < today
-    const isOverdue = !task.isCompleted && toDate < today
-    setPendingIds((current) => new Set(current).add(task.id))
+    const movedIds = tasks.map((entry) => entry.id)
+    const stillOpen = tasks.filter((entry) => !entry.isCompleted)
+    const overdueChange = stillOpen.reduce((total, entry) => total + Number(toDate < today) - Number(entry.taskDate < today), 0)
+    setPendingIds((current) => {
+      const next = new Set(current)
+      movedIds.forEach((id) => next.add(id))
+      return next
+    })
     setPage((current) =>
       current
         ? {
             ...current,
             days: days.filter((day) => day.tasks.length > 0),
-            overdueCount: Math.max(0, current.overdueCount + Number(isOverdue) - Number(wasOverdue)),
+            overdueCount: Math.max(0, current.overdueCount + overdueChange),
             olderTaskCount: Math.max(
               0,
-              current.olderTaskCount + Number(toDate < current.windowStart) - Number(task.taskDate < current.windowStart)
+              current.olderTaskCount +
+                tasks.reduce(
+                  (total, entry) => total + Number(toDate < current.windowStart) - Number(entry.taskDate < current.windowStart),
+                  0
+                )
             ),
           }
         : current
@@ -234,7 +246,7 @@ export default function DailyTasksClient() {
 
     moveQueue.current = moveQueue.current.then(async () => {
       try {
-        await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}/move`, {
+        await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${dragged.id}/move`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ today, taskDate: toDate, orderedIds }),
@@ -246,7 +258,7 @@ export default function DailyTasksClient() {
       } finally {
         setPendingIds((current) => {
           const next = new Set(current)
-          next.delete(task.id)
+          movedIds.forEach((id) => next.delete(id))
           return next
         })
       }

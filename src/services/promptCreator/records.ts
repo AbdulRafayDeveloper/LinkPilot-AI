@@ -18,6 +18,7 @@ function toCreatedPrompt(record: StoredCreatedPrompt): CreatedPrompt {
     target: record.target as PromptTargetId,
     request: record.request,
     requestSource: record.requestSource,
+    folderId: record.folderId ?? null,
     provider: record.provider && record.provider in AI_PROVIDER_LABELS ? (record.provider as AiProviderId) : null,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -51,13 +52,19 @@ export async function saveCreatedPrompt(
  * Stores the user's own name or prompt text over the written one. Only the fields sent are
  * changed, and the record is marked as edited by hand. Another account's prompt is not found.
  */
-export async function updateCreatedPrompt(viewer: Viewer, id: string, changes: { name?: string; prompt?: string }): Promise<CreatedPrompt> {
+export async function updateCreatedPrompt(
+  viewer: Viewer,
+  id: string,
+  changes: { name?: string; prompt?: string; folderId?: string | null }
+): Promise<CreatedPrompt> {
   const filter = visibleById(viewer, id)
   if (!filter) throw new UserFacingError(PROMPT_CREATOR_MESSAGES.notFound)
   await connectDatabase()
+  // Filing a prompt in a folder is not a change to what it says, so it doesn't count as edited by hand
+  const isRewrite = changes.name !== undefined || changes.prompt !== undefined
   const updated = await CreatedPromptModel.findOneAndUpdate(
     filter,
-    { ...changes, editedAt: new Date() },
+    isRewrite ? { ...changes, editedAt: new Date() } : changes,
     { returnDocument: "after", runValidators: true }
   ).lean()
   if (!updated) throw new UserFacingError(PROMPT_CREATOR_MESSAGES.notFound)

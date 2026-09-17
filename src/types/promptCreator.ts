@@ -20,6 +20,8 @@ export interface CreatedPrompt {
   // What the user described, so the saved prompt can be traced back to the request
   request: string
   requestSource: RequestSource
+  // The folder it is filed in, null for a prompt in no folder
+  folderId: string | null
   // Who wrote it (Groq, or OpenAI as the fallback); prompts saved before this was kept have none
   provider: AiProviderId | null
   providers?: AiProviderId[]

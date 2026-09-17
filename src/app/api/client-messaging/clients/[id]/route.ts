@@ -3,7 +3,6 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { ClientSchema } from "@/lib/validation/client"
 import { CLIENT_MESSAGING_MESSAGES } from "@/constants/clientMessaging"
 import { deleteClient, updateClient } from "@/services/clientMessaging/clients"
-import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
@@ -16,9 +15,6 @@ type RouteContext = { params: Promise<{ id: string }> }
 export async function PUT(req: NextRequest, { params }: RouteContext) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const body = await req.json().catch(() => null)
     const parsed = ClientSchema.safeParse(body)
@@ -49,9 +45,6 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const removed = await deleteClient(auth.viewer, (await params).id)
     if (!removed) {

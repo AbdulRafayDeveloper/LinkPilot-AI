@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { AlertCircle, Check, Cpu, Loader2, Pencil } from "lucide-react"
+import { AlertCircle, Check, Cpu, Folder, FolderInput, Loader2, Pencil } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { requestApi } from "@/lib/apiClient"
 import {
@@ -11,6 +11,10 @@ import {
   getPromptTargetLabel,
 } from "@/constants/promptCreator"
 import { describeSource } from "@/constants/aiProviders"
+import { PROMPT_FOLDER_MESSAGES } from "@/constants/promptFolders"
+import { usePromptFolders } from "@/hooks/usePromptFolders"
+import { MoveToFolderDialog } from "@/components/saved-outputs/MoveToFolderDialog"
+import { PROMPT_FOLDERS_ENDPOINT } from "@/constants/promptFolders"
 import type { CreatedPrompt } from "@/types/promptCreator"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
@@ -22,13 +26,13 @@ type SaveState = "saved" | "saving" | "failed"
 interface CreatedPromptPanelProps {
   created: CreatedPrompt
   // Keeps the page's copy in step with what was saved
-  onChange: (changes: { name?: string; prompt?: string }) => void
+  onChange: (changes: { name?: string; prompt?: string; folderId?: string | null }) => void
 }
 
 /**
- * The finished prompt: its name and text, both edited in place and saved to the same record
- * the module created, plus one copy action for the prompt exactly as it now reads. The page
- * mounts it under the record's id, so a newly created prompt starts this panel fresh.
+ * The finished prompt: its name and text, both edited in place and saved to the same record the
+ * module created, the folder it is filed in, and one copy action for the prompt exactly as it now
+ * reads. The page mounts it under the record's id, so a newly created prompt starts this panel fresh.
  */
 export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created, onChange }) => {
   const [name, setName] = useState(created.name)
@@ -37,6 +41,9 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
   const [problem, setProblem] = useState<string | null>(null)
   const promptRef = useRef<HTMLTextAreaElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [isMoving, setIsMoving] = useState(false)
+  const folders = usePromptFolders(PROMPT_FOLDERS_ENDPOINT)
+  const folderName = folders.folders?.find((folder) => folder.id === created.folderId)?.name ?? null
 
   // The text box grows with the prompt, so it reads like the output rather than a form field
   useEffect(() => {
@@ -49,7 +56,7 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
   useEffect(() => () => clearTimeout(timerRef.current ?? undefined), [])
 
   const save = useCallback(
-    async (changes: { name?: string; prompt?: string }) => {
+    async (changes: { name?: string; prompt?: string; folderId?: string | null }) => {
       setSaveState("saving")
       try {
         const { data } = await requestApi<CreatedPrompt>(`${PROMPT_CREATOR_ENDPOINT}/created/${created.id}`, {
@@ -57,7 +64,7 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(changes),
         })
-        onChange({ name: data.name, prompt: data.prompt })
+        onChange({ name: data.name, prompt: data.prompt, folderId: data.folderId })
         setSaveState("saved")
         setProblem(null)
       } catch (error: unknown) {
@@ -124,6 +131,22 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
       </div>
 
       {/* The prompt itself */}
+      {/* Where it is filed, so a new prompt can go straight into a folder */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-secondary-fixed px-2.5 py-1 text-[11px] font-semibold text-on-surface">
+          <Folder size={12} className="shrink-0 text-secondary-container" aria-hidden="true" />
+          <span className="truncate">{created.folderId ? (folderName ?? "Folder") : PROMPT_FOLDER_MESSAGES.unfiled}</span>
+        </span>
+        <button
+          type="button"
+          onClick={() => setIsMoving(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <FolderInput size={12} aria-hidden="true" />
+          {created.folderId ? "Move to another folder" : "Add to a folder"}
+        </button>
+      </div>
+
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-outline">Prompt</span>
@@ -161,6 +184,19 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
           </p>
         )}
       </div>
+      {isMoving && (
+        <MoveToFolderDialog
+          title={name}
+          folders={folders.folders}
+          currentFolderId={created.folderId}
+          onMove={async (folder) => {
+            await save({ folderId: folder?.id ?? null })
+            folders.countMoved(created.folderId, folder?.id ?? null)
+          }}
+          onCreate={folders.create}
+          onClose={() => setIsMoving(false)}
+        />
+      )}
     </div>
   )
 }

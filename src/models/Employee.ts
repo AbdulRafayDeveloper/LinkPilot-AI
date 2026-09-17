@@ -29,6 +29,10 @@ export interface IEmployee {
   // When the repeating plan was first set; null until then, so a plan made per day before it existed
   // can be taken over once
   planStartedAt: Date | null
+  // The day the employee is working on (YYYY-MM-DD). It never turns over by itself at midnight: it
+  // moves on only when they start a new day from their link, so someone still working at 1am keeps
+  // the same list. Null until their first day is opened
+  planDay: string | null
   // The order the employee dragged their tasks into on their link: their own view only, never the
   // plan's order. Empty means the plan's order; Reset today empties it
   linkOrder: string[]
@@ -63,6 +67,7 @@ const EmployeeSchema = new Schema<IEmployee>(
     planItems: { type: [PlanTaskSchema], default: [] },
     planNotes: { type: String, default: "" },
     planStartedAt: { type: Date, default: null },
+    planDay: { type: String, default: null },
     linkOrder: { type: [String], default: [] },
   },
   { timestamps: true, collection: "employees" }
@@ -79,6 +84,9 @@ export interface IPlanItem {
   done: boolean
   // When it was ticked off; cleared when it is unticked
   completedAt: Date | null
+  // Why it wasn't finished, in the employee's own words; null while there is none, and cleared when
+  // the task is ticked off. It belongs to this day only, like the tick
+  reason: string | null
 }
 
 export interface IEmployeePlan {
@@ -99,6 +107,7 @@ const PlanItemSchema = new Schema<IPlanItem>(
     text: { type: String, required: true },
     done: { type: Boolean, required: true, default: false },
     completedAt: { type: Date, default: null },
+    reason: { type: String, default: null },
   },
   { _id: false }
 )

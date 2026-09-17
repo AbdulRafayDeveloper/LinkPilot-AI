@@ -4,7 +4,6 @@ import React, { useEffect, useId, useRef, useState } from "react"
 import { AlertTriangle, CheckCircle2, CornerDownLeft, Loader2, Plus, Trash2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { CopyButton } from "@/components/ui/CopyButton"
-import { PromptAccessGate } from "@/components/prompts/PromptAccessGate"
 import { PromptTabStrip } from "@/components/prompts/PromptTabStrip"
 import { PromptLoadFailed, PromptLoading, type PromptFeedback } from "@/components/prompts/PromptModalParts"
 import { requestApi } from "@/lib/apiClient"
@@ -79,14 +78,9 @@ interface ClientsModalProps {
 
 /**
  * Manages the clients this module writes to: one tab per client, with their country, the
- * format their messages follow and their sample messages, plus adding and removing. Behind
- * the prompt password, like Update Prompt and Dummy Data.
+ * format their messages follow and their sample messages, plus adding and removing.
  */
-export const ClientsModal: React.FC<ClientsModalProps> = (props) => (
-  <PromptAccessGate onClose={props.onClose}>
-    <ClientsEditor {...props} />
-  </PromptAccessGate>
-)
+export const ClientsModal: React.FC<ClientsModalProps> = (props) => <ClientsEditor {...props} />
 
 const ClientsEditor: React.FC<ClientsModalProps> = ({ onUse, onChanged, onClose }) => {
   const idPrefix = useId()

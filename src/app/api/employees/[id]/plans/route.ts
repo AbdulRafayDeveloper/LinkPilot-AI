@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { OrderSchema, PlanQuerySchema, PlanSchema, TickSchema } from "@/lib/validation/employees"
 import { EMPLOYEE_MESSAGES } from "@/constants/employees"
-import { getPlan, reorderPlan, savePlan, tickPlanItem } from "@/services/employees/employees"
+import { getPlan, reorderPlan, savePlan, tickPlanHistoryItem, tickPlanItem } from "@/services/employees/employees"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
@@ -42,16 +42,21 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   }
 }
 
-/** PATCH { today, itemId, done }: Ticks or unticks one of today's tasks, recording when it was ticked. */
+/**
+ * PATCH { today, itemId, done }: Ticks or unticks one task of the day the employee is working on,
+ * recording when it was ticked. With a `date` it ticks that day in the history instead, which stays
+ * open so a task finished late can still be ticked off.
+ */
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   const parsed = TickSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return badRequest(parsed.error.issues[0]?.message || EMPLOYEE_MESSAGES.tickFailed)
   try {
-    const { today, itemId, done } = parsed.data
-    const plan = await tickPlanItem(auth.viewer, (await params).id, today, itemId, done)
-    return plan ? NextResponse.json({ success: true, message: "Tick saved", data: plan }) : notFound(EMPLOYEE_MESSAGES.itemNotFound)
+    const { today, date, itemId, done } = parsed.data
+    const { id } = await params
+    const plan = date ? await tickPlanHistoryItem(auth.viewer, id, date, itemId, done) : await tickPlanItem(auth.viewer, id, today, itemId, done)
+    return plan ? NextResponse.json({ success: true, message: "Tick saved", data: plan }) : notFound(date ? EMPLOYEE_MESSAGES.dayNotFound : EMPLOYEE_MESSAGES.itemNotFound)
   } catch (error: unknown) {
     console.error("PATCH Employee Plan Exception:", error instanceof Error ? error.message : error)
     return NextResponse.json({ success: false, message: toUserFacingMessage(error, EMPLOYEE_MESSAGES.tickFailed) }, { status: 500 })

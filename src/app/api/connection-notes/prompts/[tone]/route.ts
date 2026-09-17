@@ -4,7 +4,6 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { CONNECTION_NOTE_TONE_IDS, getToneLabel } from "@/constants/connectionNote"
 import { saveTonePrompt } from "@/services/connectionNote/prompts"
-import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
@@ -17,9 +16,6 @@ const ToneSchema = z.enum(CONNECTION_NOTE_TONE_IDS)
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ tone: string }> }) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const tone = ToneSchema.safeParse((await params).tone)
     if (!tone.success) {

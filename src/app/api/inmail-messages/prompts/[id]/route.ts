@@ -5,7 +5,6 @@ import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { ABOUT_ME_TAB_ID } from "@/constants/outreachTunes"
 import { INMAIL_PROMPT_IDS, getInMailTuneLabel } from "@/constants/inmail"
 import { saveInMailPrompt } from "@/services/inmail/prompts"
-import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
@@ -18,9 +17,6 @@ const PromptIdSchema = z.enum(INMAIL_PROMPT_IDS)
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const id = PromptIdSchema.safeParse((await params).id)
     if (!id.success) {

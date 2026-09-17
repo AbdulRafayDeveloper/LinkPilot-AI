@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { getConnectionNotePrompts } from "@/services/connectionNote/prompts"
-import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
@@ -12,9 +11,6 @@ export const dynamic = "force-dynamic"
 export async function GET() {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const prompts = await getConnectionNotePrompts()
     return NextResponse.json({ success: true, message: "Connection note prompts retrieved", data: prompts })

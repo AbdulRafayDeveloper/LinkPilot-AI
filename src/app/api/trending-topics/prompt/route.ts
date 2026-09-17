@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { UserFacingError } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { getActiveTrendingPrompt, saveTrendingPrompt } from "@/services/trending/prompt"
-import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
@@ -21,9 +20,6 @@ function errorResponse(error: unknown, fallbackMessage: string) {
 export async function GET() {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const active = await getActiveTrendingPrompt()
     return NextResponse.json({
@@ -43,9 +39,6 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const body = await req.json().catch(() => null)
     const parsed = PromptUpdateSchema.safeParse(body)

@@ -139,14 +139,17 @@ export async function setTaskCompletion(viewer: Viewer, id: string, isCompleted:
 export type MoveResult = { task: DailyTask } | { error: "missing" | "stale-order" }
 
 /**
- * Puts a task on a day (its own or another) at a place in that day. `orderedIds` is the day's
- * whole new order, the moved task included, exactly as the page shows it after the drop.
+ * Puts tasks on a day (their own or another) at a place in that day. `orderedIds` is the day's
+ * whole new order, exactly as the page shows it after the drop, so **the order itself says what
+ * moved**: every id in it that is on another day now is a task arriving on this one. That is one
+ * task for an ordinary drag and the whole selection when several were dragged together, with no
+ * difference to the request, and `id` is the task that was dragged.
  *
- * The order is checked against the database first: every other id must be a task the viewer may
- * see that is on that day now, and none of that day's tasks may be missing from it. A page that
- * has fallen behind (a task added or moved in another tab) is refused rather than guessed at.
- * The move and the day's new positions are then written in one ordered bulk write, so the day
- * never shows the moved task with an old position.
+ * The order is checked against the database first: every id must be a task the viewer may see, and
+ * none of that day's tasks may be missing from it. A page that has fallen behind (a task added,
+ * moved or deleted in another tab) is refused rather than guessed at. The arrivals and the day's
+ * new positions are then written in one ordered bulk write, so the day never shows a moved task
+ * with an old position, and a repeat of the same move lands on the same order.
  */
 export async function moveTask(viewer: Viewer, id: string, taskDate: string, orderedIds: string[]): Promise<MoveResult> {
   const filter = visibleById(viewer, id)
@@ -155,14 +158,23 @@ export async function moveTask(viewer: Viewer, id: string, taskDate: string, ord
   await connectDatabase()
   if (!(await DailyTaskModel.exists(filter))) return { error: "missing" }
 
-  const others = orderedIds.filter((entry) => entry !== id)
-  const dayNow = await DailyTaskModel.find({ taskDate, _id: { $ne: id }, ...visibleTo(viewer) }, { _id: 1 }).lean()
-  const dayIds = new Set(dayNow.map((record) => String(record._id)))
-  if (dayIds.size !== others.length || others.some((entry) => !dayIds.has(entry))) return { error: "stale-order" }
+  // Every task named, with the day it is on now; one that is gone, or another account's, is missing here
+  const named = (await DailyTaskModel.find({ _id: { $in: orderedIds }, ...visibleTo(viewer) }, { _id: 1, taskDate: 1 }).lean()) as unknown as {
+    _id: { toString: () => string }
+    taskDate: string
+  }[]
+  if (named.length !== orderedIds.length) return { error: "stale-order" }
+  const namedIds = new Set(orderedIds)
+  const dayNow = await DailyTaskModel.find({ taskDate, ...visibleTo(viewer) }, { _id: 1 }).lean()
+  if (dayNow.some((record) => !namedIds.has(String(record._id)))) return { error: "stale-order" }
+
+  const arriving = named.filter((record) => record.taskDate !== taskDate).map((record) => record._id.toString())
 
   await DailyTaskModel.bulkWrite(
     [
-      { updateOne: { filter, update: { $set: { taskDate } } } },
+      ...(arriving.length > 0
+        ? [{ updateMany: { filter: { _id: { $in: arriving }, ...visibleTo(viewer) }, update: { $set: { taskDate } } } }]
+        : []),
       ...orderedIds.map((entry, position) => ({
         updateOne: { filter: { _id: entry, taskDate, ...visibleTo(viewer) }, update: { $set: { position } } },
       })),

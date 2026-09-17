@@ -27,7 +27,7 @@ export const PASSWORD_MAX_LENGTH = 128
 export const MAX_FAILED_LOGINS = 5
 export const LOGIN_LOCK_MINUTES = 15
 
-// Sent with every "sign in first" answer, so the browser can tell it from any other 401 (the prompt password)
+// Sent with every "sign in first" answer, so the browser can tell it from any other 401
 export const AUTH_REQUIRED_HEADER = "x-linkpilot-auth"
 
 export const AUTH_MESSAGES = {

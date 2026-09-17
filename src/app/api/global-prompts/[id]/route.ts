@@ -4,7 +4,6 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { GLOBAL_PROMPT_IDS, getGlobalPromptLabel } from "@/constants/globalPrompts"
 import { saveGlobalPrompt } from "@/services/globalPrompts"
-import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
@@ -17,9 +16,6 @@ const GlobalPromptIdSchema = z.enum(GLOBAL_PROMPT_IDS)
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   try {
     const id = GlobalPromptIdSchema.safeParse((await params).id)
     if (!id.success) {

@@ -213,14 +213,6 @@ export default function ClientMessagingClient() {
                       {clientsError}
                     </p>
                   )}
-                  {clients !== null && !hasClients && !clientsError && (
-                    <p className="text-[12px] text-on-surface-variant">
-                      {CLIENT_MESSAGING_MESSAGES.noClients}{" "}
-                      <button type="button" onClick={() => setIsClientsOpen(true)} className="rounded py-[3px] font-semibold text-primary hover:underline">
-                        Add your first client
-                      </button>
-                    </p>
-                  )}
                   {selectedClient && (
                     <p className="text-[11px] text-outline">
                       Their format and {selectedClient.sampleMessages.filter((sample) => sample.trim()).length} sample messages are

@@ -7,6 +7,7 @@ import { FOLLOW_UP_TYPES } from "./followUp"
 import { CONVERSATION_REPLY_TYPES } from "./conversationReply"
 import { MESSAGE_CHANNELS } from "./clientMessaging"
 import { PROMPT_TARGETS } from "./promptCreator"
+import { PROMPT_CREATOR_RECORD_ENDPOINT, PROMPT_FOLDERS_ENDPOINT } from "./promptFolders"
 
 /**
  * The "view all" page of every tool that writes text: the LinkedIn tools, Client Messaging, Prompt
@@ -55,6 +56,12 @@ export interface SavedOutputTool {
   hideTexts?: boolean
   searchPlaceholder: string
   filters: readonly SavedOutputFilter[]
+  /**
+   * Set only for a tool whose records are filed in folders (today: Prompt Creator). The "view all"
+   * page then offers a folder filter, a Move button on each record and a Folders manager, all
+   * talking to this route; every other tool behaves exactly as it did before folders existed.
+   */
+  folders?: { endpoint: string; label: string; recordEndpoint: string }
 }
 
 export const SAVED_OUTPUT_TOOLS = [
@@ -193,6 +200,7 @@ export const SAVED_OUTPUT_TOOLS = [
       { key: "option", label: "Target", allLabel: "All targets", options: PROMPT_TARGETS },
       { key: "context", label: "Described by", allLabel: "Typed or spoken", options: INPUT_SOURCES },
     ],
+    folders: { endpoint: PROMPT_FOLDERS_ENDPOINT, label: "Folder", recordEndpoint: PROMPT_CREATOR_RECORD_ENDPOINT },
   },
   {
     id: "message-rewriter",

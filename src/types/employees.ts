@@ -38,6 +38,8 @@ export interface PlanItem {
   done: boolean
   // When it was ticked off, or null while it is open
   completedAt: string | null
+  // Why it wasn't finished, written by the employee on their link; empty when there is none
+  reason: string
 }
 
 /** The employee's plan as it stands today: the tasks that repeat every day, with today's ticks. */

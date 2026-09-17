@@ -36,6 +36,8 @@ export const PLAN_ITEM_MAX_LENGTH = 300
 // The whole team loads at once so it can be put in order by dragging; a team larger than this pages
 export const EMPLOYEES_LIST_MAX = 500
 export const PLAN_MAX_ITEMS = 50
+// Why a task wasn't finished, written on the employee's link: a sentence or two, not a report
+export const PLAN_REASON_MAX_LENGTH = 500
 export const PLAN_NOTES_MAX_LENGTH = 4000
 // Changes to a plan are saved once typing settles for this long
 export const PLAN_SAVE_DELAY_MS = 800
@@ -63,7 +65,14 @@ export const EMPLOYEE_MESSAGES = {
   linkInvalid: "This link doesn't open a plan. It may have been replaced or turned off; ask for a new one.",
   linkFailed: "Couldn't change the link. Please try again.",
   resetFailed: "Couldn't reset today's ticks. Please try again.",
+  startDayFailed: "Couldn't start a new day. Please try again.",
+  dayAlreadyOpen: "Your next day is already open, so there is nothing to start yet.",
+  cancelDayFailed: "Couldn't cancel this day. Please try again.",
+  reasonFailed: "Couldn't save that reason. Please try again.",
+  reasonTooLong: `Keep the reason under ${PLAN_REASON_MAX_LENGTH} characters.`,
+  noPreviousDay: "This is your first day, so there is no earlier day to go back to.",
   itemNotFound: "That task is no longer on today's plan.",
+  dayNotFound: "That day is no longer in your history.",
   orderChanged: "The plan changed while you were moving tasks. It has been reloaded; try again.",
   orderFailed: "Couldn't save the new order. Please try again.",
   teamOrderChanged: "The team changed while you were moving someone (added or removed in another tab). It has been reloaded; try again.",

@@ -4,7 +4,6 @@ import React, { useEffect, useId, useRef, useState } from "react"
 import { AlertTriangle, CheckCircle2, CornerDownLeft, Loader2, Plus, Trash2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { CopyButton } from "@/components/ui/CopyButton"
-import { PromptAccessGate } from "@/components/prompts/PromptAccessGate"
 import { PromptTabStrip } from "@/components/prompts/PromptTabStrip"
 import { PromptLoadFailed, PromptLoading, type PromptFeedback } from "@/components/prompts/PromptModalParts"
 import { requestApi } from "@/lib/apiClient"
@@ -43,14 +42,9 @@ interface DummyDataModalProps {
 /**
  * Manages one kind of Dummy Data (sample profiles, posts, comment threads, conversations)
  * saved in the database: one tab per item, edited like a prompt, plus adding, removing,
- * copying a field and loading an item into the tool. Behind the prompt password, like
- * Update Prompt.
+ * copying a field and loading an item into the tool. Admins only, like the rest of Dummy Data.
  */
-export const DummyDataModal: React.FC<DummyDataModalProps> = (props) => (
-  <PromptAccessGate onClose={props.onClose}>
-    <DummyDataEditor {...props} />
-  </PromptAccessGate>
-)
+export const DummyDataModal: React.FC<DummyDataModalProps> = (props) => <DummyDataEditor {...props} />
 
 const DummyDataEditor: React.FC<DummyDataModalProps> = ({ kind, onUse, onClose }) => {
   const config = dummyKindConfig(kind)

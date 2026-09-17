@@ -1,5 +1,6 @@
 import { z } from "zod"
 import type { SavedOutputTool } from "@/constants/savedOutputs"
+import { UNFILED_FOLDER } from "@/constants/promptFolders"
 import { DATE_ORDER_ISSUE, blankToEmpty, choiceParam, dayBoundParam, inDateOrder, searchParam } from "./listFilters"
 
 // The ids one of the tool's filters accepts, or none when the tool has no such filter
@@ -30,6 +31,10 @@ export function savedOutputsQuerySchema(tool: SavedOutputTool) {
       search: searchParam,
       option: filterParam(tool, "option"),
       context: filterParam(tool, "context"),
+      // A folder id, "none" for the records in no folder, and nothing at all for a tool without folders
+      folder: tool.folders
+        ? z.preprocess(blankToEmpty, z.union([z.literal(""), z.literal(UNFILED_FOLDER), z.string().regex(/^[0-9a-f]{24}$/)]).catch(""))
+        : z.preprocess(blankToEmpty, z.literal("")),
       from: dayBoundParam,
       to: dayBoundParam,
     })

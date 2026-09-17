@@ -1,6 +1,6 @@
 "use client"
 
-import React, { memo, useId, useMemo, useRef, useState } from "react"
+import React, { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import {
   DndContext,
   DragOverlay,
@@ -23,6 +23,7 @@ import { CSS } from "@dnd-kit/utilities"
 import {
   AlertTriangle,
   Check,
+  CheckSquare,
   ChevronLeft,
   ChevronRight,
   GripVertical,
@@ -37,13 +38,19 @@ import { DAILY_TASKS_MESSAGES, TASK_MAX_LENGTH, VISIBLE_DAYS } from "@/constants
 import { dayLabel } from "@/lib/taskDates"
 import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks"
 
-/** A task dropped somewhere new: the day it now belongs to, that day's whole order, and every day as it now looks. */
+/** Tasks dropped somewhere new: the day they now belong to, that day's whole order, and every day as it now looks. */
 export interface TaskMove {
-  task: DailyTask
+  // Everything that moved: one task for an ordinary drag, the whole selection when several travelled together
+  tasks: DailyTask[]
+  // The one that was under the pointer, which the move is saved against
+  dragged: DailyTask
   toDate: string
   orderedIds: string[]
   days: DailyTaskDay[]
 }
+
+/** A plain pick, or everything between the last pick and this one. */
+export type SelectMode = "toggle" | "range"
 
 interface TaskDayListProps {
   page: DailyTasksPage | null
@@ -98,19 +105,62 @@ interface TaskRowBodyProps {
   onToggle?: (task: DailyTask, isCompleted: boolean) => void
   onDelete?: (task: DailyTask) => void
   handle: React.ReactNode
+  // Picking tasks to move together: the box is shown while picking, and Ctrl/Cmd or Shift click picks too
+  isSelected?: boolean
+  isPicking?: boolean
+  onSelect?: (task: DailyTask, mode: SelectMode) => void
 }
 
 /**
- * What a task shows: the drag handle, a checkbox with its text, and a delete button. The label
- * covers only the checkbox and the text, so neither deleting nor dragging ever ticks it by accident.
+ * What a task shows: the drag handle, a box for picking it when several are being moved, a checkbox
+ * with its text, and a delete button. The label covers only the checkbox and the text, so neither
+ * deleting, dragging nor picking ever ticks it by accident: a Ctrl (or Cmd) click picks the task
+ * instead of ticking it, and a Shift click picks everything between it and the last one picked.
  * Without handlers it is the copy that follows the pointer during a drag.
  */
-const TaskRowBody: React.FC<TaskRowBodyProps> = ({ task, today, isPending, onToggle, onDelete, handle }) => {
+const TaskRowBody: React.FC<TaskRowBodyProps> = ({
+  task,
+  today,
+  isPending,
+  onToggle,
+  onDelete,
+  handle,
+  isSelected = false,
+  isPicking = false,
+  onSelect,
+}) => {
   const state = taskState(task, today)
   return (
     <>
       {handle}
-      <label className={`flex min-w-0 flex-1 items-start gap-3 py-3 pr-3 ${onToggle ? "cursor-pointer" : ""}`}>
+      {isPicking && onSelect && (
+        <span className="flex items-center self-stretch py-3 pl-0.5">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onSelect(task, "toggle")}
+            onClick={(event) => {
+              if (event.shiftKey) onSelect(task, "range")
+            }}
+            aria-label={`Pick "${task.content}" to move with others`}
+            title="Pick this task, then drag any picked task to move them all"
+            className="h-4 w-4 shrink-0 cursor-pointer accent-primary"
+          />
+        </span>
+      )}
+      <label
+        onClick={(event) => {
+          if (!onSelect) return
+          if (event.shiftKey) {
+            event.preventDefault()
+            onSelect(task, "range")
+          } else if (event.ctrlKey || event.metaKey) {
+            event.preventDefault()
+            onSelect(task, "toggle")
+          }
+        }}
+        className={`flex min-w-0 flex-1 items-start gap-3 py-3 pr-3 ${onToggle ? "cursor-pointer" : ""}`}
+      >
         <input
           type="checkbox"
           checked={task.isCompleted}
@@ -171,14 +221,20 @@ const SortableTaskRow = memo(function SortableTaskRow({
   task,
   today,
   isPending,
+  isSelected,
+  isPicking,
   onToggle,
   onDelete,
+  onSelect,
 }: {
   task: DailyTask
   today: string
   isPending: boolean
+  isSelected: boolean
+  isPicking: boolean
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
+  onSelect: (task: DailyTask, mode: SelectMode) => void
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -191,22 +247,27 @@ const SortableTaskRow = memo(function SortableTaskRow({
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`relative flex items-start gap-1 rounded-xl border pr-1 ${
-        isDragging ? "border-dashed border-primary/40 bg-primary-fixed/20 [&>*]:opacity-0" : `transition-colors ${stateStyles[state]}`
+        isDragging
+          ? "border-dashed border-primary/40 bg-primary-fixed/20 [&>*]:opacity-0"
+          : `transition-colors ${stateStyles[state]} ${isSelected ? "ring-2 ring-primary/50 ring-offset-1" : ""}`
       }`}
     >
       <TaskRowBody
         task={task}
         today={today}
         isPending={isPending}
+        isSelected={isSelected}
+        isPicking={isPicking}
         onToggle={onToggle}
         onDelete={onDelete}
+        onSelect={onSelect}
         handle={
           <button
             type="button"
             ref={setActivatorNodeRef}
             {...attributes}
             {...listeners}
-            aria-label={`Move task: ${task.content}`}
+            aria-label={isSelected ? `Move the picked tasks, starting with: ${task.content}` : `Move task: ${task.content}`}
             className={`${handleClass} ${isPending ? "cursor-not-allowed opacity-40" : "cursor-grab hover:bg-surface-container-high hover:text-on-surface active:cursor-grabbing"}`}
           >
             <GripVertical size={16} aria-hidden="true" />
@@ -296,17 +357,23 @@ const DayGroup = memo(function DayGroup({
   day,
   today,
   pendingIds,
+  selectedIds,
+  isPicking,
   isDragging,
   onToggle,
   onDelete,
+  onSelect,
   onAddTask,
 }: {
   day: DailyTaskDay
   today: string
   pendingIds: ReadonlySet<string>
+  selectedIds: ReadonlySet<string>
+  isPicking: boolean
   isDragging: boolean
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
+  onSelect: (task: DailyTask, mode: SelectMode) => void
   onAddTask: (date: string, content: string) => Promise<boolean>
 }) {
   const { title, detail } = dayLabel(day.date, today)
@@ -336,7 +403,7 @@ const DayGroup = memo(function DayGroup({
           } ${isDragging && isOver && day.tasks.length > 0 ? "bg-primary-fixed/15 outline outline-2 outline-offset-4 outline-primary/20" : ""}`}
         >
           {day.tasks.length === 0 ? (
-            <li className="px-3 text-[12px] text-outline">{isDragging ? "Drop a task here" : "Drag a task here, or add one below"}</li>
+            <li className="px-3 text-[12px] text-outline">{isDragging ? "Drop here" : "Drag a task here, or add one below"}</li>
           ) : (
             day.tasks.map((task) => (
               <SortableTaskRow
@@ -344,8 +411,11 @@ const DayGroup = memo(function DayGroup({
                 task={task}
                 today={today}
                 isPending={pendingIds.has(task.id)}
+                isSelected={selectedIds.has(task.id)}
+                isPicking={isPicking}
                 onToggle={onToggle}
                 onDelete={onDelete}
+                onSelect={onSelect}
               />
             ))
           )}
@@ -361,6 +431,12 @@ const DayGroup = memo(function DayGroup({
  * own heading, so the order stays readable across pages. Any task can be dragged by its handle to
  * another place in its day, or into another day on the page (today is always there to drop on);
  * the page is told once, on the drop, and saves it.
+ *
+ * **Several tasks move together.** Pick them (the boxes under "Pick several", or a Ctrl/Cmd click on
+ * a task, or a Shift click for everything in between, across days as well as within one) and drag
+ * any one of them: the rest leave their places at once and land together where that one is dropped,
+ * keeping the order they had on the page. Dragging a task that was not picked moves that one alone
+ * and drops the picking, so what is about to move is never in doubt.
  */
 export const TaskDayList: React.FC<TaskDayListProps> = ({
   page,
@@ -385,6 +461,16 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   const [activeTask, setActiveTask] = useState<DailyTask | null>(null)
   // Where the dragged task started, so a drop back in the same place saves nothing
   const origin = useRef<{ date: string; index: number } | null>(null)
+  // The tasks picked to move together, and whether the picking boxes are on show
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const [isPicking, setIsPicking] = useState(false)
+  // The last task picked, which a Shift click reaches back to
+  const lastPicked = useRef<string | null>(null)
+  // Every task on the page, top to bottom, for Shift picking and for the order a group lands in
+  const rowsInOrder = useRef<DailyTask[]>([])
+  // What is travelling with the pointer: one task, or every picked one, and how many that is
+  const moving = useRef<DailyTask[]>([])
+  const [movingCount, setMovingCount] = useState(0)
 
   // Today is always a place to drop on, on the page that shows it, even before it has a task
   const days = useMemo(() => {
@@ -392,6 +478,46 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
     if (!page || current !== 1 || !today || shown.length === 0 || shown.some((day) => day.date === today)) return shown
     return [{ date: today, tasks: [] }, ...shown]
   }, [dragDays, page, current, today])
+
+  // The rows as the page shows them, kept for a Shift pick and for the order a group lands in. It is
+  // read only when something is clicked or dragged, so it is put in the ref after the list is drawn
+  useEffect(() => {
+    rowsInOrder.current = days.flatMap((day) => day.tasks)
+  }, [days])
+
+  // A picked task that has gone (deleted, or off this page) simply stops counting as picked. It is
+  // dropped here rather than in an effect, so nothing is picked that isn't on screen
+  const onPage = useMemo(() => new Set((page?.days ?? []).flatMap((day) => day.tasks.map((task) => task.id))), [page])
+  const selectedIds = useMemo(() => new Set([...selected].filter((id) => onPage.has(id))), [selected, onPage])
+
+  const clearSelection = useCallback(() => {
+    setSelected(new Set())
+    lastPicked.current = null
+  }, [])
+
+  const selectTask = useCallback((task: DailyTask, mode: SelectMode) => {
+    setIsPicking(true)
+    setSelected((current) => {
+      const next = new Set(current)
+      const ids = rowsInOrder.current.map((entry) => entry.id)
+      const from = lastPicked.current ? ids.indexOf(lastPicked.current) : -1
+      const to = ids.indexOf(task.id)
+      if (mode === "range" && from >= 0 && to >= 0) {
+        for (const id of ids.slice(Math.min(from, to), Math.max(from, to) + 1)) next.add(id)
+      } else if (next.has(task.id)) {
+        next.delete(task.id)
+      } else {
+        next.add(task.id)
+      }
+      return next
+    })
+    lastPicked.current = task.id
+  }, [])
+
+  const stopPicking = () => {
+    setIsPicking(false)
+    clearSelection()
+  }
 
   const sensors = useSensors(
     // A few pixels of movement before a drag starts, so pressing the handle to focus it is not a drag
@@ -409,19 +535,37 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
     const day = days.find((entry) => entry.date === date)
     return day ? day.tasks.findIndex((task) => task.id === String(id)) + 1 : 0
   }
+  // While several are moving they are announced as a group, since they all land in one place
+  const moved = (id: UniqueIdentifier) => (moving.current.length > 1 ? `${moving.current.length} picked tasks` : describe(id))
   const announcements: Announcements = {
-    onDragStart: ({ active }) => `Picked up ${describe(active.id)}. Use the arrow keys to move it, Space to drop it, Escape to cancel.`,
-    onDragOver: ({ active, over }) => (over ? `${describe(active.id)} is now in position ${positionIn(active.id)}.` : "Not over a day."),
-    onDragEnd: ({ active }) => `Dropped ${describe(active.id)}.`,
-    onDragCancel: ({ active }) => `Moving cancelled. ${describe(active.id)} is back where it was.`,
+    onDragStart: ({ active }) => `Picked up ${moved(active.id)}. Use the arrow keys to move ${moving.current.length > 1 ? "them" : "it"}, Space to drop, Escape to cancel.`,
+    onDragOver: ({ active, over }) => (over ? `${moved(active.id)} now at position ${positionIn(active.id)}.` : "Not over a day."),
+    onDragEnd: ({ active }) => `Dropped ${moved(active.id)}.`,
+    onDragCancel: ({ active }) => `Moving cancelled. ${moved(active.id)} back where it was.`,
   }
 
   const handleDragStart = ({ active }: DragStartEvent) => {
-    const startDays = days.map((day) => ({ ...day, tasks: [...day.tasks] }))
+    const activeId = String(active.id)
+    const dragged = taskById(active.id) ?? null
+    // Dragging a task nobody picked moves that one, and the picking goes with it
+    const isGroup = selectedIds.has(activeId) && selectedIds.size > 1
+    if (!isGroup && selectedIds.size > 0) clearSelection()
+    // A task still being saved keeps its place rather than travelling with a stale order
+    const group = isGroup
+      ? rowsInOrder.current.filter((task) => task.id === activeId || (selectedIds.has(task.id) && !pendingIds.has(task.id)))
+      : dragged
+        ? [dragged]
+        : []
+    moving.current = group
+    setMovingCount(group.length)
+    const passengers = new Set(group.filter((task) => task.id !== activeId).map((task) => task.id))
+
+    // The tasks coming along leave their places at once, so the days show where the group will land
+    const startDays = days.map((day) => ({ ...day, tasks: day.tasks.filter((task) => !passengers.has(task.id)) }))
     const date = dateOf(startDays, active.id)
     const day = startDays.find((entry) => entry.date === date)
-    origin.current = date && day ? { date, index: day.tasks.findIndex((task) => task.id === String(active.id)) } : null
-    setActiveTask(taskById(active.id) ?? null)
+    origin.current = date && day ? { date, index: day.tasks.findIndex((task) => task.id === activeId) } : null
+    setActiveTask(dragged)
     setDragDays(startDays)
   }
 
@@ -460,12 +604,15 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
     setDragDays(null)
     setActiveTask(null)
     origin.current = null
+    moving.current = []
+    setMovingCount(0)
   }
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     const start = origin.current
-    const moved = activeTask
-    if (!over || !dragDays || !start || !moved) {
+    const dragged = activeTask
+    const group = moving.current.length > 0 ? moving.current : dragged ? [dragged] : []
+    if (!over || !dragDays || !start || !dragged) {
       finishDrag()
       return
     }
@@ -480,9 +627,21 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
     })
     const toDay = finalDays.find((day) => day.date === toDate)
     const index = toDay?.tasks.findIndex((task) => task.id === String(active.id)) ?? -1
+    // One task dropped back where it started saves nothing; a group always has others to put back
+    const isSamePlace = group.length === 1 && toDate === start.date && index === start.index
 
-    if (toDate && toDay && index >= 0 && (toDate !== start.date || index !== start.index)) {
-      onMove({ task: moved, toDate, orderedIds: toDay.tasks.map((task) => task.id), days: finalDays })
+    if (toDate && toDay && index >= 0 && !isSamePlace) {
+      // Everyone that travelled lands together, in the order they had on the page
+      const landed = group.map((task) => ({ ...task, taskDate: toDate }))
+      const days = finalDays.map((day) => {
+        if (day.date !== toDate) return day
+        const tasks = [...day.tasks]
+        tasks.splice(index, 1, ...landed)
+        return { ...day, tasks }
+      })
+      const landedDay = days.find((day) => day.date === toDate)
+      // The page is told the tasks as they were, so it can work out what left an overdue or an older day
+      onMove({ tasks: group, dragged, toDate, orderedIds: landedDay?.tasks.map((task) => task.id) ?? [], days })
     }
     finishDrag()
   }
@@ -494,12 +653,53 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-on-surface">{current === 1 ? `Last ${VISIBLE_DAYS} Days` : "Older Tasks"}</h2>
-        {page && (
-          <span className="text-[11px] text-outline">
-            {current === 1 ? `From ${page.windowStart}` : `Page ${current} of ${pageCount}`}
-          </span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {page && (
+            <span className="text-[11px] text-outline">
+              {current === 1 ? `From ${page.windowStart}` : `Page ${current} of ${pageCount}`}
+            </span>
+          )}
+          {hasDays && !error && (
+            <button
+              type="button"
+              onClick={() => (isPicking ? stopPicking() : setIsPicking(true))}
+              aria-pressed={isPicking}
+              title="Pick several tasks and drag them to another day together. Ctrl (or Cmd) click a task picks it too, Shift click picks everything in between."
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                isPicking
+                  ? "border-primary bg-primary text-white hover:bg-on-primary-fixed-variant"
+                  : "border-outline-variant bg-white text-on-surface-variant hover:border-primary/40 hover:text-primary"
+              }`}
+            >
+              <CheckSquare size={13} aria-hidden="true" />
+              {isPicking ? "Done picking" : "Pick several"}
+            </button>
+          )}
+        </div>
       </div>
+
+      {(isPicking || selectedIds.size > 0) && !error && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-primary/30 bg-primary-fixed/25 px-3 py-2 text-[12px] text-on-surface"
+        >
+          <span>
+            {selectedIds.size === 0
+              ? "Tick the box beside every task you want to move, then drag any one of them."
+              : `${selectedIds.size} task${selectedIds.size === 1 ? "" : "s"} picked. Drag any one of them to move them all to another day.`}
+          </span>
+          <div className="flex items-center gap-2">
+            {selectedIds.size > 0 && (
+              <button type="button" onClick={clearSelection} className="font-semibold text-primary hover:underline">
+                Clear
+              </button>
+            )}
+            <button type="button" onClick={stopPicking} className="font-semibold text-on-surface-variant hover:underline">
+              Done
+            </button>
+          </div>
+        </div>
+      )}
 
       {error ? (
         <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
@@ -549,30 +749,40 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 day={day}
                 today={today}
                 pendingIds={pendingIds}
+                selectedIds={selectedIds}
+                isPicking={isPicking}
                 isDragging={activeTask !== null}
                 onToggle={onToggle}
                 onDelete={onDelete}
+                onSelect={selectTask}
                 onAddTask={onAddTask}
               />
             ))}
           </ul>
           <DragOverlay dropAnimation={DROP_ANIMATION}>
             {activeTask ? (
-              <div
-                className={`flex cursor-grabbing items-start gap-1 rounded-xl border pr-1 shadow-xl ring-2 ring-primary/30 ${
-                  stateStyles[taskState({ ...activeTask, taskDate: dateOf(days, activeTask.id) ?? activeTask.taskDate }, today)]
-                } bg-white`}
-              >
-                <TaskRowBody
-                  task={{ ...activeTask, taskDate: dateOf(days, activeTask.id) ?? activeTask.taskDate }}
-                  today={today}
-                  isPending={false}
-                  handle={
-                    <span className={`${handleClass} bg-surface-container-high text-on-surface`} aria-hidden="true">
-                      <GripVertical size={16} />
-                    </span>
-                  }
-                />
+              <div className="relative">
+                <div
+                  className={`flex cursor-grabbing items-start gap-1 rounded-xl border pr-1 shadow-xl ring-2 ring-primary/30 ${
+                    stateStyles[taskState({ ...activeTask, taskDate: dateOf(days, activeTask.id) ?? activeTask.taskDate }, today)]
+                  } bg-white`}
+                >
+                  <TaskRowBody
+                    task={{ ...activeTask, taskDate: dateOf(days, activeTask.id) ?? activeTask.taskDate }}
+                    today={today}
+                    isPending={false}
+                    handle={
+                      <span className={`${handleClass} bg-surface-container-high text-on-surface`} aria-hidden="true">
+                        <GripVertical size={16} />
+                      </span>
+                    }
+                  />
+                </div>
+                {movingCount > 1 && (
+                  <span className="absolute -right-2 -top-2 rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-white shadow-lg">
+                    +{movingCount - 1} more
+                  </span>
+                )}
               </div>
             ) : null}
           </DragOverlay>

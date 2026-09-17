@@ -3,7 +3,6 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { DummyDataKindSchema, dummyItemInputSchema } from "@/lib/validation/dummyData"
 import { DUMMY_DATA_KINDS } from "@/constants/dummyData"
 import { createDummyItem, listDummyItems } from "@/services/dummyData"
-import { requirePromptAccess } from "@/services/promptAccess"
 import { requireViewer } from "@/services/auth/viewer"
 import { withIdempotency } from "@/services/idempotency"
 
@@ -19,9 +18,6 @@ const unknownKind = () => NextResponse.json({ success: false, message: "Unknown 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   const kind = DummyDataKindSchema.safeParse((await params).kind)
   if (!kind.success) return unknownKind()
   try {
@@ -42,9 +38,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 async function handlePost(req: NextRequest, { params }: RouteContext) {
   const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
-  const denied = await requirePromptAccess()
-  if (denied) return denied
-
   const kind = DummyDataKindSchema.safeParse((await params).kind)
   if (!kind.success) return unknownKind()
   try {

@@ -25,6 +25,8 @@ export interface SavedOutput {
   sourceLabel: string | null
   // Which AI provider wrote it, for records saved since attribution existed
   provider?: string | null
+  // The folder it is filed in, for a tool that has folders; null when it is in none
+  folder?: { id: string; name: string } | null
 }
 
 /** One record with the whole text it was written from. */
@@ -52,6 +54,8 @@ export interface SavedOutputFilters {
   search: string
   option: string
   context: string
+  // A folder id, UNFILED_FOLDER for the records in no folder, or "" for every folder
+  folder: string
   from: string | null
   to: string | null
 }

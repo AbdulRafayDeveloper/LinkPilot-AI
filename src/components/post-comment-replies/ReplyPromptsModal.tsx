@@ -2,7 +2,6 @@
 
 import React, { useEffect, useId, useState } from "react"
 import { Modal } from "@/components/ui/Modal"
-import { PromptAccessGate } from "@/components/prompts/PromptAccessGate"
 import { PromptEditorField } from "@/components/prompts/PromptEditorField"
 import { PromptTabStrip } from "@/components/prompts/PromptTabStrip"
 import {
@@ -72,14 +71,9 @@ const VariablesHint = () => (
 /**
  * Edits the independent reply prompts, one per context + style pair: choose the context, then the style, and the
  * editor loads that exact pair's prompt. Drafts are kept per pair while the modal is
- * open, and Save stores every pair that was edited. It opens only after the prompt password
- * check (PromptAccessGate).
+ * open, and Save stores every pair that was edited.
  */
-export const ReplyPromptsModal: React.FC<ReplyPromptsModalProps> = (props) => (
-  <PromptAccessGate onClose={props.onClose}>
-    <ReplyPromptsEditor {...props} />
-  </PromptAccessGate>
-)
+export const ReplyPromptsModal: React.FC<ReplyPromptsModalProps> = (props) => <ReplyPromptsEditor {...props} />
 
 const ReplyPromptsEditor: React.FC<ReplyPromptsModalProps> = ({ initialContext, initialStyle, onClose }) => {
   const idPrefix = useId()
