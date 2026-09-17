@@ -1,13 +1,15 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useId, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Loader2, X } from "lucide-react"
+import { ChevronDown, Loader2, X } from "lucide-react"
 import { BrandLogo } from "./BrandLogo"
-import { APP_TOOLS, TOOL_GROUPS, type LinkedInTool } from "@/constants/linkedinTools"
+import { TOOL_GROUPS, toolsFor, type LinkedInTool, type ToolLink } from "@/constants/linkedinTools"
 import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 import { markToolSeen, useToolActivity, type ActivityState } from "@/lib/toolActivity"
+import { useSidebarDropdowns } from "@/hooks/useSidebarDropdowns"
+import { useIsAdmin } from "@/hooks/useCurrentUser"
 
 interface SidebarProps {
   isOpen: boolean
@@ -34,6 +36,37 @@ const ACTIVITY_TEXT: Record<ActivityState, string> = {
 const whenCollapsed = (isCollapsed: boolean, classes: string) => (isCollapsed ? classes : "")
 const isDesktop = () => window.matchMedia("(min-width: 1024px)").matches
 
+// The collapsed rail's tooltip for one row, on hover and on keyboard focus alike
+const railHintHandlers = (isCollapsed: boolean, title: string, detail: string, onHint: (hint: RailHint | null) => void) => {
+  const show = (event: React.SyntheticEvent<HTMLElement>) => {
+    if (!isCollapsed || !isDesktop()) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    onHint({ title, detail, top: rect.top + rect.height / 2 })
+  }
+  return { onMouseEnter: show, onFocus: show, onMouseLeave: () => onHint(null), onBlur: () => onHint(null) }
+}
+
+// Rows are kept tight so every tool, an open dropdown included, fits a 900px screen without scrolling
+const rowClass = (isCollapsed: boolean, isActive: boolean, compact = false) =>
+  `group flex w-full items-center gap-2.5 rounded-lg px-2 ${compact ? "py-px" : "py-[2px]"} text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${whenCollapsed(
+    isCollapsed,
+    "lg:justify-center lg:px-0"
+  )} ${isActive ? "bg-primary-fixed/45" : "hover:bg-surface-container-low"}`
+
+const tileClass = (isActive: boolean, compact = false) =>
+  `relative flex ${compact ? "h-5 w-5 rounded-md" : "h-6 w-6 rounded-md"} shrink-0 items-center justify-center transition-colors duration-150 ${
+    isActive
+      ? "bg-primary text-on-primary shadow-sm"
+      : "bg-surface-container-low text-on-surface-variant group-hover:bg-surface-container-lowest group-hover:text-primary group-hover:shadow-sm"
+  }`
+
+const titleClass = (isCollapsed: boolean, isActive: boolean) =>
+  `min-w-0 flex-1 truncate text-[13px] leading-5 ${
+    isActive ? "font-semibold text-on-surface" : "font-medium text-on-surface-variant group-hover:text-on-surface"
+  } ${whenCollapsed(isCollapsed, "lg:sr-only")}`
+
+const ActiveBar = () => <span className="absolute -left-3 top-0.5 bottom-0.5 w-[3px] rounded-r-full bg-primary" aria-hidden="true" />
+
 // A spinner while the tool writes in the background, a dot when its result (or error) is waiting
 const ActivityMark: React.FC<{ state: ActivityState; className?: string }> = ({ state, className = "" }) =>
   state === "running" ? (
@@ -52,52 +85,31 @@ interface SidebarLinkProps {
   activity: ActivityState | undefined
   onNavigate: () => void
   onHint: (hint: RailHint | null) => void
+  // A page inside a dropdown, one size smaller than the tools around it
+  compact?: boolean
 }
 
 // One navigation row: an icon tile and the name, on a single line, so a long list of tools stays
 // scannable. The description is the row's tooltip, and the rail tooltip when collapsed.
-const SidebarLink: React.FC<SidebarLinkProps> = ({ link, isActive, isCollapsed, activity, onNavigate, onHint }) => {
+const SidebarLink: React.FC<SidebarLinkProps> = ({ link, isActive, isCollapsed, activity, onNavigate, onHint, compact = false }) => {
   const { title, description, icon: Icon, href } = link
-  const showHint = (event: React.SyntheticEvent<HTMLElement>) => {
-    if (!isCollapsed || !isDesktop()) return
-    const rect = event.currentTarget.getBoundingClientRect()
-    onHint({ title, detail: activity ? ACTIVITY_TEXT[activity] : description, top: rect.top + rect.height / 2 })
-  }
 
   return (
     <li className="relative">
-      {isActive && <span className="absolute -left-3 top-0.5 bottom-0.5 w-[3px] rounded-r-full bg-primary" aria-hidden="true" />}
+      {isActive && <ActiveBar />}
       <Link
         href={href}
         title={description}
         onClick={onNavigate}
-        onMouseEnter={showHint}
-        onFocus={showHint}
-        onMouseLeave={() => onHint(null)}
-        onBlur={() => onHint(null)}
+        {...railHintHandlers(isCollapsed, title, activity ? ACTIVITY_TEXT[activity] : description, onHint)}
         aria-current={isActive ? "page" : undefined}
-        className={`group flex items-center gap-2.5 rounded-lg px-2 py-[3px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${whenCollapsed(
-          isCollapsed,
-          "lg:justify-center lg:px-0"
-        )} ${isActive ? "bg-primary-fixed/45" : "hover:bg-surface-container-low"}`}
+        className={rowClass(isCollapsed, isActive, compact)}
       >
-        <span
-          className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 ${
-            isActive
-              ? "bg-primary text-on-primary shadow-sm"
-              : "bg-surface-container-low text-on-surface-variant group-hover:bg-surface-container-lowest group-hover:text-primary group-hover:shadow-sm"
-          }`}
-        >
-          <Icon size={15} aria-hidden="true" />
+        <span className={tileClass(isActive, compact)}>
+          <Icon size={compact ? 12 : 14} aria-hidden="true" />
           {activity && isCollapsed && <ActivityMark state={activity} className="absolute -right-1 -top-1 hidden lg:block" />}
         </span>
-        <span
-          className={`min-w-0 flex-1 truncate text-[13px] leading-5 ${
-            isActive ? "font-semibold text-on-surface" : "font-medium text-on-surface-variant group-hover:text-on-surface"
-          } ${whenCollapsed(isCollapsed, "lg:sr-only")}`}
-        >
-          {title}
-        </span>
+        <span className={titleClass(isCollapsed, isActive)}>{title}</span>
         {activity && (
           <span className={`flex shrink-0 items-center ${whenCollapsed(isCollapsed, "lg:hidden")}`}>
             <ActivityMark state={activity} />
@@ -109,15 +121,108 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ link, isActive, isCollapsed, 
   )
 }
 
+interface SidebarDropdownProps {
+  tool: LinkedInTool
+  links: ToolLink[]
+  pathname: string
+  isCollapsed: boolean
+  isOpen: boolean
+  onToggle: () => void
+  activityOf: (href: string) => ActivityState | undefined
+  onNavigate: () => void
+  onHint: (hint: RailHint | null) => void
+}
+
+/**
+ * A tool with more than one page. Its row opens and closes the list of those pages instead of
+ * going anywhere, and the pages sit indented beneath it. Only a click on that row changes it:
+ * choosing one of its pages, going to another tool or reloading leaves it exactly as it was.
+ */
+const SidebarDropdown: React.FC<SidebarDropdownProps> = ({
+  tool,
+  links,
+  pathname,
+  isCollapsed,
+  isOpen,
+  onToggle,
+  activityOf,
+  onNavigate,
+  onHint,
+}) => {
+  const listId = useId()
+  const { title, description, icon: Icon } = tool
+  const containsActive = links.some((link) => link.href === pathname)
+  // Closed, the row itself carries what its hidden pages would have shown
+  const showsAsActive = containsActive && !isOpen
+  const hiddenActivity = isOpen
+    ? undefined
+    : links.map((link) => (link.href === pathname ? undefined : activityOf(link.href))).find((state) => state !== undefined)
+
+  return (
+    <li className="relative">
+      {showsAsActive && <ActiveBar />}
+      <button
+        type="button"
+        onClick={onToggle}
+        title={description}
+        aria-expanded={isOpen}
+        aria-controls={listId}
+        {...railHintHandlers(isCollapsed, title, isOpen ? `Hide ${title} pages` : `Show ${title} pages`, onHint)}
+        className={rowClass(isCollapsed, showsAsActive)}
+      >
+        <span className={tileClass(showsAsActive)}>
+          <Icon size={14} aria-hidden="true" />
+          {hiddenActivity && isCollapsed && <ActivityMark state={hiddenActivity} className="absolute -right-1 -top-1 hidden lg:block" />}
+        </span>
+        <span className={titleClass(isCollapsed, containsActive)}>{title}</span>
+        {hiddenActivity && (
+          <span className={`flex shrink-0 items-center ${whenCollapsed(isCollapsed, "lg:hidden")}`}>
+            <ActivityMark state={hiddenActivity} />
+          </span>
+        )}
+        <ChevronDown
+          size={14}
+          aria-hidden="true"
+          className={`shrink-0 text-outline transition-transform duration-150 ${isOpen ? "rotate-180" : ""} ${whenCollapsed(isCollapsed, "lg:hidden")}`}
+        />
+      </button>
+
+      {/* Indented under the row with a hairline tying the pages to it; the rail keeps its icons centred */}
+      <ul
+        id={listId}
+        hidden={!isOpen}
+        aria-label={`${title} pages`}
+        className={`ml-[18px] border-l border-outline-variant/80 pl-2 ${whenCollapsed(isCollapsed, "lg:ml-0 lg:border-l-0 lg:pl-0")}`}
+      >
+        {links.map((link) => (
+          <SidebarLink
+            key={link.href}
+            link={link}
+            isActive={pathname === link.href}
+            isCollapsed={isCollapsed}
+            activity={pathname === link.href ? undefined : activityOf(link.href)}
+            onNavigate={onNavigate}
+            onHint={onHint}
+            compact
+          />
+        ))}
+      </ul>
+    </li>
+  )
+}
+
 /**
  * App navigation: the brand, every tool under the four headings in TOOL_GROUPS, and Global AI
  * Prompts pinned at the bottom. A drawer on small screens; on desktop a full column that
  * collapses to an icon rail. Every tool shows when it's writing in the background or has a
- * result waiting.
+ * result waiting. A tool with several pages is a dropdown that stays as the user left it.
  */
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed = false }) => {
   const pathname = usePathname()
   const activity = useToolActivity()
+  const dropdowns = useSidebarDropdowns()
+  // The admin area appears only once the account is known to be an admin, never flashing for a user
+  const tools = toolsFor(useIsAdmin())
   const [hint, setHint] = useState<RailHint | null>(null)
   const activityOf = (href: string) => activity.find((entry) => entry.href === href)?.state
 
@@ -137,6 +242,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
       onHint={setHint}
     />
   )
+
+  const renderTool = (tool: LinkedInTool) => {
+    if (!tool.links) return renderLink(tool)
+    const open = dropdowns.isOpen(tool.id, tool.links.some((link) => link.href === pathname))
+    return (
+      <SidebarDropdown
+        key={tool.id}
+        tool={tool}
+        links={tool.links}
+        pathname={pathname}
+        isCollapsed={isCollapsed}
+        isOpen={open}
+        onToggle={() => dropdowns.setOpen(tool.id, !open)}
+        activityOf={activityOf}
+        onNavigate={onClose}
+        onHint={setHint}
+      />
+    )
+  }
 
   return (
     <>
@@ -174,10 +298,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
         <nav
           aria-label="Main"
           onScroll={() => setHint(null)}
-          className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2"
+          className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-1.5"
         >
           {TOOL_GROUPS.map((group, index) => (
-            <section key={group.id} aria-labelledby={`nav-group-${group.id}`} className={index > 0 ? "mt-3" : ""}>
+            <section key={group.id} aria-labelledby={`nav-group-${group.id}`} className={index > 0 ? "mt-1" : ""}>
               {/* Collapsed, a thin line separates the groups instead of their names */}
               {index > 0 && <div className={`mx-2 mb-3 hidden h-px bg-outline-variant/70 ${whenCollapsed(isCollapsed, "lg:block")}`} aria-hidden="true" />}
               <h2
@@ -186,7 +310,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
               >
                 {group.label}
               </h2>
-              <ul>{APP_TOOLS.filter((tool) => tool.group === group.id).map(renderLink)}</ul>
+              <ul>{tools.filter((tool) => tool.group === group.id).map(renderTool)}</ul>
             </section>
           ))}
         </nav>

@@ -36,7 +36,7 @@ export async function runTrendingResearch({ brief, now, signal, onFallback }: Re
   const [template, lenses] = await Promise.all([loadPrompt("trending-research"), loadSearchLenses("trending-search-lenses")])
   const passes = lenses.map((lens) => buildResearchMessages(template, brief, now, lens))
   return runLiveResearch({
-    geminiPasses: passes,
+    groqPasses: passes,
     openAIPasses: passes,
     minSources: MIN_RESEARCH_SOURCES,
     signal,

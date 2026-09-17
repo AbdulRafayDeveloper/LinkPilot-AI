@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { getFirstMessagePrompts } from "@/services/firstMessage/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -9,6 +10,8 @@ export const dynamic = "force-dynamic"
  * GET: Returns the latest saved prompt (or default) for every tune, plus the shared sender profile.
  */
 export async function GET() {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 

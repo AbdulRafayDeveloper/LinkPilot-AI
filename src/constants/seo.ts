@@ -68,15 +68,30 @@ const TOOL_SEO: Record<string, { title: string; description: string; keywords: s
     keywords: ["client update message", "client communication template", "freelance client messages"],
   },
   meetings: {
-    title: "Meeting Minutes & Action Items from a Transcript",
+    title: "Meeting Notes to Tasks, Minutes & Action Items",
     description:
       "Paste a whole meeting, however long, and get the participants, the decisions, your own tasks and a short summary to send the client.",
     keywords: ["meeting minutes generator", "meeting transcript analysis", "action items from meeting"],
   },
   "quick-notes": {
-    title: "Quick Notes, Save Text to Reuse",
+    title: "Temporary Quick Notes, Save Text to Reuse",
     description: "Paste or write anything worth keeping, save it in one click, and copy it back whenever you need it.",
     keywords: ["save text notes", "copy paste notes", "reusable snippets"],
+  },
+  "important-content": {
+    title: "Important Content, Saved Logins, Links and Text",
+    description: "Keep the logins, links and text you need again under a name and a type of your own, then search by name and filter by type.",
+    keywords: ["save important text", "store credentials and links", "snippet manager"],
+  },
+  employees: {
+    title: "Employees Management and Team Plans",
+    description: "Keep your team in one place, with each employee's role, city, joining date and status, a daily plan for each of them with the time every task was finished, and a link each employee can tick their tasks off from.",
+    keywords: ["employee management", "team planning", "daily weekly monthly plans", "employee list"],
+  },
+  administration: {
+    title: "Audit Management",
+    description: "Every sign-in, sign-up and refused attempt, newest first, with the device and browser it came from.",
+    keywords: [],
   },
   "daily-tasks": {
     title: "Daily Tasks, a Simple Day Checklist",
@@ -85,7 +100,7 @@ const TOOL_SEO: Record<string, { title: string; description: string; keywords: s
     keywords: ["daily task list", "daily checklist", "to-do list for work", "track daily tasks"],
   },
   "meeting-planner": {
-    title: "Meeting Planner & Client Meeting Preparation",
+    title: "Meeting Scheduler & Planner with Client Meeting Preparation",
     description:
       "Put a client meeting in the calendar, then have the profile and your conversation so far turned into a read of the person and a plan for the call.",
     keywords: ["meeting preparation", "client meeting planner", "sales call preparation", "discovery call plan"],
@@ -149,16 +164,41 @@ export const SEO_PAGES: SeoPage[] = [
     keywords: TOOL_SEO[tool.id]?.keywords ?? [],
     heading: tool.title,
     subheading: tool.description,
-    indexable: true,
+    indexable: !tool.adminOnly,
   })),
+  // A tool's other pages (its "view all" list), read from the same dropdown links the sidebar shows
+  ...APP_TOOLS.flatMap((tool) =>
+    (tool.links ?? [])
+      .filter((link) => link.href !== tool.href)
+      .map((link) => ({
+        slug: link.href.slice(1),
+        path: link.href,
+        title: link.pageTitle ?? link.title,
+        description: `${link.description}, with search and filters. ${tool.title}, LinkPilot AI.`,
+        keywords: [],
+        heading: link.pageTitle ?? link.title,
+        subheading: link.description,
+        indexable: false,
+      }))
+  ),
   {
-    slug: "post-image-creator/history",
-    path: "/post-image-creator/history",
-    title: "Generated Post Images",
-    description: "Every post image you have made, with the colours, photo and content it was made from.",
-    keywords: ["generated post images", "post image history", "brand image gallery"],
-    heading: "Generated Posts",
-    subheading: "Every post image you have made",
+    slug: "login",
+    path: "/login",
+    title: "Sign In",
+    description: "Sign in to LinkPilot AI, the workspace for LinkedIn posts, outreach and client updates.",
+    keywords: [],
+    heading: "Sign in to LinkPilot",
+    subheading: "Your outreach and client workspace",
+    indexable: false,
+  },
+  {
+    slug: "signup",
+    path: "/signup",
+    title: "Create an Account",
+    description: "Create a LinkPilot AI account to keep your posts, messages and prompts in one place.",
+    keywords: [],
+    heading: "Create your LinkPilot account",
+    subheading: "Your outreach and client workspace",
     indexable: false,
   },
   {

@@ -3,6 +3,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { ReferenceItemSchema } from "@/lib/validation/referenceItem"
 import { REFERENCE_CONTENT_MESSAGES, REFERENCE_SEARCH_MAX_LENGTH } from "@/constants/referenceContent"
 import { createItem, listItems } from "@/services/referenceContent/items"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -11,9 +12,11 @@ export const dynamic = "force-dynamic"
  * The service caps the batch at REFERENCE_PAGE_SIZE (50), whatever is asked for.
  */
 export async function GET(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const search = (req.nextUrl.searchParams.get("search") ?? "").slice(0, REFERENCE_SEARCH_MAX_LENGTH)
-    const page = await listItems({ search, cursor: req.nextUrl.searchParams.get("cursor") })
+    const page = await listItems(auth.viewer, { search, cursor: req.nextUrl.searchParams.get("cursor") })
     return NextResponse.json({ success: true, message: "Saved content retrieved", data: page })
   } catch (error: unknown) {
     console.error("GET Reference Content Exception:", error)
@@ -28,6 +31,8 @@ export async function GET(req: NextRequest) {
  * POST: Saves one new piece of reference content.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = ReferenceItemSchema.safeParse(body)
@@ -38,7 +43,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const item = await createItem(parsed.data)
+    const item = await createItem(auth.viewer, parsed.data)
     return NextResponse.json({ success: true, message: REFERENCE_CONTENT_MESSAGES.created, data: item }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Reference Content Exception:", error)

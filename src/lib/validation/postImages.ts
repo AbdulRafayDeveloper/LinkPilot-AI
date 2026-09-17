@@ -8,9 +8,11 @@ import {
   IMAGE_SIZE_IDS,
   MAX_BRAND_ASSETS,
   MAX_BRAND_COLORS,
+  NO_PHOTO_FILTER,
   POST_CONTENT_MAX_LENGTH,
   POST_IMAGES_MESSAGES,
 } from "@/constants/postImages"
+import { DATE_ORDER_ISSUE, choiceParam, cursorParam, dayBoundParam, inDateOrder, searchParam } from "./listFilters"
 
 /** One brand colour, as a designer writes it. */
 const HexColor = z
@@ -68,3 +70,15 @@ export const GenerateImageSchema = z.object({
   pose: z.enum(ASSET_POSE_IDS).optional().default("standing"),
   size: z.enum(IMAGE_SIZE_IDS).optional().default("square"),
 })
+
+/** The gallery's query string: a cursor, a search, the shape, the photo and a date range. */
+export const PostImagesQuerySchema = z
+  .object({
+    cursor: cursorParam,
+    search: searchParam,
+    size: choiceParam(IMAGE_SIZE_IDS),
+    photo: choiceParam([NO_PHOTO_FILTER, ...ASSET_POSE_IDS]),
+    from: dayBoundParam,
+    to: dayBoundParam,
+  })
+  .refine(inDateOrder, DATE_ORDER_ISSUE)

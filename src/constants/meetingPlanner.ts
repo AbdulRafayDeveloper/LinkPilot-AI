@@ -101,7 +101,7 @@ export const MEETING_PLANNER_TOOL: {
   group: "clients"
 } = {
   id: "meeting-planner",
-  title: "Meeting Planner",
+  title: "Meeting Scheduler & Planner",
   description: "Schedule & prepare meetings",
   icon: CalendarPlus,
   href: "/meeting-planner",

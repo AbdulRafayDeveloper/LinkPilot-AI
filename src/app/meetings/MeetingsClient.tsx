@@ -177,7 +177,7 @@ export default function MeetingsClient() {
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
                   <CalendarClock size={24} className="text-primary shrink-0" aria-hidden="true" />
-                  Meeting Minutes
+                  Meeting Notes to Tasks
                 </h1>
                 <p className="text-sm text-on-surface-variant mt-1">
                   Paste a whole call, however long, and get the decisions, the tasks and a summary to send the client.

@@ -3,6 +3,7 @@ import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { CREATED_NAME_MAX_LENGTH, CREATED_PROMPT_MAX_LENGTH, PROMPT_CREATOR_MESSAGES } from "@/constants/promptCreator"
 import { updateCreatedPrompt } from "@/services/promptCreator/records"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -28,6 +29,8 @@ const UpdateSchema = z
  * always matches what they see on the page.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = UpdateSchema.safeParse(body)
@@ -38,7 +41,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       )
     }
 
-    const saved = await updateCreatedPrompt((await params).id, parsed.data)
+    const saved = await updateCreatedPrompt(auth.viewer, (await params).id, parsed.data)
     return NextResponse.json({ success: true, message: "Saved", data: saved })
   } catch (error: unknown) {
     console.error("PUT Created Prompt Exception:", error instanceof Error ? error.message : error)

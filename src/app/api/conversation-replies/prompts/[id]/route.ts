@@ -10,6 +10,7 @@ import {
 import { LEAD_SIGNALS_PROMPT_ID } from "@/constants/leadSignals"
 import { saveConversationReplyPrompt } from "@/services/conversationReply/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -20,6 +21,8 @@ const PromptIdSchema = z.enum(CONVERSATION_REPLY_PROMPT_IDS)
  * Nothing else changes.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 

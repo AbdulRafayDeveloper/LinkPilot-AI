@@ -4,6 +4,9 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { MESSAGE_MAX_LENGTH, MESSAGE_REWRITER_MESSAGES } from "@/constants/messageRewriter"
 import { rewriteMessage } from "@/services/messageRewriter/generate"
 import { recordRewrittenMessage } from "@/services/generationRecords"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -23,6 +26,8 @@ const RewriteSchema = z.object({
  * says what the user meant, humanized like every other written result, and saves it.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = RewriteSchema.safeParse(body)
@@ -34,8 +39,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { message, source } = parsed.data
-    const result = await rewriteMessage({ message, source, signal: req.signal })
-    await recordRewrittenMessage({ message, source }, result)
+    const result = await withModelOrder(await modelOrderFor(auth.viewer, "message-rewriter"), () => rewriteMessage({ message, source, signal: req.signal }))
+    await recordRewrittenMessage(auth.viewer, { message, source }, result)
     return NextResponse.json({ success: true, message: "Message rewritten", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

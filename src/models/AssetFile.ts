@@ -1,4 +1,5 @@
 import mongoose, { Schema, type Model } from "mongoose"
+import { OWNER_ID } from "./owner"
 
 /**
  * One file kept in Important Files: what the user called it, what it is, and where it sits in
@@ -10,6 +11,8 @@ import mongoose, { Schema, type Model } from "mongoose"
  * was interrupted can never show up as a file you can open.
  */
 export interface IAssetFile {
+  // The account it belongs to (models/owner.ts)
+  ownerId: string | null
   name: string
   description: string
   originalName: string
@@ -27,6 +30,7 @@ export interface IAssetFile {
 
 const AssetFileSchema = new Schema<IAssetFile>(
   {
+    ownerId: OWNER_ID,
     name: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     originalName: { type: String, required: true },

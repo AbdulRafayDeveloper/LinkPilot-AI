@@ -1,10 +1,13 @@
 import mongoose, { Schema, type Model } from "mongoose"
+import { OWNER_ID } from "./owner"
 
 /**
  * A piece of text the user saved to reuse later. Nothing is generated or rewritten here, so a
  * note is just its content and when it was saved.
  */
 export interface IQuickNote {
+  // The account it belongs to (models/owner.ts)
+  ownerId: string | null
   content: string
   createdAt: Date
   updatedAt: Date
@@ -12,6 +15,7 @@ export interface IQuickNote {
 
 const QuickNoteSchema = new Schema<IQuickNote>(
   {
+    ownerId: OWNER_ID,
     content: { type: String, required: true },
   },
   { timestamps: true, collection: "quick_notes" }

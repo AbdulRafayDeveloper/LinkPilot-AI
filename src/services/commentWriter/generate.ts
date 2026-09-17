@@ -1,5 +1,6 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
-import { AI_PROVIDERS, generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
+import { generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
+import { currentModelOrder } from "@/lib/modelOrder"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
 import type { ResearchResult } from "@/services/liveResearch"
@@ -23,8 +24,6 @@ import { experienceBlock, postBlock, researchBlock } from "./blocks"
 
 // Natural and varied rather than templated
 const WRITING_TEMPERATURE = 0.7
-// Gemini is the primary writer; OpenAI is only called when Gemini can't deliver
-const PROVIDER_ORDER: readonly ModelProvider[] = AI_PROVIDERS
 // Readable stand-ins for the variables when the tune prompt is used to steer web research
 const RESEARCH_BRIEF_LABELS = {
   post_content: "[the LinkedIn post]",
@@ -80,13 +79,13 @@ function collectNotices(reference: CommentReference | null, experienceQuote: str
 /**
  * One end-to-end comment: latest saved tune prompt → post text (read from the screenshot
  * when needed) → web research and/or the About Me profile when the prompt asks for them
- * → one structured writing call (Gemini, OpenAI fallback) → output verification → the
+ * → one structured writing call (the module's provider order, Groq first) → output verification → the
  * Humanization prompt, whose rewrite must pass the same comment checks.
  */
 export async function generateComment({ tune, post, signal, onStage }: GenerateOptions): Promise<GeneratedComment> {
   const now = new Date()
   const stylePrompt = await getActiveTunePrompt(tune)
-  let providers = PROVIDER_ORDER
+  let providers = currentModelOrder()
   let isFallbackAnnounced = false
   const announceModelFallback = () => {
     if (isFallbackAnnounced) return

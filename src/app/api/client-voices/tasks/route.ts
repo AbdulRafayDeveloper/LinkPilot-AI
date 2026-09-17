@@ -3,6 +3,9 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { TranscriptBatchSchema } from "@/lib/validation/clientVoices"
 import { CLIENT_VOICES_MESSAGES } from "@/constants/clientVoices"
 import { extractTasks } from "@/services/clientVoices/tasks"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -14,6 +17,8 @@ export const maxDuration = 120
  * nothing is kept between requests, so the batch exists in the page and nowhere else.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = TranscriptBatchSchema.safeParse(body)
@@ -25,7 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { voices, missingVoices } = parsed.data
-    const result = await extractTasks({ voices, missingVoices, signal: req.signal })
+    const result = await withModelOrder(await modelOrderFor(auth.viewer, "client-voices"), () => extractTasks({ voices, missingVoices, signal: req.signal }))
     return NextResponse.json({ success: true, message: "Tasks ready", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

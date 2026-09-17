@@ -1,11 +1,11 @@
 "use client"
 
-import React, { useCallback, useEffect, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import { AlertTriangle, ListTodo, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { TaskComposer, emptyRows } from "@/components/daily-tasks/TaskComposer"
-import { TaskDayList } from "@/components/daily-tasks/TaskDayList"
+import { TaskDayList, type TaskMove } from "@/components/daily-tasks/TaskDayList"
 import { CleanupOldTasksDialog } from "@/components/daily-tasks/CleanupOldTasksDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
@@ -35,6 +35,8 @@ export default function DailyTasksClient() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [cleanupError, setCleanupError] = useState<string | null>(null)
   const { taskDate, rows } = useToolStore(draftStore)
+  // Moves are saved one after another, so a second quick drag is checked against the first one's result
+  const moveQueue = useRef<Promise<void>>(Promise.resolve())
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
 
   // The day is read on arrival and again whenever the tab comes back, so a page left open
@@ -205,6 +207,52 @@ export default function DailyTasksClient() {
     }
   }
 
+  /**
+   * A task dragged to a new place. The page shows it there at once; the move is then saved after
+   * any move still being saved. If saving fails the list goes back to how it was and is read again
+   * from the server, so it never shows an order the database doesn't have.
+   */
+  const moveTask = ({ task, toDate, orderedIds, days }: TaskMove) => {
+    setTaskError(null)
+    const snapshot = page
+    const wasOverdue = !task.isCompleted && task.taskDate < today
+    const isOverdue = !task.isCompleted && toDate < today
+    setPendingIds((current) => new Set(current).add(task.id))
+    setPage((current) =>
+      current
+        ? {
+            ...current,
+            days: days.filter((day) => day.tasks.length > 0),
+            overdueCount: Math.max(0, current.overdueCount + Number(isOverdue) - Number(wasOverdue)),
+            olderTaskCount: Math.max(
+              0,
+              current.olderTaskCount + Number(toDate < current.windowStart) - Number(task.taskDate < current.windowStart)
+            ),
+          }
+        : current
+    )
+
+    moveQueue.current = moveQueue.current.then(async () => {
+      try {
+        await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}/move`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ today, taskDate: toDate, orderedIds }),
+        })
+      } catch (error: unknown) {
+        setPage(snapshot)
+        setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.moveFailed)
+        reload()
+      } finally {
+        setPendingIds((current) => {
+          const next = new Set(current)
+          next.delete(task.id)
+          return next
+        })
+      }
+    })
+  }
+
   // A task is one line, so it goes on one click and comes back if the delete fails
   const removeTask = async (task: DailyTask) => {
     if (pendingIds.has(task.id)) return
@@ -351,6 +399,7 @@ export default function DailyTasksClient() {
                 onPageChange={goToPage}
                 onToggle={toggleTask}
                 onDelete={removeTask}
+                onMove={moveTask}
                 onAddTask={addTaskToDay}
               />
             </div>

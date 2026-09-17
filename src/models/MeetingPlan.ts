@@ -7,6 +7,7 @@ import {
   type MeetingPlanStatusId,
   type PrepStatusId,
 } from "@/constants/meetingPlanner"
+import { OWNER_ID } from "./owner"
 
 /**
  * One meeting that hasn't happened yet: when it is, who it is with, and (when preparation is on)
@@ -19,6 +20,8 @@ import {
  * saved module.
  */
 export interface IMeetingPlan {
+  // The account it belongs to (models/owner.ts)
+  ownerId: string | null
   name: string
   meetingDate: string
   meetingTime: string
@@ -40,6 +43,7 @@ export interface IMeetingPlan {
 
 const MeetingPlanSchema = new Schema<IMeetingPlan>(
   {
+    ownerId: OWNER_ID,
     name: { type: String, required: true, trim: true },
     meetingDate: { type: String, required: true, match: ISO_DATE_PATTERN },
     meetingTime: { type: String, required: true, match: TIME_PATTERN },

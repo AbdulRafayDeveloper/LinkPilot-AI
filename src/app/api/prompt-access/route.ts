@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { PROMPT_ACCESS_MESSAGES, PROMPT_PASSWORD_MAX_LENGTH } from "@/constants/promptAccess"
 import { getPromptAccessStatus, submitPromptPassword, type PasswordOutcome } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -18,6 +19,8 @@ const HTTP_STATUS: Record<PasswordOutcome, number> = { granted: 200, rejected: 4
  * GET: Whether this browser may open the Update Prompt editors right now.
  */
 export async function GET() {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const status = await getPromptAccessStatus()
   return NextResponse.json({ success: true, message: "Prompt access status retrieved", data: status })
 }
@@ -27,6 +30,8 @@ export async function GET() {
  * this browser for 48 hours; the third wrong one locks this browser out for 24 hours.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const body = await req.json().catch(() => null)
   const parsed = PasswordSchema.safeParse(body)
   if (!parsed.success) {

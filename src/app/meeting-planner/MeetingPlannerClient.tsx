@@ -218,7 +218,7 @@ export default function MeetingPlannerClient() {
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
                   <CalendarPlus size={24} className="text-primary shrink-0" aria-hidden="true" />
-                  Meeting Planner
+                  Meeting Scheduler & Planner
                 </h1>
                 <p className="text-sm text-on-surface-variant mt-1">
                   Put a meeting in the calendar, and have it read the person and plan the conversation before you join.

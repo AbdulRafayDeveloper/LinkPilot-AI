@@ -96,8 +96,12 @@ export function imageSize(size: ImageSizeId) {
   return IMAGE_SIZES.find((entry) => entry.id === size) ?? IMAGE_SIZES[0]
 }
 
-// The most images one request of the history returns
-export const POST_IMAGE_PAGE_SIZE = 12
+// The gallery's photo filter: one pose, or images made with no photo at all
+export const NO_PHOTO_FILTER = "none"
+export const PHOTO_FILTER_OPTIONS = [
+  { id: NO_PHOTO_FILTER, label: "No photo" },
+  ...ASSET_POSES.map((pose) => ({ id: pose.id, label: `Photo, ${pose.label.toLowerCase()}` })),
+]
 
 export const POST_IMAGES_PROMPT_ID = "post-image"
 export const POST_IMAGES_PROMPT_TABS = [{ id: POST_IMAGES_PROMPT_ID, label: "Post image" }]
@@ -127,7 +131,6 @@ export const POST_IMAGES_MESSAGES = {
   generated: "Image ready.",
   deleted: "Deleted.",
   loadFailed: "Couldn't load your images.",
-  moreFailed: "Couldn't load more. Scroll again to retry.",
   notFound: "That image no longer exists.",
   copyFailed: "This browser can't copy an image to the clipboard. Download it instead.",
   copied: "Image copied.",

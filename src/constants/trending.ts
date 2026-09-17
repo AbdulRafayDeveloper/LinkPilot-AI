@@ -9,6 +9,9 @@ export const TRENDING_MESSAGES = {
 } as const
 export const LINKEDIN_CONTENT_SEARCH_URL = "https://www.linkedin.com/search/results/content/"
 
+// A LinkedIn content search for one query, opened from a topic on the search page or the saved topics
+export const linkedInSearchUrl = (query: string) => `${LINKEDIN_CONTENT_SEARCH_URL}?keywords=${encodeURIComponent(query)}`
+
 /**
  * The six post formats, one per topic, so a search never returns six posts that read alike.
  * `structure` is what the writing model must follow and what the reader sees on the card.
@@ -85,3 +88,45 @@ export const POST_TARGET_MAX_CHARS = 2000
 export const POST_HOOK_MAX_WORDS = 12
 export const POST_HASHTAG_MIN = 3
 export const POST_HASHTAG_MAX = 5
+
+/**
+ * Existing topics: every topic every search has found, read back from trending_searches. The
+ * sidebar's Trending Topics dropdown links here and to the search page.
+ */
+export const TRENDING_HISTORY_HREF = "/trending-topics/history"
+export const TRENDING_HISTORY_ENDPOINT = "/api/trending-topics/history"
+// Page size, search length and debounce are the ones every history shares (constants/historyFilters.ts)
+export const TRENDING_HISTORY_CATEGORY_MAX_LENGTH = 60
+
+/**
+ * Where a saved topic stands. The page shows one search at a time, so a topic is either part of
+ * the search on the page now, part of an earlier search, or part of one someone reset.
+ */
+export const SAVED_TOPIC_STATUSES = [
+  { id: "current", label: "On the page now" },
+  { id: "earlier", label: "Earlier search" },
+  { id: "dismissed", label: "Dismissed" },
+] as const
+
+export type SavedTopicStatus = (typeof SAVED_TOPIC_STATUSES)[number]["id"]
+export const SAVED_TOPIC_STATUS_IDS = SAVED_TOPIC_STATUSES.map((status) => status.id) as [
+  SavedTopicStatus,
+  ...SavedTopicStatus[],
+]
+
+// Older searches were saved before posts had a format, so "none" is a filter of its own
+export const NO_FORMAT_FILTER = "none"
+
+export const TRENDING_HISTORY_MESSAGES = {
+  loadFailed: "Couldn't load the saved topics. Please try again.",
+  empty: "No topics have been found yet. Run a search and every topic it finds lands here.",
+  noResults: "No saved topics match these filters.",
+  topicGone: "That topic no longer exists. It may have been deleted already.",
+  detailFailed: "Couldn't open this topic. Please try again.",
+  unreadable: "This topic was saved in a shape the app can no longer show in full.",
+  deleteFailed: "Couldn't delete the topic. It is back in the list, so please try again.",
+  deleted: "Topic deleted.",
+} as const
+
+// The longest topic title a delete or a detail request may name
+export const SAVED_TOPIC_TITLE_MAX_LENGTH = 500

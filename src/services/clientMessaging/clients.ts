@@ -3,12 +3,14 @@ import { UserFacingError } from "@/lib/errors"
 import { Client as ClientModel, type IClient } from "@/models/Client"
 import { CLIENT_MESSAGING_MESSAGES, SAMPLE_MESSAGE_COUNT } from "@/constants/clientMessaging"
 import type { Client, ClientInput } from "@/types/clientMessaging"
+import type { Viewer } from "@/types/auth"
+import { visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * The clients the user writes to, kept in the clients collection. Each one carries its own
- * message format and sample messages, which is what the generated message follows.
+ * message format and sample messages, which is what the generated message follows. A client belongs
+ * to the account that added it: a user writes to their own clients, an admin sees them all.
  */
-const ID_PATTERN = /^[0-9a-f]{24}$/
 
 type StoredClient = IClient & { _id: { toString: () => string } }
 
@@ -35,51 +37,54 @@ function cleanInput({ name, country, messageFormat, sampleMessages }: ClientInpu
   }
 }
 
-export async function listClients(): Promise<Client[]> {
+export async function listClients(viewer: Viewer): Promise<Client[]> {
   await connectDatabase()
-  const records = await ClientModel.find({}).sort({ createdAt: 1 }).lean()
+  const records = await ClientModel.find(visibleTo(viewer)).sort({ createdAt: 1 }).lean()
   return (records as unknown as StoredClient[]).map(toClient)
 }
 
-export async function getClient(id: string): Promise<Client | null> {
-  if (!ID_PATTERN.test(id)) return null
+export async function getClient(viewer: Viewer, id: string): Promise<Client | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
   await connectDatabase()
-  const record = await ClientModel.findById(id).lean()
+  const record = await ClientModel.findOne(filter).lean()
   return record ? toClient(record as unknown as StoredClient) : null
 }
 
-export async function createClient(input: ClientInput): Promise<Client> {
+export async function createClient(viewer: Viewer, input: ClientInput): Promise<Client> {
   await connectDatabase()
-  const record = await ClientModel.create(cleanInput(input))
+  const record = await ClientModel.create({ ownerId: viewer.id, ...cleanInput(input) })
   return toClient(record as unknown as StoredClient)
 }
 
 /**
  * Replaces a client's details. Returns null when the client no longer exists.
  */
-export async function updateClient(id: string, input: ClientInput): Promise<Client | null> {
-  if (!ID_PATTERN.test(id)) return null
+export async function updateClient(viewer: Viewer, id: string, input: ClientInput): Promise<Client | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
   await connectDatabase()
-  const record = await ClientModel.findByIdAndUpdate(id, cleanInput(input), {
+  const record = await ClientModel.findOneAndUpdate(filter, cleanInput(input), {
     returnDocument: "after",
     runValidators: true,
   }).lean()
   return record ? toClient(record as unknown as StoredClient) : null
 }
 
-export async function deleteClient(id: string): Promise<boolean> {
-  if (!ID_PATTERN.test(id)) return false
+export async function deleteClient(viewer: Viewer, id: string): Promise<boolean> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return false
   await connectDatabase()
-  const { deletedCount } = await ClientModel.deleteOne({ _id: id })
+  const { deletedCount } = await ClientModel.deleteOne(filter)
   return deletedCount > 0
 }
 
 /**
  * The client a message is being written for. Throws a message the user can act on when the
- * client was removed in another window.
+ * client was removed in another window, or belongs to another account.
  */
-export async function requireClient(id: string): Promise<Client> {
-  const client = await getClient(id)
+export async function requireClient(viewer: Viewer, id: string): Promise<Client> {
+  const client = await getClient(viewer, id)
   if (!client) throw new UserFacingError(CLIENT_MESSAGING_MESSAGES.clientNotFound)
   return client
 }

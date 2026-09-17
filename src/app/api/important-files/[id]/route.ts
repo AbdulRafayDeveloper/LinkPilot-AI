@@ -3,6 +3,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { AssetMetadataSchema } from "@/lib/validation/importantFile"
 import { IMPORTANT_FILES_MESSAGES } from "@/constants/importantFiles"
 import { deleteAsset, updateAssetMetadata } from "@/services/importantFiles/assets"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -13,6 +14,8 @@ type RouteContext = { params: Promise<{ id: string }> }
  * edit can never swap what sits behind a name.
  */
 export async function PUT(req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = AssetMetadataSchema.safeParse(body)
@@ -23,7 +26,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const asset = await updateAssetMetadata((await params).id, parsed.data)
+    const asset = await updateAssetMetadata(auth.viewer, (await params).id, parsed.data)
     if (!asset) {
       return NextResponse.json({ success: false, message: IMPORTANT_FILES_MESSAGES.notFound }, { status: 404 })
     }
@@ -43,8 +46,10 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
  * of a file that is still stored.
  */
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const removed = await deleteAsset((await params).id)
+    const removed = await deleteAsset(auth.viewer, (await params).id)
     if (!removed) {
       return NextResponse.json({ success: false, message: IMPORTANT_FILES_MESSAGES.notFound }, { status: 404 })
     }

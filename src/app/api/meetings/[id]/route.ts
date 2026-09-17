@@ -3,6 +3,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { MeetingSchema } from "@/lib/validation/meeting"
 import { MEETING_MESSAGES } from "@/constants/meetings"
 import { deleteMeeting, getMeeting, updateMeeting } from "@/services/meetings/meetings"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -12,8 +13,10 @@ type RouteContext = { params: Promise<{ id: string }> }
  * GET: One meeting in full, including its transcript and analysis.
  */
 export async function GET(_req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const meeting = await getMeeting((await params).id)
+    const meeting = await getMeeting(auth.viewer, (await params).id)
     if (!meeting) return NextResponse.json({ success: false, message: MEETING_MESSAGES.notFound }, { status: 404 })
     return NextResponse.json({ success: true, message: "Meeting retrieved", data: meeting })
   } catch (error: unknown) {
@@ -27,6 +30,8 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
  * of date, and the page then offers to run it again.
  */
 export async function PUT(req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = MeetingSchema.safeParse(body)
@@ -37,7 +42,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const meeting = await updateMeeting((await params).id, parsed.data)
+    const meeting = await updateMeeting(auth.viewer, (await params).id, parsed.data)
     if (!meeting) return NextResponse.json({ success: false, message: MEETING_MESSAGES.notFound }, { status: 404 })
     return NextResponse.json({ success: true, message: MEETING_MESSAGES.updated, data: meeting })
   } catch (error: unknown) {
@@ -50,8 +55,10 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
  * DELETE: Removes the meeting and everything read from it, after the page has confirmed.
  */
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const removed = await deleteMeeting((await params).id)
+    const removed = await deleteMeeting(auth.viewer, (await params).id)
     if (!removed) return NextResponse.json({ success: false, message: MEETING_MESSAGES.notFound }, { status: 404 })
     return NextResponse.json({ success: true, message: MEETING_MESSAGES.deleted, data: { deleted: 1 } })
   } catch (error: unknown) {

@@ -36,7 +36,7 @@ export const QUICK_NOTES_TOOL: {
   group: "workspace"
 } = {
   id: "quick-notes",
-  title: "Quick Notes",
+  title: "Temporary Quick Notes",
   description: "Save text to reuse later",
   icon: NotebookPen,
   href: "/quick-notes",

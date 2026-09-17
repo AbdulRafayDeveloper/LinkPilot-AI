@@ -7,6 +7,8 @@ import { Header } from "@/components/ui/Header"
 import { ResetButton } from "@/components/ui/ResetButton"
 import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
 import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
+import { appendSpokenText } from "@/lib/spokenText"
+import { VOICE_MESSAGES } from "@/constants/voiceInput"
 import { ClientMessageResult } from "@/components/client-messaging/ClientMessageResult"
 import { ClientMessagePromptModal } from "@/components/client-messaging/ClientMessagePromptModal"
 import { ClientsModal } from "@/components/client-messaging/ClientsModal"
@@ -50,6 +52,7 @@ export default function ClientMessagingClient() {
   const [clientsError, setClientsError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [voiceError, setVoiceError] = useState<string | null>(null)
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null)
   const { clientId, update, channel } = useToolStore(formStore)
   const updateInputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
@@ -79,12 +82,12 @@ export default function ClientMessagingClient() {
 
   const selectedClient = clients?.find((client) => client.id === clientId) ?? null
 
-  // What was spoken is added to whatever is already there, so several takes build one update,
-  // and it is cut to the same limit the typed field has
+  // What was spoken is added to whatever is already there, so several takes build one update;
+  // past the limit the beginning is kept and the page says how much was left out
   const addTranscript = useCallback((text: string) => {
-    formStore.update(({ update: current }) => ({
-      update: (current.trim() ? `${current.trim()}\n${text}` : text).slice(0, UPDATE_MAX_LENGTH),
-    }))
+    const { text: update, skipped } = appendSpokenText(formStore.getSnapshot().update, text, UPDATE_MAX_LENGTH)
+    formStore.update({ update })
+    setVoiceNotice(skipped > 0 ? VOICE_MESSAGES.clipped(skipped, UPDATE_MAX_LENGTH) : null)
     setFormError(null)
   }, [])
 
@@ -113,6 +116,7 @@ export default function ClientMessagingClient() {
     reset()
     setFormError(null)
     setVoiceError(null)
+    setVoiceNotice(null)
   }
 
   // Clears what you wanted to say and the message; the client and channel stay for the next one
@@ -120,6 +124,7 @@ export default function ClientMessagingClient() {
     formStore.update({ update: "" })
     setFormError(null)
     setVoiceError(null)
+    setVoiceNotice(null)
     reset()
     updateInputRef.current?.focus()
   }
@@ -146,7 +151,7 @@ export default function ClientMessagingClient() {
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
                   <Users size={24} className="text-primary shrink-0" aria-hidden="true" />
-                  Client Messaging
+                  Client Tasks Messaging
                 </h1>
                 <p className="text-sm text-on-surface-variant mt-1">
                   Write a formal message in your client&apos;s own format, ready to paste into the channel you send it on.
@@ -228,6 +233,7 @@ export default function ClientMessagingClient() {
                       What do you want to tell them
                     </label>
                     <VoiceRecorder
+                      transcribeFor="client-messaging"
                       onTranscript={addTranscript}
                       onError={setVoiceError}
                       disabled={isGenerating}
@@ -256,6 +262,11 @@ export default function ClientMessagingClient() {
                   {voiceError && (
                     <p role="alert" className="rounded-xl border border-error/40 bg-error-container px-3 py-2 text-[12px] text-error">
                       {voiceError}
+                    </p>
+                  )}
+                  {voiceNotice && (
+                    <p role="status" className="rounded-xl bg-secondary-container px-3 py-2 text-[12px] text-on-secondary-container">
+                      {voiceNotice}
                     </p>
                   )}
                 </div>

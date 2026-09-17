@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { POST_IMAGES_MESSAGES } from "@/constants/postImages"
 import { deletePostImage, findPostImage } from "@/services/postImages/history"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -11,8 +12,10 @@ type RouteContext = { params: Promise<{ id: string }> }
  * GET: One image with everything that was used to make it, for the detail view.
  */
 export async function GET(_req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const image = await findPostImage((await params).id)
+    const image = await findPostImage(auth.viewer, (await params).id)
     if (!image) {
       return NextResponse.json({ success: false, message: POST_IMAGES_MESSAGES.notFound }, { status: 404 })
     }
@@ -31,8 +34,10 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
  * it belongs to the defaults and other images may still name it.
  */
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const removed = await deletePostImage((await params).id)
+    const removed = await deletePostImage(auth.viewer, (await params).id)
     if (!removed) {
       return NextResponse.json({ success: false, message: POST_IMAGES_MESSAGES.notFound }, { status: 404 })
     }

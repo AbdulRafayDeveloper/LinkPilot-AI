@@ -20,7 +20,7 @@ const NETWORK_CODES = new Set([
 const NETWORK_MESSAGE = /fetch failed|socket hang up|network error|ECONNRESET|ETIMEDOUT|EAI_AGAIN/i
 const DATABASE_NETWORK_ERROR = /^(?:MongoNetworkError|MongoNetworkTimeoutError|MongoServerSelectionError|MongooseServerSelectionError)$/
 // A 429 that means the plan's quota is used up won't clear in seconds
-const QUOTA_EXHAUSTED = /exceeded your current quota|insufficient_quota|billing|per day|RESOURCE_EXHAUSTED.*daily/i
+const QUOTA_EXHAUSTED = /exceeded your current quota|insufficient_quota|billing|per day|\(TPD\)|\(RPD\)/i
 // Status codes the SDKs only put in the message, e.g. "[503 Service Unavailable]"
 const STATUS_IN_MESSAGE = /\[(\d{3})\b|\b(\d{3}) (?:Service Unavailable|Bad Gateway|Gateway Timeout|Too Many Requests|Internal Server Error|Request Timeout)\b/i
 
@@ -72,8 +72,8 @@ function headerOf(headers: unknown, name: string): string | null {
 }
 
 /**
- * The wait a rate-limited provider asked for, in ms: a Retry-After header (OpenAI) or the
- * retryDelay Gemini writes into its error ("retryDelay":"23s"). Null when it gave none.
+ * The wait a rate-limited provider asked for, in ms: a Retry-After header (OpenAI, Groq) or a delay
+ * written into the error's message ("Please try again in 7.5s"). Null when it gave none.
  */
 export function retryAfterOf(error: unknown): number | null {
   const candidate = asErrorLike(error)

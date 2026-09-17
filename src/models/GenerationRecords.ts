@@ -1,11 +1,14 @@
 import mongoose, { Schema, type Model } from "mongoose"
 import type { LeadInfo } from "@/lib/leadInfo"
+import { OWNER_ID } from "./owner"
 
 /**
  * One collection per tool, one document per generation: who it was for (`lead`), what was
  * pasted and chosen, the text written, and the full result exactly as the page received it.
  */
 interface RecordBase {
+  // The account that made it (models/owner.ts)
+  ownerId: string | null
   // The full result object, stored as is
   result: unknown
   createdAt: Date
@@ -121,6 +124,7 @@ export const ConnectionNoteRecord = recordModel(
   "ConnectionNoteRecord",
   new Schema<IConnectionNoteRecord>(
     {
+      ownerId: OWNER_ID,
       lead: LEAD,
       tone: TEXT,
       companyName: TEXT,
@@ -137,6 +141,7 @@ export const CommentRecord = recordModel(
   "CommentRecord",
   new Schema<ICommentRecord>(
     {
+      ownerId: OWNER_ID,
       tune: TEXT,
       postSource: { type: String, enum: ["text", "image"], required: true },
       postText: TEXT,
@@ -152,6 +157,7 @@ export const PostCommentReplyRecord = recordModel(
   "PostCommentReplyRecord",
   new Schema<IPostCommentReplyRecord>(
     {
+      ownerId: OWNER_ID,
       context: TEXT,
       style: TEXT,
       postSource: { type: String, enum: ["text", "image", "none"], required: true },
@@ -170,6 +176,7 @@ export const FollowUpMessageRecord = recordModel(
   "FollowUpMessageRecord",
   new Schema<IFollowUpMessageRecord>(
     {
+      ownerId: OWNER_ID,
       lead: LEAD,
       followUpType: TEXT,
       conversation: TEXT,
@@ -186,6 +193,7 @@ export const FirstMessageRecord = recordModel(
   "FirstMessageRecord",
   new Schema<IFirstMessageRecord>(
     {
+      ownerId: OWNER_ID,
       lead: LEAD,
       tune: TEXT,
       profileData: TEXT,
@@ -201,6 +209,7 @@ export const InMailMessageRecord = recordModel(
   "InMailMessageRecord",
   new Schema<IInMailMessageRecord>(
     {
+      ownerId: OWNER_ID,
       lead: LEAD,
       tune: TEXT,
       profileData: TEXT,
@@ -216,6 +225,7 @@ export const ConversationReplyRecord = recordModel(
   "ConversationReplyRecord",
   new Schema<IConversationReplyRecord>(
     {
+      ownerId: OWNER_ID,
       lead: LEAD,
       replyType: TEXT,
       conversation: TEXT,
@@ -233,6 +243,7 @@ export const ClientMessageRecord = recordModel(
   "ClientMessageRecord",
   new Schema<IClientMessageRecord>(
     {
+      ownerId: OWNER_ID,
       client: { type: ClientSchema, required: true },
       channel: TEXT,
       update: TEXT,
@@ -249,6 +260,7 @@ export const RewrittenMessageRecord = recordModel(
   "RewrittenMessageRecord",
   new Schema<IRewrittenMessageRecord>(
     {
+      ownerId: OWNER_ID,
       source: TEXT,
       sourceLanguage: TEXT,
       original: TEXT,

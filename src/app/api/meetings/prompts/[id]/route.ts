@@ -5,6 +5,7 @@ import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { MEETING_PROMPT_IDS } from "@/constants/meetings"
 import { saveMeetingPrompt } from "@/services/meetings/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -15,6 +16,8 @@ const IdSchema = z.enum(MEETING_PROMPT_IDS)
  * change and no deployment.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 

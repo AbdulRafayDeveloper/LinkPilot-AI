@@ -41,6 +41,8 @@ export function checkAudioFile(file: File): string | null {
 export async function transcribeVoice(file: File, signal: AbortSignal): Promise<string> {
   const form = new FormData()
   form.append("audio", file, file.name || "voice")
+  // Read in Client Voices' own provider order
+  form.append("for", "client-voices")
   // Writing out a recording stores nothing, so a dropped request is safe to send again
   const { data } = await requestApi<{ text: string }>(
     TRANSCRIBE_ENDPOINT,

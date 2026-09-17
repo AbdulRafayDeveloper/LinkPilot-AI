@@ -17,7 +17,7 @@ export default function Page() {
             "@type": "BreadcrumbList",
             "itemListElement": [
               { "@type": "ListItem", "position": 1, "name": "Home", "item": `${SITE_URL}/` },
-              { "@type": "ListItem", "position": 2, "name": "Client Messaging", "item": `${SITE_URL}/client-messaging` },
+              { "@type": "ListItem", "position": 2, "name": "Client Tasks Messaging", "item": `${SITE_URL}/client-messaging` },
             ],
           }),
         }}

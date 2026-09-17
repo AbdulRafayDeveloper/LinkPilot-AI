@@ -9,6 +9,9 @@ import {
 import { requireClient } from "@/services/clientMessaging/clients"
 import { generateClientMessage } from "@/services/clientMessaging/generate"
 import { saveClientMessage } from "@/services/clientMessaging/records"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -28,6 +31,8 @@ const GenerateSchema = z.object({
  * chosen channel, and saves it with the client it was written for.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = GenerateSchema.safeParse(body)
@@ -39,9 +44,9 @@ export async function POST(req: NextRequest) {
     }
 
     const { clientId, update, channel } = parsed.data
-    const client = await requireClient(clientId)
-    const result = await generateClientMessage({ client, update, channel, signal: req.signal })
-    const saved = await saveClientMessage(client, update, result)
+    const client = await requireClient(auth.viewer, clientId)
+    const result = await withModelOrder(await modelOrderFor(auth.viewer, "client-messaging"), () => generateClientMessage({ client, update, channel, signal: req.signal }))
+    const saved = await saveClientMessage(auth.viewer, client, update, result)
     return NextResponse.json({ success: true, message: "Message written", data: saved })
   } catch (error: unknown) {
     if (req.signal.aborted) {

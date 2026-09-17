@@ -8,6 +8,9 @@ import {
 } from "@/constants/firstMessage"
 import { generateFirstMessage } from "@/services/firstMessage/generate"
 import { recordFirstMessage } from "@/services/generationRecords"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -23,9 +26,11 @@ const GenerateSchema = z.object({
 
 /**
  * POST: Generates one first message from raw profile text using the latest saved prompt
- * for the selected tune (Gemini first, OpenAI fallback).
+ * for the selected tune (the module's provider order, Groq first).
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = GenerateSchema.safeParse(body)
@@ -36,8 +41,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const result = await generateFirstMessage({ ...parsed.data, signal: req.signal })
-    await recordFirstMessage(parsed.data, result)
+    const result = await withModelOrder(await modelOrderFor(auth.viewer, "first-message"), () => generateFirstMessage({ ...parsed.data, signal: req.signal }))
+    await recordFirstMessage(auth.viewer, parsed.data, result)
     return NextResponse.json({ success: true, message: "First message generated", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

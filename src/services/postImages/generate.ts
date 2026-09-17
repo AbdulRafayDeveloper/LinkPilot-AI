@@ -14,6 +14,7 @@ import {
   type ImageSizeId,
 } from "@/constants/postImages"
 import type { GenerateImageInput, PostImage } from "@/types/postImages"
+import type { Viewer } from "@/types/auth"
 import { findAsset, getStoredSettings } from "./settings"
 import { getPostImagePrompt } from "./prompts"
 import { toPostImage } from "./history"
@@ -37,6 +38,7 @@ const describeColors = (colors: string[]) =>
   colors.length === 0 ? "No brand colours are set, so use a restrained neutral palette." : colors.join(", ")
 
 interface GenerateOptions extends GenerateImageInput {
+  viewer: Viewer
   signal: AbortSignal
 }
 
@@ -84,9 +86,9 @@ async function buildPrompt(options: {
  * copies the settings in rather than pointing at them, so changing the defaults afterwards never
  * changes what an older image says about itself.
  */
-export async function createPostImage({ postContent, assetId, pose, size, signal }: GenerateOptions): Promise<PostImage> {
-  const settings = await getStoredSettings()
-  const asset = assetId ? await findAsset(assetId) : null
+export async function createPostImage({ viewer, postContent, assetId, pose, size, signal }: GenerateOptions): Promise<PostImage> {
+  const settings = await getStoredSettings(viewer)
+  const asset = assetId ? await findAsset(viewer, assetId) : null
   if (assetId && !asset) throw new UserFacingError(POST_IMAGES_MESSAGES.notFound)
 
   const colors = settings?.colors ?? []
@@ -125,6 +127,7 @@ export async function createPostImage({ postContent, assetId, pose, size, signal
     await connectDatabase()
     const record = (await PostImageModel.create({
       _id: id,
+      ownerId: viewer.id,
       storageKey,
       contentType: image.contentType,
       size: image.data.length,

@@ -1,4 +1,5 @@
 import mongoose, { Schema, type Model } from "mongoose"
+import { OWNER_ID } from "./owner"
 
 /**
  * One saved piece of reference content: a named set of steps, an explanation, a procedure or any
@@ -6,6 +7,8 @@ import mongoose, { Schema, type Model } from "mongoose"
  * opens it, exactly like Quick Notes and Daily Tasks.
  */
 export interface IReferenceItem {
+  // The account it belongs to (models/owner.ts)
+  ownerId: string | null
   title: string
   content: string
   createdAt: Date
@@ -14,6 +17,7 @@ export interface IReferenceItem {
 
 const ReferenceItemSchema = new Schema<IReferenceItem>(
   {
+    ownerId: OWNER_ID,
     title: { type: String, required: true, trim: true },
     content: { type: String, required: true },
   },

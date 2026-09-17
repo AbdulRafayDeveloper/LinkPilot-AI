@@ -4,6 +4,9 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { PROMPT_CREATOR_MESSAGES, PROMPT_TARGET_IDS, REQUEST_MAX_LENGTH } from "@/constants/promptCreator"
 import { createPrompt } from "@/services/promptCreator/generate"
 import { saveCreatedPrompt } from "@/services/promptCreator/records"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -24,6 +27,8 @@ const GenerateSchema = z.object({
  * prompt for the chosen target, and saves it with its auto-written name.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = GenerateSchema.safeParse(body)
@@ -35,8 +40,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { request, target, requestSource } = parsed.data
-    const created = await createPrompt({ request, target, requestSource, signal: req.signal })
-    const saved = await saveCreatedPrompt(created, { text: request, source: requestSource })
+    const created = await withModelOrder(await modelOrderFor(auth.viewer, "prompt-creator"), () => createPrompt({ request, target, requestSource, signal: req.signal }))
+    const saved = await saveCreatedPrompt(auth.viewer, created, { text: request, source: requestSource })
     return NextResponse.json({ success: true, message: "Prompt created", data: saved })
   } catch (error: unknown) {
     if (req.signal.aborted) {

@@ -5,6 +5,7 @@ import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { ABOUT_ME_TAB_ID, FIRST_MESSAGE_PROMPT_IDS, getTuneLabel } from "@/constants/firstMessage"
 import { saveFirstMessagePrompt } from "@/services/firstMessage/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -14,6 +15,8 @@ const PromptIdSchema = z.enum(FIRST_MESSAGE_PROMPT_IDS)
  * PUT: Saves one tune's prompt, or the shared sender profile. Nothing else changes.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 

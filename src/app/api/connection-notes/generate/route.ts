@@ -9,6 +9,9 @@ import {
 } from "@/constants/connectionNote"
 import { generateConnectionNote } from "@/services/connectionNote/generate"
 import { recordConnectionNote } from "@/services/generationRecords"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -31,9 +34,11 @@ const GenerateSchema = z.object({
 
 /**
  * POST: Generates one connection note from raw profile text using the latest saved
- * prompt for the selected tone (Gemini first, OpenAI fallback).
+ * prompt for the selected tone (the module's provider order, Groq first).
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = GenerateSchema.safeParse(body)
@@ -44,8 +49,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const result = await generateConnectionNote({ ...parsed.data, signal: req.signal })
-    await recordConnectionNote(parsed.data, result)
+    const result = await withModelOrder(await modelOrderFor(auth.viewer, "connection-note"), () => generateConnectionNote({ ...parsed.data, signal: req.signal }))
+    await recordConnectionNote(auth.viewer, parsed.data, result)
     return NextResponse.json({ success: true, message: "Connection note generated", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

@@ -3,10 +3,12 @@ import { connectDatabase } from "@/lib/db"
 import { ReferenceItem as ReferenceItemModel, type IReferenceItem } from "@/models/ReferenceItem"
 import { REFERENCE_PAGE_SIZE } from "@/constants/referenceContent"
 import type { ReferenceItem, ReferenceItemInput, ReferenceItemsPage } from "@/types/referenceContent"
+import type { Viewer } from "@/types/auth"
+import { visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * Saved reference content lives in the reference_content collection, read newest first in
- * batches. Searching matches the name and the text itself, and paging keeps working inside a
+ * batches. Each item belongs to the account that added it: a user sees their own, an admin all. Searching matches the name and the text itself, and paging keeps working inside a
  * search because the cursor and the search run in the same query.
  */
 type StoredItem = IReferenceItem & { _id: { toString: () => string } }
@@ -58,17 +60,16 @@ interface ListOptions {
  * One batch of saved content, newest first, for the current search. Never more than
  * REFERENCE_PAGE_SIZE items, whatever the caller asks for.
  */
-export async function listItems({ search = "", cursor = null, limit = REFERENCE_PAGE_SIZE }: ListOptions = {}): Promise<ReferenceItemsPage> {
+export async function listItems(viewer: Viewer, { search = "", cursor = null, limit = REFERENCE_PAGE_SIZE }: ListOptions = {}): Promise<ReferenceItemsPage> {
   await connectDatabase()
   const size = Math.min(Math.max(1, Math.trunc(limit) || REFERENCE_PAGE_SIZE), REFERENCE_PAGE_SIZE)
   const search_ = matching(search)
-  const conditions = [...search_, ...olderThan(cursor)]
-  const filter = conditions.length > 0 ? { $and: conditions } : {}
+  const filter = { $and: [visibleTo(viewer), ...search_, ...olderThan(cursor)] }
   const [records, total] = await Promise.all([
     // One extra row answers "is there more?" without a second count
     ReferenceItemModel.find(filter).sort({ createdAt: -1, _id: -1 }).limit(size + 1).lean(),
     // The total counts what the search matches, so the header follows the search
-    ReferenceItemModel.countDocuments(search_.length > 0 ? { $and: search_ } : {}),
+    ReferenceItemModel.countDocuments({ $and: [visibleTo(viewer), ...search_] }),
   ])
   const stored = records as unknown as StoredItem[]
   const batch = stored.slice(0, size)
@@ -79,20 +80,21 @@ export async function listItems({ search = "", cursor = null, limit = REFERENCE_
   }
 }
 
-export async function createItem({ title, content }: ReferenceItemInput): Promise<ReferenceItem> {
+export async function createItem(viewer: Viewer, { title, content }: ReferenceItemInput): Promise<ReferenceItem> {
   await connectDatabase()
-  const record = await ReferenceItemModel.create({ title: title.trim(), content })
+  const record = await ReferenceItemModel.create({ ownerId: viewer.id, title: title.trim(), content })
   return toItem(record as unknown as StoredItem)
 }
 
 /**
  * Replaces one item's name and text. Returns null when it no longer exists.
  */
-export async function updateItem(id: string, { title, content }: ReferenceItemInput): Promise<ReferenceItem | null> {
-  if (!ID_PATTERN.test(id)) return null
+export async function updateItem(viewer: Viewer, id: string, { title, content }: ReferenceItemInput): Promise<ReferenceItem | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
   await connectDatabase()
-  const record = await ReferenceItemModel.findByIdAndUpdate(
-    id,
+  const record = await ReferenceItemModel.findOneAndUpdate(
+    filter,
     { title: title.trim(), content },
     { returnDocument: "after", runValidators: true }
   ).lean()
@@ -102,9 +104,10 @@ export async function updateItem(id: string, { title, content }: ReferenceItemIn
 /**
  * Deletes one item. Returns false when it was already gone, so a repeated confirm is harmless.
  */
-export async function deleteItem(id: string): Promise<boolean> {
-  if (!ID_PATTERN.test(id)) return false
+export async function deleteItem(viewer: Viewer, id: string): Promise<boolean> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return false
   await connectDatabase()
-  const { deletedCount } = await ReferenceItemModel.deleteOne({ _id: id })
+  const { deletedCount } = await ReferenceItemModel.deleteOne(filter)
   return deletedCount > 0
 }

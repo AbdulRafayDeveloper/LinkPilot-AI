@@ -40,12 +40,12 @@ export const MESSAGE_REWRITER_TOOL: {
   description: string
   icon: LucideIcon
   href: string
-  group: "writing"
+  group: "clients"
 } = {
   id: "message-rewriter",
   title: "Message Rewriter",
   description: "Any language into short English",
   icon: Languages,
   href: "/message-rewriter",
-  group: "writing",
+  group: "clients",
 }

@@ -5,6 +5,7 @@ import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { MEETING_PLANNER_PROMPT_IDS } from "@/constants/meetingPlanner"
 import { saveMeetingPlannerPrompt } from "@/services/meetingPlanner/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -15,6 +16,8 @@ const PromptIdSchema = z.enum(MEETING_PLANNER_PROMPT_IDS)
  * text is used the next time a preparation is written.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 

@@ -3,6 +3,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { AssetUploadSchema } from "@/lib/validation/postImages"
 import { POST_IMAGES_MESSAGES } from "@/constants/postImages"
 import { planAssetUpload } from "@/services/postImages/settings"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -12,6 +13,8 @@ export const dynamic = "force-dynamic"
  * settings are saved with it.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = AssetUploadSchema.safeParse(body)
@@ -22,7 +25,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const plan = await planAssetUpload(parsed.data.contentType, parsed.data.size)
+    const plan = await planAssetUpload(auth.viewer, parsed.data.contentType, parsed.data.size)
     return NextResponse.json({ success: true, message: "Upload ready", data: plan }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Post Image Asset Exception:", error instanceof Error ? error.message : error)

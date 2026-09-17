@@ -4,6 +4,8 @@ import { connectDatabase } from "@/lib/db"
 import { MeetingPlan as MeetingPlanModel, type IMeetingPlan } from "@/models/MeetingPlan"
 import { monthEnd, monthStart } from "@/lib/meetingDates"
 import type { MeetingPlan, MeetingPlanDetail, MeetingPlannerPage, MeetingPrep } from "@/types/meetingPlanner"
+import type { Viewer } from "@/types/auth"
+import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { STALE_PREP_MS, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
 
 /**
@@ -48,13 +50,13 @@ const byDayThenTime = { meetingDate: 1, meetingTime: 1, _id: 1 } as const
  * One month for the calendar plus today's meetings, whichever month is on screen. Two indexed
  * range queries, so an empty month costs nothing and a busy one still reads only that month.
  */
-export async function listMonth(month: string, today: string): Promise<MeetingPlannerPage> {
+export async function listMonth(viewer: Viewer, month: string, today: string): Promise<MeetingPlannerPage> {
   await connectDatabase()
   const [monthRecords, todayRecords] = await Promise.all([
-    MeetingPlanModel.find({ meetingDate: { $gte: monthStart(month), $lte: monthEnd(month) } }, LIST_FIELDS)
+    MeetingPlanModel.find({ meetingDate: { $gte: monthStart(month), $lte: monthEnd(month) }, ...visibleTo(viewer) }, LIST_FIELDS)
       .sort(byDayThenTime)
       .lean(),
-    MeetingPlanModel.find({ meetingDate: today }, LIST_FIELDS).sort(byDayThenTime).lean(),
+    MeetingPlanModel.find({ meetingDate: today, ...visibleTo(viewer) }, LIST_FIELDS).sort(byDayThenTime).lean(),
   ])
   const todayMeetings = (todayRecords as unknown as StoredPlan[]).map(toMeeting)
   return {
@@ -81,10 +83,11 @@ export interface NewMeetingPlan {
  * Saves the meeting itself. Preparation, when it is switched on, runs afterwards in its own
  * request, so a slow or failing model never costs the meeting.
  */
-export async function createMeeting(input: NewMeetingPlan): Promise<MeetingPlanDetail> {
+export async function createMeeting(viewer: Viewer, input: NewMeetingPlan): Promise<MeetingPlanDetail> {
   await connectDatabase()
   const record = await MeetingPlanModel.create({
     ...input,
+    ownerId: viewer.id,
     status: "pending",
     completedAt: null,
     prepStatus: input.prepEnabled ? "queued" : "off",
@@ -95,10 +98,11 @@ export async function createMeeting(input: NewMeetingPlan): Promise<MeetingPlanD
   return toDetail(record as unknown as StoredPlan)
 }
 
-export async function getMeeting(id: string): Promise<MeetingPlanDetail | null> {
-  if (!mongoose.isValidObjectId(id)) return null
+export async function getMeeting(viewer: Viewer, id: string): Promise<MeetingPlanDetail | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
   await connectDatabase()
-  const record = await MeetingPlanModel.findById(id).lean()
+  const record = await MeetingPlanModel.findOne(filter).lean()
   return record ? toDetail(record as unknown as StoredPlan) : null
 }
 
@@ -118,8 +122,9 @@ export interface MeetingPlanChanges {
  * Changes the scheduling details, the status or the preparation inputs. Saved preparation is
  * never touched here: it is rewritten only when the user asks for it.
  */
-export async function updateMeeting(id: string, changes: MeetingPlanChanges): Promise<MeetingPlanDetail | null> {
-  if (!mongoose.isValidObjectId(id)) return null
+export async function updateMeeting(viewer: Viewer, id: string, changes: MeetingPlanChanges): Promise<MeetingPlanDetail | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
   await connectDatabase()
   const update: Record<string, unknown> = { ...changes }
   // Ticking a meeting off records when, and reopening it clears that again
@@ -128,17 +133,18 @@ export async function updateMeeting(id: string, changes: MeetingPlanChanges): Pr
   if (changes.prepEnabled === false) update.prepStatus = "off"
   // Switching it on puts the meeting in the queue, unless something has already been written
   if (changes.prepEnabled === true) {
-    const current = await MeetingPlanModel.findById(id, "prepStatus").lean()
+    const current = await MeetingPlanModel.findOne(filter, "prepStatus").lean()
     if (current?.prepStatus === "off") update.prepStatus = "queued"
   }
-  const record = await MeetingPlanModel.findByIdAndUpdate(id, { $set: update }, { new: true, lean: true })
+  const record = await MeetingPlanModel.findOneAndUpdate(filter, { $set: update }, { new: true, lean: true })
   return record ? toDetail(record as unknown as StoredPlan) : null
 }
 
-export async function deleteMeeting(id: string): Promise<boolean> {
-  if (!mongoose.isValidObjectId(id)) return false
+export async function deleteMeeting(viewer: Viewer, id: string): Promise<boolean> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return false
   await connectDatabase()
-  const { deletedCount } = await MeetingPlanModel.deleteOne({ _id: id })
+  const { deletedCount } = await MeetingPlanModel.deleteOne(filter)
   return deletedCount > 0
 }
 

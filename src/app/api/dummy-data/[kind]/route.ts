@@ -4,6 +4,7 @@ import { DummyDataKindSchema, dummyItemInputSchema } from "@/lib/validation/dumm
 import { DUMMY_DATA_KINDS } from "@/constants/dummyData"
 import { createDummyItem, listDummyItems } from "@/services/dummyData"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -15,6 +16,8 @@ const unknownKind = () => NextResponse.json({ success: false, message: "Unknown 
  * GET: Every item of one Dummy Data kind (profiles, posts, ...), oldest first.
  */
 export async function GET(_req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer({ role: "admin" })
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 
@@ -36,6 +39,8 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
  * POST: Adds a new item to the dummy_data collection.
  */
 export async function POST(req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer({ role: "admin" })
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 

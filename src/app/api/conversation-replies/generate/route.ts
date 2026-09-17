@@ -9,9 +9,12 @@ import {
 } from "@/constants/conversationReply"
 import { analyzeAndReply } from "@/services/conversationReply"
 import { recordConversationReply } from "@/services/generationRecords"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
-// Analysis and reply run one after the other, each with a Gemini → OpenAI fallback
+// Analysis and reply run one after the other, each trying the module's providers in order (Groq first)
 export const maxDuration = 300
 
 const GenerateSchema = z.object({
@@ -32,9 +35,11 @@ const GenerateSchema = z.object({
 
 /**
  * POST: Analyzes the pasted conversation and writes the next reply with the latest saved
- * prompt for the selected reply type (Gemini first, OpenAI fallback).
+ * prompt for the selected reply type (the module's provider order, Groq first).
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = GenerateSchema.safeParse(body)
@@ -45,8 +50,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const result = await analyzeAndReply({ ...parsed.data, signal: req.signal })
-    await recordConversationReply(parsed.data, result)
+    const result = await withModelOrder(await modelOrderFor(auth.viewer, "conversation-reply"), () => analyzeAndReply({ ...parsed.data, signal: req.signal }))
+    await recordConversationReply(auth.viewer, parsed.data, result)
     return NextResponse.json({ success: true, message: "Conversation analyzed and reply generated", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

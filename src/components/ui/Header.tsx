@@ -6,6 +6,7 @@ import { SITE_PURPOSE } from "@/config/site"
 import { ActivityIndicator } from "./ActivityIndicator"
 import { BrandLogo } from "./BrandLogo"
 import { ToolSwitcher } from "./ToolSwitcher"
+import { UserMenu } from "./UserMenu"
 
 interface HeaderProps {
   onOpenSidebar: () => void
@@ -24,7 +25,7 @@ const isShortcut = (event: KeyboardEvent, key: string) => event.key.toLowerCase(
 
 /**
  * The top bar of every page: sidebar controls, what the app is for, background work on other
- * tools, and a quick way to jump to any tool. Shortcuts: Ctrl/⌘+K opens the tool search,
+ * tools, a quick way to jump to any tool, and the signed-in account. Shortcuts: Ctrl/⌘+K opens the tool search,
  * Ctrl/⌘+B collapses or expands the sidebar (desktop).
  */
 export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarCollapsed = false, onToggleCollapse }) => {
@@ -109,6 +110,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarCollapse
             {modifier} K
           </kbd>
         </button>
+        <UserMenu />
       </div>
 
       {isSwitcherOpen && <ToolSwitcher onClose={() => setIsSwitcherOpen(false)} />}

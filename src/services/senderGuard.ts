@@ -35,7 +35,7 @@ export interface GuardedGeneration<T> extends StructuredGeneration<T> {
 }
 
 /**
- * Structured generation (Gemini first, OpenAI fallback) that, when there is no sender
+ * Structured generation (the module's provider order, Groq first) that, when there is no sender
  * profile, checks the output for invented claims about the sender and runs one
  * controlled rewrite. A claim that survives the rewrite is reported, not hidden.
  */

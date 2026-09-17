@@ -81,7 +81,7 @@ export const CLIENT_VOICES_TOOL: {
   group: "clients"
 } = {
   id: "client-voices",
-  title: "Client Voices",
+  title: "Client Voices to Tasks",
   description: "Voice notes into tasks",
   icon: AudioLines,
   href: "/client-voices",

@@ -7,6 +7,7 @@ import {
   type AssetFilterId,
 } from "@/constants/importantFiles"
 import { listAssets } from "@/services/importantFiles/assets"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -19,9 +20,11 @@ const filterFrom = (value: string | null): AssetFilterId =>
  * returns only metadata plus a short-lived preview link, never the file itself.
  */
 export async function GET(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const params = req.nextUrl.searchParams
-    const page = await listAssets({
+    const page = await listAssets(auth.viewer, {
       search: (params.get("search") ?? "").slice(0, ASSET_SEARCH_MAX_LENGTH),
       type: filterFrom(params.get("type")),
       cursor: params.get("cursor"),

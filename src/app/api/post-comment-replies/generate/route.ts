@@ -12,6 +12,9 @@ import {
 import { generatePostCommentReply, type ReplyInput } from "@/services/postCommentReplies/generate"
 import { recordPostCommentReply } from "@/services/generationRecords"
 import type { ReplyStreamEvent } from "@/types/postCommentReplies"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 // Reading a screenshot, optional live research (only when a prompt uses {{web_research}}) and a possible fallback call
@@ -52,6 +55,8 @@ async function parseRequest(req: NextRequest): Promise<ReplyInput | { error: str
  * real pipeline stages as Server-Sent Events and ending with COMPLETE or ERROR.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const input = await parseRequest(req)
   if ("error" in input) {
     return NextResponse.json({ success: false, message: input.error }, { status: 400 })
@@ -59,12 +64,12 @@ export async function POST(req: NextRequest) {
 
   return createEventStream<ReplyStreamEvent>(async (send) => {
     try {
-      const result = await generatePostCommentReply({
+      const result = await withModelOrder(await modelOrderFor(auth.viewer, "post-comment-replies"), () => generatePostCommentReply({
         input,
         signal: req.signal,
         onStage: (status) => send({ status }),
-      })
-      await recordPostCommentReply(input, result)
+      }))
+      await recordPostCommentReply(auth.viewer, input, result)
       send({ status: "COMPLETE", result })
     } catch (error: unknown) {
       if (req.signal.aborted) return

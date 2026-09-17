@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages"
-import { AI_PROVIDERS, generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
+import { generateStructuredWithFallback } from "@/services/ai"
+import { currentModelOrder } from "@/lib/modelOrder"
 import { runLiveResearch } from "@/services/liveResearch"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { getFullSenderProfile } from "@/services/senderProfile"
@@ -37,8 +38,6 @@ const LATEST_COMMENT_TEXT = "The other person's latest comment in the thread (th
 const MAX_REWRITES = 2
 // One cited source is enough to support a single reply
 const MIN_RESEARCH_SOURCES = 1
-// Gemini first; OpenAI only when Gemini can't deliver
-const PROVIDER_ORDER: readonly ModelProvider[] = AI_PROVIDERS
 const WRAPPED_IN_QUOTES = /^(["“])([\s\S]*)(["”])$/
 // First-person habit or experience claims, which models tend to invent for the user
 const EXPERIENCE_CLAIM =
@@ -159,7 +158,7 @@ async function loadSenderProfileSection(): Promise<string> {
 }
 
 /**
- * Live web research through the shared Gemini → OpenAI search. Never fails the reply: when
+ * Live web research through the shared Groq → OpenAI search. Never fails the reply: when
  * nothing verifiable is found, the writer is told not to state current facts.
  */
 async function researchConversation(conversation: Conversation, stylePrompt: string, signal: AbortSignal): Promise<string> {
@@ -182,7 +181,7 @@ async function researchConversation(conversation: Conversation, stylePrompt: str
 
   try {
     const research = await runLiveResearch({
-      geminiPasses: [messages],
+      groqPasses: [messages],
       openAIPasses: [messages],
       minSources: MIN_RESEARCH_SOURCES,
       signal,
@@ -308,7 +307,7 @@ function lengthWarning(length: number): string | null {
 
 /**
  * Writes one reply with the latest saved prompt for the exact context + style pair
- * (Gemini first, OpenAI only as a fallback). A post screenshot is read first. A draft that
+ * (the module's provider order, Groq first). A post screenshot is read first. A draft that
  * claims first-person experience gets one controlled rewrite that keeps only claims the
  * sources support. The final reply is rewritten with the Humanization prompt. Throws a
  * user-facing error when the comments contain nothing to reply to.
@@ -316,7 +315,7 @@ function lengthWarning(length: number): string | null {
 export async function generatePostCommentReply({ input, signal, onStage }: GenerateOptions): Promise<GeneratedReply> {
   const stylePrompt = await getActiveReplyPrompt(input.context, input.style)
   const needsResearch = usesVariable(stylePrompt, VARIABLE.webResearch)
-  let providers = PROVIDER_ORDER
+  let providers = currentModelOrder()
 
   let extractedPost: string | null = null
   if (input.post?.type === "image") {

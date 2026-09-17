@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
 import { deleteNote } from "@/services/quickNotes/notes"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -10,8 +11,10 @@ export const dynamic = "force-dynamic"
  * "it is gone either way" rather than an error worth showing.
  */
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const removed = await deleteNote((await params).id)
+    const removed = await deleteNote(auth.viewer, (await params).id)
     if (!removed) {
       return NextResponse.json({ success: false, message: "That note no longer exists." }, { status: 404 })
     }

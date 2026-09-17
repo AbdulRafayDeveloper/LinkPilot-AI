@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
+.env*
+
+# Account scripts: they write straight to the users collection, so they stay on the machine that has the database credentials
+/scripts/create-user.mjs
+/scripts/create-admin.mjs
+/scripts/accounts.mjs
+
+# Backups the cleanup scripts write before deleting: they hold real records (profiles, messages)
+/backups/

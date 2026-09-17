@@ -78,7 +78,7 @@ export const CLIENT_MESSAGING_TOOL: {
   group: "clients"
 } = {
   id: "client-messaging",
-  title: "Client Messaging",
+  title: "Client Tasks Messaging",
   description: "Updates in each client's format",
   icon: Users,
   href: "/client-messaging",

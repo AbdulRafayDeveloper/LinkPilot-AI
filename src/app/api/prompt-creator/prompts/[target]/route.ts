@@ -5,6 +5,7 @@ import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { PROMPT_TARGET_IDS, getPromptTargetLabel } from "@/constants/promptCreator"
 import { saveTargetPrompt } from "@/services/promptCreator/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -14,6 +15,8 @@ const TargetSchema = z.enum(PROMPT_TARGET_IDS)
  * PUT: Saves the prompt for one target only. The other target's prompt is untouched.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ target: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 

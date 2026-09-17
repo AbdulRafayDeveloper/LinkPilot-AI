@@ -43,7 +43,7 @@ function buildResearchMessages(
 }
 
 /**
- * Live web research on the post's subject through the shared Gemini → OpenAI search.
+ * Live web research on the post's subject through the shared Groq → OpenAI search.
  * Returns null instead of failing when nothing verifiable is found, so the comment is
  * still written, just without current-information claims.
  */
@@ -57,7 +57,7 @@ export async function researchPostTopic({
   const [template, lenses] = await Promise.all([loadPrompt("comment-writer-research"), loadSearchLenses("comment-writer-research-lenses")])
   try {
     return await runLiveResearch({
-      geminiPasses: [buildResearchMessages(template, postText, styleBrief, now, describeAllLenses(lenses))],
+      groqPasses: [buildResearchMessages(template, postText, styleBrief, now, describeAllLenses(lenses))],
       openAIPasses: lenses.map((lens) => buildResearchMessages(template, postText, styleBrief, now, lens)),
       minSources: MIN_RESEARCH_SOURCES,
       signal,

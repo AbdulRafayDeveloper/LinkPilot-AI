@@ -13,6 +13,7 @@ import {
   TIME_PATTERN,
 } from "@/constants/meetingPlanner"
 import { createMeeting, listMonth } from "@/services/meetingPlanner/plans"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -75,13 +76,15 @@ const badRequest = (message: string) => NextResponse.json({ success: false, mess
  * today's meetings whatever month is on screen.
  */
 export async function GET(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const month = MonthSchema.safeParse(req.nextUrl.searchParams.get("month"))
     const today = TodaySchema.safeParse(req.nextUrl.searchParams.get("today"))
     if (!month.success) return badRequest(MEETING_PLANNER_MESSAGES.invalidMonth)
     if (!today.success) return badRequest(MEETING_PLANNER_MESSAGES.invalidDate)
 
-    const page = await listMonth(month.data, today.data)
+    const page = await listMonth(auth.viewer, month.data, today.data)
     return NextResponse.json({ success: true, message: "Meetings retrieved", data: page })
   } catch (error: unknown) {
     console.error("GET Meeting Planner Exception:", error)
@@ -98,6 +101,8 @@ export async function GET(req: NextRequest) {
  * or failing model can never cost the meeting itself.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = MeetingInputSchema.safeParse(body)
@@ -106,7 +111,7 @@ export async function POST(req: NextRequest) {
       return badRequest(MEETING_PLANNER_MESSAGES.prepNeedsInput)
     }
 
-    const meeting = await createMeeting(parsed.data)
+    const meeting = await createMeeting(auth.viewer, parsed.data)
     return NextResponse.json({ success: true, message: MEETING_PLANNER_MESSAGES.created, data: meeting }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Meeting Planner Exception:", error)

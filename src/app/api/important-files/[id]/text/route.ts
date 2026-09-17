@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { IMPORTANT_FILES_MESSAGES } from "@/constants/importantFiles"
 import { assetText } from "@/services/importantFiles/assets"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -16,8 +17,10 @@ type RouteContext = { params: Promise<{ id: string }> }
  * contents pass through the app rather than going straight from S3 to the browser.
  */
 export async function GET(_req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const text = await assetText((await params).id, COPYABLE_MAX_BYTES)
+    const text = await assetText(auth.viewer, (await params).id, COPYABLE_MAX_BYTES)
     if (text === null) {
       return NextResponse.json({ success: false, message: IMPORTANT_FILES_MESSAGES.copyFailed }, { status: 404 })
     }

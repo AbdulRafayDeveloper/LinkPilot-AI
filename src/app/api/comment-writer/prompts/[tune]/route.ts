@@ -5,6 +5,7 @@ import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { COMMENT_TUNE_IDS, getTuneLabel } from "@/constants/commentWriter"
 import { saveTunePrompt } from "@/services/commentWriter/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -14,6 +15,8 @@ const TuneSchema = z.enum(COMMENT_TUNE_IDS)
  * PUT: Saves the prompt for one tune only. The other tunes' prompts are untouched.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ tune: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 

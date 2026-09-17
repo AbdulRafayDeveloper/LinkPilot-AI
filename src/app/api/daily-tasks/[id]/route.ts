@@ -3,6 +3,7 @@ import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { DAILY_TASKS_MESSAGES } from "@/constants/dailyTasks"
 import { deleteTask, setTaskCompletion } from "@/services/dailyTasks/tasks"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -13,6 +14,8 @@ const CompletionSchema = z.object({ isCompleted: z.boolean() })
  * stays a single small update, and repeating it lands on the same state.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = CompletionSchema.safeParse(body)
@@ -21,7 +24,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const { id } = await params
-    const task = await setTaskCompletion(id, parsed.data.isCompleted)
+    const task = await setTaskCompletion(auth.viewer, id, parsed.data.isCompleted)
     if (!task) {
       return NextResponse.json({ success: false, message: DAILY_TASKS_MESSAGES.invalidTask }, { status: 404 })
     }
@@ -40,9 +43,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
  * puts it back if this fails, the way one saved note behaves.
  */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const { id } = await params
-    const deleted = await deleteTask(id)
+    const deleted = await deleteTask(auth.viewer, id)
     if (!deleted) {
       return NextResponse.json({ success: false, message: DAILY_TASKS_MESSAGES.invalidTask }, { status: 404 })
     }

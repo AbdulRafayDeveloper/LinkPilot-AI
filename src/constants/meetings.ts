@@ -87,7 +87,7 @@ export const MEETINGS_TOOL: {
   group: "clients"
 } = {
   id: "meetings",
-  title: "Meeting Minutes",
+  title: "Meeting Notes to Tasks",
   description: "Understand calls & get tasks",
   icon: CalendarClock,
   href: "/meetings",

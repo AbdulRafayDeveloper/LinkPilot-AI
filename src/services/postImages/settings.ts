@@ -10,17 +10,19 @@ import {
   POST_IMAGES_MESSAGES,
 } from "@/constants/postImages"
 import type { AssetUploadPlan, BrandAsset, BrandSettings, BrandSettingsInput } from "@/types/postImages"
+import type { Viewer } from "@/types/auth"
 
 /**
  * The brand defaults: the name on the posts, the colours a design may use, and the photos that
- * can be dropped into an image. The app has no accounts, so there is one set of defaults, found
- * by a fixed scope rather than by a user.
+ * can be dropped into an image. Each user keeps their own defaults. Admins share the defaults
+ * that existed before accounts did (the "default" scope), so nothing set up then is lost.
  *
  * Photos go straight from the browser to S3 through a signed link, the same way every other
  * upload in the app works, and only what the app knows about them is kept here.
  */
 
-const SCOPE = "default"
+const ADMIN_SCOPE = "default"
+const scopeFor = (viewer: Viewer) => (viewer.role === "admin" ? ADMIN_SCOPE : `user:${viewer.id}`)
 // Photos sit beside the generated images, under the app's own folder in the bucket
 const ASSET_PREFIX = "LinkPilot/post-images/assets"
 
@@ -51,28 +53,28 @@ async function toSettings(record: IBrandSettings | null): Promise<BrandSettings>
 }
 
 /** The saved defaults, with a fresh preview link for every photo. */
-export async function getBrandSettings(): Promise<BrandSettings> {
+export async function getBrandSettings(viewer: Viewer): Promise<BrandSettings> {
   await connectDatabase()
-  const record = (await BrandSettingsModel.findOne({ scope: SCOPE }).lean()) as IBrandSettings | null
+  const record = (await BrandSettingsModel.findOne({ scope: scopeFor(viewer) }).lean()) as IBrandSettings | null
   return toSettings(record)
 }
 
 /** The stored form, for the generation step, which needs the keys rather than links. */
-export async function getStoredSettings(): Promise<IBrandSettings | null> {
+export async function getStoredSettings(viewer: Viewer): Promise<IBrandSettings | null> {
   await connectDatabase()
-  return (await BrandSettingsModel.findOne({ scope: SCOPE }).lean()) as IBrandSettings | null
+  return (await BrandSettingsModel.findOne({ scope: scopeFor(viewer) }).lean()) as IBrandSettings | null
 }
 
 /**
  * Where to upload a new photo. The record is only written once the settings are saved with it,
  * so an upload the user abandoned leaves an object nobody points at rather than a broken entry.
  */
-export async function planAssetUpload(contentType: string, size: number): Promise<AssetUploadPlan> {
+export async function planAssetUpload(viewer: Viewer, contentType: string, size: number): Promise<AssetUploadPlan> {
   if (!ASSET_CONTENT_TYPES.includes(contentType)) throw new UserFacingError(POST_IMAGES_MESSAGES.unsupportedAsset)
   if (!Number.isFinite(size) || size <= 0 || size > ASSET_MAX_BYTES) {
     throw new UserFacingError(POST_IMAGES_MESSAGES.assetTooLarge)
   }
-  const current = await getStoredSettings()
+  const current = await getStoredSettings(viewer)
   if ((current?.assets.length ?? 0) >= MAX_BRAND_ASSETS) throw new UserFacingError(POST_IMAGES_MESSAGES.tooManyAssets)
 
   const assetId = new mongoose.Types.ObjectId().toString()
@@ -86,9 +88,13 @@ export async function planAssetUpload(contentType: string, size: number): Promis
  * A photo taken out of the defaults keeps its object in storage. Images made with it still name
  * it, and deleting it here would leave those records pointing at nothing.
  */
-export async function saveBrandSettings(input: BrandSettingsInput, uploads: Map<string, { contentType: string; size: number }>): Promise<BrandSettings> {
+export async function saveBrandSettings(
+  viewer: Viewer,
+  input: BrandSettingsInput,
+  uploads: Map<string, { contentType: string; size: number }>
+): Promise<BrandSettings> {
   await connectDatabase()
-  const current = await getStoredSettings()
+  const current = await getStoredSettings(viewer)
   const known = new Map((current?.assets ?? []).map((asset) => [asset.id, asset]))
 
   const assets: IBrandAsset[] = input.assets.slice(0, MAX_BRAND_ASSETS).map((entry) => {
@@ -107,16 +113,17 @@ export async function saveBrandSettings(input: BrandSettingsInput, uploads: Map<
     }
   })
 
+  const scope = scopeFor(viewer)
   const saved = (await BrandSettingsModel.findOneAndUpdate(
-    { scope: SCOPE },
-    { scope: SCOPE, displayName: input.displayName.trim(), colors: input.colors, assets },
+    { scope },
+    { scope, displayName: input.displayName.trim(), colors: input.colors, assets },
     { upsert: true, returnDocument: "after", runValidators: true }
   ).lean()) as IBrandSettings
   return toSettings(saved)
 }
 
 /** One saved photo, by id, for the generation step. */
-export async function findAsset(assetId: string): Promise<IBrandAsset | null> {
-  const settings = await getStoredSettings()
+export async function findAsset(viewer: Viewer, assetId: string): Promise<IBrandAsset | null> {
+  const settings = await getStoredSettings(viewer)
   return settings?.assets.find((asset) => asset.id === assetId) ?? null
 }

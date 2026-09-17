@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useRef, useState } from "react"
-import { FilePenLine, Sparkles, Wand2 } from "lucide-react"
+import { AudioLines, FilePenLine, Sparkles, Wand2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ResultCard } from "@/components/ui/ResultCard"
@@ -13,6 +13,9 @@ import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
 import { CreatedPromptPanel } from "@/components/prompt-creator/CreatedPromptPanel"
 import { PromptCreatorPromptsModal } from "@/components/prompt-creator/PromptCreatorPromptsModal"
 import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
+import { appendSpokenText } from "@/lib/spokenText"
+import { VOICE_MESSAGES, type TranscriptionProvider } from "@/constants/voiceInput"
+import { describeProviders } from "@/constants/aiProviders"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
@@ -32,11 +35,16 @@ interface GeneratePayload {
   requestSource: RequestSource
 }
 
-// What was typed or spoken, and the finished prompt, both outlive the page
+// What was typed or spoken, who wrote the speech out, and the finished prompt all outlive the page
 const formStore = createToolStore(
   "prompt-creator:form",
-  { request: "", target: DEFAULT_PROMPT_TARGET as PromptTargetId | null, requestSource: "text" as RequestSource },
-  { version: 1 }
+  {
+    request: "",
+    target: DEFAULT_PROMPT_TARGET as PromptTargetId | null,
+    requestSource: "text" as RequestSource,
+    transcribedBy: [] as TranscriptionProvider[],
+  },
+  { version: 2 }
 )
 const generation = createGenerationRequest<GeneratePayload, CreatedPrompt>(
   "prompt-creator",
@@ -50,7 +58,8 @@ export default function PromptCreatorClient() {
   const [promptsTab, setPromptsTab] = useState<PromptTargetId | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [voiceError, setVoiceError] = useState<string | null>(null)
-  const { request, target, requestSource } = useToolStore(formStore)
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null)
+  const { request, target, requestSource, transcribedBy } = useToolStore(formStore)
   const requestInputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const { status, result, error, generate, reset } = useGenerationRequest(generation)
@@ -62,12 +71,15 @@ export default function PromptCreatorClient() {
     if (formError) setFormError(null)
   }
 
-  // What was spoken is added to whatever is already there, so several takes build one description
-  const addTranscript = useCallback((text: string) => {
-    formStore.update(({ request: current }) => ({
-      request: current.trim() ? `${current.trim()}\n${text}` : text,
-      requestSource: "voice" as RequestSource,
-    }))
+  // What was spoken is added to whatever is already there, so several takes build one description;
+  // past the limit the beginning is kept and the page says how much was left out. Who wrote each take
+  // out is kept with it, so the page can say whether Groq or OpenAI did
+  const addTranscript = useCallback((text: string, providers: TranscriptionProvider[]) => {
+    const current = formStore.getSnapshot()
+    const { text: request, skipped } = appendSpokenText(current.request, text, REQUEST_MAX_LENGTH)
+    const earlier = current.request.trim() ? current.transcribedBy : []
+    formStore.update({ request, requestSource: "voice" as RequestSource, transcribedBy: [...new Set([...earlier, ...providers])] })
+    setVoiceNotice(skipped > 0 ? VOICE_MESSAGES.clipped(skipped, REQUEST_MAX_LENGTH) : null)
     setFormError(null)
   }, [])
 
@@ -92,17 +104,19 @@ export default function PromptCreatorClient() {
   }, [])
 
   const loadDummyRequest = ({ request: dummyRequest }: Record<string, string>) => {
-    formStore.update({ request: dummyRequest ?? "", requestSource: "text" })
+    formStore.update({ request: dummyRequest ?? "", requestSource: "text", transcribedBy: [] })
     reset()
     setFormError(null)
     setVoiceError(null)
+    setVoiceNotice(null)
   }
 
   // Clears the description and the prompt; the chosen target stays for the next one
   const resetTool = () => {
-    formStore.update({ request: "", requestSource: "text" })
+    formStore.update({ request: "", requestSource: "text", transcribedBy: [] })
     setFormError(null)
     setVoiceError(null)
+    setVoiceNotice(null)
     reset()
     requestInputRef.current?.focus()
   }
@@ -155,7 +169,13 @@ export default function PromptCreatorClient() {
                     <label htmlFor="prompt-request" className="text-[10px] font-bold text-outline uppercase tracking-wider">
                       What do you want done
                     </label>
-                    <VoiceRecorder onTranscript={addTranscript} onError={setVoiceError} disabled={isGenerating} what="what you want done" />
+                    <VoiceRecorder
+                      onTranscript={addTranscript}
+                      onError={setVoiceError}
+                      disabled={isGenerating}
+                      what="what you want done"
+                      transcribeFor="prompt-creator"
+                    />
                   </div>
                   <textarea
                     id="prompt-request"
@@ -177,9 +197,21 @@ export default function PromptCreatorClient() {
                     </span>
                     {request !== "" && <CopyButton text={request} label="Copy what you described" />}
                   </div>
+                  {requestSource === "voice" && request !== "" && transcribedBy.length > 0 && (
+                    <p role="status" className="flex items-center gap-1.5 text-[12px] text-on-surface-variant">
+                      <AudioLines size={13} className="shrink-0 text-primary" aria-hidden="true" />
+                      Speech written out by{" "}
+                      <span className="font-semibold text-on-surface">{describeProviders(transcribedBy)}</span>
+                    </p>
+                  )}
                   {voiceError && (
                     <p role="alert" className="rounded-xl border border-error/40 bg-error-container px-3 py-2 text-[12px] text-error">
                       {voiceError}
+                    </p>
+                  )}
+                  {voiceNotice && (
+                    <p role="status" className="rounded-xl bg-secondary-container px-3 py-2 text-[12px] text-on-secondary-container">
+                      {voiceNotice}
                     </p>
                   )}
                 </div>

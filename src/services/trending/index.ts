@@ -48,8 +48,8 @@ function buildNotice(
 
 /**
  * Fresh end-to-end Trending Topics run: latest saved prompt → live web research
- * (Gemini with Google Search, OpenAI web search fallback) → structured ranking (Gemini,
- * OpenAI fallback) → source verification → the Humanization prompt on every post.
+ * (Groq browser search, OpenAI web search fallback) → structured ranking (the module's
+ * provider order, Groq first) → source verification → the Humanization prompt on every post.
  * Nothing is cached between runs.
  */
 export async function findTrendingTopics({ signal, onStage }: FindTrendingOptions): Promise<TrendingResult> {

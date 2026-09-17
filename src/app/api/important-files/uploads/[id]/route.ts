@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { IMPORTANT_FILES_MESSAGES } from "@/constants/importantFiles"
 import { cancelUpload, finishUpload } from "@/services/importantFiles/assets"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -13,8 +14,10 @@ type RouteContext = { params: Promise<{ id: string }> }
  * appear in the module. Calling it twice is harmless.
  */
 export async function POST(_req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const asset = await finishUpload((await params).id)
+    const asset = await finishUpload(auth.viewer, (await params).id)
     return NextResponse.json({ success: true, message: IMPORTANT_FILES_MESSAGES.created, data: asset })
   } catch (error: unknown) {
     console.error("POST Important File Finish Exception:", error instanceof Error ? error.message : error)
@@ -29,8 +32,10 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
  * anything already sent is removed and the record goes, so nothing half-uploaded is left.
  */
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const cancelled = await cancelUpload((await params).id)
+    const cancelled = await cancelUpload(auth.viewer, (await params).id)
     return NextResponse.json({ success: true, message: "Upload cancelled", data: { cancelled } })
   } catch (error: unknown) {
     console.error("DELETE Important File Upload Exception:", error instanceof Error ? error.message : error)

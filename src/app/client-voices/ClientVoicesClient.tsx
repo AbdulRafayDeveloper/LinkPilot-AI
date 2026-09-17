@@ -201,7 +201,7 @@ export default function ClientVoicesClient() {
               <div className="min-w-0">
                 <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
                   <AudioLines size={24} className="shrink-0 text-primary" aria-hidden="true" />
-                  Client Voices
+                  Client Voices to Tasks
                 </h1>
                 <p className="mt-1 text-sm text-on-surface-variant">
                   Paste or drop the voice messages a client sent you. Each one comes back as English text, and

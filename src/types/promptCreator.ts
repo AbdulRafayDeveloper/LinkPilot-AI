@@ -1,4 +1,5 @@
 import type { PromptTargetId } from "@/constants/promptCreator"
+import type { AiProviderId } from "@/constants/aiProviders"
 import type { EditablePrompt } from "./prompts"
 
 export interface PromptTargetPrompt extends EditablePrompt {
@@ -19,6 +20,8 @@ export interface CreatedPrompt {
   // What the user described, so the saved prompt can be traced back to the request
   request: string
   requestSource: RequestSource
+  // Who wrote it (Groq, or OpenAI as the fallback); prompts saved before this was kept have none
+  provider: AiProviderId | null
   createdAt: string
   updatedAt: string
 }

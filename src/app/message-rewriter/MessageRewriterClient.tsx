@@ -7,6 +7,8 @@ import { Header } from "@/components/ui/Header"
 import { ResetButton } from "@/components/ui/ResetButton"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
+import { appendSpokenText } from "@/lib/spokenText"
+import { VOICE_MESSAGES } from "@/constants/voiceInput"
 import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
 import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
 import { MessageRewriterPromptModal } from "@/components/message-rewriter/MessageRewriterPromptModal"
@@ -44,6 +46,7 @@ export default function MessageRewriterClient() {
   const [isPromptOpen, setIsPromptOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [voiceError, setVoiceError] = useState<string | null>(null)
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null)
   const { message, source } = useToolStore(formStore)
   const messageInputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
@@ -56,12 +59,12 @@ export default function MessageRewriterClient() {
     if (formError) setFormError(null)
   }
 
-  // What was spoken is added to whatever is already there, so several takes build one message
+  // What was spoken is added to whatever is already there, so several takes build one message;
+  // past the limit the beginning is kept and the page says how much was left out
   const addTranscript = useCallback((text: string) => {
-    formStore.update(({ message: current }) => ({
-      message: (current.trim() ? `${current.trim()}\n${text}` : text).slice(0, MESSAGE_MAX_LENGTH),
-      source: "voice" as MessageSource,
-    }))
+    const { text: message, skipped } = appendSpokenText(formStore.getSnapshot().message, text, MESSAGE_MAX_LENGTH)
+    formStore.update({ message, source: "voice" as MessageSource })
+    setVoiceNotice(skipped > 0 ? VOICE_MESSAGES.clipped(skipped, MESSAGE_MAX_LENGTH) : null)
     setFormError(null)
   }, [])
 
@@ -81,6 +84,7 @@ export default function MessageRewriterClient() {
     reset()
     setFormError(null)
     setVoiceError(null)
+    setVoiceNotice(null)
   }
 
   // Clears the message and the rewrite, ready for the next one
@@ -88,6 +92,7 @@ export default function MessageRewriterClient() {
     formStore.update({ message: "", source: "text" })
     setFormError(null)
     setVoiceError(null)
+    setVoiceNotice(null)
     reset()
     messageInputRef.current?.focus()
   }
@@ -142,6 +147,7 @@ export default function MessageRewriterClient() {
                       Your message, in any language
                     </label>
                     <VoiceRecorder
+                      transcribeFor="message-rewriter"
                       onTranscript={addTranscript}
                       onError={setVoiceError}
                       disabled={isGenerating}
@@ -171,6 +177,11 @@ export default function MessageRewriterClient() {
                   {voiceError && (
                     <p role="alert" className="rounded-xl border border-error/40 bg-error-container px-3 py-2 text-[12px] text-error">
                       {voiceError}
+                    </p>
+                  )}
+                  {voiceNotice && (
+                    <p role="status" className="rounded-xl bg-secondary-container px-3 py-2 text-[12px] text-on-secondary-container">
+                      {voiceNotice}
                     </p>
                   )}
                 </div>

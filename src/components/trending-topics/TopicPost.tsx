@@ -8,7 +8,7 @@ import { LINKEDIN_POST_MAX_CHARS } from "@/constants/linkedinLimits"
 import { POST_TARGET_MAX_CHARS, POST_TARGET_MIN_CHARS, getPostFormat } from "@/constants/trending"
 import { composeTrendingPost } from "@/lib/trendingPost"
 import { useEditableText } from "@/lib/outputEdits"
-import type { TrendingTopic } from "@/services/trending/schema"
+import type { StoredTrendingTopic } from "@/services/trending/schema"
 
 /**
  * The ready-to-publish post as its own framed box: hook, body, the line that asks for replies
@@ -17,10 +17,11 @@ import type { TrendingTopic } from "@/services/trending/schema"
  * topic uses a different post format, named on the box. The source link sits under the post
  * rather than inside it, because a post carrying a link reaches far fewer people.
  */
-export const TopicPost: React.FC<{ topic: TrendingTopic }> = ({ topic }) => {
+export const TopicPost: React.FC<{ topic: StoredTrendingTopic }> = ({ topic }) => {
   const post = useEditableText("trending-topics", composeTrendingPost(topic))
   const { url } = topic.primary_reference
-  const format = getPostFormat(topic.post_format)
+  // A search saved before posts had a format has none to name
+  const format = topic.post_format ? getPostFormat(topic.post_format) : null
   const length = post.value.length
   const isOverLinkedInLimit = length > LINKEDIN_POST_MAX_CHARS
   const isOffTarget = length < POST_TARGET_MIN_CHARS || length > POST_TARGET_MAX_CHARS
@@ -31,9 +32,11 @@ export const TopicPost: React.FC<{ topic: TrendingTopic }> = ({ topic }) => {
         <h4 className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">
           <PenLine size={13} aria-hidden="true" />
           LinkedIn post
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 normal-case tracking-normal" title={format.description}>
-            {format.label}
-          </span>
+          {format && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 normal-case tracking-normal" title={format.description}>
+              {format.label}
+            </span>
+          )}
         </h4>
         <CopyButton text={post.value} label="Copy the complete post" variant="prominent" buttonText="Copy post" />
       </div>

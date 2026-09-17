@@ -3,8 +3,8 @@
 import React from "react"
 import { ChevronDown, Clock, ExternalLink, Camera, ShieldCheck } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
-import { LINKEDIN_CONTENT_SEARCH_URL } from "@/constants/trending"
-import type { TrendingReference, TrendingTopic } from "@/services/trending/schema"
+import { linkedInSearchUrl } from "@/constants/trending"
+import type { StoredTrendingTopic, TrendingReference } from "@/services/trending/schema"
 import { TopicPost } from "./TopicPost"
 
 const SectionLabel: React.FC<{ children: React.ReactNode; action?: React.ReactNode }> = ({ children, action }) => (
@@ -45,11 +45,13 @@ function formatEventDate(eventDate: string | null): string | null {
   })
 }
 
-function linkedInSearchUrl(query: string): string {
-  return `${LINKEDIN_CONTENT_SEARCH_URL}?keywords=${encodeURIComponent(query)}`
+interface TopicCardProps {
+  topic: StoredTrendingTopic
+  // Research details (keywords, assessment, screenshot, sources) start open where the topic is read in full
+  researchOpen?: boolean
 }
 
-export const TopicCard: React.FC<{ topic: TrendingTopic }> = ({ topic }) => {
+export const TopicCard: React.FC<TopicCardProps> = ({ topic, researchOpen = false }) => {
   const isToday = topic.freshness === "Today"
   const eventDate = formatEventDate(topic.event_date)
 
@@ -121,7 +123,7 @@ export const TopicCard: React.FC<{ topic: TrendingTopic }> = ({ topic }) => {
       <TopicPost topic={topic} />
 
       {/* Secondary research details */}
-      <details className="group border-t border-outline-variant/60 pt-3 mt-auto">
+      <details open={researchOpen} className="group border-t border-outline-variant/60 pt-3 mt-auto">
         <summary className="flex items-center justify-between cursor-pointer list-none rounded-md text-xs font-semibold text-on-surface-variant hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
           Research details
           <ChevronDown size={16} className="transition-transform group-open:rotate-180" aria-hidden="true" />

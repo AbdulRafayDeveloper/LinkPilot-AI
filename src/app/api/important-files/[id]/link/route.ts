@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { IMPORTANT_FILES_MESSAGES } from "@/constants/importantFiles"
 import { assetLink } from "@/services/importantFiles/assets"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -13,8 +14,10 @@ type RouteContext = { params: Promise<{ id: string }> }
  * a stored file into a public URL.
  */
 export async function GET(req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const link = await assetLink((await params).id, req.nextUrl.searchParams.get("download") === "1")
+    const link = await assetLink(auth.viewer, (await params).id, req.nextUrl.searchParams.get("download") === "1")
     if (!link) {
       return NextResponse.json({ success: false, message: IMPORTANT_FILES_MESSAGES.notFound }, { status: 404 })
     }

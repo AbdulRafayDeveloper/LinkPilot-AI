@@ -3,10 +3,12 @@ import { connectDatabase } from "@/lib/db"
 import { QuickNote as QuickNoteModel, type IQuickNote } from "@/models/QuickNote"
 import { NOTES_BATCH_SIZE } from "@/constants/quickNotes"
 import type { QuickNote, QuickNotesFeed } from "@/types/quickNotes"
+import type { Viewer } from "@/types/auth"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
- * Saved notes live in the quick_notes collection. The app has no accounts, so notes are shared
- * by everyone who opens it, exactly like the saved Trending searches and Dummy Data.
+ * Saved notes live in the quick_notes collection. Each note belongs to the account that saved it:
+ * a user sees their own notes, an admin sees everyone's.
  */
 type StoredNote = IQuickNote & { _id: { toString: () => string } }
 
@@ -30,21 +32,21 @@ const toCursor = (record: StoredNote) => `${record.createdAt.toISOString()}${CUR
 function olderThan(cursor: string | null) {
   const [time, id] = (cursor ?? "").split(CURSOR_SEPARATOR)
   const createdAt = new Date(time ?? "")
-  if (!cursor || Number.isNaN(createdAt.getTime()) || !ID_PATTERN.test(id ?? "")) return {}
+  if (!cursor || Number.isNaN(createdAt.getTime()) || !ID_PATTERN.test(id ?? "")) return []
   const objectId = new mongoose.Types.ObjectId(id)
-  return { $or: [{ createdAt: { $lt: createdAt } }, { createdAt, _id: { $lt: objectId } }] }
+  return [{ $or: [{ createdAt: { $lt: createdAt } }, { createdAt, _id: { $lt: objectId } }] }]
 }
 
 /**
  * One batch of notes, newest first, starting after the cursor when there is one.
  */
-export async function listNotes(cursor: string | null, limit = NOTES_BATCH_SIZE): Promise<QuickNotesFeed> {
+export async function listNotes(viewer: Viewer, cursor: string | null, limit = NOTES_BATCH_SIZE): Promise<QuickNotesFeed> {
   await connectDatabase()
   const size = Math.min(Math.max(1, Math.trunc(limit) || NOTES_BATCH_SIZE), NOTES_BATCH_SIZE)
   const [records, total] = await Promise.all([
     // One extra row answers "is there more?" without a second count
-    QuickNoteModel.find(olderThan(cursor)).sort({ createdAt: -1, _id: -1 }).limit(size + 1).lean(),
-    QuickNoteModel.countDocuments(),
+    QuickNoteModel.find({ $and: [visibleTo(viewer), ...olderThan(cursor)] }).sort({ createdAt: -1, _id: -1 }).limit(size + 1).lean(),
+    QuickNoteModel.countDocuments(visibleTo(viewer)),
   ])
   const stored = records as unknown as StoredNote[]
   const batch = stored.slice(0, size)
@@ -59,27 +61,29 @@ export async function listNotes(cursor: string | null, limit = NOTES_BATCH_SIZE)
  * Saves one note as it was written. The same text can be saved twice: a repeated paste is a
  * second note, which is what the user asked for by pressing Save again.
  */
-export async function saveNote(content: string): Promise<QuickNote> {
+export async function saveNote(viewer: Viewer, content: string): Promise<QuickNote> {
   await connectDatabase()
-  const record = await QuickNoteModel.create({ content })
+  const record = await QuickNoteModel.create({ ownerId: viewer.id, content })
   return toNote(record as unknown as StoredNote)
 }
 
 /**
  * Deletes one note. Returns false when it was already gone, so a repeated click is harmless.
  */
-export async function deleteNote(id: string): Promise<boolean> {
-  if (!ID_PATTERN.test(id)) return false
+export async function deleteNote(viewer: Viewer, id: string): Promise<boolean> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return false
   await connectDatabase()
-  const { deletedCount } = await QuickNoteModel.deleteOne({ _id: id })
+  const { deletedCount } = await QuickNoteModel.deleteOne(filter)
   return deletedCount > 0
 }
 
 /**
- * Deletes every saved note. Only this collection is touched.
+ * Deletes every note the viewer owns (for an admin, also the notes from before accounts existed).
+ * Another account's notes are never touched.
  */
-export async function clearNotes(): Promise<number> {
+export async function clearNotes(viewer: Viewer): Promise<number> {
   await connectDatabase()
-  const { deletedCount } = await QuickNoteModel.deleteMany({})
+  const { deletedCount } = await QuickNoteModel.deleteMany(ownedBy(viewer))
   return deletedCount
 }

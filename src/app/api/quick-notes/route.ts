@@ -3,6 +3,7 @@ import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { NOTE_MAX_LENGTH, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
 import { clearNotes, listNotes, saveNote } from "@/services/quickNotes/notes"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -20,8 +21,10 @@ const NoteSchema = z.object({
  * the newest note; with one it continues after that note, which is what the list does as it scrolls.
  */
 export async function GET(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const notes = await listNotes(req.nextUrl.searchParams.get("cursor"))
+    const notes = await listNotes(auth.viewer, req.nextUrl.searchParams.get("cursor"))
     return NextResponse.json({ success: true, message: "Saved notes retrieved", data: notes })
   } catch (error: unknown) {
     console.error("GET Quick Notes Exception:", error)
@@ -36,6 +39,8 @@ export async function GET(req: NextRequest) {
  * POST: Saves one note. Saving the same text again keeps both, newest first.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = NoteSchema.safeParse(body)
@@ -46,7 +51,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const note = await saveNote(parsed.data.content)
+    const note = await saveNote(auth.viewer, parsed.data.content)
     return NextResponse.json({ success: true, message: QUICK_NOTES_MESSAGES.saved, data: note }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Quick Note Exception:", error)
@@ -58,11 +63,13 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * DELETE: Deletes every saved note. The page asks for confirmation before calling this.
+ * DELETE: Deletes every note this account owns. The page asks for confirmation before calling this.
  */
 export async function DELETE() {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const deleted = await clearNotes()
+    const deleted = await clearNotes(auth.viewer)
     return NextResponse.json({ success: true, message: QUICK_NOTES_MESSAGES.cleared, data: { deleted } })
   } catch (error: unknown) {
     console.error("DELETE Quick Notes Exception:", error)

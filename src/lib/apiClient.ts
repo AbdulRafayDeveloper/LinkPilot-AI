@@ -1,5 +1,6 @@
 import type { ApiEnvelope } from "@/types/api"
 import { parseRetryAfter, withRetry } from "@/lib/retry"
+import { AUTH_REQUIRED_HEADER, LOGIN_PATH } from "@/constants/auth"
 
 /**
  * Browser → our API routes. Retries follow the HTTP rules for when a repeat is safe:
@@ -29,6 +30,17 @@ class RetryableResponse extends Error {
 // fetch rejects with a TypeError when the request never got an answer (offline, dropped, DNS)
 const isNetworkFailure = (error: unknown) => error instanceof TypeError
 
+/**
+ * A session that ended (it expired, or the account signed out elsewhere) sends the person to the
+ * sign-in page, which brings them back here afterwards, instead of showing an error on every tool.
+ */
+function sendToSignIn(response: Response) {
+  if (response.status !== 401 || !response.headers.get(AUTH_REQUIRED_HEADER) || typeof window === "undefined") return
+  if (window.location.pathname === LOGIN_PATH) return
+  const next = `${window.location.pathname}${window.location.search}`
+  window.location.assign(`${LOGIN_PATH}?next=${encodeURIComponent(next)}`)
+}
+
 export async function fetchWithRetry(url: string, init: RequestInit = {}, { retry }: RetryPolicy = {}): Promise<Response> {
   const method = (init.method ?? "GET").toUpperCase()
   const retries = (retry ?? IDEMPOTENT_METHODS.has(method)) ? CLIENT_RETRIES : 0
@@ -36,6 +48,7 @@ export async function fetchWithRetry(url: string, init: RequestInit = {}, { retr
     return await withRetry(
       async () => {
         const response = await fetch(url, init)
+        sendToSignIn(response)
         if (RETRYABLE_STATUS.has(response.status)) throw new RetryableResponse(response)
         return response
       },
@@ -68,6 +81,8 @@ export async function requestApi<T>(url: string, init?: RequestInit, policy?: Re
     // Non-JSON response; handled below
   }
   if (!body?.success || body.data === undefined) {
+    // The host refuses an oversized body before the route runs, and says so in plain text
+    if (!body && response.status === 413) throw new Error("That upload is too large for the server to accept.")
     throw new Error(body?.message || "The server returned an unexpected response.")
   }
   return { data: body.data, message: body.message }

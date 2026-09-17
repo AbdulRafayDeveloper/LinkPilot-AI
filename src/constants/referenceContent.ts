@@ -34,19 +34,19 @@ export const REFERENCE_CONTENT_MESSAGES = {
   noResults: "Nothing matches that search.",
 } as const
 
-// The module's sidebar entry, next to Quick Notes under the same heading
+// The module's sidebar entry, under Client Work
 export const REFERENCE_CONTENT_TOOL: {
   id: string
   title: string
   description: string
   icon: LucideIcon
   href: string
-  group: "workspace"
+  group: "clients"
 } = {
   id: "reference-content",
-  title: "Reference Content",
+  title: "Clients Reference Content",
   description: "Reusable steps & explanations",
   icon: BookMarked,
   href: "/reference-content",
-  group: "workspace",
+  group: "clients",
 }

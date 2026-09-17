@@ -3,6 +3,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { getPostImagePrompt, savePostImagePrompt } from "@/services/postImages/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -10,6 +11,8 @@ export const dynamic = "force-dynamic"
  * GET: The prompt every post image is designed with, plus its default.
  */
 export async function GET() {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 
@@ -30,6 +33,8 @@ export async function GET() {
  * were drawn from on their own record.
  */
 export async function PUT(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 

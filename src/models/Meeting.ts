@@ -1,5 +1,6 @@
 import mongoose, { Schema, type Model } from "mongoose"
 import { MEETING_STATUS_IDS } from "@/constants/meetings"
+import { OWNER_ID } from "./owner"
 
 /**
  * One meeting: the transcript exactly as it was pasted, and the analysis built from it. The two
@@ -7,6 +8,8 @@ import { MEETING_STATUS_IDS } from "@/constants/meetings"
  * The app has no accounts, so meetings belong to whoever opens it, like the other saved modules.
  */
 export interface IMeeting {
+  // The account it belongs to (models/owner.ts)
+  ownerId: string | null
   title: string
   isTitleGenerated: boolean
   transcript: string
@@ -27,6 +30,7 @@ export interface IMeeting {
 
 const MeetingSchema = new Schema<IMeeting>(
   {
+    ownerId: OWNER_ID,
     title: { type: String, required: true, trim: true },
     isTitleGenerated: { type: Boolean, required: true, default: false },
     transcript: { type: String, required: true },

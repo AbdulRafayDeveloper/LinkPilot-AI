@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { TRENDING_POST_FORMAT_IDS, TRENDING_TOPIC_COUNT } from "@/constants/trending"
-import { SEARCH_PROVIDERS } from "@/services/liveResearch"
+import type { SearchProvider as ResearchProvider } from "@/services/liveResearch"
 
 const DiscussionPotentialSchema = z.enum(["High", "Medium", "Emerging"])
 const ConfidenceSchema = z.enum(["high", "medium", "low"])
@@ -96,7 +96,8 @@ export const TrendingResultSchema = z.object({
   notice: z.string().nullable(),
   research_metadata: z.object({
     searched_at: z.string(),
-    search_provider: z.enum(SEARCH_PROVIDERS),
+    // Who searched; a string rather than today's providers, so searches saved by an earlier provider still read back
+    search_provider: z.string(),
     sources_checked: z.number().int().nonnegative(),
     candidates_evaluated: z.number().int().nonnegative(),
   }),
@@ -105,9 +106,21 @@ export const TrendingResultSchema = z.object({
 export type SynthesisOutput = z.infer<typeof SynthesisOutputSchema>
 export type SynthesisTopic = SynthesisOutput["topics"][number]
 export type TrendingTopic = z.infer<typeof TrendingTopicSchema>
+
+/**
+ * A topic as it was saved, read back for the saved topics. Searches from before posts had a format
+ * carry no format, no LinkedIn angle and no closing line, so those three are allowed to be missing;
+ * everything else is held to the same schema as a new result.
+ */
+export const StoredTrendingTopicSchema = TrendingTopicSchema.extend({
+  post_format: TrendingTopicSchema.shape.post_format.nullable().catch(null),
+  linkedin_angle: z.string().catch(""),
+  post_cta: z.string().catch(""),
+})
+export type StoredTrendingTopic = z.infer<typeof StoredTrendingTopicSchema>
 export type TrendingReference = TrendingTopic["primary_reference"]
 export type TrendingResult = z.infer<typeof TrendingResultSchema>
-export type SearchProvider = (typeof SEARCH_PROVIDERS)[number]
+export type SearchProvider = ResearchProvider
 
 export type TrendingStage = "RESEARCHING" | "FALLBACK" | "RANKING" | "VERIFYING" | "EXPANDING" | "HUMANIZING"
 

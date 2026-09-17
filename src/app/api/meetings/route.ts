@@ -4,6 +4,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { MeetingSchema } from "@/lib/validation/meeting"
 import { MEETING_MESSAGES, MEETING_SEARCH_MAX_LENGTH, MEETING_STATUS_IDS } from "@/constants/meetings"
 import { createMeeting, listMeetings } from "@/services/meetings/meetings"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -14,9 +15,11 @@ const StatusSchema = z.enum(MEETING_STATUS_IDS).nullable().catch(null)
  * never part of this answer, however large the history grows.
  */
 export async function GET(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const params = req.nextUrl.searchParams
-    const page = await listMeetings({
+    const page = await listMeetings(auth.viewer, {
       search: (params.get("search") ?? "").slice(0, MEETING_SEARCH_MAX_LENGTH),
       status: StatusSchema.parse(params.get("status")),
       cursor: params.get("cursor"),
@@ -33,6 +36,8 @@ export async function GET(req: NextRequest) {
  * analysis with its own calls, so a five hour transcript never rides on one request.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = MeetingSchema.safeParse(body)
@@ -43,7 +48,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const meeting = await createMeeting(parsed.data)
+    const meeting = await createMeeting(auth.viewer, parsed.data)
     return NextResponse.json({ success: true, message: MEETING_MESSAGES.saved, data: meeting }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Meeting Exception:", error)

@@ -4,7 +4,8 @@ import React, { useId, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { CornerDownLeft, Search } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
-import { APP_TOOLS, TOOL_GROUPS, type ToolGroupId } from "@/constants/linkedinTools"
+import { TOOL_GROUPS, toolsFor, type ToolGroupId } from "@/constants/linkedinTools"
+import { useIsAdmin } from "@/hooks/useCurrentUser"
 import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 
 // The sidebar heading a tool sits under, so both surfaces call the same thing by the same name
@@ -12,17 +13,23 @@ const groupLabel = (id: ToolGroupId) => TOOL_GROUPS.find((group) => group.id ===
 
 /**
  * Everything the sidebar links to, in sidebar order, read from the same APP_TOOLS list, so a
- * tool can never exist in one of the two and be missing from the other.
+ * tool can never exist in one of the two and be missing from the other. The admin area is
+ * listed only for an admin, exactly as the sidebar does.
  */
-const DESTINATIONS = [
-  ...APP_TOOLS.map((tool) => ({ ...tool, area: groupLabel(tool.group) })),
+const destinationsFor = (isAdmin: boolean) => [
+  // A tool with several pages is reached through each of them, the way its sidebar dropdown is
+  ...toolsFor(isAdmin).flatMap((tool) =>
+    tool.links
+      ? tool.links.map((link) => ({ ...link, title: `${tool.title}: ${link.title}`, area: groupLabel(tool.group) }))
+      : [{ ...tool, area: groupLabel(tool.group) }]
+  ),
   // Pinned below the groups in the sidebar rather than inside one
   { ...GLOBAL_PROMPTS_LINK, area: "Shared prompts" },
 ]
 
-const matches = (query: string) => {
+const matches = (query: string, isAdmin: boolean) => {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
-  return DESTINATIONS.filter((destination) => {
+  return destinationsFor(isAdmin).filter((destination) => {
     const text = `${destination.title} ${destination.description} ${destination.area}`.toLowerCase()
     return words.every((word) => text.includes(word))
   })
@@ -39,7 +46,7 @@ export const ToolSwitcher: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState("")
   const [activeIndex, setActiveIndex] = useState(0)
-  const results = matches(query)
+  const results = matches(query, useIsAdmin())
   const optionId = (index: number) => `${listId}-option-${index}`
 
   const open = (href: string) => {
@@ -86,12 +93,12 @@ export const ToolSwitcher: React.FC<{ onClose: () => void }> = ({ onClose }) => 
           <p className="py-6 text-center text-sm text-on-surface-variant">No tool matches &ldquo;{query.trim()}&rdquo;.</p>
         ) : (
           <ul id={listId} role="listbox" aria-label="Tools" className="flex flex-col gap-1">
-            {results.map(({ id, title, description, area, icon: Icon, href }, index) => {
+            {results.map(({ title, description, area, icon: Icon, href }, index) => {
               const isActive = index === activeIndex
               const isCurrent = href === pathname
               return (
                 <li
-                  key={id}
+                  key={href}
                   id={optionId(index)}
                   role="option"
                   aria-selected={isActive}

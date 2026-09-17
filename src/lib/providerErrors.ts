@@ -26,6 +26,7 @@ export function redactSecrets(text: string): string {
   return text
     .replace(/\b(?:sk|rk)-[A-Za-z0-9_-]{8,}/g, "[key]")
     .replace(/\bAIza[0-9A-Za-z_-]{10,}/g, "[key]")
+    .replace(/\bgsk_[A-Za-z0-9]{10,}/g, "[key]")
     .replace(/\bBearer\s+[A-Za-z0-9._-]{8,}/gi, "Bearer [key]")
     .replace(/([?&](?:key|api_key|access_token)=)[^&\s]+/gi, "$1[key]")
 }
@@ -55,7 +56,7 @@ const firstSentence = (text: string, max = 160) => {
 }
 
 export interface ProviderNames {
-  // What to call the provider in a sentence, e.g. "Gemini"
+  // What to call the provider in a sentence, e.g. "Groq"
   label: string
   keyVariable: string
   modelVariable: string
@@ -93,4 +94,30 @@ export function describeProviderFailure(error: unknown, { label, keyVariable, mo
   }
   // Nothing recognised: the provider's own first sentence is more use than "please try again"
   return `${label} failed${status ? ` (${status})` : ""}. ${firstSentence(message)}`.trim()
+}
+
+// A per-minute token ceiling Groq answers with 413 rather than 429 ("Request too large ... tokens per minute")
+const TOKEN_RATE_LIMIT = /rate_limit_exceeded|tokens per minute|\((?:TPM|OTPM)\)/i
+const PER_DAY_LIMIT = /per day|\((?:TPD|RPD)\)/i
+const KEY_REJECTED_REST_MS = 10 * 60_000
+const DAILY_LIMIT_REST_MS = 15 * 60_000
+const RATE_LIMIT_REST_MS = 60_000
+
+/**
+ * Whether a failure belongs to the API key rather than the request, so the same call may well succeed
+ * with another key: the key was rejected (401, 403), rate limited or out of quota (429), or the
+ * request ran into the key's per-minute token ceiling (Groq's 413).
+ */
+export function isKeyLimitError(error: unknown): boolean {
+  const status = providerStatus(error)
+  if (status === 401 || status === 403 || status === 429) return true
+  return status === 413 && TOKEN_RATE_LIMIT.test(messageOf(error))
+}
+
+/** How long a key that failed that way is tried last: a rejected key for a while, a rate limit for as long as asked. */
+export function keyRestMs(error: unknown, retryAfterMs: number | null): number {
+  const status = providerStatus(error)
+  if (status === 401 || status === 403) return KEY_REJECTED_REST_MS
+  if (PER_DAY_LIMIT.test(messageOf(error))) return DAILY_LIMIT_REST_MS
+  return retryAfterMs ?? RATE_LIMIT_REST_MS
 }

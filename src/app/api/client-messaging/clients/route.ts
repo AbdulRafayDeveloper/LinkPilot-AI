@@ -4,6 +4,7 @@ import { ClientSchema } from "@/lib/validation/client"
 import { CLIENT_MESSAGING_MESSAGES } from "@/constants/clientMessaging"
 import { createClient, listClients } from "@/services/clientMessaging/clients"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -13,8 +14,10 @@ export const dynamic = "force-dynamic"
  * changing and removing clients stays behind the prompt password.
  */
 export async function GET() {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const clients = await listClients()
+    const clients = await listClients(auth.viewer)
     return NextResponse.json({ success: true, message: "Clients retrieved", data: clients })
   } catch (error: unknown) {
     console.error("GET Clients Exception:", error)
@@ -29,6 +32,8 @@ export async function GET() {
  * POST: Adds a client.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 
@@ -42,7 +47,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const client = await createClient(parsed.data)
+    const client = await createClient(auth.viewer, parsed.data)
     return NextResponse.json({ success: true, message: `${client.name} added.`, data: client }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Client Exception:", error)

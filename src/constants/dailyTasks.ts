@@ -20,6 +20,8 @@ export const HISTORY_DAYS_PER_PAGE = 7
 export const ISO_DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
 // How far a browser's "today" may sit from the server's UTC day before it looks wrong (any timezone is ±1)
 export const MAX_TODAY_DRIFT_DAYS = 1
+// The most tasks one day's new order may list when a task is dropped into it
+export const MAX_TASKS_PER_DAY_ORDER = 500
 
 export const DAILY_TASKS_ENDPOINT = "/api/daily-tasks"
 
@@ -36,6 +38,8 @@ export const DAILY_TASKS_MESSAGES = {
   updateFailed: "Couldn't update that task. Please try again.",
   taskDeleted: "Task deleted.",
   deleteFailed: "Couldn't delete that task. Please try again.",
+  moveFailed: "Couldn't move that task, so it is back where it was. Please try again.",
+  invalidOrder: "That new order doesn't match the tasks on that day. Reload and try again.",
   addToDayFailed: "Couldn't add that task. Please try again.",
   cleanupFailed: "Couldn't delete the older tasks. Please try again.",
   cleaned: "Older tasks deleted.",

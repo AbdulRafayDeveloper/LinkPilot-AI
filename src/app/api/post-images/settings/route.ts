@@ -3,6 +3,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { BrandSettingsSchema } from "@/lib/validation/postImages"
 import { POST_IMAGES_MESSAGES } from "@/constants/postImages"
 import { getBrandSettings, saveBrandSettings } from "@/services/postImages/settings"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -10,8 +11,10 @@ export const dynamic = "force-dynamic"
  * GET: The saved brand defaults, with a fresh preview link for every photo.
  */
 export async function GET() {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const settings = await getBrandSettings()
+    const settings = await getBrandSettings(auth.viewer)
     return NextResponse.json({ success: true, message: "Defaults retrieved", data: settings })
   } catch (error: unknown) {
     console.error("GET Post Image Settings Exception:", error instanceof Error ? error.message : error)
@@ -27,6 +30,8 @@ export async function GET() {
  * photo uploaded in this save carries the type and size it was uploaded with.
  */
 export async function PUT(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = BrandSettingsSchema.safeParse(body)
@@ -43,6 +48,7 @@ export async function PUT(req: NextRequest) {
         .map((asset) => [asset.id, { contentType: asset.contentType as string, size: asset.size as number }])
     )
     const saved = await saveBrandSettings(
+      auth.viewer,
       { displayName: parsed.data.displayName, colors: parsed.data.colors, assets: parsed.data.assets },
       uploads
     )

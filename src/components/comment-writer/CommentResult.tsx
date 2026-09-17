@@ -16,11 +16,8 @@ import { useEditableText } from "@/lib/outputEdits"
 import { getTuneLabel } from "@/constants/commentWriter"
 import type { CommentStageEntry, CommentWriterStatus } from "@/hooks/useCommentGenerator"
 import type { GeneratedComment } from "@/types/commentWriter"
+import { AI_PROVIDER_LABELS } from "@/constants/aiProviders"
 
-const PROVIDER_LABELS: Record<GeneratedComment["provider"], string> = {
-  gemini: "Gemini",
-  openai: "OpenAI",
-}
 
 interface CommentResultProps {
   status: CommentWriterStatus
@@ -120,7 +117,7 @@ export const CommentResult = React.forwardRef<HTMLElement, CommentResultProps>(f
                 {comment.value.length.toLocaleString()} / {result.maxCharacters.toLocaleString()} characters
               </span>{" "}
               ·{" "}
-              {getTuneLabel(result.tune)} · Written with {PROVIDER_LABELS[result.provider]}
+              {getTuneLabel(result.tune)} · Written with {AI_PROVIDER_LABELS[result.provider]}
             </p>
             <button
               type="button"

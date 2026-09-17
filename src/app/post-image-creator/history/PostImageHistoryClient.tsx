@@ -1,10 +1,9 @@
 "use client"
 
-import React, { useCallback, useEffect, useRef, useState } from "react"
+import React, { useState } from "react"
 import Link from "next/link"
 import {
   AlertTriangle,
-  ArrowLeft,
   Check,
   Copy,
   Download,
@@ -12,16 +11,23 @@ import {
   Info,
   Loader2,
   RefreshCw,
+  SquarePlus,
   Trash2,
 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
+import { DateRangeFilters, FilterPanel, SearchFilter, SelectFilter } from "@/components/history/HistoryFilters"
+import { LoadMore } from "@/components/history/LoadMore"
 import { copyImageToClipboard } from "@/components/post-images/PostImageResult"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
+import { useDebouncedValue } from "@/hooks/useDebouncedValue"
+import { useCursorList } from "@/hooks/useCursorList"
 import { requestApi } from "@/lib/apiClient"
-import { POST_IMAGES_ENDPOINT, POST_IMAGES_MESSAGES, getPoseLabel } from "@/constants/postImages"
-import type { PostImage, PostImagesPage } from "@/types/postImages"
+import { appendDayRange, isBackwardsRange } from "@/lib/dayRange"
+import { HISTORY_DEBOUNCE_MS, HISTORY_MESSAGES } from "@/constants/historyFilters"
+import { IMAGE_SIZES, PHOTO_FILTER_OPTIONS, POST_IMAGES_ENDPOINT, POST_IMAGES_MESSAGES, getPoseLabel } from "@/constants/postImages"
+import type { PostImage } from "@/types/postImages"
 
 const madeAt = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -29,79 +35,53 @@ const madeAt = (iso: string) =>
 const actionButton =
   "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
 
+interface FilterState {
+  search: string
+  size: string
+  photo: string
+  fromDay: string
+  toDay: string
+}
+
+const NO_FILTERS: FilterState = { search: "", size: "", photo: "", fromDay: "", toDay: "" }
+
+const idOf = (image: PostImage) => image.id
+
 /**
- * Every post image made so far, newest first, with what it was made from. Copy and download work
- * here as well as on the page that made the image, and the detail view shows the settings that
- * were in force at the time rather than today's defaults.
+ * Every post image made so far, newest first, 50 at a time and loaded as the gallery scrolls. The
+ * search, shape, photo and date filters run on the server. Copy and download work here as well as
+ * on the page that made the image, and the detail view shows the settings that were in force at
+ * the time rather than today's defaults.
  */
 export default function PostImageHistoryClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [images, setImages] = useState<PostImage[]>([])
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [total, setTotal] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [listError, setListError] = useState<string | null>(null)
-  const [reloadAttempt, setReloadAttempt] = useState(0)
+  const [filters, setFilters] = useState<FilterState>(NO_FILTERS)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [detail, setDetail] = useState<PostImage | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [failedCopyId, setFailedCopyId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
-  const isFetchingRef = useRef(false)
-  const sentinelRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const controller = new AbortController()
-    requestApi<PostImagesPage>(POST_IMAGES_ENDPOINT, { signal: controller.signal })
-      .then(({ data }) => {
-        setImages(data.items)
-        setNextCursor(data.nextCursor)
-        setTotal(data.total)
-        setListError(null)
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return
-        setListError(error instanceof Error ? error.message : POST_IMAGES_MESSAGES.loadFailed)
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false)
-      })
-    return () => controller.abort()
-  }, [reloadAttempt])
+  // Typing settles before the gallery is asked for again, and an emptied search box counts at once
+  const settledSearch = useDebouncedValue(filters.search.trim(), HISTORY_DEBOUNCE_MS)
+  const badDateRange = isBackwardsRange(filters.fromDay, filters.toDay)
+  const hasFilters = JSON.stringify(filters) !== JSON.stringify(NO_FILTERS)
+  const params = new URLSearchParams()
+  if (filters.search.trim() && settledSearch) params.set("search", settledSearch)
+  if (filters.size) params.set("size", filters.size)
+  if (filters.photo) params.set("photo", filters.photo)
+  appendDayRange(params, filters.fromDay, filters.toDay)
 
-  const loadMore = useCallback(async () => {
-    if (isFetchingRef.current || !nextCursor) return
-    isFetchingRef.current = true
-    setIsLoadingMore(true)
-    try {
-      const { data } = await requestApi<PostImagesPage>(`${POST_IMAGES_ENDPOINT}?cursor=${encodeURIComponent(nextCursor)}`)
-      setImages((current) => {
-        // An image already on screen is never added twice, whatever changed meanwhile
-        const seen = new Set(current.map((image) => image.id))
-        return [...current, ...data.items.filter((image) => !seen.has(image.id))]
-      })
-      setNextCursor(data.nextCursor)
-      setTotal(data.total)
-      setListError(null)
-    } catch (error: unknown) {
-      setListError(error instanceof Error ? error.message : POST_IMAGES_MESSAGES.moreFailed)
-    } finally {
-      isFetchingRef.current = false
-      setIsLoadingMore(false)
-    }
-  }, [nextCursor])
-
-  // The next batch loads when the end of the gallery comes into view
-  useEffect(() => {
-    const sentinel = sentinelRef.current
-    if (!sentinel || !nextCursor || isLoadingMore || listError) return
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) void loadMore()
-    }, { rootMargin: "300px" })
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [nextCursor, isLoadingMore, listError, loadMore])
+  const list = useCursorList<PostImage>({
+    endpoint: POST_IMAGES_ENDPOINT,
+    query: params.toString(),
+    enabled: !badDateRange,
+    loadFailed: POST_IMAGES_MESSAGES.loadFailed,
+    idOf,
+  })
+  const images = list.items
+  const updateFilter = (key: keyof FilterState, value: string) => setFilters((current) => ({ ...current, [key]: value }))
 
   const copy = async (image: PostImage) => {
     if (!image.imageUrl) return
@@ -121,8 +101,9 @@ export default function PostImageHistoryClient() {
     try {
       const { data } = await requestApi<{ url: string }>(`${POST_IMAGES_ENDPOINT}/${image.id}/link?download=1`)
       window.open(data.url, "_blank", "noopener,noreferrer")
+      setActionError(null)
     } catch (error: unknown) {
-      setListError(error instanceof Error ? error.message : POST_IMAGES_MESSAGES.loadFailed)
+      setActionError(error instanceof Error ? error.message : POST_IMAGES_MESSAGES.loadFailed)
     }
   }
 
@@ -130,15 +111,17 @@ export default function PostImageHistoryClient() {
     setBusyId(image.id)
     try {
       await requestApi(`${POST_IMAGES_ENDPOINT}/${image.id}`, { method: "DELETE" })
-      setImages((current) => current.filter((entry) => entry.id !== image.id))
-      setTotal((count) => Math.max(0, count - 1))
+      list.update((current) => current.filter((entry) => entry.id !== image.id), -1)
       setDetail(null)
+      setActionError(null)
     } catch (error: unknown) {
-      setListError(error instanceof Error ? error.message : POST_IMAGES_MESSAGES.loadFailed)
+      setActionError(error instanceof Error ? error.message : POST_IMAGES_MESSAGES.loadFailed)
     } finally {
       setBusyId(null)
     }
   }
+
+  const imageCount = (total: number) => `${total.toLocaleString()} ${total === 1 ? "image" : "images"}`
 
   return (
     <div className="font-body-md text-body-md flex h-screen min-h-screen overflow-hidden bg-background text-on-surface">
@@ -152,12 +135,12 @@ export default function PostImageHistoryClient() {
         />
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
-          <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:h-full lg:p-8">
-            <div className="flex shrink-0 flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div className="mx-auto flex max-w-[1400px] flex-col gap-4 p-4 md:p-6 lg:p-8">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div className="min-w-0">
                 <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
                   <GalleryHorizontalEnd size={24} className="shrink-0 text-primary" aria-hidden="true" />
-                  Generated Posts
+                  Generated Post Images
                 </h1>
                 <p className="mt-1 text-sm text-on-surface-variant">
                   Every post image you have made, with what it was made from.
@@ -165,50 +148,80 @@ export default function PostImageHistoryClient() {
               </div>
               <Link
                 href="/post-image-creator"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:shrink-0"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant sm:shrink-0"
               >
-                <ArrowLeft size={16} aria-hidden="true" />
-                Back to the creator
+                <SquarePlus size={16} aria-hidden="true" />
+                Create New Image
               </Link>
             </div>
 
-            <p className="shrink-0 text-[11px] text-outline" aria-live="polite">
-              {total.toLocaleString()} {total === 1 ? "image" : "images"}
-            </p>
+            <FilterPanel
+              columnsClassName="lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]"
+              canClear={hasFilters}
+              onClear={() => setFilters(NO_FILTERS)}
+              summary={
+                badDateRange
+                  ? HISTORY_MESSAGES.badDateRange
+                  : list.hasAnswer
+                    ? `Showing ${images.length.toLocaleString()} of ${imageCount(list.total)}`
+                    : "Loading your images..."
+              }
+            >
+              <SearchFilter value={filters.search} onChange={(value) => updateFilter("search", value)} placeholder="Post content or photo name" />
+              <SelectFilter label="Shape" allLabel="All shapes" value={filters.size} options={IMAGE_SIZES} onChange={(value) => updateFilter("size", value)} />
+              <SelectFilter label="Photo" allLabel="With or without" value={filters.photo} options={PHOTO_FILTER_OPTIONS} onChange={(value) => updateFilter("photo", value)} />
+              <DateRangeFilters
+                fromLabel="Made from"
+                toLabel="Made to"
+                fromDay={filters.fromDay}
+                toDay={filters.toDay}
+                onFromChange={(day) => updateFilter("fromDay", day)}
+                onToChange={(day) => updateFilter("toDay", day)}
+              />
+            </FilterPanel>
 
-            {listError && images.length === 0 ? (
-              <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+            {actionError && (
+              <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
+                {actionError}
+              </p>
+            )}
+
+            {list.error && !list.hasAnswer ? (
+              <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-error-container text-error">
                   <AlertTriangle size={20} aria-hidden="true" />
                 </div>
-                <p className="max-w-sm text-sm text-on-surface-variant">{listError}</p>
+                <p className="max-w-sm text-sm text-on-surface-variant">{list.error}</p>
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsLoading(true)
-                    setListError(null)
-                    setReloadAttempt((attempt) => attempt + 1)
-                  }}
+                  onClick={list.retry}
                   className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <RefreshCw size={15} aria-hidden="true" />
                   Try again
                 </button>
               </div>
-            ) : isLoading ? (
-              <div role="status" className="flex flex-1 items-center justify-center gap-2 text-sm text-on-surface-variant">
+            ) : !list.hasAnswer ? (
+              <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
                 <Loader2 size={20} className="animate-spin text-primary" aria-hidden="true" />
                 Loading your images...
               </div>
             ) : images.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+              <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/5 text-primary">
                   <GalleryHorizontalEnd size={20} aria-hidden="true" />
                 </div>
-                <p className="max-w-sm text-sm text-on-surface-variant">{POST_IMAGES_MESSAGES.emptyHistory}</p>
+                <p className="max-w-sm text-sm text-on-surface-variant">
+                  {hasFilters ? "No images match these filters." : POST_IMAGES_MESSAGES.emptyHistory}
+                </p>
               </div>
             ) : (
-              <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className={`flex flex-col gap-3 transition-opacity ${list.isLoading ? "opacity-60" : ""}`} aria-busy={list.isLoading}>
+                {list.error && (
+                  <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
+                    {list.error}
+                  </p>
+                )}
                 <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {images.map((image) => (
                     <li key={image.id} className="flex flex-col overflow-hidden rounded-2xl border border-outline-variant bg-white shadow-sm">
@@ -272,19 +285,13 @@ export default function PostImageHistoryClient() {
                     </li>
                   ))}
                 </ul>
-
-                <div ref={sentinelRef} className="pt-4 text-center text-[11px] text-outline" aria-live="polite">
-                  {isLoadingMore ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 size={13} className="animate-spin" aria-hidden="true" />
-                      Loading more...
-                    </span>
-                  ) : nextCursor ? (
-                    <span>Scroll for more</span>
-                  ) : (
-                    <span>That is everything.</span>
-                  )}
-                </div>
+                <LoadMore
+                  hasMore={list.hasMore}
+                  isLoadingMore={list.isLoadingMore}
+                  error={list.moreError}
+                  onLoadMore={list.loadMore}
+                  doneText="That is everything."
+                />
               </div>
             )}
           </div>

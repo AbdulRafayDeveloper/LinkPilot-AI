@@ -1,4 +1,5 @@
 import mongoose, { Schema, type Model } from "mongoose"
+import { OWNER_ID } from "./owner"
 
 /**
  * The brand defaults, and every post image made from them.
@@ -58,6 +59,8 @@ export const BrandSettingsModel =
  * record still describes it after the defaults, the prompt or the model have moved on.
  */
 export interface IPostImage {
+  // The account it belongs to (models/owner.ts)
+  ownerId: string | null
   storageKey: string
   contentType: string
   size: number
@@ -80,6 +83,7 @@ export interface IPostImage {
 
 const PostImageSchema = new Schema<IPostImage>(
   {
+    ownerId: OWNER_ID,
     storageKey: { type: String, required: true, unique: true },
     contentType: { type: String, required: true },
     size: { type: Number, required: true },

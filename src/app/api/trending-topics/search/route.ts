@@ -5,6 +5,9 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { createEventStream } from "@/lib/sse"
 import { TRENDING_ERROR_MESSAGE } from "@/constants/trending"
 import type { TrendingStreamEvent } from "@/services/trending/schema"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 // Live web research plus ranking can take a couple of minutes on slower searches
@@ -17,14 +20,16 @@ export const maxDuration = 300
  * the topics everyone sees, one that found none leaves the previous topics on show.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   return createEventStream<TrendingStreamEvent>(async (send) => {
     try {
-      const result = await findTrendingTopics({
+      const result = await withModelOrder(await modelOrderFor(auth.viewer, "trending-topics"), () => findTrendingTopics({
         signal: req.signal,
         onStage: (status, text) => send({ status, text }),
-      })
+      }))
       // The search still counts when saving fails; it just isn't shared
-      await saveTrendingResult(result).catch((error: unknown) => {
+      await saveTrendingResult(auth.viewer, result).catch((error: unknown) => {
         console.warn("⚠️ Couldn't save the Trending Topics:", error instanceof Error ? error.message : error)
       })
       send({ status: "COMPLETE", result })

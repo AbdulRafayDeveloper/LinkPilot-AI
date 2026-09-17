@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { AlertCircle, Check, Loader2, Pencil } from "lucide-react"
+import { AlertCircle, Check, Cpu, Loader2, Pencil } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { requestApi } from "@/lib/apiClient"
 import {
@@ -10,6 +10,7 @@ import {
   PROMPT_CREATOR_MESSAGES,
   getPromptTargetLabel,
 } from "@/constants/promptCreator"
+import { describeProviders } from "@/constants/aiProviders"
 import type { CreatedPrompt } from "@/types/promptCreator"
 
 // Typing pauses this long before the change is saved
@@ -146,6 +147,12 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
         <p className="text-[11px] text-outline">
           {prompt.length.toLocaleString()} characters · {getPromptTargetLabel(created.target)} · click the text to edit
         </p>
+        {created.provider && (
+          <p className="flex items-center gap-1.5 text-[12px] text-on-surface-variant">
+            <Cpu size={13} className="shrink-0 text-primary" aria-hidden="true" />
+            Written by <span className="font-semibold text-on-surface">{describeProviders([created.provider])}</span>
+          </p>
+        )}
         {problem && (
           <p role="alert" className="flex items-start gap-2 rounded-xl border border-error/40 bg-error-container px-3 py-2 text-[12px] text-error">
             <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />

@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
-import { AI_PROVIDERS, generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
+import { generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
+import { currentModelOrder } from "@/lib/modelOrder"
 import { loadPrompt } from "@/services/prompts"
 import { UserFacingError } from "@/lib/errors"
 import type { VerifiedImage } from "@/lib/imageType"
@@ -9,8 +10,6 @@ import { POST_INPUT_MESSAGES } from "@/constants/postInput"
 // Transcription should be literal, not creative
 const EXTRACTION_TEMPERATURE = 0
 const MIN_POST_TEXT_LENGTH = 15
-// Gemini reads the screenshot first; OpenAI vision is only the fallback
-const DEFAULT_PROVIDERS: readonly ModelProvider[] = AI_PROVIDERS
 
 const PostTranscriptionSchema = z.object({
   contains_post: z.boolean().describe("True only if the image shows a readable social media post"),
@@ -21,6 +20,7 @@ const PostTranscriptionSchema = z.object({
 interface ExtractionOptions {
   image: VerifiedImage
   signal: AbortSignal
+  // Defaults to the request's order; only providers with a vision model are tried
   providers?: readonly ModelProvider[]
   onFallback?: () => void
 }
@@ -33,7 +33,7 @@ interface ExtractionOptions {
 export async function extractPostFromImage({
   image,
   signal,
-  providers = DEFAULT_PROVIDERS,
+  providers = currentModelOrder(),
   onFallback,
 }: ExtractionOptions): Promise<{ postText: string; provider: ModelProvider }> {
   const { data, provider } = await generateStructuredWithFallback({
@@ -50,6 +50,7 @@ export async function extractPostFromImage({
     ],
     temperature: EXTRACTION_TEMPERATURE,
     providers,
+    input: "image",
     signal,
     onFallback,
     validate: (output) => (output.contains_post && !output.post_text.trim() ? "post detected but no text transcribed" : null),

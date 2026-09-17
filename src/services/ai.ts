@@ -1,20 +1,29 @@
 import OpenAI, { toFile } from "openai"
+import Groq, { toFile as toGroqFile } from "groq-sdk"
 import { ChatOpenAI } from "@langchain/openai"
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai"
+import { ChatGroq } from "@langchain/groq"
 import type { BaseMessage } from "@langchain/core/messages"
 import type { InteropZodType } from "@langchain/core/utils/types"
-import { env } from "@/config/env"
+import { env, GROQ_API_KEYS } from "@/config/env"
 import { UserFacingError } from "@/lib/errors"
-import { describeProviderFailure, type ProviderNames } from "@/lib/providerErrors"
+import { describeProviderFailure, isKeyLimitError, keyRestMs, type ProviderNames } from "@/lib/providerErrors"
+import { withKeyRotation } from "@/lib/keyRotation"
+import { currentModelOrder } from "@/lib/modelOrder"
 import { withRetry } from "@/lib/retry"
 import { isTransientError, retryAfterOf } from "@/lib/transientErrors"
+import { AI_PROVIDER_LABELS, MODEL_PROVIDERS, type AiProviderId } from "@/constants/aiProviders"
 
 /**
- * The only AI providers the LinkedIn tools use, in priority order: Gemini is primary,
- * OpenAI is the fallback. Model names come exclusively from ENV (src/config/env.ts).
+ * Every provider the app can call, in the default order: Groq, then an open-source model on an
+ * OpenAI-compatible server, then OpenAI. A module's order comes from the request (lib/modelOrder.ts),
+ * which is this default for everyone unless an admin changed it for that module. Model names come
+ * exclusively from ENV (src/config/env.ts).
  */
-export const AI_PROVIDERS = ["gemini", "openai"] as const
-export type ModelProvider = (typeof AI_PROVIDERS)[number]
+export const AI_PROVIDERS = MODEL_PROVIDERS
+export type ModelProvider = AiProviderId
+
+// What a call hands the model: plain text, or a screenshot as well (only vision models can read those)
+export type ModelInput = "text" | "image"
 
 export interface ModelOptions {
   temperature?: number
@@ -23,64 +32,125 @@ export interface ModelOptions {
 }
 
 const DEFAULT_TEMPERATURE = 0.1
+const GROQ_KEY_VARIABLES = "GROQ_API_KEY_1 to GROQ_API_KEY_5"
 
 interface ProviderSettings {
-  apiKey: string | undefined
-  model: string | undefined
+  // What the provider needs before it can be called, by variable name, and whether each is set
+  required: { variable: string; isSet: boolean }[]
   keyVariable: string
   modelVariable: string
 }
 
-/** What a provider is called, and which variables carry its key and its model name. */
-export function providerNames(provider: ModelProvider): ProviderNames {
-  const { keyVariable, modelVariable } = providerSettings(provider)
-  return { label: provider === "gemini" ? "Gemini" : "OpenAI", keyVariable, modelVariable }
-}
-
-function providerSettings(provider: ModelProvider): ProviderSettings {
-  return provider === "gemini"
-    ? {
-        apiKey: env.GOOGLE_API_KEY,
-        model: env.GEMINI_LIGHTWEIGHT_MODEL,
-        keyVariable: "GOOGLE_API_KEY",
-        modelVariable: "GEMINI_LIGHTWEIGHT_MODEL",
+function providerSettings(provider: ModelProvider, input: ModelInput = "text"): ProviderSettings {
+  switch (provider) {
+    case "groq": {
+      const modelVariable = input === "image" ? "GROQ_VISION_MODEL" : "GROQ_MODEL"
+      const model = input === "image" ? env.GROQ_VISION_MODEL : env.GROQ_MODEL
+      return {
+        required: [
+          { variable: GROQ_KEY_VARIABLES, isSet: GROQ_API_KEYS.length > 0 },
+          { variable: modelVariable, isSet: Boolean(model) },
+        ],
+        keyVariable: GROQ_KEY_VARIABLES,
+        modelVariable,
       }
-    : {
-        apiKey: env.OPENAI_API_KEY,
-        model: env.OPENAI_LIGHTWEIGHT_MODEL,
+    }
+    case "open-source":
+      return {
+        required: [
+          { variable: "OPEN_SOURCE_BASE_URL", isSet: Boolean(env.OPEN_SOURCE_BASE_URL) },
+          { variable: "OPEN_SOURCE_MODEL", isSet: Boolean(env.OPEN_SOURCE_MODEL) },
+        ],
+        keyVariable: "OPEN_SOURCE_API_KEY",
+        modelVariable: "OPEN_SOURCE_MODEL",
+      }
+    case "openai":
+      return {
+        required: [
+          { variable: "OPENAI_API_KEY", isSet: Boolean(env.OPENAI_API_KEY) },
+          { variable: "OPENAI_LIGHTWEIGHT_MODEL", isSet: Boolean(env.OPENAI_LIGHTWEIGHT_MODEL) },
+        ],
         keyVariable: "OPENAI_API_KEY",
         modelVariable: "OPENAI_LIGHTWEIGHT_MODEL",
       }
-}
-
-/**
- * A provider is usable only when both its API key and its model name are set in ENV.
- */
-export function isProviderConfigured(provider: ModelProvider): boolean {
-  const { apiKey, model } = providerSettings(provider)
-  return Boolean(apiKey && model)
-}
-
-function requireProvider(provider: ModelProvider): { apiKey: string; model: string } {
-  const { apiKey, model, keyVariable, modelVariable } = providerSettings(provider)
-  if (!apiKey || !model) {
-    const missing = [!apiKey && keyVariable, !model && modelVariable].filter(Boolean).join(" and ")
-    throw new UserFacingError(`The ${provider} provider is not configured. Set ${missing} where the app runs (.env.local here, Environment Variables on the host).`)
   }
-  return { apiKey, model }
+}
+
+/** What a provider is called, and which variables carry its key and its model name. */
+export function providerNames(provider: ModelProvider, input: ModelInput = "text"): ProviderNames {
+  const { keyVariable, modelVariable } = providerSettings(provider, input)
+  return { label: AI_PROVIDER_LABELS[provider], keyVariable, modelVariable }
 }
 
 /**
- * The Gemini chat model from ENV. Gemini has no client timeout option; pass an AbortSignal to bound a call.
+ * A provider is usable only when everything it needs is set in ENV. The open-source model reads text
+ * only, so a screenshot always skips it.
  */
-export function createGeminiModel(options: Omit<ModelOptions, "timeout"> = {}): ChatGoogleGenerativeAI {
-  const { apiKey, model } = requireProvider("gemini")
-  return new ChatGoogleGenerativeAI({ apiKey, model, temperature: DEFAULT_TEMPERATURE, ...options })
+export function isProviderConfigured(provider: ModelProvider, input: ModelInput = "text"): boolean {
+  if (provider === "open-source" && input === "image") return false
+  return providerSettings(provider, input).required.every((entry) => entry.isSet)
+}
+
+function requireModel(model: string | undefined, variable: string): string {
+  if (!model) {
+    throw new UserFacingError(`${variable} is not set. Set it where the app runs (.env.local here, Environment Variables on the host).`)
+  }
+  return model
+}
+
+// When each Groq key may be tried first again, shared by every call this server process makes
+const restingGroqKeys = new Map<number, number>()
+
+/**
+ * Runs one Groq call with the first usable key. A key that is rejected, rate limited or out of quota
+ * hands the same call to the next key (lib/keyRotation.ts), so up to five keys cover for each other;
+ * only when every key has failed does the error reach the caller, and the next provider takes over.
+ */
+export function withGroqKey<T>(call: (apiKey: string) => Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (GROQ_API_KEYS.length === 0) {
+    return Promise.reject(new UserFacingError(`Groq is not configured. Set ${GROQ_KEY_VARIABLES} where the app runs.`))
+  }
+  return withKeyRotation(GROQ_API_KEYS, (apiKey) => call(apiKey), {
+    isKeyError: isKeyLimitError,
+    restMs: (error) => keyRestMs(error, retryAfterOf(error)),
+    resting: restingGroqKeys,
+    signal,
+    onSwitch: (from, to, error) =>
+      console.warn(`🔑 Groq key ${from + 1} of ${GROQ_API_KEYS.length} failed (${error instanceof Error ? error.message : error}); trying key ${to + 1}`),
+  })
+}
+
+/** The Groq chat model (GROQ_MODEL, or GROQ_VISION_MODEL for a screenshot) on one key. */
+export function createGroqModel(apiKey: string, options: Omit<ModelOptions, "timeout"> = {}, input: ModelInput = "text"): ChatGroq {
+  const model = input === "image" ? requireModel(env.GROQ_VISION_MODEL, "GROQ_VISION_MODEL") : requireModel(env.GROQ_MODEL, "GROQ_MODEL")
+  return new ChatGroq({ apiKey, model, temperature: DEFAULT_TEMPERATURE, ...options })
 }
 
 /**
- * Whether OpenAI can read recordings: its API key and a transcription model are both set in ENV.
+ * The open-source model: any OpenAI-compatible server (OPEN_SOURCE_BASE_URL, e.g. Ollama's /v1) and
+ * the model it serves (OPEN_SOURCE_MODEL), through the same LangChain client as OpenAI, so it answers
+ * in exactly the same shape. A local server usually needs no key.
  */
+export function createOpenSourceModel(options: ModelOptions = {}): ChatOpenAI {
+  const model = requireModel(env.OPEN_SOURCE_MODEL, "OPEN_SOURCE_MODEL")
+  const baseURL = requireModel(env.OPEN_SOURCE_BASE_URL, "OPEN_SOURCE_BASE_URL")
+  return new ChatOpenAI({
+    apiKey: env.OPEN_SOURCE_API_KEY ?? "not-needed",
+    model,
+    temperature: DEFAULT_TEMPERATURE,
+    configuration: { baseURL },
+    ...options,
+  })
+}
+
+/** The OpenAI chat model from ENV (OPENAI_LIGHTWEIGHT_MODEL). */
+export function createOpenAIModel(options: ModelOptions = {}): ChatOpenAI {
+  const apiKey = requireModel(env.OPENAI_API_KEY, "OPENAI_API_KEY")
+  const model = requireModel(env.OPENAI_LIGHTWEIGHT_MODEL, "OPENAI_LIGHTWEIGHT_MODEL")
+  return new ChatOpenAI({ apiKey, model, temperature: DEFAULT_TEMPERATURE, ...options })
+}
+
+/** Whether OpenAI can read recordings: its API key and a transcription model are both set in ENV. */
 export function isTranscriptionConfigured(): boolean {
   return Boolean(env.OPENAI_API_KEY && env.OPENAI_TRANSCRIPTION_MODEL)
 }
@@ -96,19 +166,15 @@ const AUDIO_EXTENSIONS: Record<string, string> = {
 }
 
 /**
- * Writes out a recording with OpenAI's transcription model from ENV (OPENAI_TRANSCRIPTION_MODEL).
- * This is the fallback for audio, which the chat models in this file cannot read: it goes to
- * OpenAI's own transcription endpoint, retried on transient failures like every other call.
+ * Writes out a recording with OpenAI's transcription model from ENV (OPENAI_TRANSCRIPTION_MODEL),
+ * through OpenAI's own transcription endpoint, retried on transient failures like every other call.
  */
-export async function transcribeWithOpenAI(
-  audio: { data: Buffer; mimeType: string },
-  signal: AbortSignal
-): Promise<string> {
+export async function transcribeWithOpenAI(audio: { data: Buffer; mimeType: string }, signal: AbortSignal): Promise<string> {
   const apiKey = env.OPENAI_API_KEY
   const model = env.OPENAI_TRANSCRIPTION_MODEL
   if (!apiKey || !model) {
     const missing = [!apiKey && "OPENAI_API_KEY", !model && "OPENAI_TRANSCRIPTION_MODEL"].filter(Boolean).join(" and ")
-    throw new UserFacingError(`Reading recordings needs ${missing} in .env.local.`)
+    throw new UserFacingError(`Reading recordings with OpenAI needs ${missing}.`)
   }
 
   const client = new OpenAI({ apiKey, maxRetries: 0 })
@@ -122,12 +188,33 @@ export async function transcribeWithOpenAI(
   return String(text)
 }
 
+/** Whether Groq can read recordings: a key and a Whisper model (GROQ_TRANSCRIPTION_MODEL) are both set in ENV. */
+export function isGroqTranscriptionConfigured(): boolean {
+  return Boolean(GROQ_API_KEYS.length > 0 && env.GROQ_TRANSCRIPTION_MODEL)
+}
+
 /**
- * The OpenAI fallback chat model from ENV (GPT-4o Mini).
+ * Writes out a recording with Whisper on Groq (GROQ_TRANSCRIPTION_MODEL), through Groq's own SDK:
+ * LangChain has no speech-to-text interface. Every key is tried before it fails.
  */
-export function createOpenAIModel(options: ModelOptions = {}): ChatOpenAI {
-  const { apiKey, model } = requireProvider("openai")
-  return new ChatOpenAI({ apiKey, model, temperature: DEFAULT_TEMPERATURE, ...options })
+export async function transcribeWithGroq(audio: { data: Buffer; mimeType: string }, signal: AbortSignal): Promise<string> {
+  const model = env.GROQ_TRANSCRIPTION_MODEL
+  if (GROQ_API_KEYS.length === 0 || !model) {
+    const missing = [GROQ_API_KEYS.length === 0 && GROQ_KEY_VARIABLES, !model && "GROQ_TRANSCRIPTION_MODEL"].filter(Boolean).join(" and ")
+    throw new UserFacingError(`Reading recordings with Groq needs ${missing}.`)
+  }
+
+  const transcription = await withProviderRetry(
+    "groq",
+    () =>
+      withGroqKey(async (apiKey) => {
+        const client = new Groq({ apiKey, maxRetries: 0 })
+        const file = await toGroqFile(audio.data, `recording.${AUDIO_EXTENSIONS[audio.mimeType] ?? "webm"}`, { type: audio.mimeType })
+        return client.audio.transcriptions.create({ file, model, response_format: "json", temperature: 0 }, { signal })
+      }, signal),
+    signal
+  )
+  return transcription.text
 }
 
 const DEFAULT_GENERATION_TIMEOUT_MS = 45_000
@@ -158,8 +245,10 @@ export interface StructuredGenerationOptions<T extends Record<string, unknown>> 
   temperature?: number
   timeoutMs?: number
   signal?: AbortSignal
-  // Subset of AI_PROVIDERS to try, in order; defaults to Gemini first, OpenAI fallback
+  // Providers to try, in order; defaults to the request's order (lib/modelOrder.ts), Groq first
   providers?: readonly ModelProvider[]
+  // "image" when the messages carry a screenshot, so only providers with a vision model are tried
+  input?: ModelInput
   // Called when one provider fails and the next is about to be tried
   onFallback?: (failed: ModelProvider, next: ModelProvider) => void
   // Returns a reason when the output is unusable, which triggers the fallback provider
@@ -173,43 +262,53 @@ export interface StructuredGeneration<T> {
 
 function invokeStructured<T extends Record<string, unknown>>(
   provider: ModelProvider,
-  { schema, name, messages, temperature = DEFAULT_TEMPERATURE }: StructuredGenerationOptions<T>,
+  { schema, name, messages, temperature = DEFAULT_TEMPERATURE, input = "text" }: StructuredGenerationOptions<T>,
   signal: AbortSignal
 ): Promise<T> {
   const modelOptions = { temperature, maxRetries: 0 }
-  if (provider === "gemini") {
-    return createGeminiModel(modelOptions).withStructuredOutput(schema, { name }).invoke(messages, { signal })
+  if (provider === "groq") {
+    return withGroqKey(
+      (apiKey) => createGroqModel(apiKey, modelOptions, input).withStructuredOutput(schema, { name }).invoke(messages, { signal }),
+      signal
+    )
+  }
+  if (provider === "open-source") {
+    // Tool calling is what OpenAI-compatible servers support most widely for a structured answer
+    return createOpenSourceModel(modelOptions).withStructuredOutput(schema, { name, method: "functionCalling" }).invoke(messages, { signal })
   }
   return createOpenAIModel(modelOptions).withStructuredOutput(schema, { name, strict: true }).invoke(messages, { signal })
 }
 
-/**
- * The single generation path for every LinkedIn tool: LangChain structured output with
- * Gemini first and OpenAI (GPT-4o Mini) only as the fallback. A transient failure is retried
- * on the same provider first (withProviderRetry); the fallback runs only when Gemini is
- * unconfigured, keeps failing, fails for good (bad key, used-up quota), times out or returns
- * output that fails validation, so a successful request never calls both providers. The
- * timeout covers every attempt on one provider.
- */
 /** Which variables each unconfigured provider is waiting for, named one provider at a time. */
-export function missingConfiguration(providers: readonly ModelProvider[] = AI_PROVIDERS): string[] {
+export function missingConfiguration(providers: readonly ModelProvider[] = currentModelOrder(), input: ModelInput = "text"): string[] {
   return providers
-    .filter((provider) => !isProviderConfigured(provider))
+    .filter((provider) => !isProviderConfigured(provider, input) && !(provider === "open-source" && input === "image"))
     .map((provider) => {
-      const { apiKey, model } = providerSettings(provider)
-      const { label, keyVariable, modelVariable } = providerNames(provider)
-      const missing = [!apiKey && keyVariable, !model && modelVariable].filter(Boolean).join(" and ")
-      return `${label} needs ${missing}.`
+      const missing = providerSettings(provider, input)
+        .required.filter((entry) => !entry.isSet)
+        .map((entry) => entry.variable)
+        .join(" and ")
+      return `${AI_PROVIDER_LABELS[provider]} needs ${missing}.`
     })
 }
 
+/**
+ * The single generation path for every module: LangChain structured output, trying the request's
+ * providers in order (Groq first by default, every Groq key before the next provider). A transient
+ * failure is retried on the same provider first (withProviderRetry); the next provider runs only when
+ * one is unconfigured, keeps failing, fails for good (every key rejected or used up), times out or
+ * returns output that fails validation, so a successful request never calls two providers. The
+ * timeout covers every attempt on one provider.
+ */
 export async function generateStructuredWithFallback<T extends Record<string, unknown>>(
   options: StructuredGenerationOptions<T>
 ): Promise<StructuredGeneration<T>> {
-  const providers = (options.providers ?? AI_PROVIDERS).filter(isProviderConfigured)
+  const input = options.input ?? "text"
+  const order = options.providers ?? currentModelOrder()
+  const providers = order.filter((provider) => isProviderConfigured(provider, input))
   if (providers.length === 0) {
     throw new UserFacingError(
-      `No AI provider is configured. ${missingConfiguration().join(" ")} Set them where the app runs (.env.local here, Environment Variables on the host), then redeploy.`
+      `No AI provider is configured. ${missingConfiguration(order, input).join(" ")} Set them where the app runs (.env.local here, Environment Variables on the host), then redeploy.`
     )
   }
 
@@ -230,22 +329,17 @@ export async function generateStructuredWithFallback<T extends Record<string, un
       // An output that failed the tool's own check is not a provider problem
       const unusable = error instanceof Error && error.message.startsWith("UnusableOutputException:")
       failures.push(
-        unusable
-          ? `${providerNames(provider).label} wrote something the app could not use.`
-          : describeProviderFailure(error, providerNames(provider))
+        unusable ? `${AI_PROVIDER_LABELS[provider]} wrote something the app could not use.` : describeProviderFailure(error, providerNames(provider, input))
       )
       const next = providers[index + 1]
-      console.warn(
-        `⚠️ ${provider} generation failed${next ? `, falling back to ${next}` : ""}:`,
-        error instanceof Error ? error.message : error
-      )
+      console.warn(`⚠️ ${provider} generation failed${next ? `, falling back to ${next}` : ""}:`, error instanceof Error ? error.message : error)
       if (next) options.onFallback?.(provider, next)
     }
   }
   // Every provider failed. The reasons are what the user needs, not "please try again"
   if (failures.length > 0) {
     // A provider that was skipped for missing configuration is usually the one meant to cover this
-    const skipped = missingConfiguration(options.providers ?? AI_PROVIDERS)
+    const skipped = missingConfiguration(order, input)
     const reason = [...failures, ...skipped.map((note) => `${note} It was not tried.`)].join(" ")
     console.error("❌ Every AI provider failed:", reason)
     throw new UserFacingError(reason)

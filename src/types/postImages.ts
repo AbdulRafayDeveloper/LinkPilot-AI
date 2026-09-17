@@ -69,6 +69,17 @@ export interface PostImage {
   createdAt: string
 }
 
+/** What the gallery can filter by. Everything is optional; nothing set means every image. */
+export interface PostImageFilters {
+  cursor: string | null
+  search: string
+  size: ImageSizeId | ""
+  // A pose, or "none" for images made without a photo
+  photo: AssetPoseId | "none" | ""
+  from: string | null
+  to: string | null
+}
+
 export interface PostImagesPage {
   items: PostImage[]
   nextCursor: string | null

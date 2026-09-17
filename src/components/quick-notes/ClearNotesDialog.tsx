@@ -61,7 +61,7 @@ export const ClearNotesDialog: React.FC<ClearNotesDialogProps> = ({ total, isCle
       }
     >
       <p className="text-sm leading-relaxed text-on-surface-variant">
-        Every note in Quick Notes will be removed from the database. Nothing else in the app is touched, and there is no
+        Every note in Temporary Quick Notes will be removed from the database. Nothing else in the app is touched, and there is no
         way to get them back, so copy anything you still need first.
       </p>
     </Modal>

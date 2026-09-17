@@ -19,10 +19,11 @@ import type { GeneratedFirstMessage } from "@/types/firstMessage"
 import type { GeneratedInMail } from "@/types/inmail"
 import type { ConversationReplyResult } from "@/types/conversationReply"
 import type { MessageSource, RewrittenMessage } from "@/types/messageRewriter"
+import type { Viewer } from "@/types/auth"
 
 /**
- * Saves every tool's output, with who it was for and what it was written from, to that tool's
- * collection. A record that can't be saved is logged and skipped: the user still gets the result.
+ * Saves every tool's output, with who it was for, what it was written from and the account that
+ * made it, to that tool's collection. A record that can't be saved is logged and skipped: the user still gets the result.
  */
 async function saveRecord(label: string, write: () => Promise<unknown>): Promise<void> {
   try {
@@ -37,12 +38,14 @@ const postText = (post: PostSource | null, extractedPost: string | null) =>
   post?.type === "text" ? post.text : extractedPost
 
 export function recordConnectionNote(
+  viewer: Viewer,
   input: { profileData: string; companyName?: string },
   result: GeneratedConnectionNote
 ): Promise<void> {
   const lead = leadFromProfile(input.profileData)
   return saveRecord("connection note", () =>
     ConnectionNoteRecord.create({
+      ownerId: viewer.id,
       lead: { ...lead, company: input.companyName ?? lead.company },
       tone: result.tone,
       companyName: input.companyName ?? null,
@@ -54,9 +57,10 @@ export function recordConnectionNote(
   )
 }
 
-export function recordComment(post: PostSource, result: GeneratedComment): Promise<void> {
+export function recordComment(viewer: Viewer, post: PostSource, result: GeneratedComment): Promise<void> {
   return saveRecord("comment", () =>
     CommentRecord.create({
+      ownerId: viewer.id,
       tune: result.tune,
       postSource: post.type,
       postText: postText(post, result.extractedPost),
@@ -67,9 +71,10 @@ export function recordComment(post: PostSource, result: GeneratedComment): Promi
   )
 }
 
-export function recordPostCommentReply(input: { comments: string; post: PostSource | null }, result: GeneratedReply): Promise<void> {
+export function recordPostCommentReply(viewer: Viewer, input: { comments: string; post: PostSource | null }, result: GeneratedReply): Promise<void> {
   return saveRecord("comment reply", () =>
     PostCommentReplyRecord.create({
+      ownerId: viewer.id,
       context: result.context,
       style: result.style,
       postSource: input.post?.type ?? "none",
@@ -83,9 +88,10 @@ export function recordPostCommentReply(input: { comments: string; post: PostSour
   )
 }
 
-export function recordFollowUp(input: { conversation: string; profileData: string | null }, result: GeneratedFollowUp): Promise<void> {
+export function recordFollowUp(viewer: Viewer, input: { conversation: string; profileData: string | null }, result: GeneratedFollowUp): Promise<void> {
   return saveRecord("follow-up message", () =>
     FollowUpMessageRecord.create({
+      ownerId: viewer.id,
       lead: leadFromConversation(input.conversation, input.profileData),
       followUpType: result.type,
       conversation: input.conversation,
@@ -97,9 +103,10 @@ export function recordFollowUp(input: { conversation: string; profileData: strin
   )
 }
 
-export function recordFirstMessage(input: { profileData: string }, result: GeneratedFirstMessage): Promise<void> {
+export function recordFirstMessage(viewer: Viewer, input: { profileData: string }, result: GeneratedFirstMessage): Promise<void> {
   return saveRecord("first message", () =>
     FirstMessageRecord.create({
+      ownerId: viewer.id,
       lead: leadFromProfile(input.profileData),
       tune: result.tune,
       profileData: input.profileData,
@@ -110,9 +117,10 @@ export function recordFirstMessage(input: { profileData: string }, result: Gener
   )
 }
 
-export function recordInMail(input: { profileData: string }, result: GeneratedInMail): Promise<void> {
+export function recordInMail(viewer: Viewer, input: { profileData: string }, result: GeneratedInMail): Promise<void> {
   return saveRecord("InMail", () =>
     InMailMessageRecord.create({
+      ownerId: viewer.id,
       lead: leadFromProfile(input.profileData),
       tune: result.tune,
       profileData: input.profileData,
@@ -124,11 +132,13 @@ export function recordInMail(input: { profileData: string }, result: GeneratedIn
 }
 
 export function recordConversationReply(
+  viewer: Viewer,
   input: { conversation: string; profileData: string | null },
   result: ConversationReplyResult
 ): Promise<void> {
   return saveRecord("conversation reply", () =>
     ConversationReplyRecord.create({
+      ownerId: viewer.id,
       lead: leadFromConversation(input.conversation, input.profileData, result.analysis.parties.otherPersonName),
       replyType: result.replyType,
       conversation: input.conversation,
@@ -142,11 +152,13 @@ export function recordConversationReply(
 }
 
 export function recordRewrittenMessage(
+  viewer: Viewer,
   input: { message: string; source: MessageSource },
   result: RewrittenMessage
 ): Promise<void> {
   return saveRecord("rewritten message", () =>
     RewrittenMessageRecord.create({
+      ownerId: viewer.id,
       source: input.source,
       sourceLanguage: result.sourceLanguage,
       original: input.message,

@@ -6,9 +6,11 @@ import type { SearchProvider, TrendingResult } from "@/services/trending/schema"
 import { TopicCard } from "./TopicCard"
 
 const PROVIDER_LABELS: Record<SearchProvider, string> = {
-  gemini: "Gemini + Google Search",
+  groq: "Groq browser search",
   openai: "OpenAI web search",
 }
+// A search saved by a provider the app no longer uses
+const searchedWith = (provider: string) => PROVIDER_LABELS[provider as SearchProvider] ?? "Web search"
 
 export const TrendingResults: React.FC<{ result: TrendingResult }> = ({ result }) => {
   const { topics, notice, research_metadata: metadata } = result
@@ -35,7 +37,7 @@ export const TrendingResults: React.FC<{ result: TrendingResult }> = ({ result }
 
       <p className="text-[11px] text-outline">
         Researched {new Date(metadata.searched_at).toLocaleString()} · {metadata.sources_checked} sources checked ·{" "}
-        {metadata.candidates_evaluated} candidates evaluated · {PROVIDER_LABELS[metadata.search_provider]}
+        {metadata.candidates_evaluated} candidates evaluated · {searchedWith(metadata.search_provider)}
       </p>
     </div>
   )

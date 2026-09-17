@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server"
 import {
   AI_PROVIDERS,
+  isGroqTranscriptionConfigured,
   isProviderConfigured,
   isTranscriptionConfigured,
   missingConfiguration,
   providerNames,
 } from "@/services/ai"
+import { GROQ_API_KEYS } from "@/config/env"
 import { isImageModelConfigured } from "@/services/imageGeneration"
 import { isStorageConfigured } from "@/services/storage/s3"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +22,8 @@ export const dynamic = "force-dynamic"
  * names and yes or no only. No value, no key, no fragment of one, ever leaves here.
  */
 export async function GET() {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const providers = AI_PROVIDERS.map((provider) => {
     const { label, keyVariable, modelVariable } = providerNames(provider)
     return {
@@ -33,14 +38,20 @@ export async function GET() {
     success: true,
     message: "Configuration checked",
     data: {
-      // Writing anything at all needs at least one of these
-      canGenerate: providers.some((entry) => entry.configured),
+      // Every module writes with the first of these that is configured
+      canGenerate: AI_PROVIDERS.some((provider) => isProviderConfigured(provider)),
       providers,
       // What each unconfigured provider is waiting for, in words
       missing: missingConfiguration(),
       features: {
         // Voice input on Prompt Creator, Client Messaging and Client Voices
-        transcription: isProviderConfigured("gemini") || isTranscriptionConfigured(),
+        transcription: isTranscriptionConfigured() || isGroqTranscriptionConfigured(),
+        // Speech is read with Whisper on Groq first
+        groqTranscription: isGroqTranscriptionConfigured(),
+        // Screenshots (Comment Writer, Post Comment Replies): a vision model on Groq, or OpenAI
+        screenshots: isProviderConfigured("groq", "image") || isProviderConfigured("openai", "image"),
+        // How many Groq keys are set, never which
+        groqKeys: GROQ_API_KEYS.length,
         // Post Image Creator
         imageGeneration: isImageModelConfigured(),
         // Important Files and Post Image Creator

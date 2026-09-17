@@ -4,6 +4,9 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { INMAIL_MESSAGES, INMAIL_PROFILE_MAX_LENGTH, INMAIL_TUNE_IDS } from "@/constants/inmail"
 import { generateInMail } from "@/services/inmail/generate"
 import { recordInMail } from "@/services/generationRecords"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -19,9 +22,11 @@ const GenerateSchema = z.object({
 
 /**
  * POST: Generates one InMail (separate subject and message) from raw profile text using
- * the latest saved prompt for the selected tune (Gemini first, OpenAI fallback).
+ * the latest saved prompt for the selected tune (the module's provider order, Groq first).
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = GenerateSchema.safeParse(body)
@@ -32,8 +37,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const result = await generateInMail({ ...parsed.data, signal: req.signal })
-    await recordInMail(parsed.data, result)
+    const result = await withModelOrder(await modelOrderFor(auth.viewer, "inmail-composer"), () => generateInMail({ ...parsed.data, signal: req.signal }))
+    await recordInMail(auth.viewer, parsed.data, result)
     return NextResponse.json({ success: true, message: "InMail generated", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

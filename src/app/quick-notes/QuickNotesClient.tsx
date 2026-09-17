@@ -180,7 +180,7 @@ export default function QuickNotesClient() {
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
                   <NotebookPen size={24} className="text-primary shrink-0" aria-hidden="true" />
-                  Quick Notes
+                  Temporary Quick Notes
                 </h1>
                 <p className="text-sm text-on-surface-variant mt-1">
                   Keep anything you copy or write, and pick it up again whenever you need it.

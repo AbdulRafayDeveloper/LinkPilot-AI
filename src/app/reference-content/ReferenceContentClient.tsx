@@ -173,7 +173,7 @@ export default function ReferenceContentClient() {
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
                   <BookMarked size={24} className="text-primary shrink-0" aria-hidden="true" />
-                  Reference Content
+                  Clients Reference Content
                 </h1>
                 <p className="text-sm text-on-surface-variant mt-1">
                   The steps, procedures and explanations you send clients again and again, ready to copy.

@@ -3,6 +3,9 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { MEETING_PLANNER_MESSAGES } from "@/constants/meetingPlanner"
 import { claimPrepRun, failPrep, getMeeting, savePrep } from "@/services/meetingPlanner/plans"
 import { prepareMeeting } from "@/services/meetingPlanner/prepare"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 // Reading a profile, a conversation and writing a whole meeting plan takes longer than a message
@@ -17,9 +20,11 @@ export const maxDuration = 300
  * rather than queued, because nothing here may depend on a server staying alive between requests.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const { id } = await params
   try {
-    const meeting = await getMeeting(id)
+    const meeting = await getMeeting(auth.viewer, id)
     if (!meeting) {
       return NextResponse.json({ success: false, message: MEETING_PLANNER_MESSAGES.notFound }, { status: 404 })
     }
@@ -34,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     try {
-      const prep = await prepareMeeting(claimed, req.signal)
+      const prep = await withModelOrder(await modelOrderFor(auth.viewer, "meeting-planner"), () => prepareMeeting(claimed, req.signal))
       const saved = await savePrep(id, prep)
       if (!saved) {
         return NextResponse.json({ success: false, message: MEETING_PLANNER_MESSAGES.notFound }, { status: 404 })

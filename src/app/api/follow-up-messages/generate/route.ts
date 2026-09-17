@@ -9,6 +9,9 @@ import {
 } from "@/constants/followUp"
 import { generateFollowUp } from "@/services/followUp/generate"
 import { recordFollowUp } from "@/services/generationRecords"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -31,9 +34,11 @@ const GenerateSchema = z.object({
 
 /**
  * POST: Generates one follow-up from the pasted conversation (plus optional profile)
- * using the latest saved prompt for the selected type (Gemini first, OpenAI fallback).
+ * using the latest saved prompt for the selected type (the module's provider order, Groq first).
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = GenerateSchema.safeParse(body)
@@ -45,8 +50,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { conversation, profileData, followUpType } = parsed.data
-    const result = await generateFollowUp({ conversation, profileData, type: followUpType, signal: req.signal })
-    await recordFollowUp({ conversation, profileData }, result)
+    const result = await withModelOrder(await modelOrderFor(auth.viewer, "follow-up-message"), () => generateFollowUp({ conversation, profileData, type: followUpType, signal: req.signal }))
+    await recordFollowUp(auth.viewer, { conversation, profileData }, result)
     return NextResponse.json({ success: true, message: "Follow-up message generated", data: result })
   } catch (error: unknown) {
     if (req.signal.aborted) {

@@ -1,40 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
-import {
-  DAILY_TASKS_MESSAGES,
-  ISO_DATE_PATTERN,
-  MAX_TASKS_PER_SUBMIT,
-  MAX_TODAY_DRIFT_DAYS,
-  TASK_MAX_LENGTH,
-} from "@/constants/dailyTasks"
-import { shiftDate } from "@/lib/taskDates"
+import { DAILY_TASKS_MESSAGES, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
+import { IsoDate, TodaySchema } from "@/lib/validation/dailyTasks"
 import { createTasks, deleteTasksBeforeWindow, listTasks } from "@/services/dailyTasks/tasks"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
 const PageSchema = z.coerce.number().int().positive().catch(1)
-
-const IsoDate = z
-  .string()
-  .trim()
-  .regex(ISO_DATE_PATTERN, DAILY_TASKS_MESSAGES.invalidDate)
-  // Rejects a real-looking date that isn't a real day, e.g. 2026-02-31. Zod still runs this when
-  // the pattern above failed, so it must cope with text that is no date at all.
-  .refine((date) => {
-    const timestamp = Date.parse(`${date}T00:00:00Z`)
-    return !Number.isNaN(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === date
-  }, DAILY_TASKS_MESSAGES.invalidDate)
-
-/**
- * The browser sends the day its own clock is on, so a task lands on the day the user is living
- * in whatever timezone the server runs in. Any timezone is at most a day from UTC, so a "today"
- * further away than that is not a clock difference and is refused.
- */
-const TodaySchema = IsoDate.refine((date) => {
-  const utcToday = new Date().toISOString().slice(0, 10)
-  return date >= shiftDate(utcToday, -MAX_TODAY_DRIFT_DAYS) && date <= shiftDate(utcToday, MAX_TODAY_DRIFT_DAYS)
-}, DAILY_TASKS_MESSAGES.invalidDate)
 
 const CreateSchema = z
   .object({
@@ -69,12 +43,14 @@ const badRequest = (message: string) => NextResponse.json({ success: false, mess
  * days; later pages are older days, a week at a time.
  */
 export async function GET(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const today = TodaySchema.safeParse(req.nextUrl.searchParams.get("today"))
     if (!today.success) return badRequest(DAILY_TASKS_MESSAGES.invalidDate)
 
     const page = PageSchema.parse(req.nextUrl.searchParams.get("page") ?? 1)
-    const tasks = await listTasks(today.data, page)
+    const tasks = await listTasks(auth.viewer, today.data, page)
     return NextResponse.json({ success: true, message: "Tasks retrieved", data: tasks })
   } catch (error: unknown) {
     console.error("GET Daily Tasks Exception:", error)
@@ -90,6 +66,8 @@ export async function GET(req: NextRequest) {
  * rows on screen, and a row repeated in the same submission is saved once.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = CreateSchema.safeParse(body)
@@ -98,7 +76,7 @@ export async function POST(req: NextRequest) {
     const contents = cleanContents(parsed.data.contents)
     if (contents.length === 0) return badRequest(DAILY_TASKS_MESSAGES.missingContent)
 
-    const tasks = await createTasks(parsed.data.taskDate, contents)
+    const tasks = await createTasks(auth.viewer, parsed.data.taskDate, contents)
     return NextResponse.json({ success: true, message: DAILY_TASKS_MESSAGES.saved, data: { tasks } }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Daily Tasks Exception:", error)
@@ -114,11 +92,13 @@ export async function POST(req: NextRequest) {
  * for confirmation before calling this; today and the six days before it are never touched.
  */
 export async function DELETE(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const today = TodaySchema.safeParse(req.nextUrl.searchParams.get("today"))
     if (!today.success) return badRequest(DAILY_TASKS_MESSAGES.invalidDate)
 
-    const deleted = await deleteTasksBeforeWindow(today.data)
+    const deleted = await deleteTasksBeforeWindow(auth.viewer, today.data)
     return NextResponse.json({
       success: true,
       message: deleted > 0 ? DAILY_TASKS_MESSAGES.cleaned : DAILY_TASKS_MESSAGES.nothingToClean,

@@ -3,6 +3,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { GenerateImageSchema } from "@/lib/validation/postImages"
 import { POST_IMAGES_MESSAGES } from "@/constants/postImages"
 import { createPostImage } from "@/services/postImages/generate"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 // Drawing an image takes far longer than writing text, and the whole picture comes back at once
@@ -13,6 +14,8 @@ export const maxDuration = 300
  * writes the record that says how it was made. Nothing is written until the image exists.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = GenerateImageSchema.safeParse(body)
@@ -23,7 +26,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const image = await createPostImage({ ...parsed.data, signal: req.signal })
+    const image = await createPostImage({ ...parsed.data, viewer: auth.viewer, signal: req.signal })
     return NextResponse.json({ success: true, message: POST_IMAGES_MESSAGES.generated, data: image }, { status: 201 })
   } catch (error: unknown) {
     if (req.signal.aborted) {

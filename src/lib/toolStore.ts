@@ -21,6 +21,20 @@ function storageOf(kind: StorageKind): Storage | null {
   }
 }
 
+/**
+ * Removes every tool's saved inputs and results from this browser, so the next account to sign in
+ * here starts clean instead of seeing what the last one typed.
+ */
+export function clearAllToolState(): void {
+  for (const kind of ALL_STORAGES) {
+    const storage = storageOf(kind)
+    if (!storage) continue
+    Object.keys(storage)
+      .filter((key) => key.startsWith(STORAGE_PREFIX))
+      .forEach((key) => storage.removeItem(key))
+  }
+}
+
 export interface ToolStore<S extends object> {
   getSnapshot: () => S
   getServerSnapshot: () => S

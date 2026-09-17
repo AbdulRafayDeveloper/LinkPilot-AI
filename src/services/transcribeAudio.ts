@@ -1,92 +1,88 @@
-import { z } from "zod"
-import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import {
-  generateStructuredWithFallback,
-  isProviderConfigured,
+  isGroqTranscriptionConfigured,
   isTranscriptionConfigured,
+  transcribeWithGroq,
   transcribeWithOpenAI,
 } from "@/services/ai"
-import { loadPrompt } from "@/services/prompts"
 import { UserFacingError } from "@/lib/errors"
-import { describeProviderFailure } from "@/lib/providerErrors"
+import { currentModelOrder } from "@/lib/modelOrder"
+import { describeProviderFailure, type ProviderNames } from "@/lib/providerErrors"
 import type { VerifiedAudio } from "@/lib/audioType"
-import { VOICE_MESSAGES } from "@/constants/voiceInput"
+import { VOICE_MESSAGES, type TranscriptionProvider } from "@/constants/voiceInput"
 
-// A transcript must be literal, never invented
-const TRANSCRIPTION_TEMPERATURE = 0
-// Sending and reading a few minutes of audio takes longer than a text generation
-const TRANSCRIPTION_TIMEOUT_MS = 100_000
 const MIN_TRANSCRIPT_LENGTH = 3
-
-const TranscriptSchema = z.object({
-  contains_speech: z.boolean().describe("True only if the recording contains audible speech"),
-  transcript: z.string().describe("Everything that was said, written out in the language it was spoken"),
-})
 
 interface TranscribeOptions {
   audio: VerifiedAudio
   signal: AbortSignal
+  // The providers to try, in order; defaults to the request's order (lib/modelOrder.ts), Groq first
+  providers?: readonly string[]
 }
 
-// Gemini reads the recording inside the chat model, the way screenshots are read
-async function readWithGemini(audio: VerifiedAudio, signal: AbortSignal): Promise<string | null> {
-  const { data } = await generateStructuredWithFallback({
-    schema: TranscriptSchema,
-    name: "spoken_request_transcript",
-    messages: [
-      new SystemMessage(await loadPrompt("prompt-creator-transcription")),
-      new HumanMessage({
-        content: [
-          { type: "text", text: "Write out exactly what is said in this recording." },
-          { type: "audio", source_type: "base64", mime_type: audio.mimeType, data: audio.data.toString("base64") },
-        ],
-      }),
-    ],
-    temperature: TRANSCRIPTION_TEMPERATURE,
-    providers: ["gemini"],
-    timeoutMs: TRANSCRIPTION_TIMEOUT_MS,
-    signal,
-    validate: (output) => (output.contains_speech && !output.transcript.trim() ? "speech detected but nothing written out" : null),
-  })
-  // Gemini saying "nobody spoke" is an answer about the recording, not a failure to hand on
-  return data.contains_speech ? data.transcript : null
+export interface Transcript {
+  text: string
+  // Who wrote it out, so the page can say so
+  provider: TranscriptionProvider
+}
+
+interface Reader {
+  isConfigured: () => boolean
+  // Null means it heard no speech at all, so the next provider listens too
+  read: (audio: VerifiedAudio, signal: AbortSignal) => Promise<string | null>
+  // What to name in a failure: the provider and the variables to check
+  names: ProviderNames
+}
+
+const isTranscriptionProvider = (provider: string): provider is TranscriptionProvider => provider === "groq" || provider === "openai"
+
+const READERS: Record<TranscriptionProvider, Reader> = {
+  groq: {
+    isConfigured: isGroqTranscriptionConfigured,
+    read: transcribeWithGroq,
+    names: { label: "Groq transcription", keyVariable: "GROQ_API_KEY_1 to GROQ_API_KEY_5", modelVariable: "GROQ_TRANSCRIPTION_MODEL" },
+  },
+  openai: {
+    isConfigured: isTranscriptionConfigured,
+    read: transcribeWithOpenAI,
+    names: { label: "OpenAI transcription", keyVariable: "OPENAI_API_KEY", modelVariable: "OPENAI_TRANSCRIPTION_MODEL" },
+  },
 }
 
 /**
- * Turns a recording into text for whichever page recorded it, Gemini first and OpenAI's transcription model (from ENV) as the
- * fallback, so a spoken description still works when Gemini is unconfigured, failing or out of
- * quota. Whatever the provider hands back is only the words that were said; the rest of the
- * module works from that plain text.
+ * Turns a recording into text, trying the module's providers in order (by default Whisper on Groq, every
+ * key, then OpenAI's transcription model; the open-source model can't read speech, so it is skipped).
+ * A provider that is unconfigured is skipped, one that fails hands the same
+ * recording to the next, and the answer says which provider wrote it out. Whatever comes back is
+ * only the words that were said; the rest of the module works from that plain text.
  */
-export async function transcribeRecording({ audio, signal }: TranscribeOptions): Promise<string> {
-  const canFallBack = isTranscriptionConfigured()
-  let transcript: string | null = null
+export async function transcribeRecording({ audio, signal, providers = currentModelOrder() }: TranscribeOptions): Promise<Transcript> {
+  const usable = providers.filter(isTranscriptionProvider).filter((provider) => READERS[provider].isConfigured())
+  if (usable.length === 0) throw new UserFacingError(VOICE_MESSAGES.voiceUnavailable)
 
-  if (isProviderConfigured("gemini")) {
+  // Why each provider gave up, so a failure names what to change
+  const failures: string[] = []
+  for (const [index, provider] of usable.entries()) {
+    let text: string | null
     try {
-      transcript = await readWithGemini(audio, signal)
+      text = await READERS[provider].read(audio, signal)
     } catch (error: unknown) {
-      if (signal.aborted || !canFallBack) throw error
-      console.warn("⚠️ gemini could not read the recording, falling back to openai:", error instanceof Error ? error.message : error)
-    }
-  } else if (!canFallBack) {
-    throw new UserFacingError(VOICE_MESSAGES.voiceUnavailable)
-  }
-
-  // Gemini failed, or heard nothing at all, so OpenAI reads the same recording
-  if (transcript === null && canFallBack) {
-    transcript = await transcribeWithOpenAI(audio, signal).catch((error: unknown) => {
       if (signal.aborted) throw error
-      console.error("❌ openai could not read the recording:", error instanceof Error ? error.message : error)
-      // A key or model problem is worth naming; the recording itself is not the issue then
-      throw new UserFacingError(
-        describeProviderFailure(error, { label: "OpenAI transcription", keyVariable: "OPENAI_API_KEY", modelVariable: "OPENAI_TRANSCRIPTION_MODEL" })
-      )
-    })
+      const next = usable[index + 1]
+      console.warn(`⚠️ ${provider} could not read the recording${next ? `, falling back to ${next}` : ""}:`, error instanceof Error ? error.message : error)
+      failures.push(describeProviderFailure(error, READERS[provider].names))
+      continue
+    }
+    // Nobody spoke, as far as this provider could tell, so the next one listens too
+    if (text === null) continue
+
+    const written = text.trim()
+    // "Nothing was said" is a valid answer about the recording, not a provider failure
+    if (written.length < MIN_TRANSCRIPT_LENGTH) throw new UserFacingError(VOICE_MESSAGES.unclearAudio)
+    return { text: written, provider }
   }
 
-  const written = (transcript ?? "").trim()
-  // "Nothing was said" is a valid answer about the recording, not a provider failure
-  if (written.length < MIN_TRANSCRIPT_LENGTH) throw new UserFacingError(VOICE_MESSAGES.unclearAudio)
-  return written
+  // Every provider that answered heard no speech; one that failed says what went wrong instead
+  if (failures.length === 0) throw new UserFacingError(VOICE_MESSAGES.unclearAudio)
+  console.error("❌ No provider could read the recording:", failures.join(" "))
+  throw new UserFacingError(failures.join(" "))
 }

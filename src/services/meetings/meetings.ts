@@ -5,6 +5,8 @@ import { MeetingChunk } from "@/models/MeetingChunk"
 import { countChunks, hashTranscript } from "@/lib/transcriptChunks"
 import { MEETINGS_PAGE_SIZE, type MeetingStatusId } from "@/constants/meetings"
 import type { Meeting, MeetingAnalysis, MeetingInput, MeetingSummary, MeetingsPage } from "@/types/meetings"
+import type { Viewer } from "@/types/auth"
+import { visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * Meetings in the database. The history list never reads a transcript: a card needs a title, a
@@ -88,11 +90,12 @@ interface ListOptions {
  * the database against the meeting name, and the cursor is part of the same query, so paging a
  * searched or filtered list neither skips nor repeats a meeting.
  */
-export async function listMeetings({ search = "", status = null, cursor = null, limit = MEETINGS_PAGE_SIZE }: ListOptions = {}): Promise<MeetingsPage> {
+export async function listMeetings(viewer: Viewer, { search = "", status = null, cursor = null, limit = MEETINGS_PAGE_SIZE }: ListOptions = {}): Promise<MeetingsPage> {
   await connectDatabase()
   const size = Math.min(Math.max(1, Math.trunc(limit) || MEETINGS_PAGE_SIZE), MEETINGS_PAGE_SIZE)
   const term = search.trim()
   const narrowing = [
+    visibleTo(viewer),
     ...(term ? [{ title: new RegExp(escapeForSearch(term), "i") }] : []),
     ...(status ? [{ status }] : []),
   ]
@@ -115,10 +118,11 @@ export async function listMeetings({ search = "", status = null, cursor = null, 
   }
 }
 
-export async function getMeeting(id: string): Promise<Meeting | null> {
-  if (!ID_PATTERN.test(id)) return null
+export async function getMeeting(viewer: Viewer, id: string): Promise<Meeting | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
   await connectDatabase()
-  const record = await MeetingModel.findById(id).lean()
+  const record = await MeetingModel.findOne(filter).lean()
   return record ? toMeeting(record as unknown as StoredMeeting) : null
 }
 
@@ -126,10 +130,11 @@ export async function getMeeting(id: string): Promise<Meeting | null> {
  * Saves a meeting before anything is analyzed, so the transcript is safe from the first moment.
  * A meeting with no name of its own gets a working one until the analysis writes a real title.
  */
-export async function createMeeting({ title, transcript }: MeetingInput): Promise<Meeting> {
+export async function createMeeting(viewer: Viewer, { title, transcript }: MeetingInput): Promise<Meeting> {
   await connectDatabase()
   const named = (title ?? "").trim()
   const record = await MeetingModel.create({
+    ownerId: viewer.id,
     title: named || "Untitled meeting",
     isTitleGenerated: named === "",
     transcript,
@@ -147,10 +152,11 @@ export async function createMeeting({ title, transcript }: MeetingInput): Promis
  * of date: the notes read from the old transcript go, the meeting is marked as needing another
  * run, and the page says plainly that what it shows came from the earlier transcript.
  */
-export async function updateMeeting(id: string, { title, transcript }: MeetingInput): Promise<Meeting | null> {
-  if (!ID_PATTERN.test(id)) return null
+export async function updateMeeting(viewer: Viewer, id: string, { title, transcript }: MeetingInput): Promise<Meeting | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
   await connectDatabase()
-  const meeting = await MeetingModel.findById(id)
+  const meeting = await MeetingModel.findOne(filter)
   if (!meeting) return null
 
   const named = (title ?? "").trim()
@@ -179,10 +185,11 @@ export async function updateMeeting(id: string, { title, transcript }: MeetingIn
 /**
  * Deletes one meeting and everything read from it, so nothing is left behind.
  */
-export async function deleteMeeting(id: string): Promise<boolean> {
-  if (!ID_PATTERN.test(id)) return false
+export async function deleteMeeting(viewer: Viewer, id: string): Promise<boolean> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return false
   await connectDatabase()
-  const { deletedCount } = await MeetingModel.deleteOne({ _id: id })
+  const { deletedCount } = await MeetingModel.deleteOne(filter)
   if (deletedCount > 0) await MeetingChunk.deleteMany({ meetingId: new mongoose.Types.ObjectId(id) })
   return deletedCount > 0
 }

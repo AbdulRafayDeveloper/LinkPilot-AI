@@ -1,3 +1,4 @@
+import type { AiProviderId } from "@/constants/aiProviders"
 import type { CommentTuneId } from "@/constants/commentWriter"
 import type { EditablePrompt } from "./prompts"
 
@@ -16,7 +17,7 @@ export interface GeneratedComment {
   tune: CommentTuneId
   characterCount: number
   maxCharacters: number
-  provider: "gemini" | "openai"
+  provider: AiProviderId
   reference: CommentReference | null
   notices: string[]
   // The post text read from an uploaded screenshot, so the user can check it

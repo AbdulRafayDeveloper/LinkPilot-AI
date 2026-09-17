@@ -41,7 +41,6 @@ export type PromptName =
   | `global-${GlobalPromptId}`
   | "humanizer-system"
   | "prompt-creator-system"
-  | "prompt-creator-transcription"
   | `prompt-creator-${PromptTargetId}`
   | "client-message-system"
   | "client-message"

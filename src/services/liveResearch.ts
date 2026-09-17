@@ -1,15 +1,9 @@
+import Groq from "groq-sdk"
 import { tools as openAITools } from "@langchain/openai"
 import type { AIMessage, BaseMessage } from "@langchain/core/messages"
-import {
-  AI_PROVIDERS,
-  createGeminiModel,
-  createOpenAIModel,
-  isProviderConfigured,
-  withProviderRetry,
-  type ModelProvider,
-} from "@/services/ai"
-import { withRetry } from "@/lib/retry"
-import { isTransientError } from "@/lib/transientErrors"
+import { createOpenAIModel, isProviderConfigured, withGroqKey, withProviderRetry } from "@/services/ai"
+import { env } from "@/config/env"
+import { currentModelOrder } from "@/lib/modelOrder"
 import { loadPrompt, type PromptName } from "@/services/prompts"
 import { UserFacingError } from "@/lib/errors"
 import { hostnameOf, normalizeUrl } from "@/lib/url"
@@ -17,14 +11,12 @@ import { hostnameOf, normalizeUrl } from "@/lib/url"
 const RESEARCH_TIMEOUT_MS = 120_000
 // Research passes are long, so a transient failure gets one retry (withProviderRetry) before the pass counts as failed
 const RESEARCH_RETRIES = 1
-const REDIRECT_RESOLVE_TIMEOUT_MS = 8_000
 const INLINE_URL_PATTERN = /https?:\/\/[^\s<>"'`\])]+/g
-// Gemini's built-in Google Search grounding: the model decides which searches to run
-const GOOGLE_SEARCH_TOOL = { googleSearch: {} }
 
-// Same providers and order as every other AI call: Gemini first, OpenAI as the fallback
-export const SEARCH_PROVIDERS = AI_PROVIDERS
-export type SearchProvider = ModelProvider
+// The providers that can search the web: Groq (browser search on GROQ_MODEL) and OpenAI (web search).
+// They run in the request's order (lib/modelOrder.ts); the open-source model can't search, so it is skipped
+export const SEARCH_PROVIDERS = ["groq", "openai"] as const
+export type SearchProvider = (typeof SEARCH_PROVIDERS)[number]
 
 export interface ResearchSource {
   url: string
@@ -38,17 +30,13 @@ export interface ResearchResult {
 }
 
 interface LiveResearchOptions {
-  // Each entry is one grounded Gemini call; several entries run as parallel passes and are merged
-  geminiPasses: BaseMessage[][]
-  // The fallback OpenAI model searches shallowly per call, so each entry runs as its own parallel pass
+  // Each entry is one Groq call, which runs several searches of its own; several entries run as parallel passes and are merged
+  groqPasses: BaseMessage[][]
+  // OpenAI searches shallowly per call, so each entry runs as its own parallel pass
   openAIPasses: BaseMessage[][]
   minSources: number
   signal: AbortSignal
   onFallback: () => void
-}
-
-interface GroundingChunk {
-  web?: { uri?: string; title?: string }
 }
 
 /**
@@ -115,47 +103,42 @@ function extractOpenAIResearch(message: AIMessage): ResearchResult {
   return { provider: "openai", notes: notes.trim(), sources: dedupeSources(ranked) }
 }
 
-/**
- * Grounding sources arrive as Google redirect links. Each is resolved to the article it
- * points to, so citations can be verified against real URLs; unresolvable ones are dropped.
- */
-async function resolveGroundingSource(chunk: GroundingChunk, signal: AbortSignal): Promise<ResearchSource | null> {
-  const uri = chunk.web?.uri
-  if (!uri) return null
-  try {
-    // A dropped connection gets one quick retry; each attempt has its own timeout
-    const response = await withRetry(
-      () => fetch(uri, { redirect: "manual", signal: AbortSignal.any([signal, AbortSignal.timeout(REDIRECT_RESOLVE_TIMEOUT_MS)]) }),
-      { retries: 1, signal, shouldRetry: isTransientError, baseDelayMs: 250 }
-    )
-    const url = normalizeUrl(response.headers.get("location") ?? uri)
-    return url ? { url, title: chunk.web?.title?.trim() || hostnameOf(url) } : null
-  } catch (error: unknown) {
-    if (signal.aborted) throw error
-    return null
-  }
-}
+const GROQ_ROLES = { system: "system", human: "user", ai: "assistant" } as const
 
 /**
- * One grounded Gemini call. Only grounding metadata counts as a source; URLs the model
- * writes into its text are not trusted.
+ * One Groq call with browser search: the model runs its own searches and opens pages, and only the
+ * pages its searches returned count as sources; URLs it writes into its text are not trusted.
  */
-async function runGeminiPass(messages: BaseMessage[], signal: AbortSignal): Promise<ResearchResult> {
-  const model = createGeminiModel({ maxRetries: 0 })
+async function runGroqPass(messages: BaseMessage[], signal: AbortSignal): Promise<ResearchResult> {
+  const model = env.GROQ_MODEL
+  if (!model) throw new UserFacingError("GROQ_MODEL is not set.")
   const passSignal = AbortSignal.any([signal, AbortSignal.timeout(RESEARCH_TIMEOUT_MS)])
+  const conversation = messages.map((message) => ({
+    role: GROQ_ROLES[message.getType() as keyof typeof GROQ_ROLES] ?? "user",
+    content: typeof message.content === "string" ? message.content : readTextBlocks(message as AIMessage).map((block) => block.text).join("\n"),
+  }))
   const response = await withProviderRetry(
-    "gemini",
-    () => model.invoke(messages, { tools: [GOOGLE_SEARCH_TOOL], signal: passSignal }),
+    "groq",
+    () =>
+      withGroqKey(
+        (apiKey) =>
+          new Groq({ apiKey, maxRetries: 0 }).chat.completions.create(
+            { model, messages: conversation, tools: [{ type: "browser_search" }], tool_choice: "required" },
+            { signal: passSignal }
+          ),
+        passSignal
+      ),
     passSignal,
     RESEARCH_RETRIES
   )
-  const notes = readTextBlocks(response)
-    .map((block) => block.text)
-    .join("")
-    .trim()
-  const grounding = response.additional_kwargs.groundingMetadata as { groundingChunks?: GroundingChunk[] } | undefined
-  const sources = await Promise.all((grounding?.groundingChunks ?? []).map((chunk) => resolveGroundingSource(chunk, signal)))
-  return { provider: "gemini", notes, sources: dedupeSources(sources) }
+  const message = response.choices[0]?.message
+  const sources = (message?.executed_tools ?? [])
+    .flatMap((tool) => tool.search_results?.results ?? [])
+    .map((result): ResearchSource | null => {
+      const url = result.url ? normalizeUrl(result.url) : null
+      return url ? { url, title: result.title?.trim() || hostnameOf(url) } : null
+    })
+  return { provider: "groq", notes: (message?.content ?? "").trim(), sources: dedupeSources(sources) }
 }
 
 /**
@@ -186,8 +169,8 @@ async function runPasses(
   }
 }
 
-function searchWithGemini(passes: BaseMessage[][], signal: AbortSignal): Promise<ResearchResult> {
-  return runPasses("gemini", passes, (messages) => runGeminiPass(messages, signal))
+function searchWithGroq(passes: BaseMessage[][], signal: AbortSignal): Promise<ResearchResult> {
+  return runPasses("groq", passes, (messages) => runGroqPass(messages, signal))
 }
 
 function searchWithOpenAI(passes: BaseMessage[][], signal: AbortSignal): Promise<ResearchResult> {
@@ -209,41 +192,38 @@ function hasUsableEvidence(result: ResearchResult, minSources: number): boolean 
   return result.notes.length > 0 && result.sources.length >= minSources
 }
 
+const canSearch: Record<SearchProvider, () => boolean> = {
+  groq: () => isProviderConfigured("groq"),
+  openai: () => isProviderConfigured("openai"),
+}
+
+const isSearchProvider = (provider: string): provider is SearchProvider => (SEARCH_PROVIDERS as readonly string[]).includes(provider)
+
 /**
- * Live web research: Gemini with Google Search grounding first; OpenAI web search as the
- * automatic fallback when Gemini isn't configured, fails, or returns too little evidence.
+ * Live web research with the providers that can search, in the request's order (Groq's browser search
+ * first by default, then OpenAI web search). The next provider takes over when one isn't configured,
+ * fails, or returns too little evidence; the last one's thin result is an error.
  */
-export async function runLiveResearch({
-  geminiPasses,
-  openAIPasses,
-  minSources,
-  signal,
-  onFallback,
-}: LiveResearchOptions): Promise<ResearchResult> {
-  const canUseGemini = isProviderConfigured("gemini")
-  const canUseOpenAI = isProviderConfigured("openai")
-  if (!canUseGemini && !canUseOpenAI) {
+export async function runLiveResearch({ groqPasses, openAIPasses, minSources, signal, onFallback }: LiveResearchOptions): Promise<ResearchResult> {
+  const providers = currentModelOrder().filter(isSearchProvider).filter((provider) => canSearch[provider]())
+  if (providers.length === 0) {
     throw new UserFacingError(
-      "No AI provider is configured for live research. Set GOOGLE_API_KEY and GEMINI_LIGHTWEIGHT_MODEL, or OPENAI_API_KEY and OPENAI_LIGHTWEIGHT_MODEL, in .env.local."
+      "No AI provider is configured for live research. Set GROQ_API_KEY_1 and GROQ_MODEL, or OPENAI_API_KEY and OPENAI_LIGHTWEIGHT_MODEL, where the app runs."
     )
   }
 
-  if (canUseGemini) {
+  for (const [index, provider] of providers.entries()) {
+    const isLast = index === providers.length - 1
     try {
-      const result = await searchWithGemini(geminiPasses, signal)
+      const result = provider === "groq" ? await searchWithGroq(groqPasses, signal) : await searchWithOpenAI(openAIPasses, signal)
       if (hasUsableEvidence(result, minSources)) return result
-      console.warn("⚠️ Gemini research returned too few sources", { sources: result.sources.length })
+      console.warn(`⚠️ ${provider} research returned too few sources`, { sources: result.sources.length })
+      if (isLast) throw new Error(`InsufficientEvidenceException: web search returned ${result.sources.length} usable sources`)
     } catch (error: unknown) {
-      if (signal.aborted) throw error
-      console.warn("⚠️ Gemini research failed:", error instanceof Error ? error.message : error)
+      if (signal.aborted || isLast) throw error
+      console.warn(`⚠️ ${provider} research failed:`, error instanceof Error ? error.message : error)
     }
-    if (!canUseOpenAI) throw new Error("GeminiResearchException: no usable research and no fallback provider configured")
     onFallback()
   }
-
-  const result = await searchWithOpenAI(openAIPasses, signal)
-  if (!hasUsableEvidence(result, minSources)) {
-    throw new Error(`InsufficientEvidenceException: web search returned ${result.sources.length} usable sources`)
-  }
-  return result
+  throw new Error("InsufficientEvidenceException: no research provider answered")
 }

@@ -10,6 +10,7 @@ import {
 } from "@/constants/postCommentReplies"
 import { saveReplyPrompt } from "@/services/postCommentReplies/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -22,6 +23,8 @@ const ParamsSchema = z.object({
  * PUT: Saves the prompt for exactly one context + style pair. Every other prompt is untouched.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ context: string; style: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 

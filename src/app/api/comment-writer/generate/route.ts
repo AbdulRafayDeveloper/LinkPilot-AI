@@ -7,6 +7,9 @@ import { COMMENT_TUNE_IDS, COMMENT_WRITER_MESSAGES } from "@/constants/commentWr
 import { generateComment } from "@/services/commentWriter/generate"
 import { recordComment } from "@/services/generationRecords"
 import type { CommentStreamEvent } from "@/types/commentWriter"
+import { requireViewer } from "@/services/auth/viewer"
+import { withModelOrder } from "@/lib/modelOrder"
+import { modelOrderFor } from "@/services/modelPriority"
 
 export const dynamic = "force-dynamic"
 // Reading a screenshot, live web research and writing can take a couple of minutes together
@@ -22,6 +25,8 @@ const TuneSchema = z.enum(COMMENT_TUNE_IDS, { error: missingTune })
  * Events, ending with COMPLETE (verified result) or ERROR. Invalid input returns 400 JSON.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const form = await req.formData().catch(() => null)
   const input = form ? await parsePostInput(form, { required: true, missingMessage: missingPost }) : { error: missingPost }
   if ("error" in input || !input.post) {
@@ -35,13 +40,13 @@ export async function POST(req: NextRequest) {
 
   return createEventStream<CommentStreamEvent>(async (send) => {
     try {
-      const result = await generateComment({
+      const result = await withModelOrder(await modelOrderFor(auth.viewer, "comment-writer"), () => generateComment({
         tune: tune.data,
         post,
         signal: req.signal,
         onStage: (status, text) => send({ status, text }),
-      })
-      await recordComment(post, result)
+      }))
+      await recordComment(auth.viewer, post, result)
       send({ status: "COMPLETE", result })
     } catch (error: unknown) {
       if (!req.signal.aborted) {

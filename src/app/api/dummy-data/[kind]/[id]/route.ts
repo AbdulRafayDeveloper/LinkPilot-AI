@@ -4,6 +4,7 @@ import { DummyDataKindSchema, dummyItemInputSchema } from "@/lib/validation/dumm
 import { DUMMY_DATA_KINDS, dummyDataMessages } from "@/constants/dummyData"
 import { deleteDummyItem, updateDummyItem } from "@/services/dummyData"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -15,6 +16,8 @@ const unknownKind = () => NextResponse.json({ success: false, message: "Unknown 
  * PUT: Replaces one item's name and text. Other items are untouched.
  */
 export async function PUT(req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer({ role: "admin" })
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 
@@ -44,6 +47,8 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
  * DELETE: Removes one item's file.
  */
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
+  const auth = await requireViewer({ role: "admin" })
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 

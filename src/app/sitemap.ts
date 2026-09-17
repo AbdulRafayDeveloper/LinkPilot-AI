@@ -1,9 +1,9 @@
 import { MetadataRoute } from "next"
 import { SITE_URL } from "@/config/env"
-import { APP_TOOLS } from "@/constants/linkedinTools"
+import { PUBLIC_TOOLS } from "@/constants/linkedinTools"
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return APP_TOOLS.map((tool) => ({
+  return PUBLIC_TOOLS.map((tool) => ({
     url: `${SITE_URL}${tool.href}`,
     lastModified: new Date(),
     changeFrequency: tool.id === "trending-topics" ? "daily" : "monthly",

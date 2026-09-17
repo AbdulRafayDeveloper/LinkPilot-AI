@@ -4,6 +4,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { MEETING_PLANNER_MESSAGES, MEETING_PLAN_STATUS_IDS } from "@/constants/meetingPlanner"
 import { deleteMeeting, getMeeting, updateMeeting } from "@/services/meetingPlanner/plans"
 import { MeetingInputSchema, hasPrepInput } from "../route"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -19,8 +20,10 @@ const notFound = () => NextResponse.json({ success: false, message: MEETING_PLAN
  * nothing is ever generated here, so opening a meeting never calls a model.
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const meeting = await getMeeting((await params).id)
+    const meeting = await getMeeting(auth.viewer, (await params).id)
     if (!meeting) return notFound()
     return NextResponse.json({ success: true, message: "Meeting retrieved", data: meeting })
   } catch (error: unknown) {
@@ -37,6 +40,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
  * is left alone; it is only rewritten when the user asks for it on the preparation route.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = UpdateSchema.safeParse(body)
@@ -48,7 +53,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const { id } = await params
-    const current = await getMeeting(id)
+    const current = await getMeeting(auth.viewer, id)
     if (!current) return notFound()
 
     // Switching preparation on needs something to read, whether it comes with this change or was already saved
@@ -65,7 +70,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
-    const meeting = await updateMeeting(id, changes)
+    const meeting = await updateMeeting(auth.viewer, id, changes)
     if (!meeting) return notFound()
     const message = changes.status ? MEETING_PLANNER_MESSAGES.statusUpdated : MEETING_PLANNER_MESSAGES.updated
     return NextResponse.json({ success: true, message, data: meeting })
@@ -82,8 +87,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
  * DELETE: removes one meeting and its preparation.
  */
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
-    const deleted = await deleteMeeting((await params).id)
+    const deleted = await deleteMeeting(auth.viewer, (await params).id)
     if (!deleted) return notFound()
     return NextResponse.json({ success: true, message: MEETING_PLANNER_MESSAGES.deleted, data: { deleted: true } })
   } catch (error: unknown) {

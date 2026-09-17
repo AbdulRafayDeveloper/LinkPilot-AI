@@ -1,10 +1,13 @@
 import mongoose, { Schema, type Model } from "mongoose"
+import { OWNER_ID } from "./owner"
 
 /**
  * Every prompt the Prompt Creator wrote: the request it came from, the target it was shaped
  * for, the name the model gave it and the prompt itself, with the user's later edits.
  */
 export interface ICreatedPrompt {
+  // The account it belongs to (models/owner.ts)
+  ownerId: string | null
   name: string
   prompt: string
   target: string
@@ -19,6 +22,7 @@ export interface ICreatedPrompt {
 
 const CreatedPromptSchema = new Schema<ICreatedPrompt>(
   {
+    ownerId: OWNER_ID,
     name: { type: String, required: true, trim: true },
     prompt: { type: String, required: true },
     target: { type: String, required: true, index: true },

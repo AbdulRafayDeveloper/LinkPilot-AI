@@ -32,14 +32,16 @@ export function getPromptTargetLabel(target: PromptTargetId): string {
 
 export const PROMPT_TARGET_TABS = PROMPT_TARGETS.map((target) => ({ id: target.id, label: target.shortLabel }))
 
-// What the user describes, by voice (constants/voiceInput.ts) or by typing
-export const REQUEST_MAX_LENGTH = 8000
+// What the user describes, by voice (constants/voiceInput.ts) or by typing; room for a whole
+// six-minute recording plus some typing around it
+export const REQUEST_MAX_LENGTH = 12000
 // The name the model writes for the prompt, and the user can rewrite
 export const CREATED_NAME_MAX_LENGTH = 80
 // The finished prompt
 export const CREATED_PROMPT_MAX_LENGTH = 20000
 
 export const PROMPT_CREATOR_ENDPOINT = "/api/prompt-creator"
+
 
 export const PROMPT_CREATOR_MESSAGES = {
   missingRequest: "Describe the task you want a prompt for, by typing or by speaking.",
@@ -60,12 +62,12 @@ export const PROMPT_CREATOR_TOOL: {
   description: string
   icon: LucideIcon
   href: string
-  group: "writing"
+  group: "prompts"
 } = {
   id: "prompt-creator",
   title: "Prompt Creator",
   description: "Turn a task into an AI prompt",
   icon: Wand2,
   href: "/prompt-creator",
-  group: "writing",
+  group: "prompts",
 }

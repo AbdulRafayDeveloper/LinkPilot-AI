@@ -13,6 +13,8 @@ import {
   type AssetFilterId,
 } from "@/constants/importantFiles"
 import type { Asset, AssetMetadataInput, AssetsPage, UploadPlan, UploadRequest } from "@/types/importantFiles"
+import type { Viewer } from "@/types/auth"
+import { visibleById, visibleTo } from "@/services/auth/viewer"
 import {
   abortMultipartUpload,
   buildStorageKey,
@@ -90,7 +92,7 @@ interface ListOptions {
  * ASSET_PAGE_SIZE, whatever the caller asks for, and never a file whose upload never finished.
  * Each file carries a short-lived preview link rather than anything permanent.
  */
-export async function listAssets({
+export async function listAssets(viewer: Viewer, {
   search = "",
   type = "all",
   cursor = null,
@@ -98,7 +100,7 @@ export async function listAssets({
 }: ListOptions = {}): Promise<AssetsPage> {
   await connectDatabase()
   const size = Math.min(Math.max(1, Math.trunc(limit) || ASSET_PAGE_SIZE), ASSET_PAGE_SIZE)
-  const ready = [{ status: "ready" as const }, ...matching(search), ...inCategory(type)]
+  const ready = [{ status: "ready" as const }, visibleTo(viewer), ...matching(search), ...inCategory(type)]
   const [records, total] = await Promise.all([
     // One extra row answers "is there more?" without a second count
     AssetFile.find({ $and: [...ready, ...olderThan(cursor)] })
@@ -128,10 +130,11 @@ export async function listAssets({
   }
 }
 
-async function findReady(id: string): Promise<StoredAsset | null> {
-  if (!ID_PATTERN.test(id)) return null
+async function findReady(viewer: Viewer, id: string): Promise<StoredAsset | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
   await connectDatabase()
-  const record = await AssetFile.findOne({ _id: id, status: "ready" }).lean()
+  const record = await AssetFile.findOne({ ...filter, status: "ready" }).lean()
   return (record as unknown as StoredAsset) ?? null
 }
 
@@ -155,11 +158,12 @@ function checkUpload(contentType: string, size: number): AssetCategoryId {
  * Small files go up in one PUT. Anything over MULTIPART_THRESHOLD_BYTES is split into parts, so
  * the app never carries the bytes and Vercel's request limit never applies to them.
  */
-export async function planUpload({ name, description, originalName, contentType, size }: UploadRequest): Promise<UploadPlan> {
+export async function planUpload(viewer: Viewer, { name, description, originalName, contentType, size }: UploadRequest): Promise<UploadPlan> {
   const category = checkUpload(contentType, size)
   await connectDatabase()
 
   const record = await AssetFile.create({
+    ownerId: viewer.id,
     name: name.trim(),
     description: description.trim(),
     originalName,
@@ -197,10 +201,11 @@ export async function planUpload({ name, description, originalName, contentType,
  * and an object that is missing, empty or larger than the type allows is deleted with its
  * record instead of being shown. Finishing twice is harmless.
  */
-export async function finishUpload(id: string): Promise<Asset> {
-  if (!ID_PATTERN.test(id)) throw new UserFacingError(IMPORTANT_FILES_MESSAGES.notFound)
+export async function finishUpload(viewer: Viewer, id: string): Promise<Asset> {
+  const filter = visibleById(viewer, id)
+  if (!filter) throw new UserFacingError(IMPORTANT_FILES_MESSAGES.notFound)
   await connectDatabase()
-  const record = (await AssetFile.findById(id).lean()) as unknown as StoredAsset | null
+  const record = (await AssetFile.findOne(filter).lean()) as unknown as StoredAsset | null
   if (!record) throw new UserFacingError(IMPORTANT_FILES_MESSAGES.notFound)
   if (record.status === "ready") return toAsset(record, await presignDownload(record.storageKey, record.contentType))
 
@@ -235,10 +240,11 @@ export async function finishUpload(id: string): Promise<Asset> {
  * stored is removed, and the record goes with it, so a cancelled or broken upload leaves
  * nothing behind. A record that is already "ready" is left alone.
  */
-export async function cancelUpload(id: string): Promise<boolean> {
-  if (!ID_PATTERN.test(id)) return false
+export async function cancelUpload(viewer: Viewer, id: string): Promise<boolean> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return false
   await connectDatabase()
-  const record = (await AssetFile.findOne({ _id: id, status: "uploading" }).lean()) as unknown as StoredAsset | null
+  const record = (await AssetFile.findOne({ ...filter, status: "uploading" }).lean()) as unknown as StoredAsset | null
   if (!record) return false
   if (record.uploadId) await abortMultipartUpload(record.storageKey, record.uploadId)
   await deleteObject(record.storageKey).catch(() => undefined)
@@ -250,11 +256,12 @@ export async function cancelUpload(id: string): Promise<boolean> {
  * Changes only what the user typed. The stored object is never touched here, which is why an
  * edit cannot replace the file behind a name.
  */
-export async function updateAssetMetadata(id: string, { name, description }: AssetMetadataInput): Promise<Asset | null> {
-  if (!ID_PATTERN.test(id)) return null
+export async function updateAssetMetadata(viewer: Viewer, id: string, { name, description }: AssetMetadataInput): Promise<Asset | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
   await connectDatabase()
   const record = (await AssetFile.findOneAndUpdate(
-    { _id: id, status: "ready" },
+    { ...filter, status: "ready" },
     { name: name.trim(), description: description.trim() },
     { returnDocument: "after", runValidators: true }
   ).lean()) as unknown as StoredAsset | null
@@ -265,10 +272,11 @@ export async function updateAssetMetadata(id: string, { name, description }: Ass
  * Removes the file and its record. The object goes first: if S3 refuses, the record stays and
  * the user is told, so the app never forgets about a file that is still stored.
  */
-export async function deleteAsset(id: string): Promise<boolean> {
-  if (!ID_PATTERN.test(id)) return false
+export async function deleteAsset(viewer: Viewer, id: string): Promise<boolean> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return false
   await connectDatabase()
-  const record = (await AssetFile.findById(id).lean()) as unknown as StoredAsset | null
+  const record = (await AssetFile.findOne(filter).lean()) as unknown as StoredAsset | null
   if (!record) return false
   if (record.uploadId) await abortMultipartUpload(record.storageKey, record.uploadId)
   await deleteObject(record.storageKey)
@@ -277,8 +285,8 @@ export async function deleteAsset(id: string): Promise<boolean> {
 }
 
 /** A link that opens or saves one file, signed for a short while. */
-export async function assetLink(id: string, download: boolean): Promise<{ url: string } | null> {
-  const record = await findReady(id)
+export async function assetLink(viewer: Viewer, id: string, download: boolean): Promise<{ url: string } | null> {
+  const record = await findReady(viewer, id)
   if (!record) return null
   const downloadAs = download ? `${record.name}${extensionOf(record.originalName)}` : undefined
   return { url: await presignDownload(record.storageKey, record.contentType, downloadAs) }
@@ -291,8 +299,8 @@ function extensionOf(originalName: string): string {
 }
 
 /** The text of a stored text file, for the copy action, capped so a huge file cannot be pulled in. */
-export async function assetText(id: string, maxBytes: number): Promise<string | null> {
-  const record = await findReady(id)
+export async function assetText(viewer: Viewer, id: string, maxBytes: number): Promise<string | null> {
+  const record = await findReady(viewer, id)
   if (!record || record.category !== "text") return null
   if (record.size > maxBytes) return null
   const url = await presignDownload(record.storageKey, record.contentType)

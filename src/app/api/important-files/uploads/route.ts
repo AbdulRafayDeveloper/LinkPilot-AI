@@ -3,6 +3,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { UploadRequestSchema } from "@/lib/validation/importantFile"
 import { IMPORTANT_FILES_MESSAGES } from "@/constants/importantFiles"
 import { planUpload } from "@/services/importantFiles/assets"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -12,6 +13,8 @@ export const dynamic = "force-dynamic"
  * The file's bytes go straight from the browser to S3, so nothing here is near a request limit.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
     const parsed = UploadRequestSchema.safeParse(body)
@@ -22,7 +25,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const plan = await planUpload(parsed.data)
+    const plan = await planUpload(auth.viewer, parsed.data)
     return NextResponse.json({ success: true, message: "Upload ready", data: plan }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Important File Upload Exception:", error instanceof Error ? error.message : error)

@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
-import { generateStructuredWithFallback } from "@/services/ai"
+import { generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
 import { UserFacingError } from "@/lib/errors"
@@ -43,7 +43,7 @@ export interface GeneratedPrompt {
   name: string
   prompt: string
   target: PromptTargetId
-  provider: string
+  provider: ModelProvider
 }
 
 // Models like to wrap a prompt in a code fence or introduce it; the prompt itself is what we keep
@@ -74,7 +74,7 @@ function findUnusableReason(output: CreatedPromptOutput): string | null {
 
 /**
  * Writes one ready-to-paste prompt from what the user described, using the latest saved prompt
- * for the chosen target. The description is untrusted text inside its own delimiter tags, so it
+ * for the chosen target, in the module's provider order (Groq first). The description is untrusted text inside its own delimiter tags, so it
  * is treated as the subject of the work and never as instructions to follow.
  */
 export async function createPrompt({ request, target, requestSource, signal }: GenerateOptions): Promise<GeneratedPrompt> {

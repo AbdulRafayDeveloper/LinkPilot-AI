@@ -3,6 +3,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
 import { getClientMessagePrompt, saveClientMessagePrompt } from "@/services/clientMessaging/prompts"
 import { requirePromptAccess } from "@/services/promptAccess"
+import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
@@ -10,6 +11,8 @@ export const dynamic = "force-dynamic"
  * GET: The prompt every client message is written with, plus its default.
  */
 export async function GET() {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 
@@ -29,6 +32,8 @@ export async function GET() {
  * PUT: Saves the prompt. The next message written uses it, for every client and channel.
  */
 export async function PUT(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
   const denied = await requirePromptAccess()
   if (denied) return denied
 
