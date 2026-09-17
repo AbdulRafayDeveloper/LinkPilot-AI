@@ -58,7 +58,9 @@ export async function askMeeting({ meeting, ownerId, question, history, signal, 
     ...history
       .slice(-CHAT_CONTEXT_MESSAGES)
       .map((message) => (message.role === "you" ? new HumanMessage(message.text) : new AIMessage(message.text))),
-    new HumanMessage(`<meeting_notes>\n${notes}\n</meeting_notes>\n\nQuestion: ${question}`),
+    // The reminder rides with every question, so a chat that already holds answers in another language,
+    // or a question written in one, still gets an English answer
+    new HumanMessage(`<meeting_notes>\n${notes}\n</meeting_notes>\n\nQuestion: ${question}\n\nWrite your answer in English.`),
   ]
 
   const { text, provider } = await streamTextWithFallback({ messages, onToken, maxTokens: ANSWER_MAX_TOKENS, signal })
