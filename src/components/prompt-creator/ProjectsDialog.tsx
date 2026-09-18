@@ -131,7 +131,7 @@ const ProjectPrompts: React.FC<{ projectId: string; onDeleted: () => void }> = (
       {prompts.map((prompt) => (
         <li
           key={prompt.id}
-          className={`rounded-lg border p-2.5 ${prompt.appliedAt ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-white"}`}
+          className={`rounded-lg border p-2.5 ${prompt.appliedAt ? "border-success/60 bg-success-container" : "border-outline-variant bg-white"}`}
         >
           {editing?.id === prompt.id ? (
             <div className="flex flex-col gap-2">
@@ -191,7 +191,7 @@ const ProjectPrompts: React.FC<{ projectId: string; onDeleted: () => void }> = (
                   aria-label={prompt.appliedAt ? `Mark "${prompt.name}" as not used` : `Mark "${prompt.name}" as used`}
                   title={prompt.appliedAt ? "Used. Click to take the mark off" : "Mark as used"}
                   className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:opacity-50 ${
-                    prompt.appliedAt ? "text-success hover:bg-success-container" : "text-outline hover:bg-surface-container-high hover:text-success"
+                    prompt.appliedAt ? "text-success hover:bg-success/25" : "text-outline hover:bg-surface-container-high hover:text-success"
                   }`}
                 >
                   {busy === prompt.id ? (

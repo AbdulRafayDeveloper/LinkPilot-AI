@@ -140,7 +140,7 @@ const DependencyTags: React.FC<{ item: SavedOutput }> = ({ item }) => {
       <li
         title={state === "blocked" ? describePending(pending.map((entry) => entry.name || "Untitled prompt")) : PROMPT_DEPENDENCY_MESSAGES.ready}
         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-          state === "blocked" ? "bg-secondary-fixed text-on-secondary-fixed-variant" : "bg-success-container text-on-success-container"
+          state === "blocked" ? "bg-secondary-fixed text-on-secondary-fixed-variant" : "bg-success-container text-on-success-container ring-1 ring-success/40"
         }`}
       >
         {state === "blocked" ? <Lock size={11} className="shrink-0" aria-hidden="true" /> : <Play size={11} className="shrink-0" aria-hidden="true" />}
@@ -175,7 +175,7 @@ const RecordTags: React.FC<{ item: SavedOutput }> = ({ item }) =>
     <ul className="flex flex-wrap gap-1" aria-label="Written with">
       <DependencyTags item={item} />
       {item.appliedAt && (
-        <li className="inline-flex items-center gap-1 rounded-full bg-success-container px-2 py-0.5 text-[11px] font-semibold text-on-success-container">
+        <li className="inline-flex items-center gap-1 rounded-full bg-success px-2 py-0.5 text-[11px] font-semibold text-on-success">
           <CheckCircle2 size={11} className="shrink-0" aria-hidden="true" />
           Applied
         </li>
@@ -831,7 +831,7 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                     ? `Mark ${item.title} as not used`
                     : `Mark ${item.title} as used`
               }
-              className={`${actionButton} ${item.appliedAt ? "border-success/50 text-on-success-container hover:bg-success-container" : isBlocked ? "" : "hover:text-success"}`}
+              className={`${actionButton} ${item.appliedAt ? "border-success/50 text-on-success-container hover:bg-success/25" : isBlocked ? "" : "hover:text-success"}`}
             >
               {appliedBusy === item.id ? (
                 <Loader2 size={13} className="animate-spin" aria-hidden="true" />
@@ -1127,7 +1127,7 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                         <tr
                           key={item.id}
                           className={`border-b border-outline-variant/60 align-top last:border-b-0 ${
-                            item.appliedAt ? "bg-success-container/40 hover:bg-success-container/60" : "hover:bg-surface-container-lowest"
+                            item.appliedAt ? "bg-success-container hover:bg-success/25" : "hover:bg-surface-container-lowest"
                           }`}
                         >
                           <td className="w-[190px] max-w-[220px] px-3 py-2.5 2xl:w-[230px] 2xl:max-w-[250px]">
@@ -1165,7 +1165,7 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                     <li
                       key={item.id}
                       className={`flex min-w-0 flex-col gap-2 rounded-2xl border p-3 shadow-sm ${
-                        item.appliedAt ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-white"
+                        item.appliedAt ? "border-success/60 bg-success-container" : "border-outline-variant bg-white"
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
@@ -1269,6 +1269,8 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
           recordId={waiting.id}
           endpoint={tool.dependencies.endpoint}
           waitingFor={waiting.dependencies ?? []}
+          folders={folders.folders}
+          folderId={waiting.folder?.id ?? null}
           onSave={(ids) => saveDependencies(waiting, ids)}
           onClose={() => setWaiting(null)}
         />
