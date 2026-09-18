@@ -10,12 +10,14 @@ import type { PromptProject } from "@/types/promptProjects"
  * are made, changed and deleted, so the picker and the manager show the same list without asking
  * again. Mirrors `usePromptFolders`, since both keep one list a page reads in several places.
  */
-export function usePromptProjects() {
+export function usePromptProjects({ enabled = true }: { enabled?: boolean } = {}) {
   const [projects, setProjects] = useState<PromptProject[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
+    // Not asked for at all while it can't be used, rather than asked for and refused
+    if (!enabled) return
     const controller = new AbortController()
     requestApi<{ projects: PromptProject[] }>(PROMPT_PROJECTS_ENDPOINT, { signal: controller.signal })
       .then(({ data }) => {
@@ -27,7 +29,7 @@ export function usePromptProjects() {
         setError(reason instanceof Error ? reason.message : PROMPT_PROJECT_MESSAGES.loadFailed)
       })
     return () => controller.abort()
-  }, [attempt])
+  }, [attempt, enabled])
 
   const byName = (list: PromptProject[]) => [...list].sort((a, b) => a.name.localeCompare(b.name))
 

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { UserFacingError, toUserFacingMessage } from "@/lib/errors"
 import { PROMPT_CREATOR_MESSAGES, PROMPT_TARGET_IDS, REQUEST_MAX_LENGTH } from "@/constants/promptCreator"
-import { PROMPT_PROJECT_MESSAGES } from "@/constants/promptProjects"
+import { PROJECTS_TOOL, PROMPT_PROJECT_MESSAGES } from "@/constants/promptProjects"
+import { isFeatureDisabled } from "@/lib/featureAccess"
 import { createPrompt } from "@/services/promptCreator/generate"
 import { saveCreatedPrompt } from "@/services/promptCreator/records"
 import { projectForPrompt } from "@/services/promptCreator/projects"
@@ -48,7 +49,10 @@ async function handlePost(req: NextRequest) {
       )
     }
 
-    const { request, target, requestSource, projectId, temporary } = parsed.data
+    const { request, target, requestSource, temporary } = parsed.data
+    // With Projects turned off for this account, a project id left in the browser from before counts
+    // for nothing: the prompt is still written, only without a project's instructions on the end
+    const projectId = isFeatureDisabled(auth.viewer, PROJECTS_TOOL.id) ? null : parsed.data.projectId
     // Read first, so a project that is gone is refused before a model is called
     const project = await projectForPrompt(auth.viewer, projectId)
     const written = withSource(await runAiRequest(auth.viewer, "prompt-creator", () => createPrompt({ request, target, requestSource, signal: req.signal })))

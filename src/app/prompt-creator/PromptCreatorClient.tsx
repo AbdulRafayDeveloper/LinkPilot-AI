@@ -14,6 +14,8 @@ import { CreatedPromptPanel, type CreatedPromptChanges } from "@/components/prom
 import { PromptCreatorPromptsModal } from "@/components/prompt-creator/PromptCreatorPromptsModal"
 import Link from "next/link"
 import { usePromptProjects } from "@/hooks/usePromptProjects"
+import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { isFeatureDisabled } from "@/lib/featureAccess"
 import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
 import { appendSpokenText } from "@/lib/spokenText"
 import { VOICE_MESSAGES, type TranscriptionProvider } from "@/constants/voiceInput"
@@ -70,10 +72,15 @@ export default function PromptCreatorClient() {
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null)
   const { request, target, requestSource, transcribedBy, projectId, isTemporary } = useToolStore(formStore)
-  const projects = usePromptProjects()
+  // Projects are their own tool, which an admin can turn off for an account while leaving this one on:
+  // then the picker goes, nothing is sent, and the list is not even asked for (the server ignores a
+  // project id from such an account too, so a stale one left in the browser can't bring it back)
+  const viewer = useCurrentUser()
+  const projectsOff = isFeatureDisabled(viewer.user, PROJECTS_TOOL.id)
+  const projects = usePromptProjects({ enabled: viewer.status === "ready" && !projectsOff })
   // A project deleted in another tab must not be sent with the next prompt
   const selectedProject = projects.projects?.find((project) => project.id === projectId) ?? null
-  const currentProjectId = projects.projects && !selectedProject ? null : projectId
+  const currentProjectId = projectsOff || (projects.projects && !selectedProject) ? null : projectId
   const requestInputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const { status, result, error, generate, reset } = useGenerationRequest(generation)
@@ -167,13 +174,15 @@ export default function PromptCreatorClient() {
                 <ResetButton onReset={resetTool} disabled={!canReset} />
                 <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
                 {/* Projects have their own page under Client Work now; this is the way there */}
-                <Link
-                  href={PROJECTS_TOOL.href}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
-                >
-                  <FolderKanban size={16} aria-hidden="true" />
-                  Projects
-                </Link>
+                {!projectsOff && (
+                  <Link
+                    href={PROJECTS_TOOL.href}
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                  >
+                    <FolderKanban size={16} aria-hidden="true" />
+                    Projects
+                  </Link>
+                )}
                 <button
                   type="button"
                   onClick={() => setPromptsTab(target ?? DEFAULT_PROMPT_TARGET)}
@@ -258,43 +267,47 @@ export default function PromptCreatorClient() {
                 {/* What the prompt is for. The project chosen last is waiting next time, and its
                     instructions go on the end of every prompt written in it */}
                 <div className="flex flex-col gap-2">
-                  <div className="flex flex-wrap items-end gap-2">
-                    <label htmlFor="prompt-project" className="flex min-w-0 flex-1 flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-outline">
-                      Project
-                      <select
-                        id="prompt-project"
-                        value={currentProjectId ?? NO_PROJECT}
-                        onChange={(event) => formStore.update({ projectId: event.target.value === NO_PROJECT ? null : event.target.value })}
-                        disabled={isGenerating}
-                        className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
-                      >
-                        <option value={NO_PROJECT}>{PROMPT_PROJECT_MESSAGES.none}</option>
-                        {(projects.projects ?? []).map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <Link
-                      href={PROJECTS_TOOL.href}
-                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2.5 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-                    >
-                      <FolderKanban size={14} aria-hidden="true" />
-                      Manage
-                    </Link>
-                  </div>
-                  {selectedProject?.instructions && (
-                    <p className="text-[12px] leading-relaxed text-on-surface-variant">
-                      <span className="font-semibold text-on-surface">This project&apos;s instructions</span> go on the end of the prompt:{" "}
-                      <span className="italic">{selectedProject.instructions.slice(0, 160)}</span>
-                      {selectedProject.instructions.length > 160 && "..."}
-                    </p>
-                  )}
-                  {projects.error && (
-                    <p role="alert" className="text-[12px] text-error">
-                      {projects.error}
-                    </p>
+                  {!projectsOff && (
+                    <>
+                      <div className="flex flex-wrap items-end gap-2">
+                        <label htmlFor="prompt-project" className="flex min-w-0 flex-1 flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-outline">
+                          Project
+                          <select
+                            id="prompt-project"
+                            value={currentProjectId ?? NO_PROJECT}
+                            onChange={(event) => formStore.update({ projectId: event.target.value === NO_PROJECT ? null : event.target.value })}
+                            disabled={isGenerating}
+                            className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+                          >
+                            <option value={NO_PROJECT}>{PROMPT_PROJECT_MESSAGES.none}</option>
+                            {(projects.projects ?? []).map((project) => (
+                              <option key={project.id} value={project.id}>
+                                {project.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <Link
+                          href={PROJECTS_TOOL.href}
+                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2.5 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                        >
+                          <FolderKanban size={14} aria-hidden="true" />
+                          Manage
+                        </Link>
+                      </div>
+                      {selectedProject?.instructions && (
+                        <p className="text-[12px] leading-relaxed text-on-surface-variant">
+                          <span className="font-semibold text-on-surface">This project&apos;s instructions</span> go on the end of the prompt:{" "}
+                          <span className="italic">{selectedProject.instructions.slice(0, 160)}</span>
+                          {selectedProject.instructions.length > 160 && "..."}
+                        </p>
+                      )}
+                      {projects.error && (
+                        <p role="alert" className="text-[12px] text-error">
+                          {projects.error}
+                        </p>
+                      )}
+                    </>
                   )}
                   {/* Keeping a prompt or not is its own choice, so a one-off can still be written
                       for a project, and a prompt with no project is kept like any other */}
