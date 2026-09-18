@@ -173,16 +173,6 @@ export default function PromptCreatorClient() {
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
                 <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
-                {/* Projects have their own page under Client Work now; this is the way there */}
-                {!projectsOff && (
-                  <Link
-                    href={PROJECTS_TOOL.href}
-                    className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
-                  >
-                    <FolderKanban size={16} aria-hidden="true" />
-                    Projects
-                  </Link>
-                )}
                 <button
                   type="button"
                   onClick={() => setPromptsTab(target ?? DEFAULT_PROMPT_TARGET)}
@@ -295,6 +285,9 @@ export default function PromptCreatorClient() {
                           Manage
                         </Link>
                       </div>
+                      {selectedProject && !isTemporary && (
+                        <p className="text-[12px] leading-relaxed text-on-surface-variant">{PROMPT_PROJECT_MESSAGES.filedInFolder}</p>
+                      )}
                       {selectedProject?.instructions && (
                         <p className="text-[12px] leading-relaxed text-on-surface-variant">
                           <span className="font-semibold text-on-surface">This project&apos;s instructions</span> go on the end of the prompt:{" "}

@@ -49,6 +49,8 @@ export const PROMPT_PROJECT_MESSAGES = {
   nameTooLong: `Keep the project name under ${PROJECT_NAME_MAX_LENGTH} characters.`,
   instructionsTooLong: `Keep the instructions under ${PROJECT_INSTRUCTIONS_MAX_LENGTH.toLocaleString()} characters.`,
   duplicate: "A project with that name already exists.",
+  // Under the picker, so it is clear before writing where the prompt will be kept
+  filedInFolder: "Saved prompts go straight into this project's folder.",
   tooMany: `You can keep up to ${MAX_PROJECTS} projects.`,
   notFound: "That project no longer exists.",
   loadFailed: "Couldn't load your projects. Please try again.",

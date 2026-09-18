@@ -6,7 +6,7 @@ import { PROJECTS_TOOL, PROMPT_PROJECT_MESSAGES } from "@/constants/promptProjec
 import { isFeatureDisabled } from "@/lib/featureAccess"
 import { createPrompt } from "@/services/promptCreator/generate"
 import { saveCreatedPrompt } from "@/services/promptCreator/records"
-import { projectForPrompt } from "@/services/promptCreator/projects"
+import { ensureProjectFolder, projectForPrompt } from "@/services/promptCreator/projects"
 import { appendInstructions } from "@/lib/promptInstructions"
 import { ProjectIdSchema } from "@/lib/validation/promptProjects"
 import { requireViewer } from "@/services/auth/viewer"
@@ -78,7 +78,9 @@ async function handlePost(req: NextRequest) {
       })
     }
 
-    const saved = await saveCreatedPrompt(auth.viewer, created, { text: request, source: requestSource }, project?.id ?? null)
+    // A prompt written in a project is filed in that project's folder, made now if it is missing
+    const folderId = project ? await ensureProjectFolder(auth.viewer, project) : null
+    const saved = await saveCreatedPrompt(auth.viewer, created, { text: request, source: requestSource }, project?.id ?? null, folderId)
     return NextResponse.json({ success: true, message: "Prompt created", data: saved })
   } catch (error: unknown) {
     if (req.signal.aborted) {

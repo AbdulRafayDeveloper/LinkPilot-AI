@@ -85,6 +85,25 @@ export async function deleteFolder(viewer: Viewer, id: string): Promise<{ freed:
   return { freed: modifiedCount }
 }
 
+/**
+ * The folder a project files its prompts in: the one it is already linked to while that still
+ * exists, otherwise the viewer's folder with the project's name (whatever its case, so a folder the
+ * user made by hand is used rather than a second one beside it), otherwise a new folder with that
+ * name. Null only when the account already has MAX_FOLDERS folders, in which case the prompt is
+ * simply saved in no folder rather than failing.
+ */
+export async function folderForProjectName(viewer: Viewer, name: string, linkedId: string | null): Promise<string | null> {
+  await connectDatabase()
+  const scope = visibleTo(viewer)
+  const linked = linkedId ? visibleById(viewer, linkedId) : null
+  if (linked && (await PromptFolderModel.exists(linked))) return linkedId
+  const sameNamed = (await PromptFolderModel.findOne({ ...scope, name: sameName(name) }, { _id: 1 }).lean()) as unknown as StoredFolder | null
+  if (sameNamed) return sameNamed._id.toString()
+  if ((await PromptFolderModel.countDocuments(scope)) >= MAX_FOLDERS) return null
+  const record = await PromptFolderModel.create({ ownerId: viewer.id, name })
+  return record._id.toString()
+}
+
 /** The folder a prompt may be moved into: its id when the viewer may use it, null for no folder. */
 export async function folderForMove(viewer: Viewer, folderId: string | null): Promise<string | null> {
   if (!folderId) return null

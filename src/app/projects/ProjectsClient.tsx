@@ -93,7 +93,8 @@ export default function ProjectsClient() {
                   Projects
                 </h1>
                 <p className="mt-1 text-sm text-on-surface-variant">
-                  What your prompts are written for. A project&apos;s instructions are added to the end of every prompt created in it.
+                  What your prompts are written for. A project&apos;s instructions are added to the end of every prompt created in it, and
+                  each project gets a folder with its name in Prompt Creator, where the prompts written in it are saved.
                 </p>
               </div>
               <button

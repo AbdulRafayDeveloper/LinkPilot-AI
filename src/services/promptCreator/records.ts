@@ -38,7 +38,9 @@ export async function saveCreatedPrompt(
   viewer: Viewer,
   created: GeneratedPrompt,
   request: { text: string; source: RequestSource },
-  projectId: string | null
+  projectId: string | null,
+  // The folder it is filed in from the start: its project's folder, or none
+  folderId: string | null = null
 ): Promise<CreatedPrompt> {
   await connectDatabase()
   const record = await CreatedPromptModel.create({
@@ -49,6 +51,7 @@ export async function saveCreatedPrompt(
     request: request.text,
     requestSource: request.source,
     projectId,
+    folderId,
     provider: created.provider,
   })
   return toCreatedPrompt(record as unknown as StoredCreatedPrompt)

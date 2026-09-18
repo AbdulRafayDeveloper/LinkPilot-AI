@@ -11,6 +11,9 @@ export interface IPromptProject {
   ownerId: string | null
   name: string
   instructions: string
+  // The folder its prompts are filed in (models/PromptFolder.ts), made with the project; null for a
+  // project from before folders were linked, whose folder is made the first time it is needed
+  folderId: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -20,6 +23,7 @@ const PromptProjectSchema = new Schema<IPromptProject>(
     ownerId: OWNER_ID,
     name: { type: String, required: true, trim: true },
     instructions: { type: String, default: "" },
+    folderId: { type: String, default: null },
   },
   { timestamps: true, collection: "prompt_projects" }
 )

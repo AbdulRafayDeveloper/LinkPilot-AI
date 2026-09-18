@@ -7,6 +7,8 @@ export interface PromptProject {
   name: string
   instructions: string
   promptCount: number
+  // The folder its prompts are filed in, which has the project's name; null until it is made
+  folderId: string | null
 }
 
 /** One of a project's prompts, as its own list shows it. */
