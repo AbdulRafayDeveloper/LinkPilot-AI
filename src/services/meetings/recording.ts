@@ -32,6 +32,7 @@ import {
   type UploadTrackId,
 } from "@/constants/meetingRecording"
 import { VOICE_MESSAGES } from "@/constants/voiceInput"
+import { MEETING_MESSAGES } from "@/constants/meetings"
 import type {
   MeetingRecordingLinks,
   MeetingRecordingSummary,
@@ -74,7 +75,7 @@ const chunkSizes = (track: StoredRecordingTrack, total: number) => Array.from({ 
 const sumOf = (values: number[]) => values.reduce((total, value) => total + value, 0)
 
 const segmentsOf = (recording: StoredRecording) =>
-  Object.entries(recording.audio.segments)
+  Object.entries(recording.audio?.segments ?? {})
     .map(([index, segment]) => ({ index: Number(index), ...segment }))
     .sort((a, b) => a.index - b.index)
 
@@ -191,7 +192,15 @@ export async function storeChunk(
         }
       : { [`recording.tracks.${chunk.track}.chunks.${chunk.index}`]: stored.size }
   // Only while it is still recording: a chunk can never land in a recording that has moved on
-  await MeetingModel.updateOne({ _id: found.meeting._id, "recording.stage": "recording" }, { $set: path })
+  const { matchedCount } = await MeetingModel.updateOne({ _id: found.meeting._id, "recording.stage": "recording" }, { $set: path })
+  if (matchedCount === 0) {
+    // The meeting was deleted, or stopped recording, while this chunk was on its way. A delete clears
+    // only the files it knows about, and this one wasn't recorded yet, so nothing would ever remove it:
+    // it goes now, rather than part of a deleted meeting staying in storage
+    await deleteObject(key).catch(() => undefined)
+    if (!(await MeetingModel.exists({ _id: found.meeting._id }))) return null
+    throw new UserFacingError(RECORDING_MESSAGES.notRecording)
+  }
   return true
 }
 
@@ -259,8 +268,23 @@ async function removeObjects(keys: string[]): Promise<void> {
  */
 async function joinTrack(meetingId: string, trackId: RecordingTrackId, track: StoredRecordingTrack, durationMs: number | null, deadline: number): Promise<boolean> {
   const total = track.total ?? 0
-  const set = (fields: Record<string, unknown>) =>
-    MeetingModel.updateOne({ _id: new mongoose.Types.ObjectId(meetingId) }, { $set: Object.fromEntries(Object.entries(fields).map(([key, value]) => [`recording.tracks.${trackId}.${key}`, value])) })
+  // Records progress on the meeting, answering whether the meeting is still there to record it on
+  const set = async (fields: Record<string, unknown>) =>
+    (
+      await MeetingModel.updateOne(
+        { _id: new mongoose.Types.ObjectId(meetingId) },
+        { $set: Object.fromEntries(Object.entries(fields).map(([key, value]) => [`recording.tracks.${trackId}.${key}`, value])) }
+      )
+    ).matchedCount > 0
+  /**
+   * The meeting was deleted while its video was being put together. The delete has already cleared
+   * the files it knew about, so what this step has just written (the finished file, or an upload
+   * still open) has nothing left pointing at it: it is removed here, and the step stops.
+   */
+  const deletedMeanwhile = async (cleanUp: () => Promise<unknown>): Promise<never> => {
+    await cleanUp().catch(() => undefined)
+    throw new UserFacingError(MEETING_MESSAGES.notFound)
+  }
   if (total === 0) {
     await set({ finalKey: null, finalSize: 0, nextPart: 1 })
     return true
@@ -284,17 +308,15 @@ async function joinTrack(meetingId: string, trackId: RecordingTrackId, track: St
   if (parts.length === 1) {
     const bytes = await assemble(parts[0], true)
     await putObject(finalKey, bytes, track.mimeType)
-    await set({ finalKey, finalSize: bytes.length, nextPart: 2 })
+    if (!(await set({ finalKey, finalSize: bytes.length, nextPart: 2 }))) await deletedMeanwhile(() => deleteObject(finalKey))
   } else {
-    let uploadId = track.uploadId
-    if (!uploadId) {
-      uploadId = await startMultipartUpload(finalKey, track.mimeType)
-      await set({ uploadId, nextPart: 1 })
-    }
+    const uploadId = track.uploadId ?? (await startMultipartUpload(finalKey, track.mimeType))
+    const abandon = () => abortMultipartUpload(finalKey, uploadId)
+    if (!track.uploadId && !(await set({ uploadId, nextPart: 1 }))) await deletedMeanwhile(abandon)
     for (let partNumber = track.nextPart; partNumber <= parts.length; partNumber++) {
       if (Date.now() > deadline) return false
       await uploadPartBytes(finalKey, uploadId, partNumber, await assemble(parts[partNumber - 1], partNumber === 1))
-      await set({ nextPart: partNumber + 1 })
+      if (!(await set({ nextPart: partNumber + 1 }))) await deletedMeanwhile(abandon)
     }
     try {
       await completeMultipartUpload(finalKey, uploadId)
@@ -302,7 +324,7 @@ async function joinTrack(meetingId: string, trackId: RecordingTrackId, track: St
       // A step cut off right after completing leaves the file done and the upload gone: that is finished too
       if (!(await headObject(finalKey))) throw error
     }
-    await set({ finalKey, finalSize: (await headObject(finalKey))?.size ?? 0, uploadId: null })
+    if (!(await set({ finalKey, finalSize: (await headObject(finalKey))?.size ?? 0, uploadId: null }))) await deletedMeanwhile(() => deleteObject(finalKey))
   }
   // The finished file is what is kept; the chunks it was made of go
   await removeObjects(Array.from({ length: total }, (_unused, index) => recordingKeys.chunk(meetingId, trackId, index, track.mimeType)))
@@ -455,9 +477,10 @@ export function recordingStorage(meetingId: string, stored: unknown): { keys: st
   const keys: string[] = []
   const uploads: { key: string; uploadId: string }[] = []
   for (const trackId of RECORDING_TRACKS) {
-    const track = recording.tracks[trackId]
+    const track = recording.tracks?.[trackId]
     if (!track) continue
-    for (const index of Object.keys(track.chunks)) keys.push(recordingKeys.chunk(meetingId, trackId, Number(index), track.mimeType))
+    // Missing, not empty, on a track that hasn't sent a chunk yet (an empty object isn't saved)
+    for (const index of Object.keys(track.chunks ?? {})) keys.push(recordingKeys.chunk(meetingId, trackId, Number(index), track.mimeType))
     const finalKey = recordingKeys.final(meetingId, trackId, track.mimeType)
     keys.push(finalKey)
     if (track.uploadId) uploads.push({ key: finalKey, uploadId: track.uploadId })
@@ -471,9 +494,9 @@ export function recordingStorage(meetingId: string, stored: unknown): { keys: st
  * the meeting goes first and this after it: a storage failure is logged, never undoes the delete.
  */
 export async function removeRecordingFiles(meetingId: string, stored: unknown): Promise<void> {
-  const { keys, uploads } = recordingStorage(meetingId, stored)
-  if (keys.length === 0 || !isStorageConfigured()) return
   try {
+    const { keys, uploads } = recordingStorage(meetingId, stored)
+    if (keys.length === 0 || !isStorageConfigured()) return
     await Promise.all(uploads.map((upload) => abortMultipartUpload(upload.key, upload.uploadId)))
     await removeObjects(keys)
   } catch (error: unknown) {

@@ -20,6 +20,10 @@ import {
   VIDEO_MIME_TYPES,
   recordingEndpoint,
   type UploadTrackId,
+  LAPTOP_HEARD_LEVEL,
+  MEETING_SILENCE_WARN_MS,
+  VOICE_HEARD_LEVEL,
+  type RecordingSoundMode,
 } from "@/constants/meetingRecording"
 
 /**
@@ -58,6 +62,10 @@ export interface RecorderSnapshot {
   hasCamera: boolean
   hasMicrophone: boolean
   hasMeetingSound: boolean
+  // How loud the meeting (everyone else) and your microphone are right now, from 0 to 1
+  levels: { meeting: number; mic: number }
+  // The other people haven't been heard for a while although you have: their sound may not be reaching it
+  meetingSilent: boolean
   // Worth saying, not worth stopping for (the microphone was refused)
   notices: string[]
   error: string | null
@@ -95,6 +103,8 @@ const IDLE: RecorderSnapshot = {
   hasCamera: false,
   hasMicrophone: false,
   hasMeetingSound: false,
+  levels: { meeting: 0, mic: 0 },
+  meetingSilent: false,
   notices: [],
   error: null,
   preview: null,
@@ -108,6 +118,75 @@ const pickType = (candidates: readonly string[]) =>
 
 const stopStream = (stream: MediaStream | null) => stream?.getTracks().forEach((track) => track.stop())
 
+interface MeetingSoundConstraints extends MediaTrackConstraints {
+  suppressLocalAudioPlayback?: boolean
+}
+
+// The screen picker's hints that Chrome and Edge understand and TypeScript's DOM types don't list yet
+interface MeetingShareOptions extends DisplayMediaStreamOptions {
+  audio?: boolean | MeetingSoundConstraints
+  systemAudio?: "include" | "exclude"
+  selfBrowserSurface?: "include" | "exclude"
+  surfaceSwitching?: "include" | "exclude"
+  monitorTypeSurfaces?: "include" | "exclude"
+  preferCurrentTab?: boolean
+}
+
+/**
+ * How the meeting is shared. Its sound is the only way the other people's voices reach the
+ * recording, so the picker is asked to offer it for every kind of share it can: the tab's own sound,
+ * and the whole system's sound when an entire screen is shared (Zoom or Teams in their own apps).
+ * This tab is left out of the list, since it has no meeting sound in it. And the meeting's sound is
+ * taken as it plays: echo cancelling, noise suppression and gain control are made for a microphone,
+ * and on other people's voices they thin them out or cut them off.
+ */
+const SHARE_OPTIONS: MeetingShareOptions = {
+  video: { frameRate: { ideal: 15, max: 30 } },
+  audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
+  systemAudio: "include",
+  selfBrowserSurface: "exclude",
+  surfaceSwitching: "include",
+  monitorTypeSurfaces: "include",
+  preferCurrentTab: false,
+}
+
+// Only your voice: the screen is still shared (the recording keeps it), but no sound is asked for
+const VOICE_ONLY_SHARE: MeetingShareOptions = {
+  video: SHARE_OPTIONS.video,
+  audio: false,
+  selfBrowserSurface: "exclude",
+  surfaceSwitching: "include",
+  monitorTypeSurfaces: "include",
+  preferCurrentTab: false,
+}
+
+// What to fix when a share came without sound, which depends on what was shared
+function noSoundMessage(surface: string | undefined): string {
+  if (surface === "window") return RECORDING_MESSAGES.noSoundWindow
+  if (surface === "browser") return RECORDING_MESSAGES.noSoundTab
+  if (surface === "monitor") return RECORDING_MESSAGES.noSoundScreen
+  return RECORDING_MESSAGES.noSoundShared
+}
+
+// The longest window a meter can hold, about 0.7s at 48 kHz, so each half-second tick sees everything since the last
+const METER_SAMPLES = 32768
+
+// The loudest moment a meter heard since the last look, from 0 (silence) to 1
+function peakOf(meter: AnalyserNode | null, buffer: Float32Array<ArrayBuffer>): number {
+  if (!meter) return 0
+  meter.getFloatTimeDomainData(buffer)
+  let peak = 0
+  for (const sample of buffer) peak = Math.max(peak, Math.abs(sample))
+  return peak
+}
+
+// A peak shown the way loudness is heard: -70 dB and quieter is empty, full scale is full
+const SHOWN_FLOOR_DB = 70
+const shownLevel = (peak: number) => (peak <= 0 ? 0 : Math.max(0, Math.min(1, (20 * Math.log10(peak) + SHOWN_FLOOR_DB) / SHOWN_FLOOR_DB)))
+
+/** Where each meter shows sound rather than silence, so the page and the recorder agree on "heard". */
+export const HEARD_LEVELS_SHOWN = { laptop: shownLevel(LAPTOP_HEARD_LEVEL), voice: shownLevel(VOICE_HEARD_LEVEL) } as const
+
 class MeetingRecorder {
   private snapshot: RecorderSnapshot = IDLE
   private listeners = new Set<() => void>()
@@ -117,6 +196,12 @@ class MeetingRecorder {
   private camera: MediaStream | null = null
   private audioContext: AudioContext | null = null
   private mixedAudio: MediaStreamTrack | null = null
+  // One meter on each side of the mix, and when each side was last heard
+  private meetingMeter: AnalyserNode | null = null
+  private micMeter: AnalyserNode | null = null
+  private meterData = new Float32Array(METER_SAMPLES)
+  private meetingHeardAt = 0
+  private micHeardAt = 0
   private continuous: ContinuousTrack[] = []
 
   private audioRecorder: MediaRecorder | null = null
@@ -183,7 +268,10 @@ class MeetingRecorder {
    * Asks for the screen (and the microphone and camera), saves the meeting, and starts recording.
    * Must be called from a click: browsers only open the screen picker for one.
    */
-  async start(options: { title: string; withMicrophone: boolean; withCamera: boolean }) {
+  async start(options: { title: string; withMicrophone: boolean; withCamera: boolean; sound: RecordingSoundMode }) {
+    // Only your voice: there is no laptop sound to share, and the microphone is the whole recording
+    const onlyVoice = options.sound === "voice"
+    const withMicrophone = onlyVoice || options.withMicrophone
     if (this.isBusy()) return
     const screenMime = pickType(VIDEO_MIME_TYPES)
     const audioMime = pickType(AUDIO_MIME_TYPES)
@@ -201,12 +289,21 @@ class MeetingRecorder {
 
     try {
       // The screen picker first, while the click still counts as the user's own
-      this.display = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 30 } }, audio: true })
+      this.display = await navigator.mediaDevices.getDisplayMedia(onlyVoice ? VOICE_ONLY_SHARE : SHARE_OPTIONS)
     } catch {
       this.update({ status: "error", error: RECORDING_MESSAGES.shareCancelled })
       return
     }
-    if (options.withMicrophone) {
+    // What the laptop plays (the other people, a call, a video) is only ever heard through the share's
+    // own sound. Without it the recording would hold nobody but you, so it stops here, before anything
+    // is saved, and says what to share
+    if (!onlyVoice && this.display.getAudioTracks().length === 0) {
+      const surface = this.display.getVideoTracks()[0]?.getSettings().displaySurface
+      this.release()
+      this.update({ status: "error", error: noSoundMessage(surface) })
+      return
+    }
+    if (withMicrophone) {
       try {
         this.microphone = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
       } catch {
@@ -223,17 +320,21 @@ class MeetingRecorder {
     }
 
     // The meeting's sound and the microphone become one track, which both the video and the audio pieces carry
-    const meetingSound = this.display.getAudioTracks()
+    const meetingSound = onlyVoice ? [] : this.display.getAudioTracks()
     const micSound = this.microphone?.getAudioTracks() ?? []
-    if (meetingSound.length + micSound.length === 0) {
+    if (onlyVoice && micSound.length === 0) {
       this.release()
-      this.update({ status: "error", error: RECORDING_MESSAGES.noSound })
+      this.update({ status: "error", error: RECORDING_MESSAGES.micRequired })
       return
     }
     this.audioContext = new AudioContext()
     await this.audioContext.resume().catch(() => undefined)
     const mix = this.audioContext.createMediaStreamDestination()
-    for (const track of [...meetingSound, ...micSound]) this.audioContext.createMediaStreamSource(new MediaStream([track])).connect(mix)
+    // Each side goes into the mix through its own meter, so the page can show both are coming through
+    this.meetingMeter = meetingSound.length > 0 ? this.connectMetered(this.audioContext, meetingSound, mix) : null
+    this.micMeter = micSound.length > 0 ? this.connectMetered(this.audioContext, micSound, mix) : null
+    this.meetingHeardAt = Date.now()
+    this.micHeardAt = 0
     this.mixedAudio = mix.stream.getAudioTracks()[0]
 
     let meetingId: string
@@ -283,6 +384,35 @@ class MeetingRecorder {
       notices,
       preview: this.display,
     })
+  }
+
+  // One side of the sound into the mix, with a meter listening to it on the way
+  private connectMetered(context: AudioContext, tracks: MediaStreamTrack[], mix: MediaStreamAudioDestinationNode): AnalyserNode {
+    const meter = context.createAnalyser()
+    meter.fftSize = METER_SAMPLES
+    for (const track of tracks) {
+      const source = context.createMediaStreamSource(new MediaStream([track]))
+      source.connect(mix)
+      source.connect(meter)
+    }
+    return meter
+  }
+
+  /**
+   * How loud each side is now, and whether the other people have gone quiet while you haven't. That
+   * is the sign their sound has stopped reaching the recording (the shared tab muted, or the share
+   * changed to something without sound), and it is only raised while you are heard, so a quiet
+   * room where nobody is talking is never mistaken for it.
+   */
+  private measure(): Pick<RecorderSnapshot, "levels" | "meetingSilent"> {
+    const now = Date.now()
+    const meeting = peakOf(this.meetingMeter, this.meterData)
+    const mic = peakOf(this.micMeter, this.meterData)
+    if (meeting >= LAPTOP_HEARD_LEVEL) this.meetingHeardAt = now
+    if (mic >= VOICE_HEARD_LEVEL) this.micHeardAt = now
+    const meetingSilent =
+      this.meetingMeter !== null && now - this.meetingHeardAt >= MEETING_SILENCE_WARN_MS && now - this.micHeardAt < MEETING_SILENCE_WARN_MS
+    return { levels: { meeting: shownLevel(meeting), mic: shownLevel(mic) }, meetingSilent }
   }
 
   private startContinuous(track: "screen" | "camera", stream: MediaStream, mimeType: string, bits: MediaRecorderOptions): ContinuousTrack {
@@ -354,7 +484,7 @@ class MeetingRecorder {
       const segmentMs = this.activeMs() - this.audioSegmentStartMs
       if (segmentMs >= AUDIO_SEGMENT_MS || this.audioBytes >= AUDIO_SEGMENT_MAX_BYTES) void this.rotateAudio()
     }
-    this.update({})
+    this.update(this.snapshot.status === "recording" ? this.measure() : { levels: { meeting: 0, mic: 0 }, meetingSilent: false })
   }
 
   pause() {
@@ -371,6 +501,7 @@ class MeetingRecorder {
     for (const entry of this.continuous) if (entry.recorder.state === "paused") entry.recorder.resume()
     if (this.audioRecorder?.state === "paused") this.audioRecorder.resume()
     this.activeSinceMs = Date.now()
+    this.meetingHeardAt = Date.now()
     this.update({ status: "recording", uploadsPaused: false })
     this.kick()
   }
@@ -516,6 +647,8 @@ class MeetingRecorder {
     this.camera = null
     this.mixedAudio = null
     this.audioContext = null
+    this.meetingMeter = null
+    this.micMeter = null
     if (!this.isBusy()) {
       window.removeEventListener("beforeunload", this.warnBeforeLeaving)
       window.removeEventListener("online", this.kick)

@@ -3,14 +3,21 @@
 import React, { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, Circle, CloudUpload, Loader2, Mic, MonitorUp, Pause, Play, Square, Video, WifiOff } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, Circle, CloudUpload, Headphones, Laptop, Loader2, Mic, MonitorUp, Pause, Play, Square, Video, WifiOff } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useMeetingRecorder } from "@/hooks/useMeetingRecorder"
-import { meetingRecorder } from "@/lib/meetingRecorder"
+import { HEARD_LEVELS_SHOWN, meetingRecorder } from "@/lib/meetingRecorder"
 import { MEETING_TITLE_MAX_LENGTH } from "@/constants/meetings"
-import { RECORDING_CHUNK_MAX_BYTES } from "@/constants/meetingRecording"
+import {
+  DEFAULT_SOUND_MODE,
+  RECORDING_CHUNK_MAX_BYTES,
+  RECORDING_MESSAGES,
+  RECORDING_SOUND_MODES,
+  type RecordingSoundMode,
+} from "@/constants/meetingRecording"
+import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
 
 const megabytes = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`
 
@@ -26,6 +33,38 @@ const toggleClass =
   "flex items-start gap-3 rounded-xl border border-outline-variant bg-white p-3 text-left transition-colors hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
 
 /**
+ * How loud one side of the meeting is, live. Filled when there is sound, and saying so in words too,
+ * so whether the other people are coming through never rests on colour alone.
+ */
+const SoundMeter: React.FC<{ label: string; icon: React.ElementType; level: number; heardAt: number }> = ({ label, icon: Icon, level, heardAt }) => {
+  const isHeard = level >= heardAt
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2 text-[12px]">
+        <span className="flex items-center gap-1.5 font-semibold text-on-surface">
+          <Icon size={14} className="text-primary" aria-hidden="true" />
+          {label}
+        </span>
+        <span className={isHeard ? "font-semibold text-success" : "text-outline"}>{isHeard ? "Hearing sound" : "Quiet"}</span>
+      </div>
+      <div
+        role="meter"
+        aria-label={`${label}, sound level`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(level * 100)}
+        className="h-2 w-full overflow-hidden rounded-full bg-surface-container-high"
+      >
+        <div
+          className={`h-full rounded-full transition-[width] duration-300 ${isHeard ? "bg-success" : "bg-outline/50"}`}
+          style={{ width: `${Math.round(level * 100)}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/**
  * Record a meeting: share the call's tab or screen with its sound, speak into the microphone, and the
  * app uploads it in chunks while it records. Stopping waits for the last chunk, then opens the meeting,
  * where the recording is joined, written out and turned into notes.
@@ -38,6 +77,9 @@ export default function RecordMeetingClient() {
   const [title, setTitle] = useState("")
   const [withMicrophone, setWithMicrophone] = useState(true)
   const [withCamera, setWithCamera] = useState(false)
+  const [sound, setSound] = useState<RecordingSoundMode>(DEFAULT_SOUND_MODE)
+  // Recording only your voice, the microphone is the recording, so it can't be switched off
+  const onlyVoice = sound === "voice"
   const previewRef = useRef<HTMLVideoElement>(null)
 
   // The shared screen, small, so it is clear what is being recorded
@@ -76,8 +118,8 @@ export default function RecordMeetingClient() {
                 Record a meeting
               </h1>
               <p className="mt-1 text-sm text-on-surface-variant">
-                Share the meeting&apos;s tab or window with its sound. It uploads while it records; when you stop, it is written out and turned
-                into notes, and the meeting gets a name you can change.
+                Record a meeting, a WhatsApp call, a video, or just yourself: your voice and whatever the laptop plays. It uploads while it
+                records; when you stop, it is written out and turned into notes, and it gets a name you can change.
               </p>
             </div>
 
@@ -109,15 +151,31 @@ export default function RecordMeetingClient() {
                     className="rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
                   />
                 </label>
+                <RadioCardGroup
+                  name="recording-sound"
+                  legend="What are you recording?"
+                  options={RECORDING_SOUND_MODES}
+                  value={sound}
+                  onChange={setSound}
+                  wrapLabels
+                />
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <label className={toggleClass}>
-                    <input type="checkbox" checked={withMicrophone} onChange={(event) => setWithMicrophone(event.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
+                    <input
+                      type="checkbox"
+                      checked={onlyVoice || withMicrophone}
+                      onChange={(event) => setWithMicrophone(event.target.checked)}
+                      disabled={onlyVoice}
+                      className="mt-1 h-4 w-4 accent-primary disabled:opacity-60"
+                    />
                     <span className="flex flex-col gap-0.5">
                       <span className="flex items-center gap-1.5 text-sm font-semibold text-on-surface">
                         <Mic size={15} aria-hidden="true" />
                         My microphone
                       </span>
-                      <span className="text-[12px] text-on-surface-variant">Your own voice, mixed with the meeting&apos;s sound.</span>
+                      <span className="text-[12px] text-on-surface-variant">
+                        {onlyVoice ? "Always on: your voice is the recording." : "Your own voice, mixed with the laptop's sound."}
+                      </span>
                     </span>
                   </label>
                   <label className={toggleClass}>
@@ -131,13 +189,43 @@ export default function RecordMeetingClient() {
                     </span>
                   </label>
                 </div>
-                <p className="flex items-start gap-2 rounded-xl bg-surface-container-lowest px-3 py-2 text-[12px] text-on-surface-variant">
-                  <MonitorUp size={14} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
-                  In the next step pick the meeting&apos;s tab and tick &ldquo;Share tab audio&rdquo;, or other people won&apos;t be heard.
-                </p>
+                {/* What the laptop plays is only heard through what is shared, so the choice in the next step
+                    decides whether it is recorded. A share without sound is refused before anything starts */}
+                {onlyVoice ? (
+                  <p className="flex items-start gap-2 rounded-xl bg-surface-container-lowest px-3 py-2.5 text-[12px] text-on-surface-variant">
+                    <MonitorUp size={14} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
+                    In the next step pick any screen, window or tab to show. Only your microphone is recorded, so no sound option is needed.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2 rounded-xl bg-surface-container-lowest px-3 py-2.5 text-[12px] text-on-surface-variant">
+                    <p className="flex items-center gap-1.5 font-semibold text-on-surface">
+                      <MonitorUp size={14} className="shrink-0 text-primary" aria-hidden="true" />
+                      So the laptop&apos;s sound is recorded, in the next step:
+                    </p>
+                    <ul className="flex flex-col gap-1.5 pl-5">
+                      <li className="list-disc">
+                        <span className="font-semibold text-on-surface">Anything that plays on the laptop</span> (a WhatsApp call, the Zoom or Teams app,
+                        YouTube, any tab): pick <span className="font-semibold text-on-surface">Entire screen</span> and switch on{" "}
+                        <span className="font-semibold text-on-surface">&ldquo;Also share system audio&rdquo;</span>. This catches every sound the laptop makes.
+                      </li>
+                      <li className="list-disc">
+                        <span className="font-semibold text-on-surface">Just one browser tab</span> (Google Meet, YouTube, WhatsApp Web): pick that{" "}
+                        <span className="font-semibold text-on-surface">tab</span> and keep{" "}
+                        <span className="font-semibold text-on-surface">&ldquo;Also share tab audio&rdquo;</span> on.
+                      </li>
+                      <li className="list-disc">
+                        Don&apos;t pick a <span className="font-semibold text-on-surface">window</span>: a window carries no sound, so it is refused.
+                      </li>
+                    </ul>
+                    <p className="flex items-start gap-1.5">
+                      <Headphones size={14} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
+                      Wear headphones if you can, so the laptop&apos;s sound isn&apos;t also picked up a second time through your microphone.
+                    </p>
+                  </div>
+                )}
                 <button
                   type="button"
-                  onClick={() => void meetingRecorder.start({ title, withMicrophone, withCamera })}
+                  onClick={() => void meetingRecorder.start({ title, withMicrophone, withCamera, sound })}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
                 >
                   <Circle size={14} className="fill-current" aria-hidden="true" />
@@ -229,6 +317,19 @@ export default function RecordMeetingClient() {
                     {recorder.uploadsPaused ? ". Uploads are paused with the recording." : "."}
                   </p>
                 </div>
+
+                {recorder.status === "recording" && (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {recorder.hasMeetingSound && <SoundMeter label="Laptop sound" icon={Laptop} level={recorder.levels.meeting} heardAt={HEARD_LEVELS_SHOWN.laptop} />}
+                    {recorder.hasMicrophone && <SoundMeter label="Your voice" icon={Mic} level={recorder.levels.mic} heardAt={HEARD_LEVELS_SHOWN.voice} />}
+                  </div>
+                )}
+                {recorder.meetingSilent && (
+                  <p role="alert" className="flex items-start gap-2 rounded-xl border border-secondary-fixed-dim bg-secondary-fixed/40 px-3 py-2 text-[12px] text-on-secondary-fixed-variant">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+                    {RECORDING_MESSAGES.meetingSilent}
+                  </p>
+                )}
 
                 <ul className="flex flex-wrap gap-1.5 text-[11px] font-semibold">
                   <li className="rounded-full bg-surface-container-high px-2 py-0.5 text-on-surface-variant">Screen</li>
