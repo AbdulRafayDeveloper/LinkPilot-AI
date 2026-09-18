@@ -8,6 +8,7 @@ import {
   providerNames,
 } from "@/services/ai"
 import { GROQ_API_KEYS } from "@/config/env"
+import { activeGroqKeyNumber } from "@/services/groqKeyState"
 import { isImageModelConfigured } from "@/services/imageGeneration"
 import { isStorageConfigured } from "@/services/storage/s3"
 import { requireViewer } from "@/services/auth/viewer"
@@ -52,6 +53,8 @@ export async function GET() {
         screenshots: isProviderConfigured("groq", "image") || isProviderConfigured("openai", "image"),
         // How many Groq keys are set, never which
         groqKeys: GROQ_API_KEYS.length,
+        // The number of the Groq key calls start from now (GROQ_API_KEY_<n>), never its value
+        groqActiveKey: await activeGroqKeyNumber(),
         // Post Image Creator
         imageGeneration: isImageModelConfigured(),
         // Important Files and Post Image Creator

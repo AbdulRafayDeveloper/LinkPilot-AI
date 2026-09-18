@@ -32,7 +32,7 @@ export interface AiUsage {
   totalTokens: number | null
   // Speech only: how long the recording was, when the provider says
   audioSeconds: number | null
-  // Groq only: which of GROQ_API_KEY_1..5 answered (1-based)
+  // Groq only: the number of the GROQ_API_KEY_<n> that answered
   keyNumber: number | null
 }
 

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { numberedKeys } from "@/lib/keyRotation"
 
 /**
  * Server-side configuration and the single source of truth for every URL, secret and AI
@@ -21,13 +22,8 @@ const envSchema = z.object({
   // Turns text into vectors for the meeting chat (e.g. text-embedding-3-small). Groq has no embedding
   // model, so this is OpenAI's; without it a meeting cannot be asked questions
   OPENAI_EMBEDDING_MODEL: z.string().optional(),
-  // Groq, the first provider everywhere. Up to five API keys, tried in order: a key that is rejected or
-  // rate limited hands the call to the next one (services/ai.ts withGroqKey)
-  GROQ_API_KEY_1: z.string().optional(),
-  GROQ_API_KEY_2: z.string().optional(),
-  GROQ_API_KEY_3: z.string().optional(),
-  GROQ_API_KEY_4: z.string().optional(),
-  GROQ_API_KEY_5: z.string().optional(),
+  // Groq, the first provider everywhere. Its keys (GROQ_API_KEY_1, _2, _3 … as many as are set) are read
+  // below as GROQ_API_KEYS rather than listed here, so adding a key never needs a code change
   // Writes every text and runs live web research (Groq's browser search), e.g. openai/gpt-oss-120b
   GROQ_MODEL: z.string().optional(),
   // Reads screenshots, e.g. qwen/qwen3.8-27b; without it screenshots go to the next provider
@@ -69,10 +65,13 @@ function readEnv() {
 
 export const env = readEnv()
 
-// The Groq keys that are set, in the order they are tried
-export const GROQ_API_KEYS = [env.GROQ_API_KEY_1, env.GROQ_API_KEY_2, env.GROQ_API_KEY_3, env.GROQ_API_KEY_4, env.GROQ_API_KEY_5].filter(
-  (key): key is string => Boolean(key)
-)
+// Every Groq key that is set, GROQ_API_KEY_1, _2, _3 … however many, in number order. A key added where
+// the app runs is used from the next start with no code change; one that is rejected or rate limited
+// hands the call to the next (services/ai.ts withGroqKey, services/groqKeyState.ts)
+export const GROQ_API_KEYS = numberedKeys(process.env, "GROQ_API_KEY_")
+
+// How the Groq keys are named in a message that says what to set
+export const GROQ_KEY_VARIABLES = "GROQ_API_KEY_1, GROQ_API_KEY_2 …"
 
 // The public site origin without a trailing slash, for canonical links, the sitemap and JSON-LD
 export const SITE_URL = env.NEXT_PUBLIC_BASE_URL.replace(/\/+$/, "")

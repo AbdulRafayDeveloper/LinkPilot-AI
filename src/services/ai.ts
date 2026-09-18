@@ -5,15 +5,16 @@ import { ChatGroq } from "@langchain/groq"
 import { Embeddings } from "@langchain/core/embeddings"
 import type { BaseMessage } from "@langchain/core/messages"
 import type { InteropZodType } from "@langchain/core/utils/types"
-import { env, GROQ_API_KEYS } from "@/config/env"
+import { env, GROQ_API_KEYS, GROQ_KEY_VARIABLES } from "@/config/env"
 import { UserFacingError } from "@/lib/errors"
-import { describeProviderFailure, isKeyLimitError, keyRestMs, type ProviderNames } from "@/lib/providerErrors"
+import { describeProviderFailure, isKeyLimitError, keyRestMs, redactSecrets, type ProviderNames } from "@/lib/providerErrors"
 import { withKeyRotation } from "@/lib/keyRotation"
 import { currentModelOrder } from "@/lib/modelOrder"
 import { withRetry } from "@/lib/retry"
 import { isTransientError, retryAfterOf } from "@/lib/transientErrors"
 import { AI_PROVIDER_LABELS, MODEL_PROVIDERS, type AiProviderId } from "@/constants/aiProviders"
 import { recordAiUsage } from "@/services/aiUsage"
+import { groqKeyPlan, noteGroqKeyAnswered, noteGroqKeyResting } from "@/services/groqKeyState"
 import type { AiText } from "@/types/ai"
 
 /**
@@ -35,7 +36,6 @@ export interface ModelOptions {
 }
 
 const DEFAULT_TEMPERATURE = 0.1
-const GROQ_KEY_VARIABLES = "GROQ_API_KEY_1 to GROQ_API_KEY_5"
 
 interface ProviderSettings {
   // What the provider needs before it can be called, by variable name, and whether each is set
@@ -108,26 +108,37 @@ function requireModel(model: string | undefined, variable: string): string {
   return model
 }
 
-// When each Groq key may be tried first again, shared by every call this server process makes
-const restingGroqKeys = new Map<number, number>()
-
 /**
- * Runs one Groq call with the first usable key. A key that is rejected, rate limited or out of quota
- * hands the same call to the next key (lib/keyRotation.ts), so up to five keys cover for each other;
- * only when every key has failed does the error reach the caller, and the next provider takes over.
+ * Runs one Groq call, for every module, starting on the key that answered last (services/groqKeyState.ts,
+ * shared by every server instance) and going round the keys from there: after the last key comes the
+ * first. A key that is rejected, rate limited or out of quota hands the same call to the next key
+ * (lib/keyRotation.ts) and becomes the key calls start from once it answers, so a used-up key is not
+ * asked again on every call. Only when every key has failed does the error reach the caller, and the
+ * next provider takes over.
  */
-export function withGroqKey<T>(call: (apiKey: string, keyNumber: number) => Promise<T>, signal?: AbortSignal): Promise<T> {
+export async function withGroqKey<T>(call: (apiKey: string, keyNumber: number) => Promise<T>, signal?: AbortSignal): Promise<T> {
   if (GROQ_API_KEYS.length === 0) {
-    return Promise.reject(new UserFacingError(`Groq is not configured. Set ${GROQ_KEY_VARIABLES} where the app runs.`))
+    throw new UserFacingError(`Groq is not configured. Set ${GROQ_KEY_VARIABLES} where the app runs.`)
   }
-  return withKeyRotation(GROQ_API_KEYS, (apiKey, index) => call(apiKey, index + 1), {
-    isKeyError: isKeyLimitError,
-    restMs: (error) => keyRestMs(error, retryAfterOf(error)),
-    resting: restingGroqKeys,
-    signal,
-    onSwitch: (from, to, error) =>
-      console.warn(`🔑 Groq key ${from + 1} of ${GROQ_API_KEYS.length} failed (${error instanceof Error ? error.message : error}); trying key ${to + 1}`),
-  })
+  const { start, resting } = await groqKeyPlan()
+  const numberOf = (index: number) => GROQ_API_KEYS[index].number
+  return withKeyRotation(
+    GROQ_API_KEYS.map((key) => key.value),
+    (apiKey, index) => call(apiKey, numberOf(index)),
+    {
+      isKeyError: isKeyLimitError,
+      restMs: (error) => keyRestMs(error, retryAfterOf(error)),
+      resting,
+      start,
+      signal,
+      onRest: noteGroqKeyResting,
+      onAnswer: noteGroqKeyAnswered,
+      onSwitch: (from, to, error) =>
+        console.warn(
+          `🔑 Groq key ${numberOf(from)} (${from + 1} of ${GROQ_API_KEYS.length}) failed (${redactSecrets(error instanceof Error ? error.message : String(error))}); trying key ${numberOf(to)}`
+        ),
+    }
+  )
 }
 
 /** The Groq chat model (GROQ_MODEL, or GROQ_VISION_MODEL for a screenshot) on one key. */

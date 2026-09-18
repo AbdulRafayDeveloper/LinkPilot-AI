@@ -1,3 +1,4 @@
+import { GROQ_KEY_VARIABLES } from "@/config/env"
 import {
   isGroqTranscriptionConfigured,
   isTranscriptionConfigured,
@@ -40,7 +41,7 @@ const READERS: Record<TranscriptionProvider, Reader> = {
   groq: {
     isConfigured: isGroqTranscriptionConfigured,
     read: transcribeWithGroq,
-    names: { label: "Groq transcription", keyVariable: "GROQ_API_KEY_1 to GROQ_API_KEY_5", modelVariable: "GROQ_TRANSCRIPTION_MODEL" },
+    names: { label: "Groq transcription", keyVariable: GROQ_KEY_VARIABLES, modelVariable: "GROQ_TRANSCRIPTION_MODEL" },
   },
   openai: {
     isConfigured: isTranscriptionConfigured,
