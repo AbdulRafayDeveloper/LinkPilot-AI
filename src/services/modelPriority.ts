@@ -6,6 +6,7 @@ import { AI_MODULE_IDS, AI_MODULE_NEEDS, type AiModuleId, type UsageOnlyModuleId
 import { APP_TOOLS } from "@/constants/linkedinTools"
 import { isGroqTranscriptionConfigured, isProviderConfigured, isTranscriptionConfigured } from "@/services/ai"
 import { accountNames } from "@/services/auth/accounts"
+import { buildModelMap } from "@/services/modelMap"
 import type { Viewer } from "@/types/auth"
 import type { ModelPriorityOverview, ModelProviderStatus } from "@/types/modelPriority"
 import type { AiSource } from "@/types/ai"
@@ -73,6 +74,11 @@ export async function getModelPriorities(): Promise<ModelPriorityOverview> {
   const saved = (await ModelPriority.find({ module: { $in: [...AI_MODULE_IDS] } }).lean()) as IModelPriority[]
   const byModule = new Map(saved.map((entry) => [entry.module, entry]))
   const names = await accountNames(saved.map((entry) => entry.updatedBy))
+  const adminOrders = new Map(
+    saved
+      .map((entry) => [entry.module, resolveModelOrder("admin", entry.order)] as const)
+      .filter(([, order]) => order.some((provider, index) => provider !== DEFAULT_MODEL_ORDER[index]))
+  )
   return {
     modules: AI_MODULE_IDS.map((id) => {
       const entry = byModule.get(id)
@@ -90,6 +96,7 @@ export async function getModelPriorities(): Promise<ModelPriorityOverview> {
     }),
     providers: providerStatuses(),
     defaultOrder: [...DEFAULT_MODEL_ORDER],
+    modelMap: await buildModelMap(adminOrders),
   }
 }
 

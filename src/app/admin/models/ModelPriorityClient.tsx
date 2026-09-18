@@ -7,6 +7,7 @@ import { Header } from "@/components/ui/Header"
 import { SortableList } from "@/components/ui/SortableList"
 import { dateTime } from "@/components/admin/AdminParts"
 import { AiUsagePanel } from "@/components/admin/AiUsagePanel"
+import { ModelMapTable } from "@/components/admin/ModelMapTable"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { AI_PROVIDER_LABELS, type AiProviderId } from "@/constants/aiProviders"
@@ -169,6 +170,8 @@ export default function ModelPriorityClient() {
                 everyone else always uses the default{defaultOrder ? `: ${defaultOrder}` : ""}. Groq tries each of its keys before the next model.
               </p>
             </div>
+
+            {overview && <ModelMapTable map={overview.modelMap} />}
 
             <AiUsagePanel />
 
