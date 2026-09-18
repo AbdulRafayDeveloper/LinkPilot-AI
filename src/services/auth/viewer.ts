@@ -7,7 +7,8 @@ import { SESSION_COOKIE, SESSION_MS, readSession, signSession } from "@/lib/sess
 import { UserModel } from "@/models/User"
 import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, REQUEST_PATH_HEADER, type UserRole } from "@/constants/auth"
 import { FEATURE_ACCESS_MESSAGES } from "@/constants/featureAccess"
-import { isFeatureDisabled, toolIdForApiPath } from "@/lib/featureAccess"
+import { effectiveDisabledTools, isFeatureDisabled, toolIdForApiPath } from "@/lib/featureAccess"
+import { readFeatureDefaults } from "@/services/featureSettings"
 import type { Viewer } from "@/types/auth"
 
 /**
@@ -23,10 +24,15 @@ export async function getViewer(): Promise<Viewer | null> {
   const session = readSession((await cookies()).get(SESSION_COOKIE)?.value, env.AUTH_SECRET)
   if (!session) return null
   await connectDatabase()
-  const user = await UserModel.findById(session.uid, { email: 1, name: 1, role: 1, sessionVersion: 1, disabledTools: 1 }).lean()
+  // The account and the settings for every user are read side by side, so the tools it may use are
+  // worked out fresh on every request and a change an admin makes applies to the very next one
+  const [user, defaults] = await Promise.all([
+    UserModel.findById(session.uid, { email: 1, name: 1, role: 1, sessionVersion: 1, disabledTools: 1, enabledTools: 1 }).lean(),
+    readFeatureDefaults(),
+  ])
   if (!user || user.sessionVersion !== session.ver) return null
-  // An admin keeps every tool, whatever is stored, so nobody can be locked out of the admin area
-  const disabledTools = user.role === "admin" ? [] : (user.disabledTools ?? [])
+  // What is off for everyone, with this account's own choices on top; an admin keeps every tool
+  const disabledTools = effectiveDisabledTools(user.role, defaults, user)
   return { id: String(user._id), email: user.email, name: user.name, role: user.role, disabledTools }
 }
 

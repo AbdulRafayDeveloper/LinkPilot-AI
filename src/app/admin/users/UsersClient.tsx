@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, CalendarPlus, CheckCircle2, Loader2, Lock, RefreshCw, ShieldCheck, Trash2, UserCheck, Users, UsersRound, X } from "lucide-react"
+import { AlertTriangle, CalendarPlus, CheckCircle2, Loader2, Lock, RefreshCw, ShieldCheck, SlidersHorizontal, Trash2, UserCheck, Users, UsersRound, X } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
@@ -11,6 +11,9 @@ import { FilterPanel, SearchFilter, SelectFilter, historyLabelClass } from "@/co
 import { LoadMore } from "@/components/history/LoadMore"
 import { DeviceLine, EventBadge, StatCard, dateTime, timeAgo } from "@/components/admin/AdminParts"
 import { DeleteAccountDialog } from "@/components/admin/DeleteAccountDialog"
+import { FeatureDefaultsDialog } from "@/components/admin/FeatureDefaultsDialog"
+import { FEATURE_DEFAULTS_ENDPOINT, manageableFeatures } from "@/constants/featureAccess"
+import type { FeatureDefaults } from "@/types/featureAccess"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { useCursorList } from "@/hooks/useCursorList"
@@ -213,6 +216,19 @@ export default function UsersClient() {
   const summary = list.latest?.summary ?? null
   const hasFilters = Boolean(search || role)
 
+  // The tools for every user, shown beside the button that changes them
+  const [isDefaultsOpen, setIsDefaultsOpen] = useState(false)
+  const [defaults, setDefaults] = useState<FeatureDefaults | null>(null)
+  useEffect(() => {
+    const controller = new AbortController()
+    requestApi<FeatureDefaults>(FEATURE_DEFAULTS_ENDPOINT, { signal: controller.signal })
+      .then(({ data }) => setDefaults(data))
+      // Only a summary line: without it the page is still whole, and the dialog says why it failed
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [])
+  const toolCount = manageableFeatures().length
+
   // An admin never deletes their own account, nor the last admin; the server refuses both as well
   const canDelete = (user: AdminUser) => Boolean(me) && user.id !== me?.id && !(user.role === "admin" && (summary?.admins ?? 0) <= 1)
 
@@ -240,12 +256,33 @@ export default function UsersClient() {
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
           <div className="mx-auto flex max-w-[1400px] flex-col gap-4 p-4 md:p-6 lg:p-8">
-            <div>
-              <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
-                <UsersRound size={24} className="shrink-0 text-primary" aria-hidden="true" />
-                User Management
-              </h1>
-              <p className="mt-1 text-sm text-on-surface-variant">Every account, its sign-ins and what it has been doing. Open one for the tools it used.</p>
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+              <div className="min-w-0">
+                <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
+                  <UsersRound size={24} className="shrink-0 text-primary" aria-hidden="true" />
+                  User Management
+                </h1>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  Every account, its sign-ins and what it has been doing. Open one for the tools it used, and to give it its own tools.
+                </p>
+              </div>
+              <div className="flex flex-col items-stretch gap-1 sm:shrink-0 sm:items-end">
+                <button
+                  type="button"
+                  onClick={() => setIsDefaultsOpen(true)}
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                >
+                  <SlidersHorizontal size={16} aria-hidden="true" />
+                  Tools for all users
+                </button>
+                {defaults && (
+                  <span className="text-center text-[12px] text-on-surface-variant sm:text-right">
+                    {defaults.disabledTools.length === 0
+                      ? `All ${toolCount} tools on for every user`
+                      : `${toolCount - defaults.disabledTools.length} of ${toolCount} tools on for every user`}
+                  </span>
+                )}
+              </div>
             </div>
 
             {notice && (
@@ -388,6 +425,7 @@ export default function UsersClient() {
 
       {open && !deleting && <UserDetail user={open} canDelete={canDelete(open)} onDelete={() => setDeleting(open)} onClose={() => setOpen(null)} />}
       {deleting && <DeleteAccountDialog user={deleting} onClose={() => setDeleting(null)} onDeleted={handleDeleted} />}
+      {isDefaultsOpen && <FeatureDefaultsDialog onClose={() => setIsDefaultsOpen(false)} onChanged={setDefaults} />}
     </div>
   )
 }

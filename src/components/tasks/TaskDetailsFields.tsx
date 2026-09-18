@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useId, useState } from "react"
+import React, { useEffect, useId, useRef, useState } from "react"
 import { ChevronDown, Loader2, Paperclip, Trash2 } from "lucide-react"
 import { ImageDropzone } from "@/components/post-input/ImageDropzone"
 import { uploadTaskImage } from "@/lib/taskImageUpload"
@@ -22,6 +22,11 @@ interface TaskDetailsFieldsProps {
    * would look as though it had gone.
    */
   savedImageUrl?: string | null
+  /**
+   * Open from the start with no toggle, for a place that exists only to edit the details (the
+   * Daily Tasks details popup). Off by default, so a list of tasks still opens them on request.
+   */
+  alwaysOpen?: boolean
 }
 
 const labelClass = "mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-outline"
@@ -42,13 +47,21 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
   disabled = false,
   canAttachImage = true,
   savedImageUrl = null,
+  alwaysOpen = false,
 }) => {
   const fieldId = useId()
-  const [isOpen, setIsOpen] = useState(() => hasTaskDetails(details))
+  const [isOpen, setIsOpen] = useState(() => alwaysOpen || hasTaskDetails(details))
   const [isUploading, setIsUploading] = useState(false)
   const descriptionId = `${idPrefix}-${fieldId}-description`
   const imageId = `${idPrefix}-${fieldId}-image`
   const panelId = `${idPrefix}-${fieldId}-panel`
+  // The details as they are now. An upload takes a few seconds, and what is typed in that time, or
+  // an image removed before it lands, must not be undone when it finishes, so the upload's result is
+  // applied to the latest details rather than to the ones it started from
+  const latest = useRef(details)
+  useEffect(() => {
+    latest.current = details
+  })
   // An image already saved shows as it is until it is removed or a new file is chosen in its place
   const showSaved = Boolean(savedImageUrl && details.image && !details.file)
 
@@ -59,9 +72,10 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
     setIsUploading(true)
     try {
       const image = await uploadTaskImage(file)
-      onChange({ ...details, file, image })
+      // Only while this file is still the one chosen: removed or replaced meanwhile, it is left alone
+      if (latest.current.file === file) onChange({ ...latest.current, file, image })
     } catch (error: unknown) {
-      onChange({ ...details, file: null, image: null })
+      if (latest.current.file === file) onChange({ ...latest.current, file: null, image: null })
       onError(error instanceof Error ? error.message : TASK_ATTACHMENT_MESSAGES.uploadFailed)
     } finally {
       setIsUploading(false)
@@ -70,22 +84,24 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
 
   return (
     <div className="flex flex-col">
-      <button
-        type="button"
-        onClick={() => setIsOpen((current) => !current)}
-        disabled={disabled}
-        aria-expanded={isOpen}
-        aria-controls={panelId}
-        className="inline-flex w-fit items-center gap-1.5 rounded-lg px-1.5 py-1 text-[11px] font-semibold text-outline transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:opacity-50"
-      >
-        <Paperclip size={12} aria-hidden="true" />
-        {isOpen ? TASK_ATTACHMENT_MESSAGES.hideDetails : TASK_ATTACHMENT_MESSAGES.addDetails}
-        {!isOpen && hasTaskDetails(details) && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-label="This task has details" />}
-        <ChevronDown size={12} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
-      </button>
+      {!alwaysOpen && (
+        <button
+          type="button"
+          onClick={() => setIsOpen((current) => !current)}
+          disabled={disabled}
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          className="inline-flex w-fit items-center gap-1.5 rounded-lg px-1.5 py-1 text-[11px] font-semibold text-outline transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:opacity-50"
+        >
+          <Paperclip size={12} aria-hidden="true" />
+          {isOpen ? TASK_ATTACHMENT_MESSAGES.hideDetails : TASK_ATTACHMENT_MESSAGES.addDetails}
+          {!isOpen && hasTaskDetails(details) && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-label="This task has details" />}
+          <ChevronDown size={12} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+        </button>
+      )}
 
       {isOpen && (
-        <div id={panelId} className="mt-2 flex flex-col gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-3">
+        <div id={panelId} className={`${alwaysOpen ? "" : "mt-2 "}flex flex-col gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-3`}>
           <div>
             <label htmlFor={descriptionId} className={labelClass}>
               {TASK_ATTACHMENT_MESSAGES.descriptionLabel} <span className="normal-case tracking-normal">(optional)</span>

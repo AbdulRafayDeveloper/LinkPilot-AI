@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   GripVertical,
+  Paperclip,
   ListTodo,
   Loader2,
   Plus,
@@ -70,6 +71,7 @@ interface TaskDayListProps {
   onPageChange: (page: number) => void
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
+  onEditDetails: (task: DailyTask) => void
   // Deletes every picked task at once; the page confirms first, since deleting is final
   onDeletePicked: (ids: string[]) => void
   onMove: (move: TaskMove) => void
@@ -113,6 +115,8 @@ interface TaskRowBodyProps {
   isPending: boolean
   onToggle?: (task: DailyTask, isCompleted: boolean) => void
   onDelete?: (task: DailyTask) => void
+  // Opens the popup that adds or changes the task's description and image; absent on the dragged copy
+  onEditDetails?: (task: DailyTask) => void
   handle: React.ReactNode
   // Picking tasks to move together: one click on the circle picks a task, Shift picks a run of them
   isSelected?: boolean
@@ -133,6 +137,7 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
   isPending,
   onToggle,
   onDelete,
+  onEditDetails,
   handle,
   isSelected = false,
   onSelect,
@@ -198,6 +203,27 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
           </span>
         )}
       </label>
+      {/* The task's description and image, in a popup rather than in the row: the whole row is the
+          drag area, so typing or picking an image inside it would start a drag */}
+      {onEditDetails && !isPending ? (
+        <button
+          type="button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => onEditDetails(task)}
+          aria-label={`${task.description || task.image ? "Edit" : "Add"} details: ${task.content}`}
+          title={task.description || task.image ? "Edit the description and image" : "Add a description or an image"}
+          className={`mt-1 shrink-0 rounded-lg p-2 transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+            task.description || task.image ? "text-primary" : "text-outline"
+          }`}
+        >
+          <Paperclip size={15} aria-hidden="true" />
+        </button>
+      ) : (
+        // The dragged copy and a task still saving keep the same width, so nothing shifts under it
+        <span className="mt-1 shrink-0 p-2 text-outline" aria-hidden="true">
+          <Paperclip size={15} />
+        </span>
+      )}
       {isPending ? (
         <span className="p-2.5" aria-hidden="true">
           <Loader2 size={15} className="animate-spin text-outline" />
@@ -235,6 +261,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   isSelected,
   onToggle,
   onDelete,
+  onEditDetails,
   onSelect,
   wasDragging,
 }: {
@@ -244,6 +271,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   isSelected: boolean
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
+  onEditDetails: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
   wasDragging: () => boolean
 }) {
@@ -271,6 +299,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
         isSelected={isSelected}
         onToggle={onToggle}
         onDelete={onDelete}
+        onEditDetails={onEditDetails}
         onSelect={onSelect}
         wasDragging={wasDragging}
         handle={
@@ -399,6 +428,7 @@ const DayGroup = memo(function DayGroup({
   isOverDay,
   onToggle,
   onDelete,
+  onEditDetails,
   onSelect,
   onAddTask,
   wasDragging,
@@ -412,6 +442,7 @@ const DayGroup = memo(function DayGroup({
   isOverDay: boolean
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
+  onEditDetails: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
   onAddTask: AddTaskHandler
   wasDragging: () => boolean
@@ -455,6 +486,7 @@ const DayGroup = memo(function DayGroup({
                 isSelected={selectedIds.has(task.id)}
                 onToggle={onToggle}
                 onDelete={onDelete}
+                onEditDetails={onEditDetails}
                 onSelect={onSelect}
                 wasDragging={wasDragging}
               />
@@ -496,6 +528,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   onPageChange,
   onToggle,
   onDelete,
+  onEditDetails,
   onDeletePicked,
   onMove,
   onAddTask,
@@ -784,6 +817,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 isOverDay={overDate === day.date}
                 onToggle={onToggle}
                 onDelete={onDelete}
+                onEditDetails={onEditDetails}
                 onSelect={selectTask}
                 onAddTask={onAddTask}
                 wasDragging={wasDragging}

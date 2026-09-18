@@ -1,74 +1,79 @@
 "use client"
 
 import React, { useEffect, useRef, useState } from "react"
-import { AlertTriangle, Check, Loader2, ShieldCheck } from "lucide-react"
+import { AlertTriangle, Loader2, RotateCcw, ShieldCheck } from "lucide-react"
 import { requestApi } from "@/lib/apiClient"
-import { TOOL_GROUPS, type ToolGroupId } from "@/constants/linkedinTools"
 import { FEATURE_ACCESS_MESSAGES, manageableFeatures } from "@/constants/featureAccess"
-import type { FeatureAccess } from "@/services/admin/featureAccess"
+import { FeatureSwitchboard } from "@/components/admin/FeatureSwitchboard"
+import type { FeatureAccess } from "@/types/featureAccess"
+
+// What one tool looks like for this account after it is set on or off, before the server answers
+const withTools = (access: FeatureAccess, toolIds: string[], on: boolean): FeatureAccess => {
+  const off = new Set(access.effective)
+  for (const toolId of toolIds) {
+    if (on) off.delete(toolId)
+    else off.add(toolId)
+  }
+  return { ...access, effective: [...off] }
+}
 
 /**
- * Which tools one account may use, on that account's page in User Management. A tool turned off
- * here leaves their sidebar, its pages send them away and its API refuses them, on their very next
- * request: nothing they have made is touched, and turning it back on brings it back as it was.
+ * Which tools one account may use, on its page in User Management. It starts from the settings for
+ * every user; a switch changed here is this account's own choice and wins over them for it alone,
+ * which the "Own choice" tag marks. "Follow all users" drops every choice of its own.
  *
- * Every switch saves on its own, so the admin never has to remember to press Save. An admin's own
- * tools are never turned off, and the panel says so rather than showing switches that cannot move.
+ * A tool turned off leaves the account's sidebar, its pages send the account away and its API refuses
+ * it, on the account's very next request: nothing it made is touched, and turning the tool back on
+ * brings it back as it was. An admin's own tools are never turned off, and the panel says so.
  */
 export const FeatureAccessPanel: React.FC<{ userId: string; isAdminAccount: boolean }> = ({ userId, isAdminAccount }) => {
   const [access, setAccess] = useState<FeatureAccess | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState<ReadonlySet<string>>(new Set())
-  // Saves go one after another, so two quick switches land in the order they were pressed
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set())
+  // Changes go one after another, so two quick switches land in the order they were pressed
   const queue = useRef<Promise<void>>(Promise.resolve())
-  const tools = manageableFeatures()
+  const endpoint = `/api/admin/users/${userId}/features`
+  const total = manageableFeatures().length
 
   useEffect(() => {
     if (isAdminAccount) return
     const controller = new AbortController()
-    requestApi<FeatureAccess>(`/api/admin/users/${userId}/features`, { signal: controller.signal })
+    requestApi<FeatureAccess>(endpoint, { signal: controller.signal })
       .then(({ data }) => {
         setAccess(data)
         setError(null)
       })
       .catch((reason: unknown) => {
-        if (controller.signal.aborted) return
-        setError(reason instanceof Error ? reason.message : FEATURE_ACCESS_MESSAGES.loadFailed)
+        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : FEATURE_ACCESS_MESSAGES.loadFailed)
       })
     return () => controller.abort()
-  }, [userId, isAdminAccount])
+  }, [endpoint, isAdminAccount])
 
-  const save = (disabledTools: string[], touched: string[]) => {
+  const send = (body: { tools: string[]; on: boolean } | { reset: true }, touched: string[], optimistic: FeatureAccess | null) => {
     const previous = access
-    setAccess((current) => (current ? { ...current, disabledTools } : current))
-    setSaving((current) => new Set([...current, ...touched]))
+    if (optimistic) setAccess(optimistic)
+    setBusy((current) => new Set([...current, ...touched]))
     setError(null)
     queue.current = queue.current.then(async () => {
       try {
-        const { data } = await requestApi<FeatureAccess>(`/api/admin/users/${userId}/features`, {
+        const { data } = await requestApi<FeatureAccess>(endpoint, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ disabledTools }),
+          body: JSON.stringify(body),
         })
         setAccess(data)
       } catch (reason: unknown) {
-        // Put the switches back where they were, so the panel never shows a change that wasn't saved
+        // Back to what was saved, so the switches never show a change that did not happen
         setAccess(previous)
         setError(reason instanceof Error ? reason.message : FEATURE_ACCESS_MESSAGES.saveFailed)
       } finally {
-        setSaving((current) => {
+        setBusy((current) => {
           const next = new Set(current)
-          touched.forEach((id) => next.delete(id))
+          touched.forEach((toolId) => next.delete(toolId))
           return next
         })
       }
     })
-  }
-
-  const toggle = (toolId: string) => {
-    if (!access) return
-    const off = access.disabledTools.includes(toolId)
-    save(off ? access.disabledTools.filter((id) => id !== toolId) : [...access.disabledTools, toolId], [toolId])
   }
 
   if (isAdminAccount) {
@@ -83,7 +88,10 @@ export const FeatureAccessPanel: React.FC<{ userId: string; isAdminAccount: bool
     )
   }
 
-  const off = new Set(access?.disabledTools ?? [])
+  const off = new Set(access?.effective ?? [])
+  const ownOff = new Set(access?.disabledTools ?? [])
+  const ownOn = new Set(access?.enabledTools ?? [])
+  const ownChoices = ownOff.size + ownOn.size
 
   return (
     <section aria-label="Tools this account can use" className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
@@ -93,25 +101,28 @@ export const FeatureAccessPanel: React.FC<{ userId: string; isAdminAccount: bool
           Tools this account can use
         </h3>
         {access && (
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] text-outline">
-              {off.size === 0 ? `All ${tools.length} tools` : `${tools.length - off.size} of ${tools.length} on`}
-            </span>
-            {off.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[12px] text-outline">{off.size === 0 ? `All ${total} on` : `${total - off.size} of ${total} on`}</span>
+            {ownChoices > 0 && (
               <button
                 type="button"
-                onClick={() => save([], [...off])}
-                className="rounded-lg border border-outline-variant bg-white px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                onClick={() => send({ reset: true }, [...ownOff, ...ownOn], { ...access, disabledTools: [], enabledTools: [], effective: access.defaults })}
+                title="Drop this account's own choices, so it gets exactly what every user gets"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-white px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
               >
-                Turn all on
+                <RotateCcw size={12} aria-hidden="true" />
+                Follow all users
               </button>
             )}
           </div>
         )}
       </div>
-      <p className="mt-1 text-[12px] text-on-surface-variant">
-        A tool turned off leaves their sidebar and refuses them if they type its address. Nothing they have already made is deleted.
-      </p>
+      <p className="mt-1 text-[12px] leading-relaxed text-on-surface-variant">{FEATURE_ACCESS_MESSAGES.perUserExplains}</p>
+      {access && ownChoices > 0 && (
+        <p className="mt-1 text-[12px] font-semibold text-on-surface-variant">
+          {ownChoices === 1 ? "1 tool is this account's own choice." : `${ownChoices} tools are this account's own choice.`}
+        </p>
+      )}
 
       {error && (
         <p role="alert" className="mt-2 flex items-center gap-1.5 rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
@@ -127,53 +138,22 @@ export const FeatureAccessPanel: React.FC<{ userId: string; isAdminAccount: bool
         </p>
       ) : (
         access && (
-          <div className="mt-3 flex flex-col gap-3">
-            {TOOL_GROUPS.map((group) => {
-              const inGroup = tools.filter((tool) => tool.group === (group.id as ToolGroupId))
-              if (inGroup.length === 0) return null
-              return (
-                <div key={group.id}>
-                  <h4 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-outline">{group.label}</h4>
-                  <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                    {inGroup.map((tool) => {
-                      const isOff = off.has(tool.id)
-                      const isSaving = saving.has(tool.id)
-                      return (
-                        <li key={tool.id}>
-                          <button
-                            type="button"
-                            onClick={() => toggle(tool.id)}
-                            disabled={isSaving}
-                            role="switch"
-                            aria-checked={!isOff}
-                            title={tool.description}
-                            className={`flex w-full items-center justify-between gap-2 rounded-xl border px-2.5 py-2 text-left transition-colors disabled:opacity-60 ${
-                              isOff ? "border-outline-variant bg-white text-outline" : "border-primary/30 bg-primary-fixed/25 text-on-surface"
-                            }`}
-                          >
-                            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{tool.title}</span>
-                            {isSaving ? (
-                              <Loader2 size={14} className="shrink-0 animate-spin text-primary" aria-hidden="true" />
-                            ) : (
-                              <span
-                                aria-hidden="true"
-                                className={`flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors ${isOff ? "bg-outline-variant" : "bg-primary"}`}
-                              >
-                                <span
-                                  className={`flex h-4 w-4 items-center justify-center rounded-full bg-white transition-transform ${isOff ? "" : "translate-x-4"}`}
-                                >
-                                  {!isOff && <Check size={10} className="text-primary" />}
-                                </span>
-                              </span>
-                            )}
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </div>
-              )
-            })}
+          <div className="mt-3">
+            <FeatureSwitchboard
+              isOff={(toolId) => off.has(toolId)}
+              busy={busy}
+              noteFor={(toolId) =>
+                ownOff.has(toolId) || ownOn.has(toolId) ? (
+                  <span
+                    title={ownOff.has(toolId) ? "Off for this account only" : "On for this account only, though off for every user"}
+                    className="shrink-0 rounded-full bg-secondary-fixed px-1.5 py-px text-[10px] font-bold text-on-secondary-fixed-variant"
+                  >
+                    Own choice
+                  </span>
+                ) : null
+              }
+              onChange={(toolIds, on) => send({ tools: toolIds, on }, toolIds, withTools(access, toolIds, on))}
+            />
           </div>
         )
       )}

@@ -46,3 +46,41 @@ export function isFeatureDisabled(viewer: { role: string; disabledTools?: string
   if (!viewer || !toolId || viewer.role === "admin") return false
   return (viewer.disabledTools ?? []).includes(toolId)
 }
+
+/**
+ * One account's own choices, on top of the settings for everyone: the tools turned off for this
+ * account alone, and the tools turned on for it although they are off for everyone else. Only a
+ * difference from everyone else is ever stored, so an account with no choices of its own simply
+ * follows whatever everyone gets, now and after the settings for everyone change.
+ */
+export interface FeatureOverrides {
+  disabledTools: string[]
+  enabledTools: string[]
+}
+
+/**
+ * The tools an account may not use, all told: what is off for everyone, less what this account has
+ * turned back on, plus what it has turned off itself. Its own choice always wins, and when a tool
+ * somehow sits in both of its lists, off wins, because the safe mistake is a tool hidden rather than
+ * one shown. An admin keeps every tool whatever is stored.
+ */
+export function effectiveDisabledTools(role: string, defaults: readonly string[], overrides: Partial<FeatureOverrides>): string[] {
+  if (role === "admin") return []
+  const off = new Set(defaults)
+  for (const toolId of overrides.enabledTools ?? []) off.delete(toolId)
+  for (const toolId of overrides.disabledTools ?? []) off.add(toolId)
+  return [...off]
+}
+
+/**
+ * Where the named tools land in one account's own choices when they are set on or off for it: only
+ * the tools set against what everyone gets are kept as its own choice; a tool set to what everyone
+ * gets anyway lands in neither list, so it follows everyone again. The caller takes the named tools
+ * out of both lists and adds these, in one atomic update, leaving the account's other choices alone.
+ */
+export function placeTools(defaults: readonly string[], toolIds: readonly string[], on: boolean): FeatureOverrides {
+  const offForEveryone = new Set(defaults)
+  // On for this account where everyone has it off, or off where everyone has it on
+  const againstEveryone = toolIds.filter((toolId) => on === offForEveryone.has(toolId))
+  return on ? { disabledTools: [], enabledTools: againstEveryone } : { disabledTools: againstEveryone, enabledTools: [] }
+}

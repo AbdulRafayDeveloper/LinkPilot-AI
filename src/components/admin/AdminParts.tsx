@@ -3,6 +3,7 @@
 import React from "react"
 import { Bot, HelpCircle, Monitor, Smartphone, Tablet, type LucideIcon } from "lucide-react"
 import { loginEventLabel, type LoginEventType } from "@/constants/admin"
+import { deviceLabel } from "@/lib/userAgent"
 import type { DeviceSummary } from "@/types/admin"
 
 /** The small pieces both admin pages share: the summary cards, the device line and the event badge. */
@@ -37,9 +38,7 @@ export const DeviceLine: React.FC<{ device: DeviceSummary | null }> = ({ device 
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] text-on-surface">
       <Icon size={14} className="shrink-0 text-outline" aria-label={device.device} />
-      <span className="truncate">
-        {device.browser} on {device.os}
-      </span>
+      <span className="truncate">{deviceLabel(device)}</span>
     </span>
   )
 }

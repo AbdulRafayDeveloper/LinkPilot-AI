@@ -161,6 +161,37 @@ export async function setTaskCompletion(viewer: Viewer, id: string, isCompleted:
   return record ? (await toTasks([record as unknown as StoredTask]))[0] : null
 }
 
+/**
+ * Changes the optional detail on a task already written: its description and its image. Returns
+ * null when that task is gone or belongs to another account.
+ *
+ * An image that is replaced or taken off goes from storage only after the task is saved without
+ * it, never before, so the task can never point at an image that is already gone; a storage
+ * failure there is logged and swallowed (`deleteTaskImages`), because the change the user asked
+ * for has already been made and the worst case is an object nothing points at.
+ */
+export async function setTaskDetails(
+  viewer: Viewer,
+  id: string,
+  details: { description: string; image: TaskImage | null }
+): Promise<DailyTask | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
+  await connectDatabase()
+  // The image it carries now, read first so it can be cleared from storage if this change drops it
+  const before = (await DailyTaskModel.findOne(filter, "image").lean()) as unknown as { image?: TaskImage | null } | null
+  if (!before) return null
+  const record = await DailyTaskModel.findOneAndUpdate(
+    filter,
+    { $set: { description: details.description, image: details.image } },
+    { returnDocument: "after", projection: TASK_FIELDS, lean: true }
+  )
+  if (!record) return null
+  const previous = before.image ?? null
+  if (previous && previous.assetId !== details.image?.assetId) await deleteTaskImages([previous])
+  return (await toTasks([record as unknown as StoredTask]))[0]
+}
+
 export type MoveResult = { task: DailyTask } | { error: "missing" | "stale-order" }
 
 /**

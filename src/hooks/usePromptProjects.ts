@@ -64,13 +64,5 @@ export function usePromptProjects({ enabled = true }: { enabled?: boolean } = {}
     setProjects((current) => (current ?? []).map((project) => (project.id === id ? { ...project, promptCount: project.promptCount + 1 } : project)))
   }, [])
 
-  /** One prompt deleted from a project, for the same reason. */
-  const countDeleted = useCallback((id: string | null) => {
-    if (!id) return
-    setProjects((current) =>
-      (current ?? []).map((project) => (project.id === id ? { ...project, promptCount: Math.max(0, project.promptCount - 1) } : project))
-    )
-  }, [])
-
-  return { projects, error, create, save, remove, countCreated, countDeleted, reload: () => setAttempt((count) => count + 1) }
+  return { projects, error, create, save, remove, countCreated, reload: () => setAttempt((count) => count + 1) }
 }

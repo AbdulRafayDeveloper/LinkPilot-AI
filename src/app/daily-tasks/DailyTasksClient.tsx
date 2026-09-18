@@ -8,13 +8,14 @@ import { TaskComposer, emptyRows, type TaskRow } from "@/components/daily-tasks/
 import { ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { TaskDayList, type TaskMove } from "@/components/daily-tasks/TaskDayList"
 import { CleanupOldTasksDialog } from "@/components/daily-tasks/CleanupOldTasksDialog"
+import { TaskDetailsDialog } from "@/components/daily-tasks/TaskDetailsDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
 import { DAILY_TASKS_ENDPOINT, DAILY_TASKS_MESSAGES, VISIBLE_DAYS } from "@/constants/dailyTasks"
 import type { DailyTask, DailyTasksPage } from "@/types/dailyTasks"
-import type { TaskDetailsDraft } from "@/types/taskAttachment"
+import type { TaskDetailsDraft, TaskImage } from "@/types/taskAttachment"
 
 /**
  * What is half-written survives switching tools, like every other tool's input. The chosen image
@@ -47,6 +48,8 @@ export default function DailyTasksClient() {
   const [notice, setNotice] = useState<string | null>(null)
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set())
   const [taskError, setTaskError] = useState<string | null>(null)
+  // The task whose description and image are open in the details popup
+  const [detailsTask, setDetailsTask] = useState<DailyTask | null>(null)
   // The picked tasks waiting to be confirmed for deletion, and whether that delete is running
   const [confirmingPicked, setConfirmingPicked] = useState<string[] | null>(null)
   const [isDeletingPicked, setIsDeletingPicked] = useState(false)
@@ -322,6 +325,28 @@ export default function DailyTasksClient() {
     }
   }
 
+  /**
+   * The description and image of a task already written, saved from its details popup. It waits
+   * for the server rather than changing the row first, because the image needs the fresh signed
+   * link only the server can make. A failure rejects, so the popup stays open saying why.
+   */
+  const saveTaskDetails = async (task: DailyTask, details: { description: string; image: TaskImage | null }) => {
+    const { data } = await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(details),
+    })
+    setPage((current) =>
+      current
+        ? {
+            ...current,
+            days: current.days.map((day) => ({ ...day, tasks: day.tasks.map((entry) => (entry.id === data.id ? data : entry)) })),
+          }
+        : current
+    )
+    setDetailsTask(null)
+  }
+
   const removeTask = async (task: DailyTask) => {
     if (pendingIds.has(task.id)) return
     setTaskError(null)
@@ -470,6 +495,7 @@ export default function DailyTasksClient() {
                 onDeletePicked={(ids) => setConfirmingPicked(ids)}
                 onMove={moveTask}
                 onAddTask={addTaskToDay}
+                onEditDetails={setDetailsTask}
               />
             </div>
           </div>
@@ -483,6 +509,14 @@ export default function DailyTasksClient() {
           isDeleting={isDeletingPicked}
           onConfirm={() => void removePicked(confirmingPicked)}
           onClose={() => setConfirmingPicked(null)}
+        />
+      )}
+      {detailsTask && (
+        <TaskDetailsDialog
+          key={detailsTask.id}
+          task={detailsTask}
+          onSave={(details) => saveTaskDetails(detailsTask, details)}
+          onClose={() => setDetailsTask(null)}
         />
       )}
       {isConfirmingCleanup && (

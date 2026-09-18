@@ -4,8 +4,8 @@ import { UserFacingError } from "@/lib/errors"
 import { escapeForSearch } from "@/lib/listQuery"
 import { CreatedPromptModel } from "@/models/CreatedPrompt"
 import { PromptProjectModel, type IPromptProject } from "@/models/PromptProject"
-import { MAX_PROJECTS, PROJECT_PROMPTS_PAGE_SIZE, PROMPT_PROJECT_MESSAGES } from "@/constants/promptProjects"
-import type { ProjectPrompt, PromptProject } from "@/types/promptProjects"
+import { MAX_PROJECTS, PROMPT_PROJECT_MESSAGES } from "@/constants/promptProjects"
+import type { PromptProject } from "@/types/promptProjects"
 import type { Viewer } from "@/types/auth"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { folderForProjectName, renameFolder } from "@/services/promptCreator/folders"
@@ -137,25 +137,4 @@ export async function projectForPrompt(viewer: Viewer, projectId: string | null)
   const record = (await PromptProjectModel.findOne(filter, { name: 1, instructions: 1, folderId: 1 }).lean()) as unknown as StoredProject | null
   if (!record) throw new UserFacingError(PROMPT_PROJECT_MESSAGES.notFound)
   return toProject(record, 0)
-}
-
-/** The prompts written in one project, newest first. Null when it is gone or another account's. */
-export async function listProjectPrompts(viewer: Viewer, id: string): Promise<ProjectPrompt[] | null> {
-  const filter = visibleById(viewer, id)
-  if (!filter) return null
-  await connectDatabase()
-  if (!(await PromptProjectModel.exists(filter))) return null
-  const records = await CreatedPromptModel.find({ ...visibleTo(viewer), projectId: id }, { name: 1, prompt: 1, target: 1, editedAt: 1, appliedAt: 1, createdAt: 1 })
-    .sort({ createdAt: -1, _id: -1 })
-    .limit(PROJECT_PROMPTS_PAGE_SIZE)
-    .lean()
-  return records.map((record) => ({
-    id: String(record._id),
-    name: record.name,
-    prompt: record.prompt,
-    target: record.target,
-    createdAt: new Date(record.createdAt).toISOString(),
-    editedAt: record.editedAt ? new Date(record.editedAt).toISOString() : null,
-    appliedAt: record.appliedAt ? new Date(record.appliedAt).toISOString() : null,
-  }))
 }

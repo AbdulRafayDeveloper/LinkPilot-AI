@@ -32,6 +32,18 @@ export const TaskDetailsSchema = z.object({
   image: TaskImageSchema.nullish().transform((value) => value ?? null),
 })
 
+/**
+ * The detail of a task already written, as its edit saves it. Unlike a new task, **both** fields
+ * are required: an edit always sends the whole of it, so a request that left them out could
+ * otherwise clear a task's description and image without anyone meaning to.
+ */
+export const TaskDetailsEditSchema = z
+  .object({
+    description: z.string().max(TASK_DESCRIPTION_MAX_LENGTH, TASK_ATTACHMENT_MESSAGES.descriptionTooLong).transform((value) => value.trim()),
+    image: TaskImageSchema.nullable(),
+  })
+  .strict()
+
 /** What the browser asks an upload link for: the type and size it is about to send. */
 export const TaskImageUploadSchema = z.object({
   contentType: z.string().trim().refine((type) => TASK_IMAGE_TYPES.includes(type), TASK_ATTACHMENT_MESSAGES.unsupportedImage),

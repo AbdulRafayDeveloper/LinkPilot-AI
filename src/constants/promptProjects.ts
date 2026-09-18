@@ -38,8 +38,6 @@ export const PROJECT_NAME_MAX_LENGTH = 60
 export const PROJECT_INSTRUCTIONS_MAX_LENGTH = 4000
 // Enough for real work; a list longer than this is a sign of tags, not projects
 export const MAX_PROJECTS = 100
-// Prompts listed at once when a project's own prompts are opened
-export const PROJECT_PROMPTS_PAGE_SIZE = 50
 
 // What the picker calls working without a project
 export const NO_PROJECT = "none"
@@ -57,7 +55,6 @@ export const PROMPT_PROJECT_MESSAGES = {
   createFailed: "Couldn't create the project. Please try again.",
   saveFailed: "Couldn't save the project. Please try again.",
   deleteFailed: "Couldn't delete the project. Please try again.",
-  promptsFailed: "Couldn't load this project's prompts. Please try again.",
   // Deleting a project keeps the prompts written in it; only the project goes
   deleteExplains: "The prompts written in it are kept and go back to no project.",
   none: "No project",
@@ -66,6 +63,6 @@ export const PROMPT_PROJECT_MESSAGES = {
   empty: "No projects yet. Add one, and it will be waiting in Prompt Creator the next time you write a prompt.",
   noMatch: "No project matches that search.",
   choose: "Choose a project",
-  chooseHint: "Pick one on the left to see its instructions and the prompts written in it.",
+  chooseHint: "Pick one on the left to see its instructions.",
   noInstructions: "No instructions. Prompts written in this project are left exactly as they are written.",
 } as const

@@ -1,4 +1,6 @@
 import { connectDatabase } from "@/lib/db"
+import { effectiveDisabledTools } from "@/lib/featureAccess"
+import { readFeatureDefaults } from "@/services/featureSettings"
 import { UserFacingError } from "@/lib/errors"
 import { decoyPasswordHash, hashPassword, verifyPassword } from "@/lib/passwords"
 import { UserModel } from "@/models/User"
@@ -13,13 +15,20 @@ import { recordLoginEvent, type ClientInfo } from "./audit"
 
 type SignedIn = { viewer: Viewer; sessionVersion: number }
 
-const toViewer = (user: { _id: unknown; email: string; name: string; role: Viewer["role"]; disabledTools?: string[] }): Viewer => ({
+// The same account the rest of the app sees: what is off for everyone, with its own choices on top
+const toViewer = async (user: {
+  _id: unknown
+  email: string
+  name: string
+  role: Viewer["role"]
+  disabledTools?: string[]
+  enabledTools?: string[]
+}): Promise<Viewer> => ({
   id: String(user._id),
   email: user.email,
   name: user.name,
   role: user.role,
-  // An admin keeps every tool, whatever is stored against the account
-  disabledTools: user.role === "admin" ? [] : (user.disabledTools ?? []),
+  disabledTools: effectiveDisabledTools(user.role, await readFeatureDefaults(), user),
 })
 
 /**
@@ -58,7 +67,7 @@ export async function signIn({ email, password }: LoginInput, client: ClientInfo
 
   await UserModel.updateOne({ _id: user._id }, { $set: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() }, $inc: { loginCount: 1 } })
   await recordLoginEvent("sign-in", who, client)
-  return { viewer: toViewer(user), sessionVersion: user.sessionVersion }
+  return { viewer: await toViewer(user), sessionVersion: user.sessionVersion }
 }
 
 /** Creates a `user` account and signs it in. An email already in use is refused. */
@@ -69,7 +78,7 @@ export async function signUp({ name, email, password }: SignupInput, client: Cli
     // Signing up signs the account in, so it counts as the first sign-in
     const user = await UserModel.create({ name, email: email.toLowerCase(), passwordHash, role: "user", lastLoginAt: new Date(), loginCount: 1 })
     await recordLoginEvent("sign-up", { userId: String(user._id), email: user.email, name: user.name }, client)
-    return { viewer: toViewer(user), sessionVersion: user.sessionVersion }
+    return { viewer: await toViewer(user), sessionVersion: user.sessionVersion }
   } catch (error: unknown) {
     // The unique index is what decides, so two sign-ups racing for one email can't both succeed
     if (error && typeof error === "object" && "code" in error && error.code === 11000) throw new UserFacingError(AUTH_MESSAGES.emailTaken)

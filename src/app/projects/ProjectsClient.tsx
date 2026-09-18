@@ -9,7 +9,6 @@ import { Modal } from "@/components/ui/Modal"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { FilterPanel, SearchFilter } from "@/components/history/HistoryFilters"
 import { ProjectDialog } from "@/components/projects/ProjectDialog"
-import { ProjectPrompts } from "@/components/projects/ProjectPrompts"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { usePromptProjects } from "@/hooks/usePromptProjects"
 import { filterByWords } from "@/lib/nameSearch"
@@ -30,7 +29,8 @@ const promptsLabel = (count: number) => `${count.toLocaleString()} ${count === 1
 
 /**
  * Projects: the projects on the left (searched by name or instructions), the chosen project on the
- * right with its instructions and the prompts written in it, laid out the way Clients Management is.
+ * right with its instructions, laid out the way Clients Management is. The prompts themselves are
+ * read in Prompt Creator, in the folder each project has, so they are not listed again here.
  *
  * It reads and writes through `usePromptProjects`, the same list Prompt Creator's picker reads, so a
  * project made or renamed here is the one offered there, and the records are the same `prompt_projects`
@@ -181,7 +181,6 @@ export default function ProjectsClient() {
               {/* The chosen project */}
               <div ref={detailRef} className="flex scroll-mt-4 flex-col gap-4">
                 {current ? (
-                  <>
                     <section aria-label="Project details" className="rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
                       {/* The details column is full width below lg but only about 290px between lg and xl,
                           where the name and the buttons cannot share a row; it has the width again from xl */}
@@ -242,16 +241,6 @@ export default function ProjectsClient() {
                         )}
                       </div>
                     </section>
-
-                    <section aria-label="Prompts written in this project" className="rounded-2xl border border-outline-variant bg-white shadow-sm">
-                      <h3 className="px-4 pb-2 pt-4 text-[14px] font-bold text-on-surface sm:px-5">Prompts written in it</h3>
-                      {/* Keyed on the project, so choosing another starts its list afresh. The list pads itself
-                          by px-3, so this brings it in line with the heading's px-4 / sm:px-5 */}
-                      <div className="px-1 sm:px-2">
-                        <ProjectPrompts key={current.id} projectId={current.id} onDeleted={() => projects.countDeleted(current.id)} />
-                      </div>
-                    </section>
-                  </>
                 ) : (
                   <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-16 text-center">
                     <FolderKanban size={24} className="text-primary" aria-hidden="true" />

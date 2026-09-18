@@ -10,16 +10,3 @@ export interface PromptProject {
   // The folder its prompts are filed in, which has the project's name; null until it is made
   folderId: string | null
 }
-
-/** One of a project's prompts, as its own list shows it. */
-export interface ProjectPrompt {
-  id: string
-  name: string
-  prompt: string
-  target: string
-  createdAt: string
-  // When the user last changed it by hand, or null
-  editedAt: string | null
-  // When the user marked it as one they have used, or null while it is unused
-  appliedAt: string | null
-}

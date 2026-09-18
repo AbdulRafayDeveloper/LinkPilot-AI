@@ -11,8 +11,13 @@ export interface IUser {
   passwordHash: string
   role: UserRole
   sessionVersion: number
-  // The tools an admin has turned off for this account; empty for everyone by default
+  // This account's own choices, on top of the settings for every user (models/FeatureSettings.ts):
+  // the tools turned off for it alone, and the tools turned on for it although they are off for
+  // everyone. Only a difference from everyone is stored, and both are empty by default
   disabledTools: string[]
+  enabledTools: string[]
+  // The client last chosen on Client Voices, so the page opens on it again on any browser; null for none
+  clientVoicesClientId: string | null
   // Wrong passwords in a row, for the lockout; reset by a good sign-in
   failedLogins: number
   lockedUntil: Date | null
@@ -33,6 +38,8 @@ const UserSchema = new Schema<IUser>(
     role: { type: String, enum: USER_ROLES, required: true, default: "user" },
     sessionVersion: { type: Number, required: true, default: 1 },
     disabledTools: { type: [String], default: [] },
+    enabledTools: { type: [String], default: [] },
+    clientVoicesClientId: { type: String, default: null },
     failedLogins: { type: Number, required: true, default: 0 },
     loginCount: { type: Number, required: true, default: 0 },
     failedLoginCount: { type: Number, required: true, default: 0 },

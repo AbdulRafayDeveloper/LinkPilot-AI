@@ -47,6 +47,9 @@ export const FEATURE_API_PATHS: Record<string, string[]> = {
  * endpoint, the status page and the employee's public plan link. `/api/saved-outputs` is shared in
  * the same sense but names its tool in the path, so it is handled on its own.
  */
+// Where the admin reads and changes the tools for every user
+export const FEATURE_DEFAULTS_ENDPOINT = "/api/admin/features"
+
 export const SHARED_API_PATHS = [
   "/api/auth",
   "/api/admin",
@@ -72,4 +75,10 @@ export const FEATURE_ACCESS_MESSAGES = {
   adminsKeepEverything: "An admin always has every tool, so there is nothing to turn off here.",
   unknownTool: "That isn't one of the tools that can be turned off.",
   saved: "Saved. What this account can use takes effect at once.",
+  savedForEveryone: "Saved for every user. Accounts with their own choice for a tool keep it.",
+  accountGone: "That account no longer exists.",
+  defaultsExplains:
+    "Turn tools on or off for every user at once. An account with its own choice for a tool, set from that account's page, keeps it. Admins always keep every tool.",
+  perUserExplains:
+    "Starts from the tools for all users. A switch changed here is this account's own choice and wins over them for this account only. A tool turned off leaves their sidebar and refuses them; nothing they made is deleted.",
 } as const

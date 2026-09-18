@@ -25,6 +25,11 @@ export const TranscriptBatchSchema = z.object({
 })
 
 /** The user's own wording of a saved task list. */
+/** The client chosen on the page: one of the viewer's clients by id, or "" for none. */
+export const ClientChoiceSchema = z.object({
+  clientId: z.union([z.literal(""), z.string().regex(/^[0-9a-f]{24}$/)]),
+})
+
 export const EditTasksSchema = z.object({
   tasks: z
     .array(

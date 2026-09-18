@@ -36,6 +36,9 @@ export const DAILY_TASKS_MESSAGES = {
   saveFailed: "Couldn't add the tasks. Please try again.",
   loadFailed: "Couldn't load your tasks.",
   updateFailed: "Couldn't update that task. Please try again.",
+  // The description and image on a task already written, changed from its details popup
+  detailsSaved: "Details saved.",
+  detailsFailed: "Couldn't save those details. Please try again.",
   taskDeleted: "Task deleted.",
   deleteFailed: "Couldn't delete that task. Please try again.",
   moveFailed: "Couldn't move that task, so it is back where it was. Please try again.",
