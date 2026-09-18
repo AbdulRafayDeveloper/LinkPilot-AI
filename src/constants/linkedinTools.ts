@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { CLIENTS_TOOL } from "./clients"
+import { PROJECTS_TOOL } from "./promptProjects"
 import { CLIENT_MESSAGING_TOOL } from "./clientMessaging"
 import { CLIENT_VOICES_TOOL } from "./clientVoices"
 import { POST_IMAGES_HISTORY_HREF, POST_IMAGES_TOOL } from "./postImages"
@@ -136,6 +137,8 @@ export const APP_TOOLS: LinkedInTool[] = [
   ...LINKEDIN_TOOLS,
   // The people the work is for come before what is written to them
   CLIENTS_TOOL,
+  // What prompts are written for, managed here and picked from in Prompt Creator
+  PROJECTS_TOOL,
   { ...CLIENT_MESSAGING_TOOL, links: savedOutputPages("client-messaging") },
   { ...MESSAGE_REWRITER_TOOL, links: savedOutputPages("message-rewriter") },
   CLIENT_VOICES_TOOL,

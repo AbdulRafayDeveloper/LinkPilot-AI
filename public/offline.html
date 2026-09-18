@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3b0f7a">
+<meta name="robots" content="noindex">
+<title>You're offline | LinkPilot AI</title>
+<!--
+  Shown by the service worker (public/sw.js) when a page can't be reached because the connection
+  is down. It is the one page the app keeps for itself, so everything it needs is in this file:
+  the styles, the logo and the script. Nothing here may point at another file or a font, because
+  nothing else can be fetched while it is on screen.
+-->
+<style>
+  :root {
+    --violet-1: #7c3aed;
+    --violet-2: #5b21b6;
+    --violet-3: #3b0f7a;
+    --ink: #1c1826;
+    --gold: #f59e0b;
+    --gold-soft: #fde68a;
+    --white: #ffffff;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    /* The whole window, never more, so the page can never scroll */
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--white);
+    background:
+      radial-gradient(60vmax 60vmax at 12% 8%, rgba(124, 58, 237, 0.55), transparent 60%),
+      radial-gradient(50vmax 50vmax at 92% 96%, rgba(245, 158, 11, 0.16), transparent 60%),
+      linear-gradient(155deg, var(--violet-2) 0%, var(--violet-3) 62%, #230852 100%);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* A faint field of dots, so the colour reads as a surface rather than a flat fill */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+    background-size: 26px 26px;
+    mask-image: radial-gradient(ellipse at center, #000 30%, transparent 78%);
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 78%);
+    pointer-events: none;
+  }
+
+  main {
+    position: relative;
+    width: min(100%, 460px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: clamp(14px, 3.2vh, 26px);
+  }
+
+  .brand { display: flex; flex-direction: column; align-items: center; gap: clamp(12px, 2.4vh, 18px); }
+  .mark {
+    width: clamp(64px, 13vh, 96px);
+    height: clamp(64px, 13vh, 96px);
+    filter: drop-shadow(0 18px 40px rgba(20, 4, 48, 0.55)) drop-shadow(0 0 28px rgba(167, 139, 250, 0.35));
+    animation: float 6s ease-in-out infinite;
+  }
+  .wordmark { display: flex; align-items: center; gap: 10px; }
+  .wordmark h1 {
+    margin: 0;
+    font-size: clamp(26px, 4.6vh, 34px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .pill {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    padding: 4px 8px;
+    border-radius: 8px;
+    color: var(--violet-3);
+    background: #ddd6fe;
+  }
+  .purpose {
+    margin: 0;
+    font-size: clamp(13px, 1.9vh, 15px);
+    font-weight: 500;
+    color: rgba(237, 233, 254, 0.78);
+  }
+
+  .panel {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(12px, 2.2vh, 18px);
+    padding: clamp(18px, 3.4vh, 28px) clamp(18px, 5vw, 30px);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 30px 70px rgba(20, 4, 48, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 14px 7px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold-soft);
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid rgba(253, 230, 138, 0.3);
+  }
+  .status svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+    animation: pulse 2s ease-out infinite;
+  }
+  body.back .status { color: #bbf7d0; background: rgba(34, 197, 94, 0.16); border-color: rgba(187, 247, 208, 0.35); }
+  body.back .dot { background: #22c55e; animation: none; }
+
+  h2 {
+    margin: 0;
+    font-size: clamp(20px, 3.2vh, 24px);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  .lead {
+    margin: 0;
+    max-width: 34ch;
+    font-size: clamp(14px, 2vh, 15.5px);
+    line-height: 1.55;
+    color: rgba(237, 233, 254, 0.85);
+  }
+
+  .retry {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    min-height: 46px;
+    padding: 0 26px;
+    border: 0;
+    border-radius: 14px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--violet-3);
+    background: var(--white);
+    cursor: pointer;
+    box-shadow: 0 10px 26px rgba(20, 4, 48, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+  .retry:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(20, 4, 48, 0.42); background: #f5f3ff; }
+  .retry:active { transform: translateY(0); }
+  .retry:focus-visible { outline: 3px solid var(--gold-soft); outline-offset: 3px; }
+  .retry:disabled { cursor: progress; opacity: 0.85; transform: none; }
+  .retry svg { width: 17px; height: 17px; }
+  .retry.spinning svg { animation: spin 0.9s linear infinite; }
+
+  .hint {
+    margin: 0;
+    font-size: 12.5px;
+    color: rgba(221, 214, 254, 0.62);
+  }
+
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
+    70% { box-shadow: 0 0 0 9px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* A landscape phone is short, not narrow: the tagline and the hint go before anything scrolls */
+  @media (max-height: 560px) {
+    .purpose, .hint { display: none; }
+    main { gap: 12px; }
+    .panel { padding: 16px 20px; gap: 10px; }
+  }
+  @media (max-height: 420px) {
+    .lead { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mark, .dot, .retry.spinning svg { animation: none; }
+    .retry { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 64 64" role="img" aria-label="LinkPilot AI logo">
+      <defs>
+        <linearGradient id="lp-tile" x1="6" y1="4" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#7c3aed"/>
+          <stop offset="0.55" stop-color="#5b21b6"/>
+          <stop offset="1" stop-color="#3b0f7a"/>
+        </linearGradient>
+        <radialGradient id="lp-sheen" cx="14" cy="8" r="40" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>
+          <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="lp-star" x1="30" y1="12" x2="30" y2="54" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#ffffff"/>
+          <stop offset="1" stop-color="#ede9fe"/>
+        </linearGradient>
+        <linearGradient id="lp-gold" x1="44" y1="10" x2="52" y2="24" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#fde68a"/>
+          <stop offset="1" stop-color="#f59e0b"/>
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#lp-tile)"/>
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#lp-sheen)"/>
+      <rect x="2.5" y="2.5" width="59" height="59" rx="15.5" fill="none" stroke="#ffffff" stroke-opacity="0.16"/>
+      <path d="M29 12 Q29.6 30.4 45 33.5 Q29.6 36.6 29 55 Q28.4 36.6 13 33.5 Q28.4 30.4 29 12 Z" fill="url(#lp-star)"/>
+      <path d="M48 10.5 Q48.35 16.65 54 17.5 Q48.35 18.35 48 24.5 Q47.65 18.35 42 17.5 Q47.65 16.65 48 10.5 Z" fill="url(#lp-gold)"/>
+    </svg>
+    <div class="wordmark">
+      <h1>LinkPilot</h1>
+      <span class="pill">AI</span>
+    </div>
+    <p class="purpose">Outreach &amp; Client Workspace</p>
+  </div>
+
+  <section class="panel" aria-labelledby="title">
+    <span class="status" role="status" aria-live="polite">
+      <span class="dot" aria-hidden="true"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/>
+      </svg>
+      <span id="status-text">You're offline</span>
+    </span>
+    <h2 id="title">No internet connection</h2>
+    <p class="lead" id="lead">Check your Wi-Fi or mobile data. Your work is safe, and LinkPilot will open again by itself as soon as you're back online.</p>
+    <button class="retry" id="retry" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
+      </svg>
+      <span id="retry-text">Try again</span>
+    </button>
+    <p class="hint">Checking again every few seconds</p>
+  </section>
+</main>
+
+<script>
+  // Nothing to fetch here but the page the user was trying to open, and only once the line is back
+  (function () {
+    var button = document.getElementById("retry")
+    var label = document.getElementById("retry-text")
+    var statusText = document.getElementById("status-text")
+    var lead = document.getElementById("lead")
+    var checking = false
+
+    function reopen() {
+      document.body.classList.add("back")
+      statusText.textContent = "Back online"
+      lead.textContent = "You're connected again. Opening LinkPilot..."
+      label.textContent = "Opening..."
+      button.disabled = true
+      location.reload()
+    }
+
+    // The browser's own flag can say online while nothing gets through, so a real request decides
+    function check(fromButton) {
+      if (checking) return
+      checking = true
+      if (fromButton) {
+        button.disabled = true
+        button.classList.add("spinning")
+        label.textContent = "Checking..."
+      }
+      fetch(location.href, { method: "HEAD", cache: "no-store" })
+        .then(function (response) {
+          if (response.ok || response.status < 500) reopen()
+          else throw new Error("still down")
+        })
+        .catch(function () {
+          if (fromButton) {
+            label.textContent = "Still offline, try again"
+            button.disabled = false
+            button.classList.remove("spinning")
+          }
+        })
+        .then(function () { checking = false })
+    }
+
+    button.addEventListener("click", function () { check(true) })
+    window.addEventListener("online", function () { check(false) })
+    setInterval(function () { if (navigator.onLine) check(false) }, 5000)
+  })()
+</script>
+</body>
+</html>

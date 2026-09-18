@@ -10,9 +10,9 @@ import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
 import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
-import { CreatedPromptPanel } from "@/components/prompt-creator/CreatedPromptPanel"
+import { CreatedPromptPanel, type CreatedPromptChanges } from "@/components/prompt-creator/CreatedPromptPanel"
 import { PromptCreatorPromptsModal } from "@/components/prompt-creator/PromptCreatorPromptsModal"
-import { ProjectsDialog } from "@/components/prompt-creator/ProjectsDialog"
+import Link from "next/link"
 import { usePromptProjects } from "@/hooks/usePromptProjects"
 import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
 import { appendSpokenText } from "@/lib/spokenText"
@@ -29,7 +29,7 @@ import {
   REQUEST_MAX_LENGTH,
   type PromptTargetId,
 } from "@/constants/promptCreator"
-import { NO_PROJECT, PROMPT_PROJECT_MESSAGES } from "@/constants/promptProjects"
+import { NO_PROJECT, PROJECTS_TOOL, PROMPT_PROJECT_MESSAGES } from "@/constants/promptProjects"
 import type { CreatedPrompt, RequestSource } from "@/types/promptCreator"
 
 interface GeneratePayload {
@@ -71,7 +71,6 @@ export default function PromptCreatorClient() {
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null)
   const { request, target, requestSource, transcribedBy, projectId, isTemporary } = useToolStore(formStore)
   const projects = usePromptProjects()
-  const [isProjectsOpen, setIsProjectsOpen] = useState(false)
   // A project deleted in another tab must not be sent with the next prompt
   const selectedProject = projects.projects?.find((project) => project.id === projectId) ?? null
   const currentProjectId = projects.projects && !selectedProject ? null : projectId
@@ -116,7 +115,7 @@ export default function PromptCreatorClient() {
   }
 
   // The page keeps the created prompt exactly as it was saved
-  const applyChanges = useCallback((changes: { name?: string; prompt?: string; folderId?: string | null }) => {
+  const applyChanges = useCallback((changes: CreatedPromptChanges) => {
     generation.store.update((state) => (state.result ? { result: { ...state.result, ...changes } } : {}))
   }, [])
 
@@ -167,14 +166,14 @@ export default function PromptCreatorClient() {
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
                 <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
-                <button
-                  type="button"
-                  onClick={() => setIsProjectsOpen(true)}
+                {/* Projects have their own page under Client Work now; this is the way there */}
+                <Link
+                  href={PROJECTS_TOOL.href}
                   className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
                 >
                   <FolderKanban size={16} aria-hidden="true" />
                   Projects
-                </button>
+                </Link>
                 <button
                   type="button"
                   onClick={() => setPromptsTab(target ?? DEFAULT_PROMPT_TARGET)}
@@ -277,14 +276,13 @@ export default function PromptCreatorClient() {
                         ))}
                       </select>
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsProjectsOpen(true)}
+                    <Link
+                      href={PROJECTS_TOOL.href}
                       className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2.5 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                     >
                       <FolderKanban size={14} aria-hidden="true" />
                       Manage
-                    </button>
+                    </Link>
                   </div>
                   {selectedProject?.instructions && (
                     <p className="text-[12px] leading-relaxed text-on-surface-variant">
@@ -354,24 +352,6 @@ export default function PromptCreatorClient() {
       </div>
 
       {promptsTab && <PromptCreatorPromptsModal initialTarget={promptsTab} onClose={() => setPromptsTab(null)} />}
-      {isProjectsOpen && (
-        <ProjectsDialog
-          projects={projects.projects}
-          onCreate={async (input) => {
-            const project = await projects.create(input)
-            // A project made here is the one to write for next, which is what the user just named
-            formStore.update({ projectId: project.id })
-            return project
-          }}
-          onSave={projects.save}
-          onDelete={async (id) => {
-            await projects.remove(id)
-            if (formStore.getSnapshot().projectId === id) formStore.update({ projectId: null })
-          }}
-          onPromptDeleted={projects.countDeleted}
-          onClose={() => setIsProjectsOpen(false)}
-        />
-      )}
       {isDummyDataOpen && (
         <DummyDataModal kind="prompt-requests" onUse={loadDummyRequest} onClose={() => setIsDummyDataOpen(false)} />
       )}

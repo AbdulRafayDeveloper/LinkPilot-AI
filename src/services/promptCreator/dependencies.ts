@@ -6,6 +6,8 @@ import { cleanDependencyIds, findLoop, pendingDependencies } from "@/lib/promptD
 import { DEPENDENCY_CHOICES, PROMPT_DEPENDENCY_MESSAGES, describePending } from "@/constants/promptDependencies"
 import { PROMPT_CREATOR_MESSAGES } from "@/constants/promptCreator"
 import { escapeForSearch } from "@/lib/listQuery"
+import { UNFILED_FOLDER } from "@/constants/promptFolders"
+import { folderNames } from "@/services/promptCreator/folders"
 import type { PromptDependency } from "@/types/promptCreator"
 import type { Viewer } from "@/types/auth"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
@@ -69,16 +71,32 @@ export async function blockingIds(viewer: Viewer): Promise<string[]> {
 }
 
 /**
- * What a prompt may wait for: its own account's other prompts, newest first, narrowed by a search.
- * The ones it already waits for are always included, so a dependency further down the history is
- * still shown as picked.
+ * Which prompts a folder choice keeps: one folder, the ones in none, or all of them. "None" is decided
+ * against the folders the viewer really has, the same rule the history's folder filter follows, so a
+ * prompt the page shows under No folder is listed under No folder here too.
  */
-export async function dependencyChoices(viewer: Viewer, options: { search?: string; exclude?: string; include?: string[] }): Promise<PromptDependency[]> {
+async function inFolder(viewer: Viewer, folder: string | undefined): Promise<Record<string, unknown>> {
+  if (!folder) return {}
+  if (folder !== UNFILED_FOLDER) return { folderId: folder }
+  return { folderId: { $nin: [...(await folderNames(viewer)).keys()] } }
+}
+
+/**
+ * What a prompt may wait for: its own account's other prompts, newest first, narrowed by a search
+ * and a folder (the picker starts on the prompt's own folder, where most of what it waits for lives).
+ * The ones it already waits for are always included, whatever folder they are in, so a dependency
+ * further down the history or in another folder is still shown as picked.
+ */
+export async function dependencyChoices(
+  viewer: Viewer,
+  options: { search?: string; folder?: string; exclude?: string; include?: string[] }
+): Promise<PromptDependency[]> {
   await connectDatabase()
   const scope = visibleTo(viewer)
   const search = (options.search ?? "").trim()
   const filter: Record<string, unknown> = {
     ...scope,
+    ...(await inFolder(viewer, options.folder)),
     ...(options.exclude && isRecordId(options.exclude) ? { _id: { $ne: asId(options.exclude) } } : {}),
     ...(search ? { name: { $regex: escapeForSearch(search), $options: "i" } } : {}),
   }

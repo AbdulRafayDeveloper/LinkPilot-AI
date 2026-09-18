@@ -9,15 +9,22 @@ import { FEATURE_API_PATHS } from "@/constants/featureAccess"
 /** A path is a tool's when it is the tool's own path or something under it, never a longer name that merely starts the same. */
 const isUnder = (pathname: string, base: string) => pathname === base || pathname.startsWith(`${base}/`)
 
-/** The tool an API path belongs to, or null when it belongs to all of them (signing in, the admin area). */
+/**
+ * The tool an API path belongs to, or null when it belongs to all of them (signing in, the admin area).
+ * The longest matching path wins, the same rule pages follow, so a tool whose API sits inside another
+ * tool's folder (Projects, under `/api/prompt-creator/projects`) is not taken for the outer one.
+ */
 export function toolIdForApiPath(pathname: string): string | null {
   // The "view all" pages share one route and name their tool in the path
   const saved = /^\/api\/saved-outputs\/([^/?]+)/.exec(pathname)
   if (saved) return saved[1]
+  let best: { toolId: string; length: number } | null = null
   for (const [toolId, paths] of Object.entries(FEATURE_API_PATHS)) {
-    if (paths.some((base) => isUnder(pathname, base))) return toolId
+    for (const base of paths) {
+      if (isUnder(pathname, base) && (!best || base.length > best.length)) best = { toolId, length: base.length }
+    }
   }
-  return null
+  return best?.toolId ?? null
 }
 
 /**

@@ -1,13 +1,16 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { AlertTriangle, Check, CircleCheck, CircleDashed, Loader2, Search } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
+import { SearchableSelectFilter } from "@/components/history/HistoryFilters"
 import { requestApi } from "@/lib/apiClient"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { HISTORY_DEBOUNCE_MS } from "@/constants/historyFilters"
 import { MAX_DEPENDENCIES, PROMPT_DEPENDENCY_MESSAGES } from "@/constants/promptDependencies"
+import { PROMPT_FOLDER_MESSAGES, UNFILED_FOLDER } from "@/constants/promptFolders"
 import type { PromptDependency } from "@/types/promptCreator"
+import type { PromptFolder } from "@/types/promptFolders"
 
 interface DependenciesDialogProps {
   // The record being changed, named so it is clear which one is going to wait
@@ -16,6 +19,9 @@ interface DependenciesDialogProps {
   // Where the choices are listed and where the change is saved: GET here, PUT here/<id>
   endpoint: string
   waitingFor: PromptDependency[]
+  // The account's folders, and the one the record is filed in, which the list starts on
+  folders: PromptFolder[] | null
+  folderId: string | null
   onSave: (ids: string[]) => Promise<void>
   onClose: () => void
 }
@@ -26,11 +32,25 @@ const rowClass =
 /**
  * Picks what one prompt waits for. The list is the account's own prompts, newest first and searched
  * as you type, each saying whether it has run (applied), and whatever the prompt already waits for is
- * shown picked even when the search or the limit would hide it. The prompt itself is never offered,
- * and a pick that would make a loop is refused by the server with a message saying so.
+ * shown picked even when the search, the folder or the limit would hide it. The prompt itself is
+ * never offered, and a pick that would make a loop is refused by the server with a message saying so.
+ *
+ * **The list starts on the prompt's own folder**, because a series of prompts is usually filed
+ * together and what one waits for is nearly always beside it; the Folder choice switches to another
+ * folder, No folder, or All folders. A prompt in no folder starts on All folders.
  */
-export const DependenciesDialog: React.FC<DependenciesDialogProps> = ({ title, recordId, endpoint, waitingFor, onSave, onClose }) => {
+export const DependenciesDialog: React.FC<DependenciesDialogProps> = ({
+  title,
+  recordId,
+  endpoint,
+  waitingFor,
+  folders,
+  folderId,
+  onSave,
+  onClose,
+}) => {
   const [query, setQuery] = useState("")
+  const [folder, setFolder] = useState(folderId ?? "")
   const [choices, setChoices] = useState<PromptDependency[] | null>(null)
   const [picked, setPicked] = useState<string[]>(waitingFor.map((dependency) => dependency.id))
   const [error, setError] = useState<string | null>(null)
@@ -44,6 +64,7 @@ export const DependenciesDialog: React.FC<DependenciesDialogProps> = ({ title, r
     const controller = new AbortController()
     const params = new URLSearchParams({ exclude: recordId })
     if (settled) params.set("search", settled)
+    if (folder) params.set("folder", folder)
     if (alreadyWaiting) params.set("include", alreadyWaiting)
     requestApi<{ prompts: PromptDependency[] }>(`${endpoint}?${params}`, { signal: controller.signal })
       .then(({ data }) => {
@@ -56,7 +77,16 @@ export const DependenciesDialog: React.FC<DependenciesDialogProps> = ({ title, r
         setError(reason instanceof Error ? reason.message : PROMPT_DEPENDENCY_MESSAGES.loadFailed)
       })
     return () => controller.abort()
-  }, [endpoint, recordId, settled, alreadyWaiting])
+  }, [endpoint, recordId, settled, folder, alreadyWaiting])
+
+  // "No folder" first, then every folder with how many prompts it holds, as the history's filter lists them
+  const folderOptions = useMemo(
+    () => [
+      { id: UNFILED_FOLDER, label: PROMPT_FOLDER_MESSAGES.unfiled },
+      ...(folders ?? []).map((entry) => ({ id: entry.id, label: `${entry.name} (${entry.promptCount})`, searchText: entry.name })),
+    ],
+    [folders]
+  )
 
   const toggle = (id: string) =>
     setPicked((current) => (current.includes(id) ? current.filter((picked) => picked !== id) : [...current, id]))
@@ -112,6 +142,16 @@ export const DependenciesDialog: React.FC<DependenciesDialogProps> = ({ title, r
       <div className="flex flex-col gap-3">
         <p className="text-[12px] text-on-surface-variant">{PROMPT_DEPENDENCY_MESSAGES.dialogHint}</p>
 
+        <SearchableSelectFilter
+          label={PROMPT_DEPENDENCY_MESSAGES.folderLabel}
+          allLabel={PROMPT_FOLDER_MESSAGES.allFolders}
+          value={folder}
+          options={folderOptions}
+          onChange={setFolder}
+          searchPlaceholder={PROMPT_FOLDER_MESSAGES.searchFolders}
+          emptyLabel={PROMPT_FOLDER_MESSAGES.noFolderMatch}
+        />
+
         <label className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30">
           <Search size={15} className="shrink-0 text-outline" aria-hidden="true" />
           <input
@@ -138,7 +178,11 @@ export const DependenciesDialog: React.FC<DependenciesDialogProps> = ({ title, r
           </p>
         ) : choices.length === 0 ? (
           <p className="rounded-xl bg-surface-container-lowest px-3 py-6 text-center text-[12px] text-on-surface-variant">
-            {query.trim() ? PROMPT_DEPENDENCY_MESSAGES.noPromptMatch : PROMPT_DEPENDENCY_MESSAGES.onlyPrompt}
+            {query.trim()
+              ? PROMPT_DEPENDENCY_MESSAGES.noPromptMatch
+              : folder
+                ? PROMPT_DEPENDENCY_MESSAGES.noPromptInFolder
+                : PROMPT_DEPENDENCY_MESSAGES.onlyPrompt}
           </p>
         ) : (
           <ul className="custom-scrollbar flex max-h-[46vh] flex-col gap-1 overflow-y-auto pr-1">

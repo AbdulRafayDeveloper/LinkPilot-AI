@@ -33,6 +33,14 @@ const nextConfig: NextConfig = {
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },
       { source: BRAND_ASSETS, headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }] },
+      // The browser checks for a new service worker on every visit, and it may control the whole site
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
     ]
   },
   // The manifest is app/manifest.ts (/manifest.webmanifest); tools that look for the other common names find it too

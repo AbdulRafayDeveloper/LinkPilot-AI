@@ -13,6 +13,7 @@ import {
 } from "@/config/site"
 import { HOME_SEO } from "@/constants/seo"
 import { fullTitle, socialMetadata } from "@/lib/metadata"
+import { ServiceWorkerRegistration } from "@/components/ui/ServiceWorkerRegistration"
 import "./globals.css"
 
 const inter = Inter({
@@ -86,7 +87,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        {children}
+        <ServiceWorkerRegistration />
+      </body>
     </html>
   )
 }

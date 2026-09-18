@@ -8,9 +8,10 @@ import { requireViewer } from "@/services/auth/viewer"
 export const dynamic = "force-dynamic"
 
 /**
- * GET (?search=&exclude=&include=): the prompts one prompt may be told to wait for, newest first and
- * narrowed by a search, with whether each has run. It answers names and marks only, never the prompt
- * texts, because this is what the picker lists and nothing else.
+ * GET (?search=&folder=&exclude=&include=): the prompts one prompt may be told to wait for, newest
+ * first and narrowed by a search and a folder (a folder id, "none", or "" for all), with whether each
+ * has run. It answers names and marks only, never the prompt texts, because this is what the picker
+ * lists and nothing else.
  */
 export async function GET(req: NextRequest) {
   const auth = await requireViewer()

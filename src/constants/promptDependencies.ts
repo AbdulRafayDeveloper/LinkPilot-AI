@@ -51,6 +51,12 @@ export const PROMPT_DEPENDENCY_MESSAGES = {
   dialogHint: "Pick the prompts that must be run before this one. Applied prompts count as run.",
   searchPrompts: "Search your prompts",
   noPromptMatch: "No other prompt matches that name.",
+  // The folder the picker lists from, which starts on the prompt's own folder
+  folderLabel: "Folder",
+  noPromptInFolder: "No other prompt is in this folder. Pick another folder, or All folders.",
+  // On the create page, beside the folder
+  setDependencies: "Set what it waits for",
+  changeDependencies: "Change what it waits for",
   onlyPrompt: "This is your only prompt, so there is nothing for it to wait for yet.",
   // Refusals
   tooMany: `A prompt can wait for up to ${MAX_DEPENDENCIES} others.`,

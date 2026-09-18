@@ -53,6 +53,8 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except Next's own files, the social cards and the public brand files (icons, manifest, robots, sitemap)
-  matcher: ["/((?!_next/|og/|favicon|icon-|apple-touch-icon|maskable-icon|monochrome-icon|safari-pinned-tab|linkpilot-mark|manifest|site\\.webmanifest|robots\\.txt|sitemap\\.xml).*)"],
+  // Everything except Next's own files, the social cards, the public brand files (icons, manifest, robots,
+  // sitemap) and the offline screen with its service worker, which must load as themselves even signed out:
+  // a sign-in redirect cached as the offline page would be what an offline user saw
+  matcher: ["/((?!_next/|og/|favicon|icon-|apple-touch-icon|maskable-icon|monochrome-icon|safari-pinned-tab|linkpilot-mark|manifest|site\\.webmanifest|robots\\.txt|sitemap\\.xml|sw\\.js|offline\\.html).*)"],
 }

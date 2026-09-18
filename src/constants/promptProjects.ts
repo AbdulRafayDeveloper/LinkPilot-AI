@@ -1,3 +1,5 @@
+import { FolderKanban, type LucideIcon } from "lucide-react"
+
 /**
  * Projects for the Prompt Creator: the piece of work a prompt was written for. A project keeps its
  * own instruction block, which is added to the end of every prompt created in it, so a standing
@@ -8,6 +10,27 @@
  */
 
 export const PROMPT_PROJECTS_ENDPOINT = "/api/prompt-creator/projects"
+
+/**
+ * Projects have their own page under Client Work, next to Clients Management, and that page is where
+ * they are made, changed and deleted. Prompt Creator only picks one, from the same list, so what the
+ * picker offers and what this page shows can never differ.
+ */
+export const PROJECTS_TOOL: {
+  id: string
+  title: string
+  description: string
+  icon: LucideIcon
+  href: string
+  group: "clients"
+} = {
+  id: "projects",
+  title: "Projects",
+  description: "What each prompt is written for",
+  icon: FolderKanban,
+  href: "/projects",
+  group: "clients",
+}
 
 // A project's name is a label, not a sentence
 export const PROJECT_NAME_MAX_LENGTH = 60
@@ -37,4 +60,10 @@ export const PROMPT_PROJECT_MESSAGES = {
   deleteExplains: "The prompts written in it are kept and go back to no project.",
   none: "No project",
   instructionsHint: "Added to the end of every prompt created in this project.",
+  // The Projects page
+  empty: "No projects yet. Add one, and it will be waiting in Prompt Creator the next time you write a prompt.",
+  noMatch: "No project matches that search.",
+  choose: "Choose a project",
+  chooseHint: "Pick one on the left to see its instructions and the prompts written in it.",
+  noInstructions: "No instructions. Prompts written in this project are left exactly as they are written.",
 } as const

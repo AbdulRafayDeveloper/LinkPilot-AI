@@ -15,8 +15,10 @@ export const AUTH_ENDPOINTS = {
   me: "/api/auth/me",
 } as const
 
-// A sign-in lasts this long; signing out, or a password change, ends it sooner
-export const SESSION_DAYS = 7
+// A sign-in lasts this long: sign in once and stay signed in for a year. Signing out, or a password
+// reset, ends it sooner. A year is under the 400 days browsers allow a cookie to live, so it is kept
+// whole rather than cut short by the browser
+export const SESSION_DAYS = 365
 
 export const NAME_MAX_LENGTH = 80
 export const EMAIL_MAX_LENGTH = 254

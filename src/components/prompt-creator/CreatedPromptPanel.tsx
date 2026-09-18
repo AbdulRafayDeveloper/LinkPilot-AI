@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { AlertCircle, Check, Cpu, Folder, FolderInput, Loader2, Pencil } from "lucide-react"
+import { AlertCircle, Check, Cpu, Folder, FolderInput, Hourglass, ListChecks, Loader2, Pencil } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { requestApi } from "@/lib/apiClient"
 import {
@@ -11,11 +11,13 @@ import {
   getPromptTargetLabel,
 } from "@/constants/promptCreator"
 import { describeSource } from "@/constants/aiProviders"
-import { PROMPT_FOLDER_MESSAGES } from "@/constants/promptFolders"
+import { PROMPT_CREATOR_RECORD_ENDPOINT, PROMPT_FOLDER_MESSAGES } from "@/constants/promptFolders"
+import { PROMPT_DEPENDENCY_MESSAGES } from "@/constants/promptDependencies"
 import { usePromptFolders } from "@/hooks/usePromptFolders"
 import { MoveToFolderDialog } from "@/components/saved-outputs/MoveToFolderDialog"
+import { DependenciesDialog } from "@/components/saved-outputs/DependenciesDialog"
 import { PROMPT_FOLDERS_ENDPOINT } from "@/constants/promptFolders"
-import type { CreatedPrompt } from "@/types/promptCreator"
+import type { CreatedPrompt, PromptDependency } from "@/types/promptCreator"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 // Typing pauses this long before the change is saved
@@ -23,16 +25,24 @@ const SAVE_DELAY_MS = 900
 
 type SaveState = "saved" | "saving" | "failed"
 
+/** What changed on the record, so the page's copy follows what was saved. */
+export type CreatedPromptChanges = { name?: string; prompt?: string; folderId?: string | null; dependencies?: PromptDependency[] }
+
 interface CreatedPromptPanelProps {
   created: CreatedPrompt
   // Keeps the page's copy in step with what was saved
-  onChange: (changes: { name?: string; prompt?: string; folderId?: string | null }) => void
+  onChange: (changes: CreatedPromptChanges) => void
 }
 
 /**
  * The finished prompt: its name and text, both edited in place and saved to the same record the
- * module created, the folder it is filed in, and one copy action for the prompt exactly as it now
- * reads. The page mounts it under the record's id, so a newly created prompt starts this panel fresh.
+ * module created, the folder it is filed in, what it waits for, and one copy action for the prompt
+ * exactly as it now reads. The page mounts it under the record's id, so a newly created prompt
+ * starts this panel fresh.
+ *
+ * What it waits for is set here as well as from the history, with the same dialog: a prompt written
+ * as the next step of a series can be tied to the steps before it the moment it is written, and the
+ * dialog starts on the folder it was just filed in.
  *
  * A prompt created with "use once" has no record (`id` is empty): it can be read, changed here and
  * copied, but nothing is saved and it has no folder, so those controls are left out rather than
@@ -46,6 +56,8 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
   const promptRef = useRef<HTMLTextAreaElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isMoving, setIsMoving] = useState(false)
+  const [isPickingDependencies, setIsPickingDependencies] = useState(false)
+  const waitsFor = created.dependencies ?? []
   // Nothing was stored for a temporary prompt, so there is nothing to save changes to
   const isTemporary = created.id === ""
   const folders = usePromptFolders(isTemporary ? undefined : PROMPT_FOLDERS_ENDPOINT)
@@ -86,6 +98,19 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
     },
     [created.id, onChange]
   )
+
+  /**
+   * Saves what the prompt waits for. It throws on a refusal (a loop, a prompt gone meanwhile) rather
+   * than swallowing it, so the dialog it came from shows the server's own reason and stays open.
+   */
+  const saveDependencies = async (ids: string[]) => {
+    const { data } = await requestApi<CreatedPrompt>(`${PROMPT_CREATOR_RECORD_ENDPOINT}/${created.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dependencyIds: ids }),
+    })
+    onChange({ dependencies: data.dependencies ?? [] })
+  }
 
   const saveLater = (changes: { name?: string; prompt?: string }) => {
     clearTimeout(timerRef.current ?? undefined)
@@ -162,6 +187,26 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
           <FolderInput size={12} aria-hidden="true" />
           {created.folderId ? "Move to another folder" : "Add to a folder"}
         </button>
+        {/* What it waits for, set the moment it is written rather than only from the history */}
+        <span
+          title={waitsFor.map((entry) => `${entry.name || "Untitled prompt"} (${entry.appliedAt ? "applied" : "not yet"})`).join("\n") || undefined}
+          className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-semibold text-on-surface"
+        >
+          <Hourglass size={12} className="shrink-0 text-outline" aria-hidden="true" />
+          <span className="truncate">
+            {waitsFor.length === 0
+              ? PROMPT_DEPENDENCY_MESSAGES.none
+              : `${PROMPT_DEPENDENCY_MESSAGES.dependsOn} ${waitsFor.map((entry) => entry.name || "Untitled prompt").join(", ")}`}
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={() => setIsPickingDependencies(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <ListChecks size={12} aria-hidden="true" />
+          {waitsFor.length === 0 ? PROMPT_DEPENDENCY_MESSAGES.setDependencies : PROMPT_DEPENDENCY_MESSAGES.changeDependencies}
+        </button>
       </div>
       )}
 
@@ -217,6 +262,18 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
           }}
           onCreate={folders.create}
           onClose={() => setIsMoving(false)}
+        />
+      )}
+      {isPickingDependencies && (
+        <DependenciesDialog
+          title={name}
+          recordId={created.id}
+          endpoint={PROMPT_CREATOR_RECORD_ENDPOINT}
+          waitingFor={waitsFor}
+          folders={folders.folders}
+          folderId={created.folderId}
+          onSave={saveDependencies}
+          onClose={() => setIsPickingDependencies(false)}
         />
       )}
     </div>
