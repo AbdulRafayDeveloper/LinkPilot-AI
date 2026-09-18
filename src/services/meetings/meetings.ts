@@ -10,6 +10,8 @@ import type { Meeting, MeetingAnalysis, MeetingInput, MeetingSummary, MeetingsPa
 import type { Viewer } from "@/types/auth"
 import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import type { AiSource } from "@/types/ai"
+import type { StoredRecording } from "@/types/meetingRecording"
+import { removeRecordingFiles, toRecordingSummary } from "@/services/meetings/recording"
 
 /**
  * Meetings in the database. The history list never reads a transcript: a card needs a title, a
@@ -65,7 +67,26 @@ function toMeeting(record: StoredMeeting): Meeting {
     isAnalysisStale: Boolean(record.analyzedHash) && record.analyzedHash !== record.transcriptHash,
     analyzedAt: record.analyzedAt ? record.analyzedAt.toISOString() : null,
     analysisSource: { provider: (record.analysisProvider as AiSource["provider"]) ?? null, providers: (record.analysisProviders ?? []) as AiSource["providers"] },
+    notes: record.notes ?? "",
+    notesEditedAt: record.notesEditedAt ? new Date(record.notesEditedAt).toISOString() : null,
+    recording: record.recording ? toRecordingSummary(record.recording as StoredRecording) : null,
   }
+}
+
+/**
+ * Keeps the user's own wording of the notes. From then on a new analysis leaves them alone, since
+ * they are the user's now; clearing them lets the next analysis write them again.
+ */
+export async function saveNotes(viewer: Viewer, id: string, notes: string): Promise<Meeting | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
+  await connectDatabase()
+  const updated = await MeetingModel.findOneAndUpdate(
+    filter,
+    { $set: { notes, notesEditedAt: notes.trim() ? new Date() : null } },
+    { returnDocument: "after" }
+  ).lean()
+  return updated ? toMeeting(updated as unknown as StoredMeeting) : null
 }
 
 const toCursor = (record: StoredMeeting) => `${record.createdAt.toISOString()}${CURSOR_SEPARATOR}${record._id.toString()}`
@@ -193,6 +214,8 @@ export async function deleteMeeting(viewer: Viewer, id: string): Promise<boolean
   const filter = visibleById(viewer, id)
   if (!filter) return false
   await connectDatabase()
+  // The recording is read first: its files are named from it, and they go once the meeting has
+  const recording = ((await MeetingModel.findOne(filter, { recording: 1 }).lean()) as { recording?: unknown } | null)?.recording ?? null
   const { deletedCount } = await MeetingModel.deleteOne(filter)
   if (deletedCount > 0) {
     await Promise.all([
@@ -200,6 +223,7 @@ export async function deleteMeeting(viewer: Viewer, id: string): Promise<boolean
       // What its chat was answered from, and the chat itself
       deleteMeetingVectors(id),
       clearMeetingChat(id),
+      removeRecordingFiles(id, recording),
     ])
   }
   return deletedCount > 0
@@ -226,12 +250,15 @@ export async function deleteMeetings(
     ...(ids ? [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] : []),
   ]
   // The ids are read first, because what each meeting left behind is keyed by them
-  const doomed = (await MeetingModel.find({ $and: narrowing }, { _id: 1 }).lean()).map((record) => String(record._id))
+  const found = (await MeetingModel.find({ $and: narrowing }, { _id: 1, recording: 1 }).lean()) as unknown as { _id: unknown; recording?: unknown }[]
+  const doomed = found.map((record) => String(record._id))
   if (doomed.length === 0) return { deleted: 0 }
   const { deletedCount } = await MeetingModel.deleteMany({ _id: { $in: doomed.map((id) => new mongoose.Types.ObjectId(id)) } })
   await Promise.all([
     MeetingChunk.deleteMany({ meetingId: { $in: doomed.map((id) => new mongoose.Types.ObjectId(id)) } }),
     ...doomed.flatMap((id) => [deleteMeetingVectors(id), clearMeetingChat(id)]),
+    // A recorded meeting's files go with it
+    ...found.map((record) => removeRecordingFiles(String(record._id), record.recording ?? null)),
   ])
   return { deleted: deletedCount ?? 0 }
 }

@@ -116,6 +116,15 @@ export function presignParts(key: string, uploadId: string, partCount: number): 
 }
 
 /**
+ * Sends one part of a multipart upload from the server, for bytes the server assembled itself (the
+ * chunks of a meeting recording joined into parts S3 accepts). The browser's own parts go through
+ * signed links instead.
+ */
+export async function uploadPartBytes(key: string, uploadId: string, partNumber: number, body: Buffer): Promise<void> {
+  await s3().send(new UploadPartCommand({ Bucket: bucket(), Key: key, UploadId: uploadId, PartNumber: partNumber, Body: body }))
+}
+
+/**
  * Assembles the parts into the finished object. The part list comes from S3 itself rather than
  * from the browser, so a page that lost an ETag, or made one up, cannot affect what is stored.
  */

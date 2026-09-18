@@ -12,6 +12,8 @@ import { MeetingAnalysisView } from "@/components/meetings/MeetingAnalysisView"
 import { MeetingChatPanel } from "@/components/meeting-planner/MeetingChatPanel"
 import { MeetingFormDialog } from "@/components/meetings/MeetingFormDialog"
 import { DeleteMeetingDialog } from "@/components/meetings/DeleteMeetingDialog"
+import { RecordingPanel } from "@/components/meetings/RecordingPanel"
+import { MeetingNotesPanel } from "@/components/meetings/MeetingNotesPanel"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useMeetingRun } from "@/hooks/useMeetingRun"
 import { requestApi } from "@/lib/apiClient"
@@ -120,8 +122,16 @@ export default function MeetingDetailClient({ id }: { id: string }) {
   const transcript = meeting?.transcript ?? ""
   const isTranscriptLong = transcript.length > TRANSCRIPT_PREVIEW_CHARS
   const shownTranscript = isTranscriptOpen || !isTranscriptLong ? transcript : `${transcript.slice(0, TRANSCRIPT_PREVIEW_CHARS)}…`
-  const canAnalyse = meeting !== null && !isRunning && meeting.status !== "completed"
-  const canReanalyse = meeting !== null && !isRunning && (meeting.status === "completed" || meeting.isAnalysisStale)
+  // A recorded meeting has nothing to analyse until its audio has been written out
+  const awaitingRecording = Boolean(meeting?.recording && meeting.recording.stage !== "done")
+  const canAnalyse = meeting !== null && !isRunning && !awaitingRecording && meeting.status !== "completed"
+  const canReanalyse = meeting !== null && !isRunning && !awaitingRecording && (meeting.status === "completed" || meeting.isAnalysisStale)
+  // The recording's progress comes from its own calls; the rest of the meeting stays as it is
+  const onRecordingProgress = useCallback(
+    (recording: NonNullable<Meeting["recording"]>) => setMeeting((current) => (current ? { ...current, recording } : current)),
+    []
+  )
+  const onTranscribed = useCallback(() => setReloadAttempt((attempt) => attempt + 1), [])
 
   return (
     <div className="font-body-md text-body-md min-h-screen bg-background text-on-surface flex overflow-hidden h-screen">
@@ -242,7 +252,11 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                     <span className="text-on-surface-variant">You can leave this page; it carries on when you come back.</span>
                   </p>
                 )}
-                {(runError || (meeting.status === "failed" && meeting.statusMessage)) && (
+                {/* A recorded meeting: joining and writing it out, then the video */}
+                {meeting.recording && (
+                  <RecordingPanel meetingId={meeting.id} recording={meeting.recording} onProgress={onRecordingProgress} onTranscribed={onTranscribed} />
+                )}
+                {!awaitingRecording && (runError || (meeting.status === "failed" && meeting.statusMessage)) && (
                   <p role="alert" className="rounded-xl border border-error/40 bg-error-container px-3 py-2 text-[12px] text-error">
                     {runError ?? MEETING_MESSAGES.analysisFailed}
                     {meeting.statusMessage && <span className="ml-1 text-on-surface-variant">({meeting.statusMessage})</span>}
@@ -254,11 +268,14 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                   </p>
                 )}
 
+                {/* The notes written from the analysis, which are the user's to edit */}
+                {meeting.notes && <MeetingNotesPanel meeting={meeting} onSaved={setMeeting} />}
+
                 {/* The analysis */}
                 {meeting.analysis ? (
                   <MeetingAnalysisView analysis={meeting.analysis} />
                 ) : (
-                  !isRunning && (
+                  !isRunning && !awaitingRecording && (
                     <p className="rounded-2xl border border-outline-variant bg-white p-6 text-center text-sm text-on-surface-variant shadow-sm">
                       This meeting has not been analyzed yet. Press Analyse to read the transcript.
                     </p>
@@ -269,10 +286,11 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                     whether or not the meeting has been analysed yet */}
                 <MeetingChatPanel surface="notes" meetingId={meeting.id} subject={meeting.title} />
 
-                {/* The transcript, kept exactly as it was pasted */}
+                {/* The transcript, kept exactly as it was pasted, or as the recording was written out */}
+                {transcript && (
                 <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-sm font-bold text-on-surface">Original notes</h2>
+                    <h2 className="text-sm font-bold text-on-surface">{meeting.recording ? "Transcript of the recording" : "Original notes"}</h2>
                     <div className="flex items-center gap-1">
                       <CopyButton text={transcript} label="Copy the whole transcript" showLabel />
                       {isTranscriptLong && (
@@ -298,6 +316,7 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                     </p>
                   )}
                 </section>
+                )}
               </>
             )}
           </div>

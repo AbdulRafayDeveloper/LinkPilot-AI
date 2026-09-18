@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, CalendarClock, FilePenLine, Loader2, Plus, RefreshCw, Search, SearchX, X } from "lucide-react"
+import Link from "next/link"
+import { AlertTriangle, CalendarClock, FilePenLine, Loader2, Plus, RefreshCw, Search, SearchX, Video, X } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { MeetingsTable } from "@/components/meetings/MeetingsTable"
@@ -258,6 +259,14 @@ export default function MeetingsClient() {
                   <Plus size={16} aria-hidden="true" />
                   New Meeting
                 </button>
+                {/* Record the call itself instead of pasting its notes: transcript and notes follow on their own */}
+                <Link
+                  href="/meetings/record"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                >
+                  <Video size={16} aria-hidden="true" />
+                  Record a meeting
+                </Link>
               </div>
             </div>
 

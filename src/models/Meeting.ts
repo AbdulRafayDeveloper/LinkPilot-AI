@@ -27,6 +27,12 @@ export interface IMeeting {
   // Who wrote the analysis: the last provider that answered and every provider that did, over all its calls
   analysisProvider: string | null
   analysisProviders: string[]
+  // The notes built from the analysis, which the user can edit (lib/meetingNotes.ts); "" until the first analysis
+  notes: string
+  // When the user last changed the notes by hand; while set, a new analysis leaves them alone
+  notesEditedAt: Date | null
+  // A meeting recorded in the app (types/meetingRecording.ts StoredRecording); null for a pasted one
+  recording: unknown
   createdAt: Date
   updatedAt: Date
 }
@@ -36,9 +42,10 @@ const MeetingSchema = new Schema<IMeeting>(
     ownerId: OWNER_ID,
     title: { type: String, required: true, trim: true },
     isTitleGenerated: { type: Boolean, required: true, default: false },
-    transcript: { type: String, required: true },
-    transcriptChars: { type: Number, required: true },
-    transcriptHash: { type: String, required: true },
+    // Empty only while a recorded meeting is still being written out; a pasted one is refused empty by its route
+    transcript: { type: String, default: "" },
+    transcriptChars: { type: Number, default: 0 },
+    transcriptHash: { type: String, default: "" },
     analyzedHash: { type: String, default: null },
     status: { type: String, enum: MEETING_STATUS_IDS, required: true, default: "saved" },
     statusMessage: { type: String, default: null },
@@ -49,6 +56,10 @@ const MeetingSchema = new Schema<IMeeting>(
     analyzedAt: { type: Date, default: null },
     analysisProvider: { type: String, default: null },
     analysisProviders: { type: [String], default: [] },
+    notes: { type: String, default: "" },
+    notesEditedAt: { type: Date, default: null },
+    // Mixed on purpose: chunks are confirmed one key at a time with a $set on their own path
+    recording: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true, collection: "meetings" }
 )

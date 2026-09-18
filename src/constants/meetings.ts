@@ -29,6 +29,8 @@ export const TRANSCRIPT_PREVIEW_CHARS = 4_000
  * transcript is never at risk, and every later state is recorded on the meeting itself.
  */
 export const MEETING_STATUSES = [
+  { id: "recording", label: "Recording", description: "Being recorded and uploaded from the app" },
+  { id: "transcribing", label: "Transcribing", description: "The recording is being joined and written out" },
   { id: "saved", label: "Saved", description: "Saved, waiting to be analyzed" },
   { id: "analyzing", label: "Analyzing", description: "Reading the transcript chunk by chunk" },
   { id: "summarizing", label: "Generating summary", description: "Putting the whole meeting together" },

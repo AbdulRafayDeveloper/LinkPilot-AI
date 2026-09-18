@@ -30,8 +30,15 @@ export async function modelOrderFor(viewer: Viewer, module: AiModuleId): Promise
  * provider wrote it, and every provider that answered). Every AI route runs its service through this, so a
  * new module or provider is attributed and counted without code of its own.
  */
-export async function runAiRequest<T>(viewer: Viewer, module: AiModuleId | UsageOnlyModuleId, run: () => Promise<T>): Promise<{ result: T; source: AiSource }> {
-  const order = module === "post-image-creator" ? DEFAULT_MODEL_ORDER : await modelOrderFor(viewer, module)
+export async function runAiRequest<T>(
+  viewer: Viewer,
+  module: AiModuleId | UsageOnlyModuleId,
+  run: () => Promise<T>,
+  // Providers this request must never use, whatever the order says (a recorded meeting leaves OpenAI out)
+  options: { without?: readonly string[] } = {}
+): Promise<{ result: T; source: AiSource }> {
+  const resolved = module === "post-image-creator" ? DEFAULT_MODEL_ORDER : await modelOrderFor(viewer, module)
+  const order = options.without ? resolved.filter((provider) => !options.without?.includes(provider)) : resolved
   return withModelOrder(
     order,
     async () => {

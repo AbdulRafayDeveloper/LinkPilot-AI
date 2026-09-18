@@ -1,4 +1,5 @@
 import type { AiSource, WithAiSource } from "./ai"
+import type { MeetingRecordingSummary } from "./meetingRecording"
 import type { MeetingStatusId } from "@/constants/meetings"
 
 /**
@@ -86,6 +87,11 @@ export interface Meeting extends MeetingSummary {
   analyzedAt: string | null
   // Who wrote the analysis, over every call that built it
   analysisSource: AiSource
+  // The editable notes built from the analysis; "" until there is one
+  notes: string
+  notesEditedAt: string | null
+  // Set for a meeting recorded in the app, null for a pasted one
+  recording: MeetingRecordingSummary | null
 }
 
 export interface MeetingsPage {

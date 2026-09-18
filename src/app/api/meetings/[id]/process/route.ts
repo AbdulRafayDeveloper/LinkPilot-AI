@@ -27,7 +27,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   try {
     // Only a meeting this account may see can be analysed; anyone else's reads as not found
-    if (!(await getMeeting(auth.viewer, id))) {
+    const meeting = await getMeeting(auth.viewer, id)
+    if (!meeting) {
       return NextResponse.json({ success: false, message: MEETING_MESSAGES.notFound }, { status: 404 })
     }
     const body = await req.json().catch(() => ({}))
@@ -36,7 +37,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (!reset) return NextResponse.json({ success: false, message: MEETING_MESSAGES.notFound }, { status: 404 })
     }
 
-    const { result: state, source } = await runAiRequest(auth.viewer, "meetings", () => runAnalysis(id, { signal: req.signal }))
+    // A meeting recorded in the app is written up without OpenAI, like its transcript was
+    const { result: state, source } = await runAiRequest(auth.viewer, "meetings", () => runAnalysis(id, { signal: req.signal }), {
+      without: meeting.recording ? ["openai"] : undefined,
+    })
     if (state) await noteAnalysisSource(id, source)
     if (!state) return NextResponse.json({ success: false, message: MEETING_MESSAGES.notFound }, { status: 404 })
     return NextResponse.json({ success: true, message: "Analysis moved on", data: { ...state, ...source } })

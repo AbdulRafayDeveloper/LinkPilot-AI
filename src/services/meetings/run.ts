@@ -7,6 +7,7 @@ import { CHUNKS_PER_REQUEST, CHUNK_CONCURRENCY } from "@/constants/meetings"
 import type { MeetingRunState } from "@/types/meetings"
 import { analyzeChunk, ChunkResultSchema, synthesizeMeeting, type ChunkResult } from "./analysis"
 import type { AiSource } from "@/types/ai"
+import { buildMeetingNotes } from "@/lib/meetingNotes"
 
 /**
  * Running the analysis of one meeting, a bit at a time.
@@ -58,6 +59,10 @@ export async function runAnalysis(id: string, { signal }: RunOptions): Promise<M
 
   const meetingId = meeting._id as mongoose.Types.ObjectId
   const transcriptHash = meeting.transcriptHash
+  // A recorded meeting has nothing to read until its audio has been written out
+  if (!meeting.transcript.trim()) {
+    return { status: meeting.status, statusMessage: meeting.statusMessage, progress: { analyzedChunks: 0, totalChunks: 0 }, hasMore: false }
+  }
   const chunks = splitTranscript(meeting.transcript)
   const totalChunks = chunks.length
 
@@ -117,6 +122,8 @@ export async function runAnalysis(id: string, { signal }: RunOptions): Promise<M
       {
         analysis,
         title,
+        // Editable notes laid out from the analysis, unless the user has written their own
+        ...(meeting.notesEditedAt ? {} : { notes: buildMeetingNotes(analysis) }),
         analyzedHash: transcriptHash,
         analyzedAt: new Date(),
         status: "completed",

@@ -7,6 +7,7 @@ import { PostImageModel } from "@/models/PostImage"
 import { UserModel } from "@/models/User"
 import { ADMIN_MESSAGES } from "@/constants/admin"
 import { abortMultipartUpload, deleteObject, isStorageConfigured } from "@/services/storage/s3"
+import { removeRecordingFiles } from "@/services/meetings/recording"
 import { recordLoginEvent, type ClientInfo } from "@/services/auth/audit"
 import type { Viewer } from "@/types/auth"
 import type { AccountDeletion } from "@/types/admin"
@@ -70,6 +71,9 @@ export async function deleteAccount(admin: Viewer, id: string, confirmEmail: str
 
   // 1. Stored files. If storage fails here, no record has been touched yet
   await removeStoredFiles(files)
+  // Meeting recordings are attachments of their meetings: removed here too, and a failure is only logged
+  const recorded = (await Meeting.find({ ...owner, recording: { $ne: null } }, { _id: 1, recording: 1 }).lean()) as unknown as { _id: unknown; recording: unknown }[]
+  await Promise.all(recorded.map((meeting) => removeRecordingFiles(String(meeting._id), meeting.recording)))
 
   // 2. What hangs off a record without an owner of its own
   const meetingIds = (await Meeting.find(owner, { _id: 1 }).lean()).map((meeting) => meeting._id)
