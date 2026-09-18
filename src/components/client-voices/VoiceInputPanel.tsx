@@ -134,24 +134,25 @@ export const VoiceInputPanel: React.FC<VoiceInputPanelProps> = ({
           if (isProcessing) return
           take(Array.from(event.dataTransfer.files), "drop")
         }}
-        className={`flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed px-4 py-6 text-center transition-colors ${
+        className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed px-4 py-4 text-center transition-colors ${
           isDragging ? "border-primary bg-primary/5" : "border-outline-variant bg-surface-container-lowest"
         }`}
       >
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/5 text-primary">
-          <AudioLines size={20} aria-hidden="true" />
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/5 text-primary">
+          <AudioLines size={18} aria-hidden="true" />
         </div>
         <p className="text-sm font-semibold text-on-surface">Paste a copied voice message, or drop the files here</p>
         <p className="max-w-sm text-[12px] leading-relaxed text-on-surface-variant">
-          Press Ctrl+V anywhere on this page. If the app you copied from only copies a link, save the voice and drop it
-          here instead. Up to {VOICE_BATCH_MAX} voices, each under {VOICE_MAX_LABEL}.
+          Press Ctrl+V anywhere on this page, or use the button. If the app you copied from only copies a link, save the
+          voice and drop it here instead. Up to {VOICE_BATCH_MAX} voices, each under {VOICE_MAX_LABEL}.
         </p>
-        <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+        {/* Pasting is the way most voices arrive, so it is the filled button and sits first */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <button
             type="button"
             onClick={readClipboard}
             disabled={isProcessing || isFull || isReadingClipboard}
-            className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 text-[12px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isReadingClipboard ? (
               <Loader2 size={14} className="animate-spin" aria-hidden="true" />

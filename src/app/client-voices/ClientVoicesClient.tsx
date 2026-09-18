@@ -1,10 +1,11 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { AudioLines, FilePenLine, RotateCcw } from "lucide-react"
+import { AudioLines, FilePenLine, RotateCcw, Users } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { VoiceInputPanel } from "@/components/client-voices/VoiceInputPanel"
+import { SavedVoicesPanel } from "@/components/client-voices/SavedVoicesPanel"
 import { TranscriptList } from "@/components/client-voices/TranscriptList"
 import { TaskListPanel } from "@/components/client-voices/TaskListPanel"
 import { ClientVoicesPromptModal } from "@/components/client-voices/ClientVoicesPromptModal"
@@ -12,11 +13,23 @@ import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { checkAudioFile, runWithLimit, transcribeVoice } from "@/lib/voiceBatch"
 import {
+  CLIENT_CHOICE_KEY,
   CLIENT_VOICES_ENDPOINT,
   CLIENT_VOICES_MESSAGES,
   VOICE_BATCH_MAX,
 } from "@/constants/clientVoices"
-import type { TaskExtraction, VoiceEntry, VoiceSource } from "@/types/clientVoices"
+import { CLIENT_MESSAGING_ENDPOINT } from "@/constants/clientMessaging"
+import type { Client } from "@/types/clientMessaging"
+import type { SavedVoice, TaskExtraction, VoiceEntry, VoiceSource } from "@/types/clientVoices"
+
+// The client chosen last time, so the page opens on it again
+const readChosenClient = () => {
+  try {
+    return window.localStorage.getItem(CLIENT_CHOICE_KEY) ?? ""
+  } catch {
+    return ""
+  }
+}
 
 const newId = () =>
   typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `voice-${Date.now()}-${Math.random()}`
@@ -31,12 +44,42 @@ export default function ClientVoicesClient() {
   const [notice, setNotice] = useState<string | null>(null)
   const [isPromptOpen, setIsPromptOpen] = useState(false)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
+  const [clients, setClients] = useState<Client[]>([])
+  const [clientId, setClientId] = useState("")
+  // Bumped when something is kept or deleted, so the saved list reads itself again
+  const [savedChanged, setSavedChanged] = useState(0)
   const runRef = useRef<AbortController | null>(null)
+  // The ids of the voices kept in this run, so the task list can point back at the recordings
+  const savedIdsRef = useRef(new Map<string, string>())
   // The transcripts as they land, so the task step never reads a half-updated render
   const transcriptsRef = useRef(new Map<string, string>())
 
   // The batch belongs to this page and nothing else: leaving it drops the audio with it
   useEffect(() => () => runRef.current?.abort(), [])
+
+  // The clients to choose from are the ones Client Tasks Messaging already keeps
+  useEffect(() => {
+    const controller = new AbortController()
+    requestApi<Client[]>(`${CLIENT_MESSAGING_ENDPOINT}/clients`, { signal: controller.signal })
+      .then(({ data }) => {
+        setClients(data)
+        const chosen = readChosenClient()
+        if (chosen && data.some((client) => client.id === chosen)) setClientId(chosen)
+      })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [])
+
+  const chooseClient = (id: string) => {
+    setClientId(id)
+    try {
+      window.localStorage.setItem(CLIENT_CHOICE_KEY, id)
+    } catch {
+      // The choice simply isn't remembered for next time
+    }
+  }
+
+  const chosenClient = clients.find((client) => client.id === clientId) ?? null
 
   const update = useCallback((id: string, changes: Partial<VoiceEntry>) => {
     setVoices((current) => current.map((voice) => (voice.id === id ? { ...voice, ...changes } : voice)))
@@ -107,15 +150,17 @@ export default function ClientVoicesClient() {
         body: JSON.stringify({
           voices: done.map((voice) => ({ voice: voice.position, transcript: transcriptsRef.current.get(voice.id) })),
           missingVoices: missing.map((voice) => voice.position),
+          ...(clientId ? { clientId, voiceIds: done.map((voice) => savedIdsRef.current.get(voice.id)).filter(Boolean) } : {}),
         }),
       }, { retry: true })
       setTasks(data)
+      if (clientId) setSavedChanged((count) => count + 1)
     } catch (error: unknown) {
       setTaskError(error instanceof Error ? error.message : CLIENT_VOICES_MESSAGES.tasksFailed)
     } finally {
       setIsExtracting(false)
     }
-  }, [])
+  }, [clientId])
 
   /**
    * Runs the batch. Every voice is transcribed on its own, a few at a time, so one failure is
@@ -149,6 +194,24 @@ export default function ClientVoicesClient() {
           const { text: transcript, provider } = await transcribeVoice(voice.file, controller.signal)
           transcriptsRef.current.set(voice.id, transcript)
           update(voice.id, { status: "done", transcript, transcribedBy: provider, error: null })
+          // With a client chosen, the recording and its transcript are kept with that client. A
+          // failure here costs the transcript nothing: it is already on the page
+          if (clientId) {
+            try {
+              const form = new FormData()
+              form.append("audio", voice.file, voice.name)
+              form.append("clientId", clientId)
+              form.append("position", String(voice.position))
+              form.append("name", voice.name)
+              form.append("transcript", transcript)
+              if (provider) form.append("transcribedBy", provider)
+              const { data: saved } = await requestApi<SavedVoice>(`${CLIENT_VOICES_ENDPOINT}/records`, { method: "POST", body: form })
+              savedIdsRef.current.set(voice.id, saved.id)
+              setSavedChanged((count) => count + 1)
+            } catch (error: unknown) {
+              setNotice(error instanceof Error ? error.message : CLIENT_VOICES_MESSAGES.saveFailed)
+            }
+          }
         } catch (error: unknown) {
           if (controller.signal.aborted) return
           const message = error instanceof Error && !(error instanceof TypeError) ? error.message : ""
@@ -172,6 +235,7 @@ export default function ClientVoicesClient() {
   const startAgain = () => {
     runRef.current?.abort()
     transcriptsRef.current.clear()
+    savedIdsRef.current.clear()
     setVoices([])
     setTasks(null)
     setTaskError(null)
@@ -229,13 +293,39 @@ export default function ClientVoicesClient() {
               </div>
             </div>
 
+            {/* The client the batch belongs to. It decides what is kept, so it sits above the voices */}
+            <div className="flex shrink-0 flex-col gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-3 sm:flex-row sm:items-center sm:gap-3">
+              <label htmlFor="client-voices-client" className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-outline">
+                <Users size={14} className="text-primary" aria-hidden="true" />
+                Client
+              </label>
+              <select
+                id="client-voices-client"
+                value={clientId}
+                onChange={(event) => chooseClient(event.target.value)}
+                className="w-full rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm text-on-surface focus:border-primary focus:outline-none sm:w-64"
+              >
+                <option value="">No client, keep nothing</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[12px] text-on-surface-variant">
+                {chosenClient
+                  ? `Every voice in this batch is kept with ${chosenClient.name}, with its transcript and its tasks.`
+                  : CLIENT_VOICES_MESSAGES.noClient}
+              </p>
+            </div>
+
             {notice && (
               <p role="alert" className="shrink-0 rounded-xl border border-error/40 bg-error-container px-3 py-2 text-[12px] text-error">
                 {notice}
               </p>
             )}
 
-            <div className="grid grid-cols-1 gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+            <div className="grid grid-cols-1 gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,0.95fr)]">
               <VoiceInputPanel
                 voices={voices}
                 isProcessing={isProcessing}
@@ -271,6 +361,10 @@ export default function ClientVoicesClient() {
                     <TranscriptList voices={voices} isProcessing={isProcessing} onRetry={(id) => void retryVoice(id)} />
                   </div>
                 )}
+              </div>
+
+              <div className="custom-scrollbar flex min-h-0 flex-col lg:col-span-2 lg:overflow-y-auto xl:col-span-1 xl:pr-1">
+                <SavedVoicesPanel clientId={clientId || null} clientName={chosenClient?.name ?? null} reloadKey={savedChanged} />
               </div>
             </div>
           </div>

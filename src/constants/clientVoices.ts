@@ -4,9 +4,10 @@ import { AudioLines, type LucideIcon } from "lucide-react"
  * Client Voices: the voice messages a client sends on WhatsApp or Slack, turned into English
  * transcripts and one list of the work they actually asked for.
  *
- * Nothing here is stored. The audio goes from the browser to the transcription provider and is
- * gone the moment the answer comes back, the transcripts live in the page, and no record of any
- * of it is written to the database.
+ * A batch with no client chosen stores nothing, as it always has: the audio goes from the browser to
+ * the transcription provider, the transcripts live in the page, and the page is closed and it is gone.
+ * Choosing a client keeps that batch instead: each recording goes to S3 and its transcript and task
+ * list are saved with the client, so they can be played, read, edited and deleted later.
  */
 
 // One batch. More than this in one go is a different conversation, not one client update
@@ -54,6 +55,18 @@ export const CLIENT_VOICES_PROMPT_ID = "client-voice-tasks"
 export const CLIENT_VOICES_PROMPT_TABS = [{ id: CLIENT_VOICES_PROMPT_ID, label: "Task extraction" }]
 
 export const CLIENT_VOICES_ENDPOINT = "/api/client-voices"
+// Where a kept recording lives in the bucket, beside the other modules' prefixes
+export const VOICE_STORAGE_PREFIX = "LinkPilot/client-voices"
+// The saved voices list, a page at a time
+export const SAVED_VOICES_PAGE_SIZE = 20
+// Where the chosen client is remembered, so the page opens on the same client next time
+export const CLIENT_CHOICE_KEY = "clientVoices:client"
+// Filters for the saved list
+export const VOICE_FILTERS = [
+  { id: "client", label: "This client" },
+  { id: "all", label: "All clients" },
+] as const
+export type VoiceFilterId = (typeof VOICE_FILTERS)[number]["id"]
 // Every voice is transcribed on its own, through the app's shared transcription endpoint
 export const TRANSCRIBE_ENDPOINT = "/api/transcribe"
 
@@ -69,6 +82,15 @@ export const CLIENT_VOICES_MESSAGES = {
   tasksFailed: "Couldn't work out the tasks. The transcripts are still here, so you can try again.",
   noTranscripts: "None of the voices could be transcribed, so there is nothing to take tasks from.",
   copied: "Tasks copied.",
+  clientMissing: "That client no longer exists. Choose another one.",
+  storageUnavailable: "Keeping a client's voices needs file storage. Set the AWS variables where the app runs, or work without choosing a client.",
+  noClient: "Choose a client to keep these voices with, or leave it on none and nothing is saved.",
+  savedVoicesFailed: "Couldn't load the saved voices. Please try again.",
+  saveFailed: "Couldn't keep this voice with the client. Its transcript is still here.",
+  deleteFailed: "Couldn't delete that voice. Please try again.",
+  deleted: "Voice deleted.",
+  taskEditFailed: "Couldn't save your changes to the tasks.",
+  noSavedVoices: "No voices kept yet. Choose a client before you transcribe, and every voice is kept here with its tasks.",
 } as const
 
 // The module's sidebar entry, with the other work done for clients
