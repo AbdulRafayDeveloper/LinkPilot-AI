@@ -50,3 +50,10 @@ next-env.d.ts
 
 # Backups the cleanup scripts write before deleting: they hold real records (profiles, messages)
 /backups/
+
+# Tests are the owner's own and stay on this machine: never pushed, never shared with collaborators
+/tests/
+
+# One-off scripts and their output left in the project root while testing
+/*.local.mjs
+/*.out
