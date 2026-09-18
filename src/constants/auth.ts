@@ -28,6 +28,9 @@ export const MAX_FAILED_LOGINS = 5
 export const LOGIN_LOCK_MINUTES = 15
 
 // Sent with every "sign in first" answer, so the browser can tell it from any other 401
+// The path the request came in on, put there by the proxy so a route guard can tell which tool it is
+export const REQUEST_PATH_HEADER = "x-linkpilot-path"
+
 export const AUTH_REQUIRED_HEADER = "x-linkpilot-auth"
 
 export const AUTH_MESSAGES = {

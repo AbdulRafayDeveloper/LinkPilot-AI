@@ -4,7 +4,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 import { AlertTriangle, ListTodo, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
-import { TaskComposer, emptyRows } from "@/components/daily-tasks/TaskComposer"
+import { TaskComposer, emptyRows, type TaskRow } from "@/components/daily-tasks/TaskComposer"
+import { ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { TaskDayList, type TaskMove } from "@/components/daily-tasks/TaskDayList"
 import { CleanupOldTasksDialog } from "@/components/daily-tasks/CleanupOldTasksDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -13,9 +14,24 @@ import { requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
 import { DAILY_TASKS_ENDPOINT, DAILY_TASKS_MESSAGES, VISIBLE_DAYS } from "@/constants/dailyTasks"
 import type { DailyTask, DailyTasksPage } from "@/types/dailyTasks"
+import type { TaskDetailsDraft } from "@/types/taskAttachment"
 
-// What is half-written survives switching tools, like every other tool's input
-const draftStore = createToolStore("daily-tasks:draft", { taskDate: "", rows: emptyRows() }, { version: 1 })
+/**
+ * What is half-written survives switching tools, like every other tool's input. The chosen image
+ * file itself is left out of what is stored (a File cannot be), but the id it was already
+ * uploaded under is kept, so a draft that comes back still has its image.
+ */
+const draftStore = createToolStore(
+  "daily-tasks:draft",
+  { taskDate: "", rows: emptyRows() as TaskRow[] },
+  {
+    version: 2,
+    toStored: (state) => ({
+      ...state,
+      rows: state.rows.map((row) => ({ ...row, details: { ...row.details, file: null } })),
+    }),
+  }
+)
 
 export default function DailyTasksClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -31,6 +47,9 @@ export default function DailyTasksClient() {
   const [notice, setNotice] = useState<string | null>(null)
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set())
   const [taskError, setTaskError] = useState<string | null>(null)
+  // The picked tasks waiting to be confirmed for deletion, and whether that delete is running
+  const [confirmingPicked, setConfirmingPicked] = useState<string[] | null>(null)
+  const [isDeletingPicked, setIsDeletingPicked] = useState(false)
   const [isConfirmingCleanup, setIsConfirmingCleanup] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [cleanupError, setCleanupError] = useState<string | null>(null)
@@ -101,7 +120,16 @@ export default function DailyTasksClient() {
 
   const addTasks = async () => {
     if (isSaving || !today) return
-    const contents = rows.map((row) => row.trim()).filter(Boolean)
+    // A row is sent as its line alone unless details were opened on it, so a plain list of tasks
+    // posts exactly the body it always did
+    const contents = rows
+      .map((row) => ({ ...row, content: row.content.trim() }))
+      .filter((row) => row.content)
+      .map((row) =>
+        row.details.description.trim() || row.details.image
+          ? { content: row.content, description: row.details.description.trim(), image: row.details.image }
+          : row.content
+      )
     if (contents.length === 0) {
       setSaveError(DAILY_TASKS_MESSAGES.missingContent)
       return
@@ -180,13 +208,17 @@ export default function DailyTasksClient() {
   }
 
   // One more task on a day already on the list: it appears in that day, in the order written
-  const addTaskToDay = async (date: string, content: string): Promise<boolean> => {
+  const addTaskToDay = async (date: string, content: string, details?: TaskDetailsDraft): Promise<boolean> => {
     setTaskError(null)
     try {
+      const row =
+        details && (details.description.trim() || details.image)
+          ? { content, description: details.description.trim(), image: details.image }
+          : content
       const { data } = await requestApi<{ tasks: DailyTask[] }>(DAILY_TASKS_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ today, taskDate: date, contents: [content] }),
+        body: JSON.stringify({ today, taskDate: date, contents: [row] }),
       }, { idempotent: true })
       const added = data.tasks[0]
       if (!added) return false
@@ -266,6 +298,30 @@ export default function DailyTasksClient() {
   }
 
   // A task is one line, so it goes on one click and comes back if the delete fails
+  /**
+   * Deletes every picked task in one call, whatever day each is on. Deleting is final, so it only
+   * runs from the confirmation; the list is read again afterwards rather than patched.
+   */
+  const removePicked = async (ids: string[]) => {
+    if (isDeletingPicked) return
+    setIsDeletingPicked(true)
+    setTaskError(null)
+    try {
+      await requestApi<{ deleted: number }>(DAILY_TASKS_ENDPOINT, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      })
+      setConfirmingPicked(null)
+      reload()
+    } catch (error: unknown) {
+      setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.deleteFailed)
+      setConfirmingPicked(null)
+    } finally {
+      setIsDeletingPicked(false)
+    }
+  }
+
   const removeTask = async (task: DailyTask) => {
     if (pendingIds.has(task.id)) return
     setTaskError(null)
@@ -411,6 +467,7 @@ export default function DailyTasksClient() {
                 onPageChange={goToPage}
                 onToggle={toggleTask}
                 onDelete={removeTask}
+                onDeletePicked={(ids) => setConfirmingPicked(ids)}
                 onMove={moveTask}
                 onAddTask={addTaskToDay}
               />
@@ -419,6 +476,15 @@ export default function DailyTasksClient() {
         </main>
       </div>
 
+      {confirmingPicked && (
+        <ConfirmBulkDelete
+          count={confirmingPicked.length}
+          noun={{ one: "task", many: "tasks" }}
+          isDeleting={isDeletingPicked}
+          onConfirm={() => void removePicked(confirmingPicked)}
+          onClose={() => setConfirmingPicked(null)}
+        />
+      )}
       {isConfirmingCleanup && (
         <CleanupOldTasksDialog
           total={olderTaskCount}

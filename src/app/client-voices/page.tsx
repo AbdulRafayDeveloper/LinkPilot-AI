@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import ClientVoicesClient from "./ClientVoicesClient"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("client-voices")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("client-voices", "/client-voices")
   return (
     <>
       {/* Breadcrumb schema markup */}

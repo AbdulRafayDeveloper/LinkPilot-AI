@@ -1,5 +1,7 @@
 import mongoose, { Schema, type Model } from "mongoose"
 import { EMPLOYEE_STATUS_IDS, STORED_PLAN_PERIODS, type EmployeeStatus } from "@/constants/employees"
+import { TASK_IMAGE_TYPES } from "@/constants/taskAttachments"
+import type { TaskImage } from "@/types/taskAttachment"
 import { OWNER_ID } from "./owner"
 
 /**
@@ -43,12 +45,26 @@ export interface IEmployee {
 export interface IPlanTask {
   id: string
   text: string
+  // The optional note under the task, and the one image it carries; both empty on a plain task
+  description: string
+  image: TaskImage | null
 }
+
+// Only ever the id the server issued and the type it was uploaded as (services/taskImages.ts)
+const TaskImageSchema = new Schema<TaskImage>(
+  {
+    assetId: { type: String, required: true },
+    contentType: { type: String, required: true, enum: TASK_IMAGE_TYPES },
+  },
+  { _id: false }
+)
 
 const PlanTaskSchema = new Schema<IPlanTask>(
   {
     id: { type: String, required: true },
     text: { type: String, required: true },
+    description: { type: String, default: "" },
+    image: { type: TaskImageSchema, default: null },
   },
   { _id: false }
 )
@@ -81,6 +97,9 @@ export const EmployeeModel = (mongoose.models.Employee as Model<IEmployee> | und
 export interface IPlanItem {
   id: string
   text: string
+  // The day's own copy of the detail the plan's task carried when the day was written
+  description: string
+  image: TaskImage | null
   done: boolean
   // When it was ticked off; cleared when it is unticked
   completedAt: Date | null
@@ -105,6 +124,8 @@ const PlanItemSchema = new Schema<IPlanItem>(
   {
     id: { type: String, required: true },
     text: { type: String, required: true },
+    description: { type: String, default: "" },
+    image: { type: TaskImageSchema, default: null },
     done: { type: Boolean, required: true, default: false },
     completedAt: { type: Date, default: null },
     reason: { type: String, default: null },

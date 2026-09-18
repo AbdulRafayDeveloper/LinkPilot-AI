@@ -30,3 +30,18 @@ export const SavedTopicsQuerySchema = z
 export const SavedTopicKeySchema = z.object({
   title: z.string({ error: TRENDING_HISTORY_MESSAGES.topicGone }).min(1, TRENDING_HISTORY_MESSAGES.topicGone).max(SAVED_TOPIC_TITLE_MAX_LENGTH, TRENDING_HISTORY_MESSAGES.topicGone),
 })
+
+/**
+ * What a bulk topic delete covers: the topics named one by one (each by its search and title, the
+ * way a single topic is named everywhere else), or every topic the filters cover when `all` is true.
+ */
+export const SavedTopicsDeleteSchema = z
+  .object({
+    topics: z
+      .array(z.object({ searchId: z.string().regex(/^[0-9a-f]{24}$/), title: z.string().trim().min(1).max(300) }))
+      .min(1)
+      .max(200)
+      .optional(),
+    all: z.boolean().optional(),
+  })
+  .refine((body) => (body.topics === undefined) !== (body.all !== true), "Choose the topics to delete, or delete everything the filters cover.")

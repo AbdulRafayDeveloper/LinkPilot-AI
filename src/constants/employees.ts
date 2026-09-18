@@ -64,6 +64,13 @@ export const EMPLOYEE_MESSAGES = {
   historyFailed: "Couldn't load the history. Please try again.",
   linkInvalid: "This link doesn't open a plan. It may have been replaced or turned off; ask for a new one.",
   linkFailed: "Couldn't change the link. Please try again.",
+  // Both of these stop the link the employee is using, so each is confirmed before it happens
+  newLinkTitle: "Make a new link?",
+  newLinkExplains: "The link this employee is using now stops working straight away, so anyone holding it is locked out until you send them the new one. Their tasks, ticks and history are kept.",
+  newLinkConfirm: "Make a new link",
+  turnOffTitle: "Turn this link off?",
+  turnOffExplains: "The employee will not be able to open their plan at all until you make them a new link. Their tasks, ticks and history are kept.",
+  turnOffConfirm: "Turn off the link",
   resetFailed: "Couldn't reset today's ticks. Please try again.",
   startDayFailed: "Couldn't start a new day. Please try again.",
   dayAlreadyOpen: "Your next day is already open, so there is nothing to start yet.",

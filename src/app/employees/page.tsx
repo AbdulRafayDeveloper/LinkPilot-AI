@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import EmployeesClient from "./EmployeesClient"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("employees")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("employees", "/employees")
   return (
     <>
       {/* Breadcrumb schema markup */}

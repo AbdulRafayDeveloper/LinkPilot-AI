@@ -7,6 +7,8 @@ import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { Pagination } from "@/components/ui/Pagination"
+import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
+import { useRowSelection } from "@/hooks/useRowSelection"
 import { DateRangeFilters, FilterPanel, SearchFilter, SelectFilter, historyLabelClass as labelClass } from "@/components/history/HistoryFilters"
 import { SavedTopicModal, SavedTopicStatusBadge, searchedOn } from "@/components/trending-topics/SavedTopicModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -115,6 +117,9 @@ export default function TrendingHistoryClient() {
   // Topics deleted on this page: they leave the list at once, before the server answers
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set())
   const [actionError, setActionError] = useState<string | null>(null)
+  // Deleting several at once: which delete is waiting to be confirmed, and whether it is running
+  const [confirmingMany, setConfirmingMany] = useState<"picked" | "all" | null>(null)
+  const [isDeletingMany, setIsDeletingMany] = useState(false)
 
   const badDateRange = isBackwardsRange(filters.fromDay, filters.toDay)
   const hasFilters = JSON.stringify(filters) !== JSON.stringify(NO_FILTERS)
@@ -194,6 +199,39 @@ export default function TrendingHistoryClient() {
 
   const items = result?.items ?? []
   const visibleItems = items.filter((topic) => !removed.has(topicKey(topic)))
+  const selection = useRowSelection(visibleItems.map(topicKey))
+
+  /**
+   * Deletes the ticked topics, or every topic the filters cover, in one call. A topic lives inside
+   * its search, so the searches are kept and only lose the topics that went. Final, so it only runs
+   * from the confirmation; the page is read again from the first page afterwards.
+   */
+  const deleteMany = async (which: "picked" | "all") => {
+    if (isDeletingMany) return
+    setIsDeletingMany(true)
+    setActionError(null)
+    try {
+      const picked = [...selection.pickedIds].map((key) => {
+        const [searchId, ...rest] = key.split("|")
+        return { searchId, title: rest.join("|") }
+      })
+      await requestApi<{ deleted: number }>(`${TRENDING_HISTORY_ENDPOINT}?${query}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(which === "picked" ? { topics: picked } : { all: true }),
+      })
+      selection.clear()
+      setConfirmingMany(null)
+      setRemoved(new Set())
+      setPage(1)
+      setReloadAttempt((attempt) => attempt + 1)
+    } catch (reason: unknown) {
+      setActionError(reason instanceof Error ? reason.message : TRENDING_HISTORY_MESSAGES.deleteFailed)
+      setConfirmingMany(null)
+    } finally {
+      setIsDeletingMany(false)
+    }
+  }
   // Deleted rows still waiting for the page to be read again are already out of the count
   const total = Math.max(0, (result?.total ?? 0) - (items.length - visibleItems.length))
   const totalPages = result?.totalPages ?? 1
@@ -265,6 +303,19 @@ export default function TrendingHistoryClient() {
               />
             </FilterPanel>
 
+            {result && total > 0 && (
+              <BulkDeleteBar
+                pickedCount={selection.pickedIds.size}
+                total={total}
+                noun={{ one: "topic", many: "topics" }}
+                hasFilters={hasFilters}
+                isBusy={isDeletingMany}
+                onDeletePicked={() => setConfirmingMany("picked")}
+                onDeleteAll={() => setConfirmingMany("all")}
+                onClear={selection.clear}
+              />
+            )}
+
             {error && !result ? (
               <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-error-container text-error">
@@ -305,6 +356,9 @@ export default function TrendingHistoryClient() {
                     <caption className="sr-only">Saved trending topics, page {page} of {totalPages}</caption>
                     <thead className="bg-surface-container-lowest">
                       <tr className="border-b border-outline-variant">
+                        <th scope="col" className="w-[36px] px-2 py-2.5">
+                          <span className="sr-only">Picked</span>
+                        </th>
                         {["Topic", "LinkedIn searches", "Category", "Format", "Event", "Searched", "Status", "Post", "Actions"].map((heading) => (
                           <th key={heading} scope="col" className={`px-3 py-2.5 ${labelClass}`}>
                             {heading}
@@ -315,6 +369,16 @@ export default function TrendingHistoryClient() {
                     <tbody>
                       {visibleItems.map((topic) => (
                         <tr key={topicKey(topic)} className="border-b border-outline-variant/60 align-top last:border-b-0 hover:bg-surface-container-lowest">
+                          <td className="w-[36px] px-2 py-2.5">
+                            <input
+                              type="checkbox"
+                              checked={selection.isPicked(topicKey(topic))}
+                              disabled={isDeletingMany}
+                              onChange={(event) => selection.pick(topicKey(topic), (event.nativeEvent as MouseEvent).shiftKey)}
+                              aria-label={`Pick "${topic.title}"`}
+                              className="h-4 w-4 accent-primary"
+                            />
+                          </td>
                           <td className="min-w-[210px] max-w-[320px] px-3 py-2.5">
                             <p className="text-[13px] font-semibold leading-snug text-on-surface">{topic.title}</p>
                             {topic.whyTrending && <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-on-surface-variant">{topic.whyTrending}</p>}
@@ -348,6 +412,14 @@ export default function TrendingHistoryClient() {
                 <ul className="flex flex-col gap-3 2xl:hidden">
                   {visibleItems.map((topic) => (
                     <li key={topicKey(topic)} className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                      <input
+                        type="checkbox"
+                        checked={selection.isPicked(topicKey(topic))}
+                        disabled={isDeletingMany}
+                        onChange={(event) => selection.pick(topicKey(topic), (event.nativeEvent as MouseEvent).shiftKey)}
+                        aria-label={`Pick "${topic.title}"`}
+                        className="h-4 w-4 self-start accent-primary"
+                      />
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-[13px] font-semibold leading-snug text-on-surface">{topic.title}</p>
                         <SavedTopicStatusBadge status={topic.status} />
@@ -390,6 +462,16 @@ export default function TrendingHistoryClient() {
         </main>
       </div>
 
+      {confirmingMany && (
+        <ConfirmBulkDelete
+          count={confirmingMany === "picked" ? selection.pickedIds.size : total}
+          noun={{ one: "topic", many: "topics" }}
+          alsoGoes="The searches they came from are kept; only the topics go."
+          isDeleting={isDeletingMany}
+          onConfirm={() => void deleteMany(confirmingMany)}
+          onClose={() => setConfirmingMany(null)}
+        />
+      )}
       {viewing && <SavedTopicModal topic={viewing} onClose={() => setViewing(null)} />}
     </div>
   )

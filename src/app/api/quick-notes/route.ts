@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { NOTE_MAX_LENGTH, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
-import { clearNotes, listNotes, saveNote } from "@/services/quickNotes/notes"
+import { clearNotes, deleteNotes, listNotes, saveNote } from "@/services/quickNotes/notes"
+import { BulkDeleteSchema } from "@/lib/validation/listFilters"
 import { requireViewer } from "@/services/auth/viewer"
 import { withIdempotency } from "@/services/idempotency"
 
@@ -66,10 +67,22 @@ async function handlePost(req: NextRequest) {
 /**
  * DELETE: Deletes every note this account owns. The page asks for confirmation before calling this.
  */
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
+    // With ids, only those notes go; without a body at all, every note of this account does
+    const body = await req.json().catch(() => null)
+    const ticked = body === null ? null : BulkDeleteSchema.safeParse(body)
+    if (ticked?.success && ticked.data.ids) {
+      const removed = await deleteNotes(auth.viewer, ticked.data.ids)
+      return NextResponse.json({
+        success: true,
+        message: `${removed} ${removed === 1 ? "note" : "notes"} deleted.`,
+        data: { deleted: removed },
+      })
+    }
+
     const deleted = await clearNotes(auth.viewer)
     return NextResponse.json({ success: true, message: QUICK_NOTES_MESSAGES.cleared, data: { deleted } })
   } catch (error: unknown) {

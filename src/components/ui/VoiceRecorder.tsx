@@ -67,6 +67,14 @@ interface VoiceRecorderProps {
   transcribeFor?: VoiceModuleId
   /** Show "Source: Groq" after a recording is written out; off where the page names the source itself */
   showSource?: boolean
+  /**
+   * For a message composer, where the button sits in a row with the box and Send and there is no
+   * room for a sentence beside it: the button becomes one square icon the size of the others, and
+   * what the wider button says on the page (the limit, what speaking fills in) is said in its
+   * tooltip and to a screen reader instead. It still shows the timer while it is recording, because
+   * a recording that is running has to be visible. Off everywhere else, so no other page changes.
+   */
+  compact?: boolean
 }
 
 /**
@@ -83,6 +91,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   what = "what you want done",
   transcribeFor,
   showSource = true,
+  compact = false,
 }) => {
   const [state, setState] = useState<RecorderState>("idle")
   // Who wrote out the last recording, shown beside the button until the next one starts
@@ -239,10 +248,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const isNearLimit = isRecording && secondsLeft <= VOICE_WARN_SECONDS
   const writingLabel =
     progress && progress.total > 1 ? `Writing it out (${Math.min(progress.done + 1, progress.total)} of ${progress.total})...` : "Writing it out..."
+  // What the wide button says beside itself; in a composer it is the tooltip instead
+  const idleHint = `Say ${what} instead of typing it, ${VOICE_MESSAGES.limit.toLowerCase()}`
+  const buttonTitle = isRecording ? `Stop recording and use what you said (${formatSeconds(seconds)} of ${formatSeconds(VOICE_MAX_SECONDS)})` : isTranscribing ? writingLabel : idleHint
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      {isRecording && (
+    <div className={`flex flex-wrap items-center justify-end gap-2 ${compact ? "shrink-0" : ""}`}>
+      {!compact && isRecording && (
         <span
           className={`flex items-center gap-1.5 text-[11px] ${isNearLimit ? "font-semibold text-error" : "text-on-surface-variant"}`}
           role="status"
@@ -251,12 +263,12 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
           {isNearLimit ? `${secondsLeft}s left, it stops at ${formatSeconds(VOICE_MAX_SECONDS)}` : `Recording, say ${what}`}
         </span>
       )}
-      {isTranscribing && stoppedAtLimit && (
+      {!compact && isTranscribing && stoppedAtLimit && (
         <span className="text-[11px] text-on-surface-variant" role="status">
           {VOICE_MESSAGES.stoppedAtLimit}
         </span>
       )}
-      {state === "idle" && (
+      {!compact && state === "idle" && (
         <span className="text-[11px] text-outline">
           {VOICE_MESSAGES.limit}
           {showSource && <AiSourceLabel source={{ provider: lastProviders.at(-1) ?? null, providers: lastProviders }} />}
@@ -267,10 +279,14 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
           type="button"
           onClick={() => void writeOut()}
           disabled={disabled}
-          className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary-fixed/40 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label="Try writing that recording out again"
+          title="Try writing that recording out again"
+          className={`inline-flex items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary-fixed/40 text-xs font-semibold text-primary transition-colors hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-60 ${
+            compact ? "h-11 w-11 shrink-0" : "px-3 py-2"
+          }`}
         >
           <RotateCcw size={15} aria-hidden="true" />
-          Try again
+          {!compact && "Try again"}
         </button>
       )}
       <button
@@ -278,7 +294,12 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         onClick={isRecording ? stop : start}
         disabled={disabled || isTranscribing}
         aria-label={isRecording ? "Stop recording and use what you said" : `Say ${what} instead of typing it, up to ${VOICE_MAX_SECONDS / 60} minutes`}
-        className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+        title={compact ? buttonTitle : undefined}
+        className={`inline-flex items-center justify-center gap-2 rounded-xl border text-xs font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+          // In a composer an idle button is one square the size of Send; it only widens while it has
+          // something to report, which is a recording running or being written out
+          compact ? (state === "idle" ? "h-11 w-11 shrink-0" : "h-11 shrink-0 px-3") : "px-3 py-2"
+        } ${
           isRecording
             ? "border-error bg-error-container text-error"
             : "border-outline-variant bg-white text-on-surface hover:border-primary/40 hover:text-primary"
@@ -292,12 +313,20 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
           <Mic size={15} aria-hidden="true" />
         )}
         {isTranscribing
-          ? writingLabel
+          ? compact
+            ? progress && progress.total > 1
+              ? `${Math.min(progress.done + 1, progress.total)}/${progress.total}`
+              : "Writing..."
+            : writingLabel
           : isRecording
-            ? `Stop (${formatSeconds(seconds)} / ${formatSeconds(VOICE_MAX_SECONDS)})`
-            : state === "failed"
-              ? "Record again"
-              : "Speak instead"}
+            ? compact
+              ? formatSeconds(seconds)
+              : `Stop (${formatSeconds(seconds)} / ${formatSeconds(VOICE_MAX_SECONDS)})`
+            : compact
+              ? null
+              : state === "failed"
+                ? "Record again"
+                : "Speak instead"}
       </button>
     </div>
   )

@@ -1,6 +1,7 @@
 import { conversationOf } from "@/lib/meetingScript"
 import { CHUNK_MAX_CHARS, CHUNK_OVERLAP_CHARS, type MeetingChunkKind } from "@/constants/meetingChat"
 import type { MeetingPlanDetail, MeetingPrep } from "@/types/meetingPlanner"
+import type { Meeting as MeetingNotes } from "@/types/meetings"
 
 /**
  * Cutting one meeting into the pieces its chat is answered from: the details, the profile, the
@@ -42,6 +43,9 @@ const piecesOf = (kind: MeetingChunkKind, label: string, text: string): MeetingC
   const parts = splitText(text)
   return parts.map((part, index) => ({ kind, label: parts.length > 1 ? `${label} (${index + 1} of ${parts.length})` : label, text: part }))
 }
+
+const taskText = (heading: string, item: { task: string; owner: string | null; deadline: string | null; evidence: string }) =>
+  [`${heading}: ${item.task}`, item.owner && `Agreed by: ${item.owner}`, item.deadline && `By: ${item.deadline}`, `This is ${item.evidence}.`].filter(Boolean).join("\n")
 
 const list = (heading: string, values: string[]) => (values.filter(Boolean).length > 0 ? `${heading}\n${values.filter(Boolean).map((value) => `- ${value}`).join("\n")}` : "")
 
@@ -116,4 +120,61 @@ export function meetingChunks(meeting: MeetingPlanDetail): MeetingChunk[] {
     ...piecesOf("notes", "Your notes", clean(meeting.additionalInfo)),
     ...(meeting.prep ? prepChunks(meeting.prep) : []),
   ]
+}
+
+/**
+ * The same, for a meeting that has already happened: the transcript exactly as it was pasted, cut
+ * into readable pieces, and each part of the analysis built from it. The transcript is included as
+ * well as the analysis because the analysis is a summary, and a question about what someone
+ * actually said can only be answered from the words themselves.
+ */
+export function notesChunks(meeting: MeetingNotes): MeetingChunk[] {
+  const analysis = meeting.analysis
+  const chunks: MeetingChunk[] = [
+    {
+      kind: "meeting",
+      label: "Meeting details",
+      text: [
+        `Meeting: ${meeting.title}`,
+        analysis?.purpose && `Purpose: ${analysis.purpose}`,
+        `Status: ${meeting.status}`,
+        `Held: ${meeting.createdAt.slice(0, 10)}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    },
+  ]
+
+  if (analysis) {
+    if (analysis.purpose) chunks.push(...piecesOf("purpose", "Purpose of the meeting", analysis.purpose))
+    if (analysis.minutes) chunks.push(...piecesOf("minutes", "Minutes of meeting", analysis.minutes))
+    const topics = list("Topics discussed:", analysis.topics ?? [])
+    if (topics) chunks.push(...piecesOf("topics", "Topics discussed", topics))
+    const people = list(
+      `Who was there (${analysis.participantCount}):`,
+      (analysis.participants ?? []).map((person) => `${person.name}${person.role ? ` - ${person.role}` : ""} (${person.evidence})`)
+    )
+    if (people) chunks.push(...piecesOf("participants", "Who was there", people))
+    // A decision or a task is its own piece, so a question about one never has to carry the rest
+    for (const [index, entry] of (analysis.myDecisions ?? []).entries()) {
+      chunks.push({ kind: "decisions", label: `Decision involving me ${index + 1}`, text: `Decision involving me: ${entry.decision}
+This is ${entry.evidence}.` })
+    }
+    for (const [index, entry] of (analysis.decisions ?? []).entries()) {
+      chunks.push({ kind: "decisions", label: `Decision ${index + 1}`, text: `Decision made: ${entry.decision}
+This is ${entry.evidence}.` })
+    }
+    for (const [index, item] of (analysis.myTasks ?? []).entries()) {
+      chunks.push({ kind: "my-tasks", label: `My task ${index + 1}`, text: taskText("A task for me", item) })
+    }
+    for (const [index, item] of (analysis.actionItems ?? []).entries()) {
+      chunks.push({ kind: "action-items", label: `Action item ${index + 1}`, text: taskText("Action item", item) })
+    }
+    const requests = list("What the client asked for:", analysis.clientRequests ?? [])
+    if (requests) chunks.push(...piecesOf("client-requests", "What the client asked for", requests))
+    const unknowns = list("The meeting never answered these:", analysis.unknowns ?? [])
+    if (unknowns) chunks.push(...piecesOf("unknowns", "Left unanswered", unknowns))
+  }
+
+  return [...chunks, ...piecesOf("transcript", "What was said", clean(meeting.transcript))]
 }

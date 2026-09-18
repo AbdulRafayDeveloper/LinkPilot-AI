@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { ImportantContentQuerySchema, ImportantContentSchema } from "@/lib/validation/importantContent"
+import { BulkDeleteSchema } from "@/lib/validation/listFilters"
 import { IMPORTANT_CONTENT_MESSAGES } from "@/constants/importantContent"
-import { createEntry, listEntries } from "@/services/importantContent/entries"
+import { createEntry, deleteEntries, listEntries } from "@/services/importantContent/entries"
 import { requireViewer } from "@/services/auth/viewer"
 import { withIdempotency } from "@/services/idempotency"
 
@@ -44,3 +45,25 @@ async function handlePost(req: NextRequest) {
 
 // A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
 export const POST = withIdempotency("important-content", handlePost)
+
+/**
+ * DELETE (?search=&type=, body `{ ids }` or `{ all: true }`): removes several entries at once, the
+ * ticked ones or everything the filters cover, always inside what the viewer may see. Final.
+ */
+export async function DELETE(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
+  const filters = ImportantContentQuerySchema.safeParse(Object.fromEntries(req.nextUrl.searchParams))
+  const body = BulkDeleteSchema.safeParse(await req.json().catch(() => null))
+  if (!filters.success || !body.success) {
+    const issue = filters.success ? body.error?.issues[0]?.message : filters.error.issues[0]?.message
+    return NextResponse.json({ success: false, message: issue || IMPORTANT_CONTENT_MESSAGES.deleteFailed }, { status: 400 })
+  }
+  try {
+    const { deleted } = await deleteEntries(auth.viewer, filters.data, body.data.ids)
+    return NextResponse.json({ success: true, message: `${deleted} ${deleted === 1 ? "entry" : "entries"} deleted.`, data: { deleted } })
+  } catch (error: unknown) {
+    console.error("DELETE Important Content (bulk) Exception:", error instanceof Error ? error.message : error)
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_CONTENT_MESSAGES.deleteFailed) }, { status: 500 })
+  }
+}

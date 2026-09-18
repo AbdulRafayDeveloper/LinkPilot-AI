@@ -15,6 +15,9 @@ export const MAX_FOLDERS = 100
 
 // The filter value for prompts that are in no folder, and the value the picker uses for "no folder"
 export const UNFILED_FOLDER = "none"
+// The filter value for every prompt that is filed, whichever folder it is in. Neither this nor
+// UNFILED_FOLDER can be mistaken for a folder, whose id is always 24 hex characters
+export const IN_ANY_FOLDER = "in-folder"
 
 export const PROMPT_FOLDER_MESSAGES = {
   missingName: "Name the folder.",
@@ -31,4 +34,8 @@ export const PROMPT_FOLDER_MESSAGES = {
   deleteExplains: "The prompts in it are kept and go back to No folder.",
   unfiled: "No folder",
   allFolders: "All folders",
+  inAnyFolder: "In a folder",
+  // The search box inside the folder filter, and what it says when nothing matches
+  searchFolders: "Search folders",
+  noFolderMatch: "No folder matches that name.",
 } as const

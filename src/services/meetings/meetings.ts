@@ -2,11 +2,13 @@ import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { Meeting as MeetingModel, type IMeeting } from "@/models/Meeting"
 import { MeetingChunk } from "@/models/MeetingChunk"
+import { deleteMeetingVectors } from "@/services/meetingPlanner/vectors"
+import { clearMeetingChat } from "@/services/meetingPlanner/chatHistory"
 import { countChunks, hashTranscript } from "@/lib/transcriptChunks"
 import { MEETINGS_PAGE_SIZE, type MeetingStatusId } from "@/constants/meetings"
 import type { Meeting, MeetingAnalysis, MeetingInput, MeetingSummary, MeetingsPage } from "@/types/meetings"
 import type { Viewer } from "@/types/auth"
-import { visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import type { AiSource } from "@/types/ai"
 
 /**
@@ -192,6 +194,44 @@ export async function deleteMeeting(viewer: Viewer, id: string): Promise<boolean
   if (!filter) return false
   await connectDatabase()
   const { deletedCount } = await MeetingModel.deleteOne(filter)
-  if (deletedCount > 0) await MeetingChunk.deleteMany({ meetingId: new mongoose.Types.ObjectId(id) })
+  if (deletedCount > 0) {
+    await Promise.all([
+      MeetingChunk.deleteMany({ meetingId: new mongoose.Types.ObjectId(id) }),
+      // What its chat was answered from, and the chat itself
+      deleteMeetingVectors(id),
+      clearMeetingChat(id),
+    ])
+  }
   return deletedCount > 0
+}
+
+/**
+ * Deletes several meetings at once: the ones named by `ids`, or every meeting the search and status
+ * cover when `ids` is left out. Everything read from each meeting goes with it (its chunks, what its
+ * chat was answered from, and the chat), exactly as deleting one does, so nothing is left behind.
+ * Both forms stay inside what the viewer may see. Answers how many meetings really went.
+ */
+export async function deleteMeetings(
+  viewer: Viewer,
+  { search = "", status = null }: { search?: string; status?: string | null },
+  ids?: string[]
+): Promise<{ deleted: number }> {
+  await connectDatabase()
+  const term = search.trim()
+  // Ticked rows follow the per-record delete; a whole filter never reaches another account's meetings
+  const narrowing = [
+    ids ? visibleTo(viewer) : ownedBy(viewer),
+    ...(term ? [{ title: new RegExp(escapeForSearch(term), "i") }] : []),
+    ...(status ? [{ status }] : []),
+    ...(ids ? [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] : []),
+  ]
+  // The ids are read first, because what each meeting left behind is keyed by them
+  const doomed = (await MeetingModel.find({ $and: narrowing }, { _id: 1 }).lean()).map((record) => String(record._id))
+  if (doomed.length === 0) return { deleted: 0 }
+  const { deletedCount } = await MeetingModel.deleteMany({ _id: { $in: doomed.map((id) => new mongoose.Types.ObjectId(id)) } })
+  await Promise.all([
+    MeetingChunk.deleteMany({ meetingId: { $in: doomed.map((id) => new mongoose.Types.ObjectId(id)) } }),
+    ...doomed.flatMap((id) => [deleteMeetingVectors(id), clearMeetingChat(id)]),
+  ])
+  return { deleted: deletedCount ?? 0 }
 }

@@ -4,6 +4,7 @@ import React, { useState } from "react"
 import { CheckCircle2, ChevronDown, Circle, History, Loader2 } from "lucide-react"
 import type { PlanHistoryDay, PlanHistoryPage, PlanItem } from "@/types/employees"
 import { TaskReason } from "./TaskReason"
+import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 
 /** Ticks or unticks one task on a day gone by. Given one, the history ticks; without it, it reads. */
 export type HistoryTick = (day: PlanHistoryDay, item: PlanItem, done: boolean) => Promise<void>
@@ -85,8 +86,9 @@ const HistoryDay: React.FC<{ day: PlanHistoryDay; onTick?: HistoryTick; onReason
                   item.completedAt && <span className="shrink-0 whitespace-nowrap text-[11px] text-outline">Done {tickedOn(item.completedAt, day.date)}</span>
                 )}
               </div>
-              {/* Why it wasn't finished: written from the employee's own link, read everywhere else */}
+              {/* What the task carried on that day, and why it wasn't finished */}
               <div className="pl-6">
+                <TaskDetailsView description={item.description} image={item.image} label={item.text} />
                 <TaskReason
                   reason={item.reason}
                   taskText={item.text}

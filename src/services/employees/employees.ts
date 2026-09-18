@@ -1,3 +1,4 @@
+import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { allOf, searchCondition } from "@/lib/listQuery"
 import { planLinkMatches, planLinkToken, readPlanLinkToken } from "@/lib/planLink"
@@ -16,7 +17,9 @@ import type {
   PublicPlan,
 } from "@/types/employees"
 import type { Viewer } from "@/types/auth"
-import { visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
+import type { TaskImage, TaskImageView } from "@/types/taskAttachment"
+import { deleteTaskImages, taskImageViews } from "@/services/taskImages"
 import { accountNames } from "@/services/auth/accounts"
 
 /**
@@ -117,13 +120,86 @@ export async function updateEmployee(viewer: Viewer, id: string, input: Employee
 }
 
 /** Deletes an employee and every plan made for them, so nothing is left pointing at no one. */
+/**
+ * Every image the plan tasks of these employees point at, read before those employees go.
+ *
+ * A plan task's image lives in two places: on the employee's repeating plan (`planItems`) and in
+ * each day's own copy in `employee_plans`, which is what the history keeps after the plan has
+ * moved on. Both are read, so nothing is left in storage with nothing pointing at it.
+ *
+ * Call it BEFORE the records are deleted, then pass what it returns to `deleteTaskImages`: the
+ * records go first and the objects after, the same order Daily Tasks uses, so a storage problem
+ * leaves an unreachable object rather than a task showing an image that is already gone.
+ */
+export async function planTaskImagesOf(employeeIds: string[]): Promise<TaskImage[]> {
+  if (employeeIds.length === 0) return []
+  await connectDatabase()
+  const [employees, days] = await Promise.all([
+    EmployeeModel.find({ _id: { $in: employeeIds.map((id) => new mongoose.Types.ObjectId(id)) } }, { planItems: 1 }).lean(),
+    EmployeePlanModel.find({ employeeId: { $in: employeeIds } }, { items: 1 }).lean(),
+  ])
+  const images: TaskImage[] = []
+  for (const employee of employees as unknown as { planItems?: IPlanTask[] }[]) {
+    for (const task of employee.planItems ?? []) if (task.image) images.push(task.image)
+  }
+  for (const day of days as unknown as { items?: IPlanItem[] }[]) {
+    for (const item of day.items ?? []) if (item.image) images.push(item.image)
+  }
+  // One object may be on the plan and on every day it has run, so each is only removed once
+  return [...new Map(images.map((image) => [image.assetId, image])).values()]
+}
+
+/** Of these images, the ones no day of this employee still points at, so they are safe to remove. */
+async function unusedImages(employeeId: string, candidates: (TaskImage | null | undefined)[]): Promise<TaskImage[]> {
+  const wanted = candidates.filter((image): image is TaskImage => Boolean(image?.assetId))
+  if (wanted.length === 0) return []
+  const days = (await EmployeePlanModel.find({ employeeId }, { items: 1 }).lean()) as unknown as { items?: IPlanItem[] }[]
+  const stillUsed = new Set<string>()
+  for (const day of days) {
+    for (const item of day.items ?? []) if (item.image) stillUsed.add(item.image.assetId)
+  }
+  return wanted.filter((image) => !stillUsed.has(image.assetId))
+}
+
 export async function deleteEmployee(viewer: Viewer, id: string): Promise<boolean> {
   const filter = visibleById(viewer, id)
   if (!filter) return false
   await connectDatabase()
+  const images = await planTaskImagesOf([id])
   const { deletedCount } = await EmployeeModel.deleteOne(filter)
-  if (deletedCount > 0) await EmployeePlanModel.deleteMany({ employeeId: id })
+  if (deletedCount > 0) {
+    await EmployeePlanModel.deleteMany({ employeeId: id })
+    await deleteTaskImages(images)
+  }
   return deletedCount > 0
+}
+
+/**
+ * Deletes several employees at once: the ones named by `ids`, or everyone the search and status
+ * cover when `ids` is left out. Each takes their plans with them, exactly as deleting one does, and
+ * both forms stay inside what the viewer may see. Answers how many employees really went.
+ */
+export async function deleteEmployees(
+  viewer: Viewer,
+  filters: { search: string; status: EmployeeStatus | "" },
+  ids?: string[]
+): Promise<{ deleted: number }> {
+  await connectDatabase()
+  // Ticked rows follow the per-record delete; a whole filter never reaches another account's team
+  const matching = allOf([
+    ids ? visibleTo(viewer) : ownedBy(viewer),
+    searchCondition(filters.search, ["name", "city", "role"]),
+    filters.status ? { status: filters.status } : null,
+    ids ? { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } } : null,
+  ])
+  // The ids are read first, because each employee's plans are keyed by them
+  const doomed = (await EmployeeModel.find(matching, { _id: 1 }).lean()).map((record) => String(record._id))
+  if (doomed.length === 0) return { deleted: 0 }
+  const images = await planTaskImagesOf(doomed)
+  const { deletedCount } = await EmployeeModel.deleteMany({ _id: { $in: doomed.map((id) => new mongoose.Types.ObjectId(id)) } })
+  await EmployeePlanModel.deleteMany({ employeeId: { $in: doomed } })
+  await deleteTaskImages(images)
+  return { deleted: deletedCount ?? 0 }
 }
 
 /**
@@ -164,18 +240,26 @@ const PLAN_FIELDS = {
   role: 1,
 } as const
 
-const toItem = (item: IPlanItem): PlanItem => ({
+const toItem = (item: IPlanItem, image: TaskImageView | null = null): PlanItem => ({
   id: item.id,
   text: item.text,
+  description: item.description ?? "",
+  image,
   done: Boolean(item.done),
   completedAt: item.done && item.completedAt ? new Date(item.completedAt).toISOString() : null,
   // A finished task has nothing to explain, so a reason only ever shows on one that is still open
   reason: item.done ? "" : (item.reason ?? ""),
 })
 
+/** The same items with their images signed, in one round rather than one per task. */
+async function toItems(items: IPlanItem[]): Promise<PlanItem[]> {
+  const signed = await taskImageViews(items, (item) => item.image)
+  return items.map((item) => toItem(item, signed.get(item) ?? null))
+}
+
 // One day as the history shows it: the tasks that day's plan held, and how many were ticked off
-const toHistoryDay = (record: IEmployeePlan): PlanHistoryDay => {
-  const items = (record.items ?? []).map(toItem)
+async function toHistoryDay(record: IEmployeePlan): Promise<PlanHistoryDay> {
+  const items = await toItems(record.items ?? [])
   return { date: record.periodStart, items, doneCount: items.filter((item) => item.done).length }
 }
 
@@ -191,13 +275,24 @@ async function loadPlan(employee: PlanOwner, today: string): Promise<{ tasks: IP
   const latest = (await EmployeePlanModel.findOne({ employeeId: employee._id.toString(), period: PLAN_PERIOD, periodStart: { $lte: today }, "items.0": { $exists: true } })
     .sort({ periodStart: -1 })
     .lean()) as IEmployeePlan | null
-  const tasks = (latest?.items ?? []).map(({ id, text }) => ({ id, text }))
+  const tasks = (latest?.items ?? []).map(({ id, text, description, image }) => ({ id, text, description: description ?? "", image: image ?? null }))
   const notes = latest?.notes ?? ""
   await EmployeeModel.updateOne({ _id: employee._id, planStartedAt: null }, { $set: { planItems: tasks, planNotes: notes, planStartedAt: new Date() } })
   return { tasks, notes }
 }
 
-const sameTasks = (a: IPlanItem[], b: IPlanTask[]) => a.length === b.length && a.every((item, index) => item.id === b[index].id && item.text === b[index].text)
+const sameImage = (a: TaskImage | null | undefined, b: TaskImage | null | undefined) => (a?.assetId ?? null) === (b?.assetId ?? null)
+
+// The day follows the plan's wording, its detail and its order; only the ticks are the day's own
+const sameTasks = (a: IPlanItem[], b: IPlanTask[]) =>
+  a.length === b.length &&
+  a.every(
+    (item, index) =>
+      item.id === b[index].id &&
+      item.text === b[index].text &&
+      (item.description ?? "") === (b[index].description ?? "") &&
+      sameImage(item.image, b[index].image)
+  )
 
 /**
  * Today's record, brought in line with the plan: the plan's tasks in the plan's order, each keeping
@@ -213,6 +308,8 @@ async function syncToday(employee: PlanOwner, today: string): Promise<{ items: P
     return {
       id: task.id,
       text: task.text,
+      description: task.description ?? "",
+      image: task.image ?? null,
       done: Boolean(ticked?.done),
       completedAt: ticked?.done ? (ticked.completedAt ?? null) : null,
       // Why it wasn't finished stays with the task through a change to the plan, like its tick
@@ -233,7 +330,7 @@ async function syncToday(employee: PlanOwner, today: string): Promise<{ items: P
       throw error
     })
   }
-  return { items: (record?.items ?? items).map(toItem), notes, updatedAt: record?.updatedAt ? new Date(record.updatedAt).toISOString() : null }
+  return { items: await toItems(record?.items ?? items), notes, updatedAt: record?.updatedAt ? new Date(record.updatedAt).toISOString() : null }
 }
 
 /**
@@ -286,8 +383,15 @@ export async function savePlan(viewer: Viewer, employeeId: string, input: Employ
   const employee = await planOwner(viewer, employeeId)
   if (!employee) return null
   const date = await currentDay(employee, input.today)
-  const tasks = input.items.filter((item) => item.text.trim()).map((item) => ({ id: item.id, text: item.text.trim() }))
+  const tasks = input.items
+    .filter((item) => item.text.trim())
+    .map((item) => ({ id: item.id, text: item.text.trim(), description: item.description.trim(), image: item.image }))
+  // An image taken off a task, or a task removed outright, leaves nothing behind in storage
+  const kept = new Set(tasks.map((task) => task.image?.assetId).filter(Boolean))
+  const dropped = (employee.planItems ?? []).filter((task) => task.image && !kept.has(task.image.assetId)).map((task) => task.image)
   await EmployeeModel.updateOne({ _id: employee._id }, { $set: { planItems: tasks, planNotes: input.notes, planStartedAt: employee.planStartedAt ?? new Date() } })
+  // Days already in the history keep their own copy, so only an image no day still points at goes
+  if (dropped.length > 0) await deleteTaskImages(await unusedImages(employee._id.toString(), dropped))
   return toPlan(employeeId, date, await syncToday({ ...employee, planItems: tasks, planNotes: input.notes, planStartedAt: employee.planStartedAt ?? new Date() }, date))
 }
 
@@ -381,7 +485,7 @@ async function historyBefore(employeeId: string, before: string): Promise<PlanHi
     .sort({ periodStart: -1 })
     .limit(PLAN_HISTORY_DAYS + 1)
     .lean()) as IEmployeePlan[]
-  const days = records.slice(0, PLAN_HISTORY_DAYS).map(toHistoryDay)
+  const days = await Promise.all(records.slice(0, PLAN_HISTORY_DAYS).map(toHistoryDay))
   return { days, nextBefore: records.length > PLAN_HISTORY_DAYS && days.length > 0 ? days[days.length - 1].date : null }
 }
 

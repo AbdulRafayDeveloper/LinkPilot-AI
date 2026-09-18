@@ -25,3 +25,11 @@ export const inDateOrder = (query: { from: string | null; to: string | null }) =
   !query.from || !query.to || new Date(query.from) <= new Date(query.to)
 
 export const DATE_ORDER_ISSUE = { message: HISTORY_MESSAGES.badDateRange }
+
+/**
+ * What a bulk delete covers: the records named by `ids`, or everything the filters cover when
+ * `all` is true. One or the other, never neither.
+ */
+export const BulkDeleteSchema = z
+  .object({ ids: z.array(z.string().regex(/^[0-9a-f]{24}$/)).min(1).max(200).optional(), all: z.boolean().optional() })
+  .refine((body) => (body.ids === undefined) !== (body.all !== true), "Choose what to delete, or delete everything the filters cover.")

@@ -3,10 +3,12 @@ import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import { SavedOutputsView } from "@/components/saved-outputs/SavedOutputsView"
 import { getSavedOutputTool } from "@/constants/savedOutputs"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("follow-up-message/history")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("follow-up-message", "/follow-up-message")
   return (
     <>
       {/* Breadcrumb schema markup */}

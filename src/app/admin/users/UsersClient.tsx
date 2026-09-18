@@ -6,6 +6,7 @@ import { AlertTriangle, CalendarPlus, CheckCircle2, Loader2, Lock, RefreshCw, Sh
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
+import { FeatureAccessPanel } from "@/components/admin/FeatureAccessPanel"
 import { FilterPanel, SearchFilter, SelectFilter, historyLabelClass } from "@/components/history/HistoryFilters"
 import { LoadMore } from "@/components/history/LoadMore"
 import { DeviceLine, EventBadge, StatCard, dateTime, timeAgo } from "@/components/admin/AdminParts"
@@ -149,6 +150,9 @@ const UserDetail: React.FC<{ user: AdminUser; canDelete: boolean; onDelete: () =
             )}
             {unused.length > 0 && <p className="text-[12px] text-outline">Not used yet: {unused.map((tool) => tool.title).join(", ")}.</p>}
           </section>
+
+          {/* What this account is allowed to open at all, which is a different question from what it has used */}
+          <FeatureAccessPanel userId={activity.user.id} isAdminAccount={activity.user.role === "admin"} />
 
           <section aria-labelledby="recent-logins" className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">

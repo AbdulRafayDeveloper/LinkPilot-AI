@@ -236,3 +236,79 @@ export async function deleteSavedTopic(viewer: Viewer, searchId: string, title: 
   )
   return modifiedCount > 0
 }
+
+/**
+ * Deletes several saved topics at once: the ones named by `topics` (each a search and a title, the
+ * way one topic is named everywhere else), or every topic the filters cover when none are named.
+ *
+ * A topic lives inside its search, so each search is rewritten once: its matching topics are taken
+ * out of `result.topics` and `topicCount` is set to what is left. A search is never deleted, even
+ * when its last topic goes, exactly as deleting one topic has always behaved. Ticked topics follow
+ * the single delete and stay inside what the viewer may see; a whole filter follows the other bulk
+ * actions and only ever reaches the viewer's own searches.
+ */
+export async function deleteSavedTopics(
+  viewer: Viewer,
+  filters: SavedTopicFilters,
+  topics?: { searchId: string; title: string }[]
+): Promise<{ deleted: number }> {
+  await connectDatabase()
+  const bySearch = new Map<string, Set<string>>()
+
+  if (topics) {
+    for (const { searchId, title } of topics) {
+      if (!visibleById(viewer, searchId)) continue
+      const titles = bySearch.get(searchId) ?? new Set<string>()
+      titles.add(title)
+      bySearch.set(searchId, titles)
+    }
+  } else {
+    const currentId = await currentSearchId(viewer)
+    const scoped = { $and: [searchConditions(viewer, filters, currentId), ownedBy(viewer)] }
+    const rows = await TrendingSearch.aggregate<{ _id: mongoose.Types.ObjectId; topic: { title?: string } }>([
+      { $match: scoped },
+      { $project: { topic: "$result.topics" } },
+      { $unwind: { path: "$topic" } },
+      { $match: topicConditions(filters) },
+    ])
+    for (const row of rows) {
+      const title = typeof row.topic?.title === "string" ? row.topic.title : null
+      if (!title) continue
+      const id = String(row._id)
+      const titles = bySearch.get(id) ?? new Set<string>()
+      titles.add(title)
+      bySearch.set(id, titles)
+    }
+  }
+
+  if (bySearch.size === 0) return { deleted: 0 }
+
+  // Each search is rewritten once: the topics that go are filtered out, then the count follows
+  const writes = [...bySearch].map(([searchId, titles]) => ({
+    updateOne: {
+      filter: { _id: new mongoose.Types.ObjectId(searchId), ...visibleTo(viewer) },
+      update: [
+        {
+          $set: {
+            "result.topics": {
+              $filter: { input: "$result.topics", as: "topic", cond: { $not: [{ $in: ["$$topic.title", [...titles]] }] } },
+            },
+          },
+        },
+        { $set: { topicCount: { $size: "$result.topics" } } },
+      ],
+    },
+  }))
+  // How many of the named topics are really there, so the count answers what went rather than what was asked for
+  const searches = await TrendingSearch.find(
+    { _id: { $in: [...bySearch.keys()].map((id) => new mongoose.Types.ObjectId(id)) }, ...visibleTo(viewer) },
+    { "result.topics.title": 1 }
+  ).lean()
+  const present = searches.reduce((count, search) => {
+    const titles = bySearch.get(String(search._id)) ?? new Set<string>()
+    const held = ((search.result as { topics?: { title?: string }[] } | undefined)?.topics ?? []).map((topic) => topic.title)
+    return count + held.filter((title) => typeof title === "string" && titles.has(title)).length
+  }, 0)
+  await TrendingSearch.bulkWrite(writes)
+  return { deleted: present }
+}

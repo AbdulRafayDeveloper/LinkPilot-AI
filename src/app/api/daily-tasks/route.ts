@@ -3,7 +3,10 @@ import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { DAILY_TASKS_MESSAGES, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
 import { IsoDate, TodaySchema } from "@/lib/validation/dailyTasks"
-import { createTasks, deleteTasksBeforeWindow, listTasks } from "@/services/dailyTasks/tasks"
+import { TaskDetailsSchema } from "@/lib/validation/taskAttachment"
+import type { NewDailyTask } from "@/types/dailyTasks"
+import { createTasks, deleteTasks, deleteTasksBeforeWindow, listTasks } from "@/services/dailyTasks/tasks"
+import { BulkDeleteSchema } from "@/lib/validation/listFilters"
 import { requireViewer } from "@/services/auth/viewer"
 import { withIdempotency } from "@/services/idempotency"
 
@@ -11,28 +14,49 @@ export const dynamic = "force-dynamic"
 
 const PageSchema = z.coerce.number().int().positive().catch(1)
 
-const CreateSchema = z
+export const CreateSchema = z
   .object({
     today: TodaySchema,
     taskDate: IsoDate,
+    // A row is its line plus whatever optional detail was opened on it. A plain string is still
+    // accepted for a row with nothing extra, so anything that posted a list of lines before this
+    // existed goes on working unchanged
     contents: z
-      .array(z.string().max(TASK_MAX_LENGTH, DAILY_TASKS_MESSAGES.contentTooLong))
+      .array(
+        z.union([
+          z.string().max(TASK_MAX_LENGTH, DAILY_TASKS_MESSAGES.contentTooLong),
+          z
+            .object({ content: z.string().max(TASK_MAX_LENGTH, DAILY_TASKS_MESSAGES.contentTooLong) })
+            .and(TaskDetailsSchema),
+        ])
+      )
       .min(1, DAILY_TASKS_MESSAGES.missingContent)
       .max(MAX_TASKS_PER_SUBMIT, DAILY_TASKS_MESSAGES.tooManyTasks),
   })
   // A task belongs to a day that has happened: a later one would never show in the seven-day view
   .refine((body) => body.taskDate <= body.today, { message: DAILY_TASKS_MESSAGES.futureDate, path: ["taskDate"] })
 
-// Empty rows are dropped, and the same task written twice in one submission is kept once
-function cleanContents(contents: string[]): string[] {
+type SubmittedRow = string | ({ content: string } & { description: string; image: { assetId: string; contentType: string } | null })
+
+/**
+ * Empty rows are dropped, and the same task written twice in one submission is kept once. A row
+ * repeated with detail on it keeps the first one, exactly as a repeated line always has: the line
+ * is what decides whether it is the same task.
+ */
+function cleanContents(contents: SubmittedRow[]): NewDailyTask[] {
   const seen = new Set<string>()
-  const kept: string[] = []
-  for (const content of contents) {
-    const task = content.trim().replace(/\s+/g, " ")
+  const kept: NewDailyTask[] = []
+  for (const row of contents) {
+    const line = typeof row === "string" ? row : row.content
+    const task = line.trim().replace(/\s+/g, " ")
     const key = task.toLowerCase()
     if (!task || seen.has(key)) continue
     seen.add(key)
-    kept.push(task)
+    kept.push({
+      content: task,
+      description: typeof row === "string" ? "" : row.description,
+      image: typeof row === "string" ? null : row.image,
+    })
   }
   return kept
 }
@@ -74,10 +98,10 @@ async function handlePost(req: NextRequest) {
     const parsed = CreateSchema.safeParse(body)
     if (!parsed.success) return badRequest(parsed.error.issues[0]?.message || DAILY_TASKS_MESSAGES.missingContent)
 
-    const contents = cleanContents(parsed.data.contents)
-    if (contents.length === 0) return badRequest(DAILY_TASKS_MESSAGES.missingContent)
+    const rows = cleanContents(parsed.data.contents)
+    if (rows.length === 0) return badRequest(DAILY_TASKS_MESSAGES.missingContent)
 
-    const tasks = await createTasks(auth.viewer, parsed.data.taskDate, contents)
+    const tasks = await createTasks(auth.viewer, parsed.data.taskDate, rows)
     return NextResponse.json({ success: true, message: DAILY_TASKS_MESSAGES.saved, data: { tasks } }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Daily Tasks Exception:", error)
@@ -96,6 +120,18 @@ export async function DELETE(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
+    // With ids, the ticked tasks go, whatever day they are on; without, the week-old cleanup runs
+    const body = await req.json().catch(() => null)
+    const ticked = body === null ? null : BulkDeleteSchema.safeParse(body)
+    if (ticked?.success && ticked.data.ids) {
+      const removed = await deleteTasks(auth.viewer, ticked.data.ids)
+      return NextResponse.json({
+        success: true,
+        message: `${removed} ${removed === 1 ? "task" : "tasks"} deleted.`,
+        data: { deleted: removed },
+      })
+    }
+
     const today = TodaySchema.safeParse(req.nextUrl.searchParams.get("today"))
     if (!today.success) return badRequest(DAILY_TASKS_MESSAGES.invalidDate)
 

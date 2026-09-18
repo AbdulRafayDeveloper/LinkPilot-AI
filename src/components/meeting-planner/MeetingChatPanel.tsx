@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { AlertTriangle, ArrowUp, Bot, Loader2, Maximize2, MessageSquare, Minimize2, Square, Trash2, User } from "lucide-react"
+import { AlertTriangle, ArrowUp, Bot, Loader2, Maximize2, MessageSquare, Mic, Minimize2, Square, Trash2, User } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { RichTextView } from "@/components/ui/RichTextView"
@@ -10,7 +10,8 @@ import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
 import { requestApi } from "@/lib/apiClient"
 import { appendSpokenText } from "@/lib/spokenText"
 import { readSSEStream } from "@/lib/sse"
-import { MEETING_CHAT_MESSAGES, MEETING_PLANNER_ENDPOINT_CHAT, QUESTION_MAX_LENGTH } from "@/constants/meetingChat"
+import { MEETING_CHAT_MESSAGES, MEETING_CHAT_SURFACES, QUESTION_MAX_LENGTH, type MeetingChatSurfaceId } from "@/constants/meetingChat"
+import { VOICE_MESSAGES } from "@/constants/voiceInput"
 import { AI_PROVIDER_LABELS, type AiProviderId } from "@/constants/aiProviders"
 import type { MeetingChatEvent, MeetingChatHistory, MeetingChatMessage } from "@/types/meetingChat"
 
@@ -27,7 +28,8 @@ const Bubble: React.FC<{ message: MeetingChatMessage; isStreaming?: boolean }> =
       >
         {isYou ? <User size={14} /> : <Bot size={14} />}
       </span>
-      <div className={`group flex min-w-0 max-w-[85%] flex-col gap-1 ${isYou ? "items-end" : "items-start"}`}>
+      {/* An answer with headings and lists needs the room to lay them out; a question never does */}
+      <div className={`group flex min-w-0 flex-col gap-1 ${isYou ? "max-w-[85%] items-end" : "max-w-[92%] items-start"}`}>
         <div
           className={`break-words rounded-2xl px-3.5 py-2.5 text-[14px] leading-relaxed ${
             isYou ? "whitespace-pre-wrap bg-primary text-white" : "bg-surface-container-lowest text-on-surface ring-1 ring-outline-variant"
@@ -37,8 +39,13 @@ const Bubble: React.FC<{ message: MeetingChatMessage; isStreaming?: boolean }> =
             message.text
           ) : (
             <>
-              {/* Bold, italics, bullets and numbered steps are shown as formatting, not as the marks around them */}
-              <RichTextView text={message.text} className="!gap-2 !text-[14px] !text-on-surface" />
+              {/* Headings, bold, italics, bullets and numbered steps are shown as formatting, not as
+                  the marks around them. A heading gets air above it so the parts of a long answer
+                  read as separate sections, and the first one never pushes the bubble open. */}
+              <RichTextView
+                text={message.text}
+                className="!gap-2 !text-[14px] !text-on-surface [&>h3]:mt-1.5 [&>h4]:mt-1.5 [&>h5]:mt-1.5 [&>*:first-child]:!mt-0"
+              />
               {isStreaming && <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-primary align-middle" aria-hidden="true" />}
             </>
           )}
@@ -60,12 +67,16 @@ const Bubble: React.FC<{ message: MeetingChatMessage; isStreaming?: boolean }> =
 }
 
 /**
- * Ask this meeting: a chat that answers from the meeting's own vectors (services/meetingPlanner).
- * The answer is written as it arrives, the chat is kept with the meeting, and Expand shows it on the
- * whole screen for a long read. What an answer was read from is named under it, and an answer the
- * meeting could not supply says so rather than passing itself off as part of the preparation.
+ * Ask this meeting: a chat that answers from the meeting's own vectors. The answer is written as it
+ * arrives, the chat is kept with the meeting, and Expand shows it on the whole screen for a long
+ * read. What an answer was read from is named under it, and an answer the meeting could not supply
+ * says so rather than passing itself off as part of the meeting.
+ *
+ * It serves both meetings: one being prepared for and one that has already happened. Everything that
+ * differs between them (where the chat lives, which module reads the speech, the words on the page)
+ * comes from MEETING_CHAT_SURFACES, so the behaviour is written once.
  */
-export const MeetingChatPanel: React.FC<{ meetingId: string; meetingName: string; personName: string | null }> = ({ meetingId, meetingName, personName }) => {
+export const MeetingChatPanel: React.FC<{ surface: MeetingChatSurfaceId; meetingId: string; subject: string }> = ({ surface, meetingId, subject }) => {
   const [messages, setMessages] = useState<MeetingChatMessage[]>([])
   const [pieces, setPieces] = useState<number | null>(null)
   const [question, setQuestion] = useState("")
@@ -77,7 +88,8 @@ export const MeetingChatPanel: React.FC<{ meetingId: string; meetingName: string
   const abort = useRef<AbortController | null>(null)
   const list = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
-  const endpoint = `${MEETING_PLANNER_ENDPOINT_CHAT(meetingId)}`
+  const chatFor = MEETING_CHAT_SURFACES[surface]
+  const endpoint = chatFor.endpoint(meetingId)
   const isAnswering = answer !== null
 
   useEffect(() => {
@@ -196,9 +208,7 @@ export const MeetingChatPanel: React.FC<{ meetingId: string; meetingName: string
             <MessageSquare size={16} className="shrink-0 text-primary" aria-hidden="true" />
             Ask this meeting
           </h2>
-          <p className="mt-0.5 text-[12px] text-on-surface-variant">
-            Answers from everything saved on {personName || meetingName}. Ask anything you want to understand before the call.
-          </p>
+          <p className="mt-0.5 text-[12px] text-on-surface-variant">{chatFor.subtitle(subject)}</p>
         </div>
         <div className="flex items-center gap-1">
           {messages.length > 0 && (
@@ -231,7 +241,7 @@ export const MeetingChatPanel: React.FC<{ meetingId: string; meetingName: string
             Loading the chat...
           </p>
         ) : messages.length === 0 && !isAnswering ? (
-          <p className="py-6 text-center text-[13px] text-on-surface-variant">{pieces === 0 ? MEETING_CHAT_MESSAGES.notReady : MEETING_CHAT_MESSAGES.emptyChat}</p>
+          <p className="py-6 text-center text-[13px] text-on-surface-variant">{pieces === 0 ? chatFor.notReady : chatFor.empty}</p>
         ) : (
           <ul className="flex flex-col gap-3" aria-label="The chat about this meeting" aria-live="polite">
             {messages.map((message) => (
@@ -266,7 +276,8 @@ export const MeetingChatPanel: React.FC<{ meetingId: string; meetingName: string
           className="custom-scrollbar max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-outline-variant bg-white px-3 py-2.5 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
         />
         <VoiceRecorder
-          transcribeFor="meeting-planner"
+          compact
+          transcribeFor={chatFor.transcribeFor}
           what="what you want to ask"
           showSource={false}
           disabled={isAnswering}
@@ -298,6 +309,20 @@ export const MeetingChatPanel: React.FC<{ meetingId: string; meetingName: string
           </button>
         )}
       </div>
+
+      {/* The two ways to ask, said plainly under the box, so the microphone is never just an icon
+          nobody is sure about. The button itself carries the same words in its tooltip. */}
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px] text-outline">
+        <span>
+          <kbd className="rounded border border-outline-variant bg-surface-container-low px-1 font-sans text-[10px] font-semibold text-on-surface-variant">Enter</kbd> to
+          ask, <kbd className="rounded border border-outline-variant bg-surface-container-low px-1 font-sans text-[10px] font-semibold text-on-surface-variant">Shift</kbd>+
+          <kbd className="rounded border border-outline-variant bg-surface-container-low px-1 font-sans text-[10px] font-semibold text-on-surface-variant">Enter</kbd> for a new line
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Mic size={12} aria-hidden="true" />
+          Speak your question instead, {VOICE_MESSAGES.limit.toLowerCase()}
+        </span>
+      </p>
     </>
   )
 
@@ -315,7 +340,7 @@ export const MeetingChatPanel: React.FC<{ meetingId: string; meetingName: string
 
       {isExpanded &&
         createPortal(
-          <div role="dialog" aria-modal="true" aria-label={`Ask this meeting: ${meetingName}`} className="fixed inset-0 z-[80] flex flex-col gap-3 bg-background p-3 sm:p-5">
+          <div role="dialog" aria-modal="true" aria-label={`Ask this meeting: ${subject}`} className="fixed inset-0 z-[80] flex flex-col gap-3 bg-background p-3 sm:p-5">
             {chat}
           </div>,
           document.body
@@ -324,7 +349,7 @@ export const MeetingChatPanel: React.FC<{ meetingId: string; meetingName: string
       {isClearOpen && (
         <Modal
           title="Clear this chat?"
-          description="The questions and answers go. The meeting, its preparation and what the chat reads from stay as they are."
+          description={chatFor.clearDescription}
           onClose={() => setIsClearOpen(false)}
           size="compact"
           footer={

@@ -15,6 +15,9 @@ interface ReferenceListProps {
   // True while a search is in effect, so "nothing found" reads differently from "nothing saved"
   isSearching: boolean
   deletingId: string | null
+  // Which items are ticked for deleting several at once, and how a tick is made
+  pickedIds: ReadonlySet<string>
+  onPick: (id: string, isRange: boolean) => void
   onRetry: () => void
   onLoadMore: () => void
   onEdit: (item: ReferenceItem) => void
@@ -33,9 +36,11 @@ const actionButton =
 const ReferenceCard: React.FC<{
   item: ReferenceItem
   isDeleting: boolean
+  isPicked: boolean
+  onPick: (id: string, isRange: boolean) => void
   onEdit: (item: ReferenceItem) => void
   onDelete: (item: ReferenceItem) => void
-}> = ({ item, isDeleting, onEdit, onDelete }) => {
+}> = ({ item, isDeleting, isPicked, onPick, onEdit, onDelete }) => {
   const [isOpen, setIsOpen] = useState(false)
   const isCut = item.content.length > REFERENCE_PREVIEW_MAX_LENGTH
   const shown = isCut && !isOpen ? `${item.content.slice(0, REFERENCE_PREVIEW_MAX_LENGTH)}…` : item.content
@@ -47,6 +52,14 @@ const ReferenceCard: React.FC<{
       }`}
     >
       <div className="flex items-start justify-between gap-2">
+        <input
+          type="checkbox"
+          checked={isPicked}
+          disabled={isDeleting}
+          onChange={(event) => onPick(item.id, (event.nativeEvent as MouseEvent).shiftKey)}
+          aria-label={`Pick ${item.title}`}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+        />
         <h3 className="min-w-0 break-words text-sm font-bold text-on-surface">{item.title}</h3>
         <span className="shrink-0 text-[11px] text-outline">{savedAt(item.updatedAt)}</span>
       </div>
@@ -127,6 +140,8 @@ export const ReferenceList: React.FC<ReferenceListProps> = ({
   error,
   isSearching,
   deletingId,
+  pickedIds,
+  onPick,
   onRetry,
   onLoadMore,
   onEdit,
@@ -199,7 +214,15 @@ export const ReferenceList: React.FC<ReferenceListProps> = ({
     <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
       <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
-          <ReferenceCard key={item.id} item={item} isDeleting={deletingId === item.id} onEdit={onEdit} onDelete={onDelete} />
+          <ReferenceCard
+            key={item.id}
+            item={item}
+            isDeleting={deletingId === item.id}
+            isPicked={pickedIds.has(item.id)}
+            onPick={onPick}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
         ))}
       </ul>
 

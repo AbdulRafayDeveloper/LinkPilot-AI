@@ -8,9 +8,17 @@ import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
-// Everything is optional here: the status toggle sends one field, the edit form sends several
-const UpdateSchema = MeetingInputSchema.partial()
-  .extend({ status: z.enum(MEETING_PLAN_STATUS_IDS).optional() })
+/**
+ * Everything is optional here: the status toggle sends one field, the edit form sends several.
+ *
+ * `prepEnabled` is spelled out again rather than taken from the partial, because on the create
+ * schema it carries a default of false, and a default still answers for a key that was not sent.
+ * That made every small change switch preparation off: ticking a meeting completed, which sends
+ * nothing but the status, took its preparation away with it. Left optional with no default, a
+ * change that says nothing about preparation leaves preparation alone.
+ */
+export const UpdateSchema = MeetingInputSchema.partial()
+  .extend({ prepEnabled: z.boolean().optional(), status: z.enum(MEETING_PLAN_STATUS_IDS).optional() })
   .refine((body) => Object.keys(body).length > 0, MEETING_PLANNER_MESSAGES.updateFailed)
 
 const notFound = () => NextResponse.json({ success: false, message: MEETING_PLANNER_MESSAGES.notFound }, { status: 404 })

@@ -10,8 +10,10 @@ import {
   MEETING_PLANNER_MESSAGES,
   PERSON_NAME_MAX_LENGTH,
   PREP_INPUT_MAX_LENGTH,
+  PROFILE_LINK_MAX_LENGTH,
   TIME_PATTERN,
 } from "@/constants/meetingPlanner"
+import { isUsableProfileLink, normalizeProfileLink } from "@/lib/profileLink"
 import { createMeeting, listMonth } from "@/services/meetingPlanner/plans"
 import { requireViewer } from "@/services/auth/viewer"
 import { withIdempotency } from "@/services/idempotency"
@@ -57,6 +59,16 @@ export const MeetingInputSchema = z.object({
   meetingDate: IsoDateSchema,
   meetingTime: z.string().trim().regex(TIME_PATTERN, MEETING_PLANNER_MESSAGES.invalidTime),
   personName: optionalText(PERSON_NAME_MAX_LENGTH),
+  // Typed, or read out of the pasted profile by the form. "linkedin.com/in/x" is made into an
+  // address before it is checked, so a link copied without its scheme is still saved
+  profileLink: z
+    .string()
+    .trim()
+    .max(PROFILE_LINK_MAX_LENGTH, MEETING_PLANNER_MESSAGES.profileLinkTooLong)
+    .nullish()
+    .transform((value) => normalizeProfileLink(value ?? ""))
+    .refine((link) => link === "" || isUsableProfileLink(link), MEETING_PLANNER_MESSAGES.profileLinkInvalid)
+    .transform((link) => link || null),
   prepEnabled: z.boolean().default(false),
   profileInfo: optionalText(PREP_INPUT_MAX_LENGTH),
   conversationHistory: optionalText(PREP_INPUT_MAX_LENGTH),

@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/Modal"
 import { SortableList } from "@/components/ui/SortableList"
 import { PlanHistory, dayHeading, mergeHistory, replaceHistoryDay, tickTime } from "@/components/employees/PlanHistory"
 import { TaskReason } from "@/components/employees/TaskReason"
+import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 import { requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
 import { SITE_LOGO_PNG, SITE_SHORT_NAME } from "@/config/site"
@@ -252,14 +253,15 @@ export default function PublicPlanClient({ token }: { token: string }) {
   return (
     <div className="min-h-dvh bg-background text-on-surface">
       <header className="border-b border-outline-variant/80 bg-white">
-        <div className="mx-auto flex max-w-2xl items-center gap-2.5 px-4 py-3">
+        <div className="flex w-full items-center gap-2.5 px-4 py-3 sm:px-6 lg:px-8">
           <Image src={SITE_LOGO_PNG} alt="" width={32} height={32} className="h-8 w-8" priority />
           <span className="text-[15px] font-bold tracking-tight">{SITE_SHORT_NAME}</span>
           <span className="ml-auto text-[12px] text-outline">Daily plan</span>
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-2xl flex-col gap-5 px-4 py-6 sm:py-8">
+      {/* The whole width, so a task reads on one line on a laptop instead of wrapping in a narrow column */}
+      <main className="flex w-full flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {error && !plan ? (
           <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-white px-6 py-12 text-center">
             <AlertCircle size={24} className="text-error" aria-hidden="true" />
@@ -353,6 +355,8 @@ export default function PublicPlanClient({ token }: { token: string }) {
                     onReorder={(ids) => void reorder(ids)}
                     disabled={isMoving}
                     label="Today's tasks"
+                    multiSelect
+                    itemNoun="tasks"
                     className="flex flex-col gap-2"
                     renderItem={(item, handle) => (
                       <div
@@ -377,6 +381,8 @@ export default function PublicPlanClient({ token }: { token: string }) {
                               item.completedAt && <span className="shrink-0 text-[12px] text-outline">{tickTime(item.completedAt)}</span>
                             )}
                           </label>
+                          {/* What the manager put on this task, then why it isn't done */}
+                          <TaskDetailsView description={item.description} image={item.image} label={item.text} />
                           {/* Why it isn't done, written by the employee and shown to their manager */}
                           <TaskReason reason={item.reason} taskText={item.text} isDone={item.done} onSave={(reason) => saveReason(item, reason)} />
                         </div>

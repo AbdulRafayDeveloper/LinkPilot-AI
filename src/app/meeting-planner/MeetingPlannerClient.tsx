@@ -143,6 +143,7 @@ export default function MeetingPlannerClient() {
           meetingDate: values.meetingDate,
           meetingTime: values.meetingTime,
           personName: values.personName || null,
+          profileLink: values.profileLink || null,
           prepEnabled: values.prepEnabled,
           profileInfo: values.profileInfo || null,
           conversationHistory: values.conversationHistory || null,

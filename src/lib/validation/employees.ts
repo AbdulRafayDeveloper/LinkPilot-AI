@@ -13,6 +13,7 @@ import {
   PLAN_TODAY_DRIFT_DAYS,
 } from "@/constants/employees"
 import { shiftDate } from "@/lib/taskDates"
+import { TaskDetailsSchema } from "@/lib/validation/taskAttachment"
 import { choiceParam, cursorParam, searchParam } from "./listFilters"
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
@@ -76,10 +77,13 @@ export const PlanSchema = z.object({
   today: TodaySchema,
   items: z
     .array(
-      z.object({
-        id: ItemId,
-        text: z.string().trim().max(PLAN_ITEM_MAX_LENGTH, EMPLOYEE_MESSAGES.itemTooLong),
-      })
+      z
+        .object({
+          id: ItemId,
+          text: z.string().trim().max(PLAN_ITEM_MAX_LENGTH, EMPLOYEE_MESSAGES.itemTooLong),
+        })
+        // The same optional detail a Daily Task carries, checked the same way
+        .and(TaskDetailsSchema)
     )
     .max(PLAN_MAX_ITEMS, EMPLOYEE_MESSAGES.tooManyItems),
   notes: z.string().max(PLAN_NOTES_MAX_LENGTH, EMPLOYEE_MESSAGES.notesTooLong),

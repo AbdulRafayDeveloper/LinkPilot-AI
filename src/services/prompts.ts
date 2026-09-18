@@ -50,6 +50,7 @@ export type PromptName =
   | "meeting-system"
   | "meeting-chunk"
   | "meeting-synthesis"
+  | "meeting-notes-chat-system"
   | "message-rewriter-system"
   | "message-rewriter"
   | "client-voice-tasks-system"

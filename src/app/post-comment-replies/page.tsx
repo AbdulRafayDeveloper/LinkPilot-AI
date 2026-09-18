@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import PostCommentRepliesClient from "./PostCommentRepliesClient"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("post-comment-replies")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("post-comment-replies", "/post-comment-replies")
   return (
     <>
       {/* Breadcrumb schema markup */}

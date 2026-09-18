@@ -15,6 +15,9 @@ interface SavedNotesListProps {
   error: string | null
   // Ids being deleted right now, so a note cannot be deleted twice
   deletingIds: string[]
+  // Which notes are ticked for deleting several at once, and how a tick is made
+  pickedIds: ReadonlySet<string>
+  onPick: (id: string, isRange: boolean) => void
   onRetry: () => void
   onLoadMore: () => void
   onDelete: (note: QuickNote) => void
@@ -28,11 +31,13 @@ const savedAt = (iso: string) =>
  * and a delete that removes it straight away. Notes are small and easy to save again, so deleting
  * one does not ask first.
  */
-const NoteCard: React.FC<{ note: QuickNote; isDeleting: boolean; onDelete: (note: QuickNote) => void }> = ({
-  note,
-  isDeleting,
-  onDelete,
-}) => {
+const NoteCard: React.FC<{
+  note: QuickNote
+  isDeleting: boolean
+  isPicked: boolean
+  onPick: (id: string, isRange: boolean) => void
+  onDelete: (note: QuickNote) => void
+}> = ({ note, isDeleting, isPicked, onPick, onDelete }) => {
   const isCut = note.content.length > NOTE_PREVIEW_MAX_LENGTH
   return (
     <li
@@ -41,7 +46,17 @@ const NoteCard: React.FC<{ note: QuickNote; isDeleting: boolean; onDelete: (note
       }`}
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="text-[11px] text-outline">{savedAt(note.createdAt)}</span>
+        <span className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={isPicked}
+            disabled={isDeleting}
+            onChange={(event) => onPick(note.id, (event.nativeEvent as MouseEvent).shiftKey)}
+            aria-label={`Pick the note saved ${savedAt(note.createdAt)}`}
+            className="h-4 w-4 accent-primary"
+          />
+          <span className="text-[11px] text-outline">{savedAt(note.createdAt)}</span>
+        </span>
         <div className="flex items-center gap-1">
           <CopyButton text={note.content} label="Copy this note" showLabel />
           <button
@@ -80,6 +95,8 @@ export const SavedNotesList: React.FC<SavedNotesListProps> = ({
   hasMore,
   error,
   deletingIds,
+  pickedIds,
+  onPick,
   onRetry,
   onLoadMore,
   onDelete,
@@ -142,7 +159,14 @@ export const SavedNotesList: React.FC<SavedNotesListProps> = ({
         <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
           <ul className="space-y-2">
             {notes.map((note) => (
-              <NoteCard key={note.id} note={note} isDeleting={deletingIds.includes(note.id)} onDelete={onDelete} />
+              <NoteCard
+                key={note.id}
+                note={note}
+                isDeleting={deletingIds.includes(note.id)}
+                isPicked={pickedIds.has(note.id)}
+                onPick={onPick}
+                onDelete={onDelete}
+              />
             ))}
           </ul>
 

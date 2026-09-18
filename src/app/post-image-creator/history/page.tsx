@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import PostImageHistoryClient from "./PostImageHistoryClient"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("post-image-creator/history")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("post-image-creator", "/post-image-creator")
   return (
     <>
       {/* Breadcrumb schema markup */}

@@ -3,10 +3,12 @@ import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import { SavedOutputsView } from "@/components/saved-outputs/SavedOutputsView"
 import { getSavedOutputTool } from "@/constants/savedOutputs"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("prompt-creator/history")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("prompt-creator", "/prompt-creator")
   return (
     <>
       {/* Breadcrumb schema markup */}

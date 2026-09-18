@@ -28,6 +28,8 @@ export interface IMeetingPlan {
   status: MeetingPlanStatusId
   completedAt: Date | null
   personName: string | null
+  // A link straight to their profile, read from what was pasted or typed by the user
+  profileLink: string | null
   prepEnabled: boolean
   profileInfo: string | null
   conversationHistory: string | null
@@ -50,6 +52,7 @@ const MeetingPlanSchema = new Schema<IMeetingPlan>(
     status: { type: String, enum: MEETING_PLAN_STATUS_IDS, required: true, default: "pending" },
     completedAt: { type: Date, default: null },
     personName: { type: String, default: null, trim: true },
+    profileLink: { type: String, default: null, trim: true },
     prepEnabled: { type: Boolean, required: true, default: false },
     profileInfo: { type: String, default: null },
     conversationHistory: { type: String, default: null },

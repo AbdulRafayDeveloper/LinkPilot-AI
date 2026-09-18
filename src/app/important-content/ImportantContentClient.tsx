@@ -1,10 +1,13 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import { AlertTriangle, ChevronLeft, ChevronRight, Eye, FileKey2, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { AlertTriangle, Eye, FileKey2, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
+import { Pagination } from "@/components/ui/Pagination"
+import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
+import { useRowSelection } from "@/hooks/useRowSelection"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { FilterPanel, SearchFilter, SelectFilter, historyLabelClass } from "@/components/history/HistoryFilters"
 import { ContentDialog } from "@/components/important-content/ContentDialog"
@@ -19,9 +22,13 @@ import type { ImportantContent, ImportantContentPage } from "@/types/importantCo
 
 const savedOn = (iso: string) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
-// The table shows the words, not the formatting marks; View details shows the formatting
+/**
+ * The list shows the words, not the formatting marks, and not the line breaks either: a few lines
+ * of a clamped preview are worth more filled with words than left short by the newlines of a list
+ * or a code block. View details shows the description as it was written.
+ */
 const preview = (description: string) => {
-  const text = toPlainText(description)
+  const text = toPlainText(description).replace(/\s+/g, " ").trim()
   return text.length > CONTENT_PREVIEW_MAX_LENGTH ? `${text.slice(0, CONTENT_PREVIEW_MAX_LENGTH).trimEnd()}...` : text
 }
 
@@ -57,6 +64,9 @@ export default function ImportantContentClient() {
   const [deleting, setDeleting] = useState<ImportantContent | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // Deleting several at once: which delete is waiting to be confirmed, and whether it is running
+  const [confirmingMany, setConfirmingMany] = useState<"picked" | "all" | null>(null)
+  const [isDeletingMany, setIsDeletingMany] = useState(false)
 
   // Typing settles before the list is asked for again, and an emptied search box counts at once
   const settledSearch = useDebouncedValue(search.trim(), HISTORY_DEBOUNCE_MS)
@@ -89,6 +99,33 @@ export default function ImportantContentClient() {
 
   const reload = () => setAttempt((count) => count + 1)
   const hasFilters = Boolean(search || type)
+  const selection = useRowSelection((result?.items ?? []).map((entry) => entry.id))
+
+  /**
+   * Deletes the ticked entries, or every entry the search and type cover, in one call. Deleting is
+   * final, so it only runs from the confirmation. The list is read again from the first page.
+   */
+  const deleteMany = async (which: "picked" | "all") => {
+    if (isDeletingMany) return
+    setIsDeletingMany(true)
+    setDeleteError(null)
+    try {
+      await requestApi<{ deleted: number }>(`${IMPORTANT_CONTENT_ENDPOINT}?${query}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(which === "picked" ? { ids: [...selection.pickedIds] } : { all: true }),
+      })
+      selection.clear()
+      setConfirmingMany(null)
+      setPage(1)
+      setAttempt((count) => count + 1)
+    } catch (reason: unknown) {
+      setDeleteError(reason instanceof Error ? reason.message : IMPORTANT_CONTENT_MESSAGES.deleteFailed)
+      setConfirmingMany(null)
+    } finally {
+      setIsDeletingMany(false)
+    }
+  }
   const items = result?.items ?? []
   const total = result?.total ?? 0
   const pageSize = result?.pageSize ?? 0
@@ -204,6 +241,19 @@ export default function ImportantContentClient() {
               />
             </FilterPanel>
 
+            {result && total > 0 && (
+              <BulkDeleteBar
+                pickedCount={selection.pickedIds.size}
+                total={total}
+                noun={{ one: "entry", many: "entries" }}
+                hasFilters={hasFilters}
+                isBusy={isDeletingMany}
+                onDeletePicked={() => setConfirmingMany("picked")}
+                onDeleteAll={() => setConfirmingMany("all")}
+                onClear={selection.clear}
+              />
+            )}
+
             {error && !result ? (
               <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <AlertTriangle size={20} className="text-error" aria-hidden="true" />
@@ -239,8 +289,11 @@ export default function ImportantContentClient() {
                     <caption className="sr-only">Important content, page {page} of {totalPages}</caption>
                     <thead className="bg-surface-container-lowest">
                       <tr className="border-b border-outline-variant">
-                        {["Name", "Type", "Description", "Updated", ""].map((heading, index) => (
-                          <th key={heading || index} scope="col" className={`px-3 py-2.5 ${historyLabelClass}`}>
+                        <th scope="col" className="w-[36px] px-2 py-2.5">
+                          <span className="sr-only">Picked</span>
+                        </th>
+                        {["Name", "Type", "Description", "Updated", "Actions"].map((heading) => (
+                          <th key={heading} scope="col" className={`px-3 py-2.5 ${historyLabelClass} ${heading === "Actions" ? "text-right" : ""}`}>
                             {heading}
                           </th>
                         ))}
@@ -249,16 +302,25 @@ export default function ImportantContentClient() {
                     <tbody>
                       {items.map((entry) => (
                         <tr key={entry.id} className="border-b border-outline-variant/60 align-top last:border-b-0 hover:bg-surface-container-lowest">
+                          <td className="w-[36px] px-2 py-2.5">
+                            <input
+                              type="checkbox"
+                              checked={selection.isPicked(entry.id)}
+                              disabled={isDeletingMany}
+                              onChange={(event) => selection.pick(entry.id, (event.nativeEvent as MouseEvent).shiftKey)}
+                              aria-label={`Pick ${entry.name}`}
+                              className="h-4 w-4 accent-primary"
+                            />
+                          </td>
                           <td className="max-w-[240px] px-3 py-2.5">
                             <p className="break-words text-[13px] font-semibold text-on-surface">{entry.name}</p>
-                            {entry.owner && <p className="text-[11px] text-outline">By {entry.owner}</p>}
                           </td>
                           <td className="max-w-[160px] px-3 py-2.5">
                             <TypeBadge type={entry.type} />
                           </td>
                           <td className="max-w-[420px] px-3 py-2.5">
                             {entry.description ? (
-                              <p className="line-clamp-3 whitespace-pre-wrap break-words font-code text-[12px] leading-relaxed text-on-surface-variant">{preview(entry.description)}</p>
+                              <p className="line-clamp-3 break-words text-[13px] leading-relaxed text-on-surface-variant">{preview(entry.description)}</p>
                             ) : (
                               <span className="text-[12px] text-outline">No description</span>
                             )}
@@ -274,15 +336,22 @@ export default function ImportantContentClient() {
                 <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {items.map((entry) => (
                     <li key={entry.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                      <input
+                        type="checkbox"
+                        checked={selection.isPicked(entry.id)}
+                        disabled={isDeletingMany}
+                        onChange={(event) => selection.pick(entry.id, (event.nativeEvent as MouseEvent).shiftKey)}
+                        aria-label={`Pick ${entry.name}`}
+                        className="h-4 w-4 self-start accent-primary"
+                      />
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="break-words text-[14px] font-semibold text-on-surface">{entry.name}</p>
-                          {entry.owner && <p className="text-[11px] text-outline">By {entry.owner}</p>}
                         </div>
                         <TypeBadge type={entry.type} />
                       </div>
                       {entry.description && (
-                        <p className="line-clamp-4 whitespace-pre-wrap break-words font-code text-[12px] leading-relaxed text-on-surface-variant">{preview(entry.description)}</p>
+                        <p className="line-clamp-4 break-words text-[13px] leading-relaxed text-on-surface-variant">{preview(entry.description)}</p>
                       )}
                       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant/70 pt-2">
                         <span className="whitespace-nowrap text-[11px] text-outline">{savedOn(entry.updatedAt)}</span>
@@ -292,26 +361,23 @@ export default function ImportantContentClient() {
                   ))}
                 </ul>
 
-                <nav aria-label="Pages" className="flex flex-wrap items-center justify-between gap-2">
-                  <button type="button" onClick={() => setPage((current) => current - 1)} disabled={page <= 1 || isLoading} className={pagerButton}>
-                    <ChevronLeft size={14} aria-hidden="true" />
-                    Previous
-                  </button>
-                  <p className="flex items-center gap-2 text-[12px] text-on-surface-variant" aria-live="polite">
-                    {isLoading && <Loader2 size={13} className="animate-spin text-primary" aria-hidden="true" />}
-                    Page {page} of {totalPages}
-                  </p>
-                  <button type="button" onClick={() => setPage((current) => current + 1)} disabled={page >= totalPages || isLoading} className={pagerButton}>
-                    Next
-                    <ChevronRight size={14} aria-hidden="true" />
-                  </button>
-                </nav>
+                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} isLoading={isLoading} />
               </div>
             )}
           </div>
         </main>
       </div>
 
+      {confirmingMany && (
+        <ConfirmBulkDelete
+          count={confirmingMany === "picked" ? selection.pickedIds.size : total}
+          noun={{ one: "entry", many: "entries" }}
+          alsoGoes={confirmingMany === "all" && hasFilters ? "Everything matching the filters goes, including entries on the other pages." : undefined}
+          isDeleting={isDeletingMany}
+          onConfirm={() => void deleteMany(confirmingMany)}
+          onClose={() => setConfirmingMany(null)}
+        />
+      )}
       {viewing && (
         <ContentDetailsDialog
           entry={viewing}

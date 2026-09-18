@@ -1,6 +1,7 @@
 import { connectDatabase } from "@/lib/db"
 import { UserFacingError } from "@/lib/errors"
 import { Client as ClientModel, type IClient } from "@/models/Client"
+import { ClientProjectModel } from "@/models/ClientProject"
 import { CLIENT_MESSAGING_MESSAGES, SAMPLE_MESSAGE_COUNT } from "@/constants/clientMessaging"
 import type { Client, ClientInput } from "@/types/clientMessaging"
 import type { Viewer } from "@/types/auth"
@@ -71,11 +72,17 @@ export async function updateClient(viewer: Viewer, id: string, input: ClientInpu
   return record ? toClient(record as unknown as StoredClient) : null
 }
 
+/**
+ * Removes a client and the projects being done for them (models/ClientProject.ts), so a deleted
+ * client can never leave projects behind pointing at nothing. Messages already written for them
+ * stay in the history, which is a record of what was sent.
+ */
 export async function deleteClient(viewer: Viewer, id: string): Promise<boolean> {
   const filter = visibleById(viewer, id)
   if (!filter) return false
   await connectDatabase()
   const { deletedCount } = await ClientModel.deleteOne(filter)
+  if (deletedCount > 0) await ClientProjectModel.deleteMany({ clientId: id })
   return deletedCount > 0
 }
 

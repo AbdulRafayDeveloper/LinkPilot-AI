@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { toUserFacingMessage } from "@/lib/errors"
+import { UserFacingError, toUserFacingMessage } from "@/lib/errors"
 import { PROMPT_CREATOR_MESSAGES, PROMPT_TARGET_IDS, REQUEST_MAX_LENGTH } from "@/constants/promptCreator"
+import { PROMPT_PROJECT_MESSAGES } from "@/constants/promptProjects"
 import { createPrompt } from "@/services/promptCreator/generate"
 import { saveCreatedPrompt } from "@/services/promptCreator/records"
+import { projectForPrompt } from "@/services/promptCreator/projects"
+import { appendInstructions } from "@/lib/promptInstructions"
+import { ProjectIdSchema } from "@/lib/validation/promptProjects"
 import { requireViewer } from "@/services/auth/viewer"
 import { runAiRequest, withSource } from "@/services/modelPriority"
 import { withIdempotency } from "@/services/idempotency"
@@ -20,6 +24,11 @@ const GenerateSchema = z.object({
   target: z.enum(PROMPT_TARGET_IDS, { error: PROMPT_CREATOR_MESSAGES.missingTarget }),
   // Only for the record: whether the description was spoken or typed
   requestSource: z.enum(["text", "voice"]).optional().default("text"),
+  // The project this prompt is for: its instructions go on the end and it is filed under it
+  projectId: ProjectIdSchema.optional().default(null),
+  // A prompt to work with now and not keep: nothing is written to the database, whatever project
+  // it was written for
+  temporary: z.boolean().optional().default(false),
 })
 
 /**
@@ -39,13 +48,41 @@ async function handlePost(req: NextRequest) {
       )
     }
 
-    const { request, target, requestSource } = parsed.data
-    const created = withSource(await runAiRequest(auth.viewer, "prompt-creator", () => createPrompt({ request, target, requestSource, signal: req.signal })))
-    const saved = await saveCreatedPrompt(auth.viewer, created, { text: request, source: requestSource })
+    const { request, target, requestSource, projectId, temporary } = parsed.data
+    // Read first, so a project that is gone is refused before a model is called
+    const project = await projectForPrompt(auth.viewer, projectId)
+    const written = withSource(await runAiRequest(auth.viewer, "prompt-creator", () => createPrompt({ request, target, requestSource, signal: req.signal })))
+    // The project's standing instructions end every prompt written in it, saved or not
+    const created = { ...written, prompt: appendInstructions(written.prompt, project?.instructions ?? "") }
+
+    if (temporary) {
+      // Nothing is stored: the prompt lives on the page until it is replaced or the page is reset
+      const now = new Date().toISOString()
+      return NextResponse.json({
+        success: true,
+        message: "Prompt created. It is not saved.",
+        data: {
+          ...created,
+          id: "",
+          request,
+          requestSource,
+          folderId: null,
+          projectId: project?.id ?? null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      })
+    }
+
+    const saved = await saveCreatedPrompt(auth.viewer, created, { text: request, source: requestSource }, project?.id ?? null)
     return NextResponse.json({ success: true, message: "Prompt created", data: saved })
   } catch (error: unknown) {
     if (req.signal.aborted) {
       return NextResponse.json({ success: false, message: "Request cancelled" }, { status: 499 })
+    }
+    // A project that was deleted meanwhile is the caller's to fix, not a failure of the module
+    if (error instanceof UserFacingError && error.message === PROMPT_PROJECT_MESSAGES.notFound) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 })
     }
     console.error("POST Prompt Creator Generate Exception:", error instanceof Error ? error.message : error)
     return NextResponse.json(

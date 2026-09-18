@@ -1,12 +1,14 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { AlertTriangle, CalendarClock, FilePenLine, Loader2, Plus, RefreshCw, Search, SearchX, X } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
-import { MeetingStatusBadge } from "@/components/meetings/MeetingStatusBadge"
+import { MeetingsTable } from "@/components/meetings/MeetingsTable"
+import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
+import { useRowSelection } from "@/hooks/useRowSelection"
+import { DeleteMeetingDialog } from "@/components/meetings/DeleteMeetingDialog"
 import { MeetingFormDialog } from "@/components/meetings/MeetingFormDialog"
 import { MeetingsPromptModal } from "@/components/meetings/MeetingsPromptModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -26,9 +28,6 @@ import type { Meeting, MeetingInput, MeetingSummary, MeetingsPage } from "@/type
 // While something is being analyzed, the list checks back this often
 const RUNNING_REFRESH_MS = 4000
 
-const when = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
-
 export default function MeetingsClient() {
   const router = useRouter()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -46,6 +45,13 @@ export default function MeetingsClient() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [promptTab, setPromptTab] = useState<MeetingPromptId | null>(null)
+  // The meeting waiting on a Delete that has been asked for but not confirmed
+  const [meetingToDelete, setMeetingToDelete] = useState<MeetingSummary | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  // Deleting the ticked meetings, confirmed the same way one meeting is
+  const [isConfirmingPicked, setIsConfirmingPicked] = useState(false)
+  const [isDeletingPicked, setIsDeletingPicked] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const sentinelRef = useRef<HTMLDivElement>(null)
   const isFetchingRef = useRef(false)
@@ -157,6 +163,55 @@ export default function MeetingsClient() {
     }
   }
 
+  /**
+   * Deletes one meeting from the list, after the dialog has asked. The row leaves as soon as the
+   * server confirms, and the count follows; a delete that fails leaves the meeting where it is and
+   * says why, in the dialog it was asked from. The transcript, the analysis and everything the
+   * meeting was read into go with it, which is why this always confirms first.
+   */
+  const confirmDelete = async () => {
+    const meeting = meetingToDelete
+    if (!meeting || isDeleting) return
+    setIsDeleting(true)
+    setDeleteError(null)
+    try {
+      await requestApi<{ deleted: number }>(`${MEETINGS_ENDPOINT}/${meeting.id}`, { method: "DELETE" })
+      setMeetings((current) => current.filter((entry) => entry.id !== meeting.id))
+      setTotal((count) => Math.max(0, count - 1))
+      setMeetingToDelete(null)
+    } catch (error: unknown) {
+      setDeleteError(error instanceof Error ? error.message : MEETING_MESSAGES.deleteFailed)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const selection = useRowSelection(meetings.map((meeting) => meeting.id))
+
+  /**
+   * Deletes the ticked meetings in one call. Each takes its transcript, what was read from it and
+   * its chat with it, exactly as deleting one does. Final, so it only runs from the confirmation.
+   */
+  const deletePicked = async () => {
+    if (isDeletingPicked) return
+    setIsDeletingPicked(true)
+    try {
+      await requestApi<{ deleted: number }>(MEETINGS_ENDPOINT, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...selection.pickedIds] }),
+      })
+      selection.clear()
+      setIsConfirmingPicked(false)
+      reload()
+    } catch (error: unknown) {
+      setListError(error instanceof Error ? error.message : MEETING_MESSAGES.deleteFailed)
+      setIsConfirmingPicked(false)
+    } finally {
+      setIsDeletingPicked(false)
+    }
+  }
+
   const isFiltering = search !== "" || status !== ""
 
   return (
@@ -208,7 +263,7 @@ export default function MeetingsClient() {
 
             {/* Search and filter */}
             <div className="flex flex-col gap-2 shrink-0 sm:flex-row sm:items-center">
-              <div className="flex w-full items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 sm:max-w-md">
+              <label className="flex w-full items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 sm:max-w-md">
                 <Search size={16} className="shrink-0 text-outline" aria-hidden="true" />
                 <input
                   type="search"
@@ -235,7 +290,7 @@ export default function MeetingsClient() {
                     <X size={14} aria-hidden="true" />
                   </button>
                 )}
-              </div>
+              </label>
               <select
                 value={status}
                 onChange={(event) => {
@@ -289,32 +344,22 @@ export default function MeetingsClient() {
               </div>
             ) : (
               <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-                <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {meetings.map((meeting) => (
-                    <li key={meeting.id}>
-                      <Link
-                        href={`/meetings/${meeting.id}`}
-                        className="flex h-full flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <h2 className="min-w-0 break-words text-sm font-bold text-on-surface">{meeting.title}</h2>
-                          <MeetingStatusBadge status={meeting.status} progress={meeting.progress} />
-                        </div>
-                        <p className="text-[11px] text-outline">
-                          {when(meeting.createdAt)} · {meeting.transcriptChars.toLocaleString()} characters
-                          {meeting.participantCount !== null && ` · ${meeting.participantCount} people`}
-                        </p>
-                        {meeting.purpose ? (
-                          <p className="line-clamp-3 text-[13px] leading-relaxed text-on-surface-variant">{meeting.purpose}</p>
-                        ) : meeting.status === "failed" ? (
-                          <p className="text-[12px] text-error">The analysis stopped. Open it to run it again.</p>
-                        ) : (
-                          <p className="text-[12px] text-outline">Not analyzed yet.</p>
-                        )}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <BulkDeleteBar
+                  pickedCount={selection.pickedIds.size}
+                  total={null}
+                  noun={{ one: "meeting", many: "meetings" }}
+                  isBusy={isDeletingPicked}
+                  onDeletePicked={() => setIsConfirmingPicked(true)}
+                  onClear={selection.clear}
+                />
+
+                <MeetingsTable
+                  meetings={meetings}
+                  deletingId={isDeleting ? (meetingToDelete?.id ?? null) : null}
+                  pickedIds={selection.pickedIds}
+                  onPick={selection.pick}
+                  onDelete={setMeetingToDelete}
+                />
 
                 <div ref={sentinelRef} className="pt-4 text-center text-[11px] text-outline" aria-live="polite">
                   {listError ? (
@@ -353,6 +398,29 @@ export default function MeetingsClient() {
             if (isSaving) return
             setIsCreating(false)
             setSaveError(null)
+          }}
+        />
+      )}
+      {isConfirmingPicked && (
+        <ConfirmBulkDelete
+          count={selection.pickedIds.size}
+          noun={{ one: "meeting", many: "meetings" }}
+          alsoGoes="The transcript, the analysis and the chat go with each one."
+          isDeleting={isDeletingPicked}
+          onConfirm={() => void deletePicked()}
+          onClose={() => setIsConfirmingPicked(false)}
+        />
+      )}
+      {meetingToDelete && (
+        <DeleteMeetingDialog
+          meeting={meetingToDelete}
+          isDeleting={isDeleting}
+          error={deleteError}
+          onConfirm={() => void confirmDelete()}
+          onClose={() => {
+            if (isDeleting) return
+            setMeetingToDelete(null)
+            setDeleteError(null)
           }}
         />
       )}

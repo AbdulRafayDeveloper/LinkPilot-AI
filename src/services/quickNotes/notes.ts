@@ -87,3 +87,13 @@ export async function clearNotes(viewer: Viewer): Promise<number> {
   const { deletedCount } = await QuickNoteModel.deleteMany(ownedBy(viewer))
   return deletedCount
 }
+
+/** Deletes the notes named by `ids`, inside the viewer's own notes. Answers how many really went. */
+export async function deleteNotes(viewer: Viewer, ids: string[]): Promise<number> {
+  await connectDatabase()
+  const { deletedCount } = await QuickNoteModel.deleteMany({
+    ...ownedBy(viewer),
+    _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) },
+  })
+  return deletedCount ?? 0
+}

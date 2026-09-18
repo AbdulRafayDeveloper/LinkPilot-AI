@@ -1,4 +1,5 @@
 import type { EmployeeStatus } from "@/constants/employees"
+import type { TaskImage, TaskImageView } from "./taskAttachment"
 
 export interface Employee {
   id: string
@@ -35,6 +36,10 @@ export interface EmployeesPage {
 export interface PlanItem {
   id: string
   text: string
+  // The optional note under the task; empty when it has none
+  description: string
+  // The image on it, with a short-lived link to show it from; null when it has none
+  image: TaskImageView | null
   done: boolean
   // When it was ticked off, or null while it is open
   completedAt: string | null
@@ -57,7 +62,7 @@ export interface EmployeePlan {
 /** What the manager's editor saves: the plan's tasks (wording and order) and notes. Ticks are saved on their own. */
 export interface EmployeePlanInput {
   today: string
-  items: { id: string; text: string }[]
+  items: { id: string; text: string; description: string; image: TaskImage | null }[]
   notes: string
 }
 

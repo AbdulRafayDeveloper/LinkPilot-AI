@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import InMailClient from "./InMailClient"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("inmail-message")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("inmail-composer", "/inmail-message")
   return (
     <>
       {/* Breadcrumb schema markup */}

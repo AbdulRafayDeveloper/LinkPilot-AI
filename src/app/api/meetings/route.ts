@@ -3,7 +3,8 @@ import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { MeetingSchema } from "@/lib/validation/meeting"
 import { MEETING_MESSAGES, MEETING_SEARCH_MAX_LENGTH, MEETING_STATUS_IDS } from "@/constants/meetings"
-import { createMeeting, listMeetings } from "@/services/meetings/meetings"
+import { createMeeting, deleteMeetings, listMeetings } from "@/services/meetings/meetings"
+import { BulkDeleteSchema } from "@/lib/validation/listFilters"
 import { requireViewer } from "@/services/auth/viewer"
 import { withIdempotency } from "@/services/idempotency"
 
@@ -59,3 +60,27 @@ async function handlePost(req: NextRequest) {
 
 // A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
 export const POST = withIdempotency("meetings", handlePost)
+
+/**
+ * DELETE (?search=&status=, body `{ ids }` or `{ all: true }`): removes several meetings at once,
+ * the ticked ones or every meeting the filters cover. The transcript, what was read from it and its
+ * chat go with each one. Final, and only ever within what the viewer may see.
+ */
+export async function DELETE(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
+  const body = BulkDeleteSchema.safeParse(await req.json().catch(() => null))
+  if (!body.success) {
+    return NextResponse.json({ success: false, message: body.error.issues[0]?.message || MEETING_MESSAGES.deleteFailed }, { status: 400 })
+  }
+  try {
+    const params = req.nextUrl.searchParams
+    const search = (params.get("search") ?? "").slice(0, MEETING_SEARCH_MAX_LENGTH)
+    const status = StatusSchema.parse(params.get("status"))
+    const { deleted } = await deleteMeetings(auth.viewer, { search, status }, body.data.ids)
+    return NextResponse.json({ success: true, message: `${deleted} ${deleted === 1 ? "meeting" : "meetings"} deleted.`, data: { deleted } })
+  } catch (error: unknown) {
+    console.error("DELETE Meetings (bulk) Exception:", error instanceof Error ? error.message : error)
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, MEETING_MESSAGES.deleteFailed) }, { status: 500 })
+  }
+}

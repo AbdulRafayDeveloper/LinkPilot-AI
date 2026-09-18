@@ -1,11 +1,13 @@
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { env } from "@/config/env"
 import { connectDatabase } from "@/lib/db"
 import { toUserFacingMessage } from "@/lib/errors"
 import { SESSION_COOKIE, SESSION_MS, readSession, signSession } from "@/lib/sessionToken"
 import { UserModel } from "@/models/User"
-import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, type UserRole } from "@/constants/auth"
+import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, REQUEST_PATH_HEADER, type UserRole } from "@/constants/auth"
+import { FEATURE_ACCESS_MESSAGES } from "@/constants/featureAccess"
+import { isFeatureDisabled, toolIdForApiPath } from "@/lib/featureAccess"
 import type { Viewer } from "@/types/auth"
 
 /**
@@ -21,9 +23,11 @@ export async function getViewer(): Promise<Viewer | null> {
   const session = readSession((await cookies()).get(SESSION_COOKIE)?.value, env.AUTH_SECRET)
   if (!session) return null
   await connectDatabase()
-  const user = await UserModel.findById(session.uid, { email: 1, name: 1, role: 1, sessionVersion: 1 }).lean()
+  const user = await UserModel.findById(session.uid, { email: 1, name: 1, role: 1, sessionVersion: 1, disabledTools: 1 }).lean()
   if (!user || user.sessionVersion !== session.ver) return null
-  return { id: String(user._id), email: user.email, name: user.name, role: user.role }
+  // An admin keeps every tool, whatever is stored, so nobody can be locked out of the admin area
+  const disabledTools = user.role === "admin" ? [] : (user.disabledTools ?? [])
+  return { id: String(user._id), email: user.email, name: user.name, role: user.role, disabledTools }
 }
 
 type Guard = { viewer: Viewer; denied: null } | { viewer: null; denied: NextResponse }
@@ -32,8 +36,13 @@ type Guard = { viewer: Viewer; denied: null } | { viewer: null; denied: NextResp
  * Guard for API routes: the signed-in account, or the response to send instead. `role: "admin"`
  * also refuses users. The "sign in first" answer carries AUTH_REQUIRED_HEADER so the browser sends
  * the person to the sign-in page rather than showing an error.
+ *
+ * **It also refuses a tool the admin has turned off for this account**, which is what makes hiding
+ * it from the sidebar more than a suggestion. Which tool a route belongs to is read from the path
+ * the proxy passed along, so a new route under a tool is covered without naming itself; `feature`
+ * names it outright where a route's path does not say (and `feature: null` opts out).
  */
-export async function requireViewer(options: { role?: UserRole } = {}): Promise<Guard> {
+export async function requireViewer(options: { role?: UserRole; feature?: string | null } = {}): Promise<Guard> {
   let viewer: Viewer | null
   try {
     viewer = await getViewer()
@@ -51,7 +60,18 @@ export async function requireViewer(options: { role?: UserRole } = {}): Promise<
   if (options.role === "admin" && viewer.role !== "admin") {
     return { viewer: null, denied: NextResponse.json({ success: false, message: AUTH_MESSAGES.adminOnly }, { status: 403 }) }
   }
+  if (await isDeniedFeature(viewer, options)) {
+    return { viewer: null, denied: NextResponse.json({ success: false, message: FEATURE_ACCESS_MESSAGES.unavailable }, { status: 403 }) }
+  }
   return { viewer, denied: null }
+}
+
+/** Whether this request is for a tool this account may not use. An admin is never refused. */
+async function isDeniedFeature(viewer: Viewer, options: { feature?: string | null }): Promise<boolean> {
+  if (viewer.role === "admin" || viewer.disabledTools.length === 0) return false
+  if (options.feature !== undefined) return isFeatureDisabled(viewer, options.feature)
+  const path = (await headers()).get(REQUEST_PATH_HEADER)
+  return isFeatureDisabled(viewer, path ? toolIdForApiPath(path) : null)
 }
 
 /** Starts a session for an account, in an httpOnly cookie this browser sends back on every request. */

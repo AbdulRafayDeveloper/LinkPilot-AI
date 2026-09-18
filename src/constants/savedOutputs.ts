@@ -8,6 +8,7 @@ import { CONVERSATION_REPLY_TYPES } from "./conversationReply"
 import { MESSAGE_CHANNELS } from "./clientMessaging"
 import { PROMPT_TARGETS } from "./promptCreator"
 import { PROMPT_CREATOR_RECORD_ENDPOINT, PROMPT_FOLDERS_ENDPOINT } from "./promptFolders"
+import { PROMPT_DEPENDENCY_MESSAGES } from "./promptDependencies"
 
 /**
  * The "view all" page of every tool that writes text: the LinkedIn tools, Client Messaging, Prompt
@@ -62,6 +63,15 @@ export interface SavedOutputTool {
    * talking to this route; every other tool behaves exactly as it did before folders existed.
    */
   folders?: { endpoint: string; label: string; recordEndpoint: string }
+  /**
+   * Set only for a tool whose records wait for other records of the same tool (today: Prompt
+   * Creator). The page then shows what each record waits for, whether it is ready or blocked, the
+   * three-state filter and the picker, all on this one endpoint: GET lists what a record may wait
+   * for, and PUT /<id> saves it. Every other tool behaves exactly as it did before.
+   */
+  dependencies?: { endpoint: string; label: string }
+  // The tool's records can be marked as used, on the same record endpoint the folders use
+  canMarkApplied?: boolean
 }
 
 export const SAVED_OUTPUT_TOOLS = [
@@ -201,6 +211,8 @@ export const SAVED_OUTPUT_TOOLS = [
       { key: "context", label: "Described by", allLabel: "Typed or spoken", options: INPUT_SOURCES },
     ],
     folders: { endpoint: PROMPT_FOLDERS_ENDPOINT, label: "Folder", recordEndpoint: PROMPT_CREATOR_RECORD_ENDPOINT },
+    dependencies: { endpoint: PROMPT_CREATOR_RECORD_ENDPOINT, label: PROMPT_DEPENDENCY_MESSAGES.filterLabel },
+    canMarkApplied: true,
   },
   {
     id: "message-rewriter",
@@ -234,6 +246,7 @@ export const SAVED_OUTPUT_MESSAGES = {
   unknownTool: "There is no saved history for that tool.",
   sourceFailed: "Couldn't load what it was written from. Please try again.",
   deleteFailed: "Couldn't delete that. It is back in the list.",
+  appliedFailed: "Couldn't save that mark. The row is back as it was.",
   notFound: "That record no longer exists.",
   deleted: "Deleted",
 } as const

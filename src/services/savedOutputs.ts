@@ -13,8 +13,10 @@ import {
   RewrittenMessageRecord,
 } from "@/models/GenerationRecords"
 import { CreatedPromptModel } from "@/models/CreatedPrompt"
-import { UNFILED_FOLDER } from "@/constants/promptFolders"
+import { IN_ANY_FOLDER, UNFILED_FOLDER } from "@/constants/promptFolders"
 import { folderNames } from "@/services/promptCreator/folders"
+import { blockingIds, dependenciesOf, forgetDeletedPrompts, namedDependencies } from "@/services/promptCreator/dependencies"
+import type { PromptDependency } from "@/types/promptCreator"
 import { HISTORY_PAGE_SIZE } from "@/constants/historyFilters"
 import type { SavedOutputTool, SavedOutputToolId } from "@/constants/savedOutputs"
 import type {
@@ -26,7 +28,7 @@ import type {
   SavedOutputsPage,
 } from "@/types/savedOutputs"
 import type { Viewer } from "@/types/auth"
-import { visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * Reads back what the LinkedIn tools wrote. Every tool already keeps its outputs in its own
@@ -43,6 +45,10 @@ interface OutputReader {
   collection: () => Collection
   // The field naming the folder a record is filed in, for a tool whose records have folders
   folderField?: string
+  // The field holding when the record was marked as used, for a tool whose records can be
+  appliedField?: string
+  // The field holding the records this one waits for, for a tool whose records have dependencies
+  dependencyField?: string
   // The field holding the tone, tune, type or style, and for replies the field holding the context
   optionField: string
   contextField?: string
@@ -172,6 +178,8 @@ const READERS: Record<SavedOutputToolId, OutputReader> = {
     collection: () => CreatedPromptModel.collection,
     optionField: "target",
     folderField: "folderId",
+    appliedField: "appliedAt",
+    dependencyField: "dependencyIds",
     contextField: "requestSource",
     searchFields: ["name", "prompt", "request"],
     source: { field: "request", label: "Description" },
@@ -212,7 +220,19 @@ function choiceLabel(tool: SavedOutputTool, key: "option" | "context", id: unkno
 const fieldValue = (row: Row, field: string): unknown =>
   field.split(".").reduce<unknown>((value, key) => (value && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined), row)
 
-function toSavedOutput(tool: SavedOutputTool, reader: OutputReader, row: Row, folders?: Map<string, string>): SavedOutput {
+// The ids a record waits for, as they were saved; anything else reads as waiting for nothing
+const waitingIds = (row: Row, field: string): string[] => {
+  const value = row[field]
+  return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []
+}
+
+function toSavedOutput(
+  tool: SavedOutputTool,
+  reader: OutputReader,
+  row: Row,
+  folders?: Map<string, string>,
+  dependencies?: Map<string, PromptDependency>
+): SavedOutput {
   const heading = reader.heading(row)
   const choices = [
     choiceLabel(tool, "context", reader.contextField ? fieldValue(row, reader.contextField) : null),
@@ -231,7 +251,19 @@ function toSavedOutput(tool: SavedOutputTool, reader: OutputReader, row: Row, fo
     provider: text(row.provider) || null,
     // A folder that was deleted while the page was open reads as no folder rather than as a gap
     ...(reader.folderField ? { folder: folderOf(row, reader.folderField, folders) } : {}),
+    ...(reader.appliedField ? { appliedAt: appliedOf(row, reader.appliedField) } : {}),
+    // A record it waited for that has since been deleted is left out: it can never run again, so
+    // waiting for it would block this one for ever
+    ...(reader.dependencyField
+      ? { dependencies: dependenciesOf(waitingIds(row, reader.dependencyField), dependencies ?? new Map()) }
+      : {}),
   }
+}
+
+// When a record was marked as used, as the page reads it
+function appliedOf(row: Row, field: string): string | null {
+  const value = row[field]
+  return value ? new Date(value as string | number | Date).toISOString() : null
 }
 
 // Which folder a record is in, with the name to show for it
@@ -259,20 +291,19 @@ export async function listSavedOutputs(viewer: Viewer, tool: SavedOutputTool, fi
   const pageSize = HISTORY_PAGE_SIZE
 
   const scope = visibleTo(viewer)
-  const matching = allOf([
-    scope,
-    searchCondition(filters.search, reader.searchFields),
-    filters.option ? { [reader.optionField]: filters.option } : null,
-    filters.context && reader.contextField ? { [reader.contextField]: filters.context } : null,
-    folderCondition(reader, filters.folder),
-    createdBetween(filters.from, filters.to),
-  ])
+  // A tool with folders needs them anyway, to name each record's folder. They are read first because
+  // the folder filters are decided against the folders the viewer really has, not against the field
+  // alone, so a record the page cannot name a folder for is filtered exactly as it is shown
+  const folders = reader.folderField ? await folderNames(viewer) : undefined
+  // Which records block others is worked out once, from the ids that are really waited on, so the
+  // filter runs in the database over the whole list rather than over the page on screen
+  const blocking = reader.dependencyField && filters.dependencies ? await blockingIds(viewer) : undefined
+  const matching = matchingFilter(viewer, reader, filters, folders, blocking)
 
   const serverFilter = tool.filters.find((filter) => filter.fromServer)
-  const [total, recordChoices, folders] = await Promise.all([
+  const [total, recordChoices] = await Promise.all([
     collection.countDocuments(matching),
     serverFilter && reader.recordChoices ? reader.recordChoices(collection, scope) : Promise.resolve(null),
-    reader.folderField ? folderNames(viewer) : Promise.resolve(undefined),
   ])
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const page = Math.min(Math.max(1, filters.page), totalPages)
@@ -283,8 +314,15 @@ export async function listSavedOutputs(viewer: Viewer, tool: SavedOutputTool, fi
     .limit(pageSize)
     .toArray()) as unknown as Row[]
 
+  // One query names everything this page waits for, however many records that is between them
+  const waiting = reader.dependencyField
+    ? await namedDependencies(viewer, rows.flatMap((row) => waitingIds(row, reader.dependencyField as string)))
+    : undefined
+  const items = rows.map((row) => toSavedOutput(tool, reader, row, folders, waiting))
+  warnAboutLostFolders(tool, reader, rows, items)
+
   return {
-    items: rows.map((row) => toSavedOutput(tool, reader, row, folders)),
+    items,
     page,
     pageSize,
     total,
@@ -293,10 +331,100 @@ export async function listSavedOutputs(viewer: Viewer, tool: SavedOutputTool, fi
   }
 }
 
-/** Which records a folder filter keeps: one folder, the ones in none, or every record. */
-function folderCondition(reader: OutputReader, folder: string): Record<string, unknown> | null {
+/**
+ * Exactly the records a set of filters covers, for the viewer. The list and the bulk delete both go
+ * through here, so a delete can never reach a record the same filters would not have shown.
+ */
+function matchingFilter(
+  viewer: Viewer,
+  reader: OutputReader,
+  filters: SavedOutputFilters,
+  folders: Map<string, string> | undefined,
+  blocking: string[] | undefined,
+  // Reading shows an admin every account's records; deleting a whole filter only ever takes their own
+  scope: Record<string, unknown> = visibleTo(viewer)
+): Record<string, unknown> {
+  return allOf([
+    scope,
+    searchCondition(filters.search, reader.searchFields),
+    filters.option ? { [reader.optionField]: filters.option } : null,
+    filters.context && reader.contextField ? { [reader.contextField]: filters.context } : null,
+    folderCondition(reader, filters.folder, folders),
+    dependencyCondition(reader, filters.dependencies, blocking),
+    createdBetween(filters.from, filters.to),
+  ])
+}
+
+/**
+ * Which records one of the three states keeps. They are worked out from `blocking`, the records that
+ * are really waited on and have not run, so the three never overlap and cover the whole list between
+ * them: independent waits for nothing, blocked waits for at least one of those, and ready waits for
+ * records that have all run. A record waiting only for records that no longer exist is ready, which
+ * is what the list shows it as, because a deleted record can never run again.
+ */
+function dependencyCondition(reader: OutputReader, state: string, blocking: string[] | undefined): Record<string, unknown> | null {
+  const field = reader.dependencyField
+  if (!field || !state) return null
+  if (state === "independent") return { $or: [{ [field]: { $exists: false } }, { [field]: { $size: 0 } }] }
+  const pending = blocking ?? []
+  if (state === "blocked") return { [field]: { $in: pending } }
+  return allOf([{ [`${field}.0`]: { $exists: true } }, { [field]: { $nin: pending } }])
+}
+
+/**
+ * Deletes records in one go: the ones named by `ids`, or every record the filters cover when
+ * `ids` is left out. Both are held inside the viewer's own scope (`visibleTo`), so a user can only
+ * ever delete their own and an admin only what they can see, and both use the same filter the list
+ * uses, so what goes is what was on screen. Answers how many were really deleted.
+ */
+export async function deleteSavedOutputs(
+  viewer: Viewer,
+  tool: SavedOutputTool,
+  filters: SavedOutputFilters,
+  ids?: string[]
+): Promise<{ deleted: number }> {
+  const reader = READERS[tool.id as SavedOutputToolId]
+  await connectDatabase()
+  const folders = reader.folderField ? await folderNames(viewer) : undefined
+  const blocking = reader.dependencyField && filters.dependencies ? await blockingIds(viewer) : undefined
+  // Ticked rows follow the per-record delete (an admin may delete a record they can see); a whole
+  // filter follows Clear All and the Daily Tasks cleanup, which never reach another account's records
+  const matching = matchingFilter(viewer, reader, filters, folders, blocking, ids ? visibleTo(viewer) : ownedBy(viewer))
+  const chosen = ids ? { ...matching, _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } } : matching
+  // Which records are going is read first, so what waited for them can be freed once they are gone
+  const going = reader.dependencyField ? ((await reader.collection().find(chosen, { projection: { _id: 1 } }).toArray()) as unknown as Row[]) : []
+  const { deletedCount } = await reader.collection().deleteMany(chosen)
+  if (reader.dependencyField) await forgetDeletedPrompts(viewer, going.map((row) => row._id.toString()))
+  return { deleted: deletedCount ?? 0 }
+}
+
+/**
+ * A record that names a folder nothing can be found for is shown, counted and filtered as "No folder",
+ * which is the only honest thing to do with it, but it is never silent: one line per page says how many
+ * there were. The app cannot make this state (filing a record checks the folder, and deleting a folder
+ * frees its records), so it means a write that went round the app: a `folderId` saved with the wrong
+ * type, which reads as no folder at all, or a folder deleted without its records being freed.
+ */
+function warnAboutLostFolders(tool: SavedOutputTool, reader: OutputReader, rows: Row[], items: SavedOutput[]): void {
+  const field = reader.folderField
+  if (!field) return
+  const lost = rows.filter((row, index) => row[field] !== null && row[field] !== undefined && !items[index].folder).length
+  if (lost > 0) console.warn(`⚠️ ${lost} ${tool.id} record(s) name a folder that can't be found; they read as "No folder"`)
+}
+
+/**
+ * Which records a folder filter keeps: one folder, the ones in any folder, the ones in none, or every
+ * record. Filed means **a folder the viewer really has**, matched by its id rather than by the field
+ * merely being set, so the filters say exactly what each row shows: a record the page can name a folder
+ * for is filed, and anything else is not. The two choices are therefore always the whole list between
+ * them, whatever odd value a record carries (see warnAboutLostFolders).
+ */
+function folderCondition(reader: OutputReader, folder: string, folders?: Map<string, string>): Record<string, unknown> | null {
   if (!reader.folderField || !folder) return null
-  return folder === UNFILED_FOLDER ? { [reader.folderField]: null } : { [reader.folderField]: folder }
+  const filed = [...(folders?.keys() ?? [])]
+  if (folder === UNFILED_FOLDER) return { [reader.folderField]: { $nin: filed } }
+  if (folder === IN_ANY_FOLDER) return { [reader.folderField]: { $in: filed } }
+  return { [reader.folderField]: folder }
 }
 
 /** One record with the whole text it was written from. Null when it's gone or belongs to another account. */
@@ -308,7 +436,8 @@ export async function getSavedOutput(viewer: Viewer, tool: SavedOutputTool, id: 
   const row = (await reader.collection().findOne(filter, { projection: { result: 0 } })) as unknown as Row | null
   if (!row) return null
   const folders = reader.folderField ? await folderNames(viewer) : undefined
-  return { ...toSavedOutput(tool, reader, row, folders), source: text(row[reader.source.field]) }
+  const waiting = reader.dependencyField ? await namedDependencies(viewer, waitingIds(row, reader.dependencyField)) : undefined
+  return { ...toSavedOutput(tool, reader, row, folders, waiting), source: text(row[reader.source.field]) }
 }
 
 /** Deletes one record. False when it's gone or belongs to another account. */
@@ -318,5 +447,7 @@ export async function deleteSavedOutput(viewer: Viewer, tool: SavedOutputTool, i
   const reader = READERS[tool.id as SavedOutputToolId]
   await connectDatabase()
   const { deletedCount } = await reader.collection().deleteOne(filter)
+  // Nothing is left waiting for a record that has gone
+  if (deletedCount > 0 && reader.dependencyField) await forgetDeletedPrompts(viewer, [id])
   return deletedCount > 0
 }

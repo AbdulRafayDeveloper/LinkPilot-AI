@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   CalendarDays,
   Clock,
+  ExternalLink,
   Loader2,
   Pencil,
   RefreshCw,
@@ -147,6 +148,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
           meetingDate: values.meetingDate,
           meetingTime: values.meetingTime,
           personName: values.personName || null,
+          profileLink: values.profileLink || null,
           prepEnabled: values.prepEnabled,
           profileInfo: values.profileInfo || null,
           conversationHistory: values.conversationHistory || null,
@@ -245,6 +247,18 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                             {meeting.personName}
                           </span>
                         )}
+                        {/* Their profile, one click away during the call, like a project's own link */}
+                        {meeting.profileLink && (
+                          <a
+                            href={meeting.profileLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 font-semibold text-primary underline underline-offset-2 transition-colors hover:text-on-primary-fixed-variant"
+                          >
+                            <ExternalLink size={14} aria-hidden="true" />
+                            Open profile
+                          </a>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -323,7 +337,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                   </div>
                 </section>
 
-                {meeting.prep && <MeetingChatPanel meetingId={meeting.id} meetingName={meeting.name} personName={meeting.personName} />}
+                {meeting.prep && <MeetingChatPanel surface="plan" meetingId={meeting.id} subject={meeting.personName || meeting.name} />}
 
                 {meeting.prep && (
                   <MeetingPrepView

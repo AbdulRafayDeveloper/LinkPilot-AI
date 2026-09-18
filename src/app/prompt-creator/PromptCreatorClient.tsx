@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useRef, useState } from "react"
-import { AudioLines, FilePenLine, Sparkles, Wand2 } from "lucide-react"
+import { AudioLines, FilePenLine, FolderKanban, Sparkles, Wand2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ResultCard } from "@/components/ui/ResultCard"
@@ -12,6 +12,8 @@ import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
 import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
 import { CreatedPromptPanel } from "@/components/prompt-creator/CreatedPromptPanel"
 import { PromptCreatorPromptsModal } from "@/components/prompt-creator/PromptCreatorPromptsModal"
+import { ProjectsDialog } from "@/components/prompt-creator/ProjectsDialog"
+import { usePromptProjects } from "@/hooks/usePromptProjects"
 import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
 import { appendSpokenText } from "@/lib/spokenText"
 import { VOICE_MESSAGES, type TranscriptionProvider } from "@/constants/voiceInput"
@@ -27,12 +29,17 @@ import {
   REQUEST_MAX_LENGTH,
   type PromptTargetId,
 } from "@/constants/promptCreator"
+import { NO_PROJECT, PROMPT_PROJECT_MESSAGES } from "@/constants/promptProjects"
 import type { CreatedPrompt, RequestSource } from "@/types/promptCreator"
 
 interface GeneratePayload {
   request: string
   target: PromptTargetId
   requestSource: RequestSource
+  // The project the prompt is for; its instructions end the prompt
+  projectId: string | null
+  // A prompt to work with now and not keep: nothing is saved, whatever project it is for
+  temporary: boolean
 }
 
 // What was typed or spoken, who wrote the speech out, and the finished prompt all outlive the page
@@ -43,8 +50,11 @@ const formStore = createToolStore(
     target: DEFAULT_PROMPT_TARGET as PromptTargetId | null,
     requestSource: "text" as RequestSource,
     transcribedBy: [] as TranscriptionProvider[],
+    // The project last written for, so the next prompt starts in the same one
+    projectId: null as string | null,
+    isTemporary: false,
   },
-  { version: 2 }
+  { version: 5 }
 )
 const generation = createGenerationRequest<GeneratePayload, CreatedPrompt>(
   "prompt-creator",
@@ -59,7 +69,12 @@ export default function PromptCreatorClient() {
   const [formError, setFormError] = useState<string | null>(null)
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null)
-  const { request, target, requestSource, transcribedBy } = useToolStore(formStore)
+  const { request, target, requestSource, transcribedBy, projectId, isTemporary } = useToolStore(formStore)
+  const projects = usePromptProjects()
+  const [isProjectsOpen, setIsProjectsOpen] = useState(false)
+  // A project deleted in another tab must not be sent with the next prompt
+  const selectedProject = projects.projects?.find((project) => project.id === projectId) ?? null
+  const currentProjectId = projects.projects && !selectedProject ? null : projectId
   const requestInputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const { status, result, error, generate, reset } = useGenerationRequest(generation)
@@ -95,7 +110,9 @@ export default function PromptCreatorClient() {
       return
     }
     setFormError(null)
-    generate({ request, target, requestSource })
+    generate({ request, target, requestSource, projectId: currentProjectId, temporary: isTemporary })
+    // A prompt that is kept counts towards its project; a temporary one is never stored
+    if (!isTemporary) projects.countCreated(currentProjectId)
   }
 
   // The page keeps the created prompt exactly as it was saved
@@ -111,7 +128,7 @@ export default function PromptCreatorClient() {
     setVoiceNotice(null)
   }
 
-  // Clears the description and the prompt; the chosen target stays for the next one
+  // Clears the description and the prompt; the chosen target and project stay for the next one
   const resetTool = () => {
     formStore.update({ request: "", requestSource: "text", transcribedBy: [] })
     setFormError(null)
@@ -150,6 +167,14 @@ export default function PromptCreatorClient() {
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
                 <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
+                <button
+                  type="button"
+                  onClick={() => setIsProjectsOpen(true)}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+                >
+                  <FolderKanban size={16} aria-hidden="true" />
+                  Projects
+                </button>
                 <button
                   type="button"
                   onClick={() => setPromptsTab(target ?? DEFAULT_PROMPT_TARGET)}
@@ -231,6 +256,67 @@ export default function PromptCreatorClient() {
                   wrapLabels
                 />
 
+                {/* What the prompt is for. The project chosen last is waiting next time, and its
+                    instructions go on the end of every prompt written in it */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label htmlFor="prompt-project" className="flex min-w-0 flex-1 flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-outline">
+                      Project
+                      <select
+                        id="prompt-project"
+                        value={currentProjectId ?? NO_PROJECT}
+                        onChange={(event) => formStore.update({ projectId: event.target.value === NO_PROJECT ? null : event.target.value })}
+                        disabled={isGenerating}
+                        className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+                      >
+                        <option value={NO_PROJECT}>{PROMPT_PROJECT_MESSAGES.none}</option>
+                        {(projects.projects ?? []).map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsProjectsOpen(true)}
+                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2.5 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                    >
+                      <FolderKanban size={14} aria-hidden="true" />
+                      Manage
+                    </button>
+                  </div>
+                  {selectedProject?.instructions && (
+                    <p className="text-[12px] leading-relaxed text-on-surface-variant">
+                      <span className="font-semibold text-on-surface">This project&apos;s instructions</span> go on the end of the prompt:{" "}
+                      <span className="italic">{selectedProject.instructions.slice(0, 160)}</span>
+                      {selectedProject.instructions.length > 160 && "..."}
+                    </p>
+                  )}
+                  {projects.error && (
+                    <p role="alert" className="text-[12px] text-error">
+                      {projects.error}
+                    </p>
+                  )}
+                  {/* Keeping a prompt or not is its own choice, so a one-off can still be written
+                      for a project, and a prompt with no project is kept like any other */}
+                  <label className="flex items-start gap-2 text-[13px] text-on-surface">
+                    <input
+                      type="checkbox"
+                      checked={isTemporary}
+                      onChange={(event) => formStore.update({ isTemporary: event.target.checked })}
+                      disabled={isGenerating}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                    />
+                    <span>
+                      Use this prompt once, don&apos;t save it
+                      <span className="block text-[12px] text-on-surface-variant">
+                        It stays on this page to copy, and is never written to your saved prompts.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
                 {formError && (
                   <p role="alert" className="text-[12px] text-error">
                     {formError}
@@ -268,6 +354,24 @@ export default function PromptCreatorClient() {
       </div>
 
       {promptsTab && <PromptCreatorPromptsModal initialTarget={promptsTab} onClose={() => setPromptsTab(null)} />}
+      {isProjectsOpen && (
+        <ProjectsDialog
+          projects={projects.projects}
+          onCreate={async (input) => {
+            const project = await projects.create(input)
+            // A project made here is the one to write for next, which is what the user just named
+            formStore.update({ projectId: project.id })
+            return project
+          }}
+          onSave={projects.save}
+          onDelete={async (id) => {
+            await projects.remove(id)
+            if (formStore.getSnapshot().projectId === id) formStore.update({ projectId: null })
+          }}
+          onPromptDeleted={projects.countDeleted}
+          onClose={() => setIsProjectsOpen(false)}
+        />
+      )}
       {isDummyDataOpen && (
         <DummyDataModal kind="prompt-requests" onUse={loadDummyRequest} onClose={() => setIsDummyDataOpen(false)} />
       )}

@@ -6,6 +6,8 @@ export interface Viewer {
   email: string
   name: string
   role: UserRole
+  // The tools this account may not use. Always empty for an admin, who keeps every tool
+  disabledTools: string[]
 }
 
 export interface LoginInput {

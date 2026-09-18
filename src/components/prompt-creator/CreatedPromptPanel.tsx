@@ -33,6 +33,10 @@ interface CreatedPromptPanelProps {
  * The finished prompt: its name and text, both edited in place and saved to the same record the
  * module created, the folder it is filed in, and one copy action for the prompt exactly as it now
  * reads. The page mounts it under the record's id, so a newly created prompt starts this panel fresh.
+ *
+ * A prompt created with "use once" has no record (`id` is empty): it can be read, changed here and
+ * copied, but nothing is saved and it has no folder, so those controls are left out rather than
+ * offered and refused.
  */
 export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created, onChange }) => {
   const [name, setName] = useState(created.name)
@@ -42,7 +46,9 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
   const promptRef = useRef<HTMLTextAreaElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isMoving, setIsMoving] = useState(false)
-  const folders = usePromptFolders(PROMPT_FOLDERS_ENDPOINT)
+  // Nothing was stored for a temporary prompt, so there is nothing to save changes to
+  const isTemporary = created.id === ""
+  const folders = usePromptFolders(isTemporary ? undefined : PROMPT_FOLDERS_ENDPOINT)
   const folderName = folders.folders?.find((folder) => folder.id === created.folderId)?.name ?? null
 
   // The text box grows with the prompt, so it reads like the output rather than a form field
@@ -57,6 +63,11 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
 
   const save = useCallback(
     async (changes: { name?: string; prompt?: string; folderId?: string | null }) => {
+      // A temporary prompt lives on the page only; the change stays on screen and goes nowhere
+      if (created.id === "") {
+        onChange(changes)
+        return
+      }
       setSaveState("saving")
       try {
         const { data } = await requestApi<CreatedPrompt>(`${PROMPT_CREATOR_ENDPOINT}/created/${created.id}`, {
@@ -132,6 +143,12 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
 
       {/* The prompt itself */}
       {/* Where it is filed, so a new prompt can go straight into a folder */}
+      {isTemporary ? (
+        <p className="inline-flex w-fit items-center gap-1.5 rounded-full bg-secondary-fixed px-2.5 py-1 text-[11px] font-semibold text-on-secondary-fixed-variant">
+          <Folder size={12} className="shrink-0" aria-hidden="true" />
+          Not saved. Copy it before you leave this page.
+        </p>
+      ) : (
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-secondary-fixed px-2.5 py-1 text-[11px] font-semibold text-on-surface">
           <Folder size={12} className="shrink-0 text-secondary-container" aria-hidden="true" />
@@ -146,16 +163,21 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
           {created.folderId ? "Move to another folder" : "Add to a folder"}
         </button>
       </div>
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-outline">Prompt</span>
-          <span className="flex items-center gap-1 text-[11px] text-outline" aria-live="polite">
-            {saveState === "saving" && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}
-            {saveState === "saved" && <Check size={12} className="text-primary" aria-hidden="true" />}
-            {saveState === "failed" && <AlertCircle size={12} className="text-error" aria-hidden="true" />}
-            {saveState === "saving" ? "Saving..." : saveState === "failed" ? "Not saved" : "Saved to your prompt library"}
-          </span>
+          {/* A temporary prompt is never written anywhere, so it has no saving state to report:
+              saying "Saved to your prompt library" there would be untrue */}
+          {!isTemporary && (
+            <span className="flex items-center gap-1 text-[11px] text-outline" aria-live="polite">
+              {saveState === "saving" && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}
+              {saveState === "saved" && <Check size={12} className="text-primary" aria-hidden="true" />}
+              {saveState === "failed" && <AlertCircle size={12} className="text-error" aria-hidden="true" />}
+              {saveState === "saving" ? "Saving..." : saveState === "failed" ? "Not saved" : "Saved to your prompt library"}
+            </span>
+          )}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto rounded-r-xl border-l-2 border-primary bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary/30">
           <textarea

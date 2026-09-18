@@ -10,10 +10,11 @@ import { FilterPanel, SearchFilter, SelectFilter } from "@/components/history/Hi
 import { LoadMore } from "@/components/history/LoadMore"
 import { EmployeeDialog } from "@/components/employees/EmployeeDialog"
 import { PlanEditor } from "@/components/employees/PlanEditor"
-import { PlanLinkPanel } from "@/components/employees/PlanLinkPanel"
+import { PlanLinkActions, PlanLinkConfirmDialog, PlanLinkPanel, usePlanLink } from "@/components/employees/PlanLinkPanel"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { useCursorList } from "@/hooks/useCursorList"
+import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { requestApi } from "@/lib/apiClient"
 import { HISTORY_DEBOUNCE_MS } from "@/constants/historyFilters"
 import { EMPLOYEES_ENDPOINT, EMPLOYEE_MESSAGES, EMPLOYEE_STATUSES } from "@/constants/employees"
@@ -71,6 +72,9 @@ export default function EmployeesClient() {
   const [dialog, setDialog] = useState<{ employee: Employee | null } | null>(null)
   const [deleting, setDeleting] = useState<Employee | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  // Deleting the ticked employees, confirmed the same way one employee is
+  const [isConfirmingPicked, setIsConfirmingPicked] = useState(false)
+  const [isDeletingPicked, setIsDeletingPicked] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
   const [orderError, setOrderError] = useState<string | null>(null)
@@ -93,6 +97,8 @@ export default function EmployeesClient() {
   const hasFilters = Boolean(search || status)
   // Nobody chosen yet (a fresh load, or the chosen one was deleted): the first employee is open
   const current = selected ?? list.items[0] ?? null
+  // The people picked in the list's own circles: dragging moves them together, and the bar deletes them
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
   // Dragging puts the whole team in order, so it needs the whole team on screen and no filter
   const canReorder = !hasFilters && list.hasAnswer && list.items.length > 1 && list.items.length === list.total
 
@@ -139,6 +145,37 @@ export default function EmployeesClient() {
   const linkChanged = (employee: Employee) => {
     setSelected(employee)
     list.update((items) => items.map((item) => (item.id === employee.id ? employee : item)))
+  }
+
+  // The plan link is changed from the row of actions at the top and shown further down, so its
+  // state is held here and handed to both
+  const planLink = usePlanLink(current, linkChanged)
+
+  /**
+   * Deletes the ticked employees in one call. Each takes their daily plans with them, exactly as
+   * deleting one does. Final, so it only runs from the confirmation.
+   */
+  const removePicked = async () => {
+    if (isDeletingPicked) return
+    setIsDeletingPicked(true)
+    setDeleteError(null)
+    try {
+      const ids = [...picked]
+      await requestApi(EMPLOYEES_ENDPOINT, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      })
+      if (current && ids.includes(current.id)) setSelected(null)
+      setPicked(new Set())
+      setIsConfirmingPicked(false)
+      list.retry()
+    } catch (reason: unknown) {
+      setDeleteError(reason instanceof Error ? reason.message : EMPLOYEE_MESSAGES.deleteFailed)
+      setIsConfirmingPicked(false)
+    } finally {
+      setIsDeletingPicked(false)
+    }
   }
 
   const remove = async () => {
@@ -236,12 +273,24 @@ export default function EmployeesClient() {
                       </p>
                     )}
                     {hasFilters && list.items.length > 1 && <p className="px-1 text-[12px] text-outline">{EMPLOYEE_MESSAGES.reorderNeedsAll}</p>}
+                    <BulkDeleteBar
+                      pickedCount={picked.size}
+                      total={null}
+                      noun={{ one: "employee", many: "employees" }}
+                      isBusy={isDeletingPicked}
+                      onDeletePicked={() => setIsConfirmingPicked(true)}
+                      onClear={() => setPicked(new Set())}
+                    />
                     <SortableList
                       items={list.items}
+                      picked={picked}
+                      onPickedChange={setPicked}
                       getId={idOf}
                       getLabel={nameOf}
                       onReorder={reorderTeam}
                       label="Employees"
+                      multiSelect
+                      itemNoun="people"
                       className="flex flex-col gap-2"
                       disabled={!canReorder}
                       renderItem={(employee, handle) => {
@@ -285,7 +334,9 @@ export default function EmployeesClient() {
                 {current ? (
                   <>
                     <section aria-label="Employee details" className="rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      {/* Four actions need the width: below xl they go on their own line under the
+                          name, so they never squeeze it (the same rule the tool headers follow) */}
+                      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                         <div className="flex min-w-0 items-center gap-3">
                           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-white">{initialsOf(current.name)}</span>
                           <div className="min-w-0">
@@ -296,22 +347,23 @@ export default function EmployeesClient() {
                             {current.owner && <p className="text-[12px] text-outline">Added by {current.owner}</p>}
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
                             onClick={() => setDialog({ employee: current })}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                           >
                             <Pencil size={14} aria-hidden="true" />
                             Edit
                           </button>
+                          <PlanLinkActions link={planLink} />
                           <button
                             type="button"
                             onClick={() => {
                               setDeleteError(null)
                               setDeleting(current)
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant px-3 py-2 text-[13px] font-semibold text-outline transition-colors hover:border-error/40 hover:text-error"
+                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant px-3 py-2 text-[13px] font-semibold text-outline transition-colors hover:border-error/40 hover:text-error"
                           >
                             <Trash2 size={14} aria-hidden="true" />
                             Delete
@@ -335,9 +387,11 @@ export default function EmployeesClient() {
                           </div>
                         ))}
                       </dl>
-                      <PlanLinkPanel employee={current} onChange={linkChanged} />
+                      <PlanLinkPanel employee={current} link={planLink} />
                     </section>
                     <PlanEditor key={current.id} employee={current} />
+                    {/* Neither New link nor Turn off happens until this is confirmed */}
+                    <PlanLinkConfirmDialog employee={current} link={planLink} />
                   </>
                 ) : (
                   <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-16 text-center">
@@ -354,6 +408,16 @@ export default function EmployeesClient() {
 
       {dialog && <EmployeeDialog employee={dialog.employee} onClose={() => setDialog(null)} onSaved={saved} />}
 
+      {isConfirmingPicked && (
+        <ConfirmBulkDelete
+          count={picked.size}
+          noun={{ one: "employee", many: "employees" }}
+          alsoGoes="Their daily plans and history go with them."
+          isDeleting={isDeletingPicked}
+          onConfirm={() => void removePicked()}
+          onClose={() => setIsConfirmingPicked(false)}
+        />
+      )}
       {deleting && (
         <Modal
           title={`Delete ${deleting.name}?`}

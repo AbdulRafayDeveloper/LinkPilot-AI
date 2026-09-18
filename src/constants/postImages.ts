@@ -130,6 +130,7 @@ export const POST_IMAGES_MESSAGES = {
   saved: "Saved.",
   generated: "Image ready.",
   deleted: "Deleted.",
+  deleteFailed: "Couldn't delete that. Please try again.",
   loadFailed: "Couldn't load your images.",
   notFound: "That image no longer exists.",
   copyFailed: "This browser can't copy an image to the clipboard. Download it instead.",

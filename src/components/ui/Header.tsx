@@ -92,17 +92,19 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarCollapse
         <BrandLogo className="lg:hidden" wordmarkClassName="max-[359px]:sr-only" />
 
         <span className="hidden h-5 w-px bg-outline-variant md:block" aria-hidden="true" />
-        <p className="hidden truncate text-sm font-semibold tracking-tight text-on-surface md:block md:text-[15px]">{SITE_PURPOSE}</p>
+        <p className="hidden min-w-0 truncate text-sm font-semibold tracking-tight text-on-surface md:block md:text-[15px]">{SITE_PURPOSE}</p>
       </div>
 
-      <div className="flex min-w-0 items-center gap-2">
+      {/* Never shrinks: its parts have no room to give, so squeezing this group would push them off the
+          edge. What gives instead is the line on the left, which truncates */}
+      <div className="flex shrink-0 items-center gap-2">
         <ActivityIndicator />
         <button
           type="button"
           onClick={() => setIsSwitcherOpen(true)}
           aria-label="Jump to a tool"
           aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}
-          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-low px-2.5 text-sm text-outline transition-colors hover:border-primary/40 hover:bg-surface-container-lowest hover:text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:w-60 sm:px-3"
+          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-low px-2.5 text-sm text-outline transition-colors hover:border-primary/40 hover:bg-surface-container-lowest hover:text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:w-60 sm:px-3 md:w-48 lg:w-60"
         >
           <Search size={16} className="shrink-0" aria-hidden="true" />
           <span className="hidden sm:inline">Jump to a tool...</span>

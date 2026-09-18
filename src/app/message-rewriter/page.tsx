@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import MessageRewriterClient from "./MessageRewriterClient"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("message-rewriter")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("message-rewriter", "/message-rewriter")
   return (
     <>
       {/* Breadcrumb schema markup */}

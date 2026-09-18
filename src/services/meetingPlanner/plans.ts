@@ -19,7 +19,7 @@ import { clearMeetingChat } from "@/services/meetingPlanner/chatHistory"
  */
 // What the calendar, today's list and the history rows draw; the long preparation inputs stay out
 const LIST_FIELDS =
-  "name meetingDate meetingTime status completedAt personName prepEnabled prepStatus prepError preparedAt createdAt"
+  "name meetingDate meetingTime status completedAt personName profileLink prepEnabled prepStatus prepError preparedAt createdAt"
 
 type StoredPlan = IMeetingPlan & { _id: { toString: () => string } }
 
@@ -31,6 +31,7 @@ const toMeeting = (record: StoredPlan): MeetingPlan => ({
   status: record.status,
   completedAt: record.completedAt ? record.completedAt.toISOString() : null,
   personName: record.personName ?? null,
+  profileLink: record.profileLink ?? null,
   prepEnabled: record.prepEnabled,
   prepStatus: record.prepStatus,
   prepError: record.prepError ?? null,
@@ -75,6 +76,7 @@ export interface NewMeetingPlan {
   meetingDate: string
   meetingTime: string
   personName: string | null
+  profileLink: string | null
   prepEnabled: boolean
   profileInfo: string | null
   conversationHistory: string | null
@@ -113,6 +115,7 @@ export interface MeetingPlanChanges {
   meetingDate?: string
   meetingTime?: string
   personName?: string | null
+  profileLink?: string | null
   status?: MeetingPlanStatusId
   prepEnabled?: boolean
   profileInfo?: string | null

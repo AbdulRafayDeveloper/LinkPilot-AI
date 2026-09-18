@@ -13,11 +13,13 @@ import { recordLoginEvent, type ClientInfo } from "./audit"
 
 type SignedIn = { viewer: Viewer; sessionVersion: number }
 
-const toViewer = (user: { _id: unknown; email: string; name: string; role: Viewer["role"] }): Viewer => ({
+const toViewer = (user: { _id: unknown; email: string; name: string; role: Viewer["role"]; disabledTools?: string[] }): Viewer => ({
   id: String(user._id),
   email: user.email,
   name: user.name,
   role: user.role,
+  // An admin keeps every tool, whatever is stored against the account
+  disabledTools: user.role === "admin" ? [] : (user.disabledTools ?? []),
 })
 
 /**

@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { FilePenLine, Send, UserPlus, Users } from "lucide-react"
+import Link from "next/link"
+import { FilePenLine, Send, Users } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ResetButton } from "@/components/ui/ResetButton"
@@ -11,7 +12,6 @@ import { appendSpokenText } from "@/lib/spokenText"
 import { VOICE_MESSAGES } from "@/constants/voiceInput"
 import { ClientMessageResult } from "@/components/client-messaging/ClientMessageResult"
 import { ClientMessagePromptModal } from "@/components/client-messaging/ClientMessagePromptModal"
-import { ClientsModal } from "@/components/client-messaging/ClientsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
@@ -24,6 +24,7 @@ import {
   UPDATE_MAX_LENGTH,
   type MessageChannelId,
 } from "@/constants/clientMessaging"
+import { CLIENTS_TOOL } from "@/constants/clients"
 import type { Client, GeneratedClientMessage } from "@/types/clientMessaging"
 
 interface GeneratePayload {
@@ -46,7 +47,6 @@ const generation = createGenerationRequest<GeneratePayload, GeneratedClientMessa
 
 export default function ClientMessagingClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isClientsOpen, setIsClientsOpen] = useState(false)
   const [isPromptOpen, setIsPromptOpen] = useState(false)
   const [clients, setClients] = useState<Client[] | null>(null)
   const [clientsError, setClientsError] = useState<string | null>(null)
@@ -60,7 +60,7 @@ export default function ClientMessagingClient() {
   const isGenerating = status === "loading"
   const canReset = update !== "" || status !== "idle"
 
-  // The client list is shared, so it is read on arrival and after the popup changes it
+  // The clients themselves are managed in Clients Management; this page only reads them to write to one
   const loadClients = useCallback((signal?: AbortSignal) => {
     return requestApi<Client[]>(`${CLIENT_MESSAGING_ENDPOINT}/clients`, { signal })
       .then(({ data }) => {
@@ -110,15 +110,6 @@ export default function ClientMessagingClient() {
     generate({ clientId, update, channel })
   }
 
-  // A client chosen in the popup replaces the message written for the previous one
-  const selectClient = (client: Client) => {
-    formStore.update({ clientId: client.id })
-    reset()
-    setFormError(null)
-    setVoiceError(null)
-    setVoiceNotice(null)
-  }
-
   // Clears what you wanted to say and the message; the client and channel stay for the next one
   const resetTool = () => {
     formStore.update({ update: "" })
@@ -159,14 +150,6 @@ export default function ClientMessagingClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <button
-                  type="button"
-                  onClick={() => setIsClientsOpen(true)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
-                >
-                  <UserPlus size={16} aria-hidden="true" />
-                  Clients
-                </button>
                 <button
                   type="button"
                   onClick={() => setIsPromptOpen(true)}
@@ -217,6 +200,15 @@ export default function ClientMessagingClient() {
                     <p className="text-[11px] text-outline">
                       Their format and {selectedClient.sampleMessages.filter((sample) => sample.trim()).length} sample messages are
                       used for every message written here.
+                    </p>
+                  )}
+                  {/* Clients are added and edited in their own module, so this page only ever chooses one */}
+                  {clients !== null && !hasClients && !clientsError && (
+                    <p className="text-[11px] text-outline">
+                      <Link href={CLIENTS_TOOL.href} className="font-semibold text-primary underline underline-offset-2 hover:text-on-primary-fixed-variant">
+                        Add your first client
+                      </Link>{" "}
+                      in {CLIENTS_TOOL.title}, with their message format and two sample messages.
                     </p>
                   )}
                 </div>
@@ -335,19 +327,6 @@ export default function ClientMessagingClient() {
         </main>
       </div>
 
-      {isClientsOpen && (
-        <ClientsModal
-          onUse={selectClient}
-          onChanged={(saved) => {
-            setClients(saved)
-            setClientsError(null)
-          }}
-          onClose={() => {
-            setIsClientsOpen(false)
-            void loadClients()
-          }}
-        />
-      )}
       {isPromptOpen && <ClientMessagePromptModal onClose={() => setIsPromptOpen(false)} />}
     </div>
   )

@@ -9,6 +9,7 @@ import { Header } from "@/components/ui/Header"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { MeetingStatusBadge } from "@/components/meetings/MeetingStatusBadge"
 import { MeetingAnalysisView } from "@/components/meetings/MeetingAnalysisView"
+import { MeetingChatPanel } from "@/components/meeting-planner/MeetingChatPanel"
 import { MeetingFormDialog } from "@/components/meetings/MeetingFormDialog"
 import { DeleteMeetingDialog } from "@/components/meetings/DeleteMeetingDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -263,6 +264,10 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                     </p>
                   )
                 )}
+
+                {/* Ask this meeting. The transcript alone is enough to answer from, so this is here
+                    whether or not the meeting has been analysed yet */}
+                <MeetingChatPanel surface="notes" meetingId={meeting.id} subject={meeting.title} />
 
                 {/* The transcript, kept exactly as it was pasted */}
                 <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">

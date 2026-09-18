@@ -1,8 +1,24 @@
 "use client"
 
-import React, { useCallback, useEffect, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, Check, ChevronsDownUp, ChevronsUpDown, Copy, Eye, EyeOff, FileText, Folder, FolderCog, FolderInput, History, Loader2, RefreshCw, SquarePlus, Trash2 } from "lucide-react"
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core"
+import { AlertTriangle, Check, CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Copy, Eye, EyeOff, FileText, Folder, FolderCog, FolderInput, GitBranch, History, Loader2, Lock, Play, RefreshCw, SquarePlus, Trash2 } from "lucide-react"
+import { DragPreview, FolderDropBar, RowDragHandle } from "./FolderDrop"
+import { folderFromDropId } from "@/lib/folderDrop"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
@@ -35,6 +51,10 @@ import { IN_ANY_FOLDER, PROMPT_FOLDER_MESSAGES, UNFILED_FOLDER } from "@/constan
 import { usePromptFolders } from "@/hooks/usePromptFolders"
 import { MoveToFolderDialog } from "./MoveToFolderDialog"
 import { FoldersDialog } from "./FoldersDialog"
+import { DependenciesDialog } from "./DependenciesDialog"
+import { DEPENDENCY_FILTERS, DEPENDENCY_STATE_LABELS, PROMPT_DEPENDENCY_MESSAGES, describePending } from "@/constants/promptDependencies"
+import { dependencyState, pendingDependencies } from "@/lib/promptDependencies"
+import type { PromptDependency } from "@/types/promptCreator"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 import { describeSource } from "@/constants/aiProviders"
 
@@ -44,23 +64,29 @@ interface FilterState {
   context: string
   // Only a tool with folders uses this; for the others it stays empty and is never sent
   folder: string
+  // Only a tool whose records wait for others: "independent", "ready" or "blocked"
+  dependencies: string
   fromDay: string
   toDay: string
 }
 
-const NO_FILTERS: FilterState = { search: "", option: "", context: "", folder: "", fromDay: "", toDay: "" }
+const NO_FILTERS: FilterState = { search: "", option: "", context: "", folder: "", dependencies: "", fromDay: "", toDay: "" }
 
 const writtenOn = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 
-// Search + one or two choice lists + two dates, laid out on one row on a wide screen
+// Search + the choice lists + two dates, laid out on one row on a wide screen
 const COLUMNS: Record<number, string> = {
   1: "lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_repeat(2,minmax(0,0.9fr))]",
   2: "lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]",
   3: "lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]",
+  4: "lg:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]",
 }
+
+// The folder and dependency filters are choice lists of their own, so they count towards the columns
+const filterColumns = (tool: SavedOutputTool) => tool.filters.length + (tool.folders ? 1 : 0) + (tool.dependencies ? 1 : 0)
 
 function queryString(filters: FilterState, search: string, page: number): string {
   const params = new URLSearchParams({ page: String(page) })
@@ -68,6 +94,7 @@ function queryString(filters: FilterState, search: string, page: number): string
   if (filters.option) params.set("option", filters.option)
   if (filters.context) params.set("context", filters.context)
   if (filters.folder) params.set("folder", filters.folder)
+  if (filters.dependencies) params.set("dependencies", filters.dependencies)
   return appendDayRange(params, filters.fromDay, filters.toDay).toString()
 }
 
@@ -87,12 +114,72 @@ const actionButton =
 const toolbarButton =
   "inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
-/** The choices a record was written with (violet), the facts about it (neutral) and its folder. */
+/** What a record waits for, and whether that leaves it ready or blocked. */
+const waitingState = (item: SavedOutput) => {
+  const dependencies = item.dependencies ?? []
+  const pending = pendingDependencies(dependencies)
+  return {
+    dependencies,
+    pending,
+    state: dependencyState(dependencies),
+    // The whole list, with what has run and what hasn't, as the tooltip of the short tag
+    describe: dependencies.map((entry) => `${entry.name || "Untitled prompt"} (${entry.appliedAt ? "applied" : "not yet"})`).join("\n"),
+  }
+}
+
+/**
+ * Whether a record is ready to run or waiting on others, said in a word and in colour. A record that
+ * waits for nothing shows nothing: there is no state to explain.
+ */
+const DependencyTags: React.FC<{ item: SavedOutput }> = ({ item }) => {
+  const { dependencies, pending, state, describe } = waitingState(item)
+  if (dependencies.length === 0) return null
+  const names = dependencies.map((entry) => entry.name || "Untitled prompt")
+  return (
+    <>
+      <li
+        title={state === "blocked" ? describePending(pending.map((entry) => entry.name || "Untitled prompt")) : PROMPT_DEPENDENCY_MESSAGES.ready}
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+          state === "blocked" ? "bg-secondary-fixed text-on-secondary-fixed-variant" : "bg-success-container text-on-success-container"
+        }`}
+      >
+        {state === "blocked" ? <Lock size={11} className="shrink-0" aria-hidden="true" /> : <Play size={11} className="shrink-0" aria-hidden="true" />}
+        {DEPENDENCY_STATE_LABELS[state]}
+      </li>
+      <li
+        title={describe}
+        className="inline-flex max-w-full items-center gap-1 rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant"
+      >
+        <GitBranch size={11} className="shrink-0 text-outline" aria-hidden="true" />
+        <span className="truncate">
+          {PROMPT_DEPENDENCY_MESSAGES.dependsOn} {names.join(", ")}
+        </span>
+      </li>
+    </>
+  )
+}
+
+/**
+ * The choices a record was written with (violet), the facts about it (neutral), its folder, whether
+ * it has been used, and what it waits for. The applied tag says in words what the green row says in
+ * colour, so the mark is never carried by colour alone, and so does the blocked tag.
+ */
 const RecordTags: React.FC<{ item: SavedOutput }> = ({ item }) =>
-  item.choices.length + item.details.length === 0 && !describeSource(item) && !item.folder ? (
+  item.choices.length + item.details.length === 0 &&
+  !describeSource(item) &&
+  !item.folder &&
+  !item.appliedAt &&
+  (item.dependencies?.length ?? 0) === 0 ? (
     <span className="text-[12px] text-outline">None</span>
   ) : (
     <ul className="flex flex-wrap gap-1" aria-label="Written with">
+      <DependencyTags item={item} />
+      {item.appliedAt && (
+        <li className="inline-flex items-center gap-1 rounded-full bg-success-container px-2 py-0.5 text-[11px] font-semibold text-on-success-container">
+          <CheckCircle2 size={11} className="shrink-0" aria-hidden="true" />
+          Applied
+        </li>
+      )}
       {item.folder && (
         <li className="inline-flex max-w-full items-center gap-1 rounded-full bg-secondary-fixed px-2 py-0.5 text-[11px] font-semibold text-on-surface">
           <Folder size={11} className="shrink-0 text-secondary-container" aria-hidden="true" />
@@ -359,9 +446,23 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
   // Records deleted on this page: they leave the list at once, before the server answers
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set())
   const [actionError, setActionError] = useState<string | null>(null)
+  // Which record is being marked as used, so its button waits rather than being clicked twice
+  const [appliedBusy, setAppliedBusy] = useState<string | null>(null)
+  // The records picked to be filed together, the one under the pointer, and where a drop would land
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
+  const [dragging, setDragging] = useState<{ id: string; count: number } | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+  const [isFiling, setIsFiling] = useState(false)
+  // Which bulk delete has been asked for and is waiting to be confirmed, and whether it is running
+  const [confirmingDelete, setConfirmingDelete] = useState<"picked" | "all" | null>(null)
+  const [isDeletingMany, setIsDeletingMany] = useState(false)
+  const lastPicked = useRef<string | null>(null)
+  const movingIds = useRef<string[]>([])
   // The record being filed in a folder, and the folder manager
   const [moving, setMoving] = useState<SavedOutput | null>(null)
   const [isManagingFolders, setIsManagingFolders] = useState(false)
+  // The record whose dependencies are being picked
+  const [waiting, setWaiting] = useState<SavedOutput | null>(null)
   // What a record was written from is read once per page load, whether it was opened or copied first
   const details = useRef(new Map<string, Promise<SavedOutputDetail>>())
   // Only a tool with folders loads any of this; for the others the hook does nothing
@@ -411,6 +512,41 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
     [endpoint]
   )
   const loadSource = useCallback((id: string) => loadDetail(id).then((detail) => detail.source), [loadDetail])
+
+  // A record picked and then deleted, or left behind on another page, stops counting as picked
+  const pickedIds = useMemo(() => new Set([...picked].filter((id) => (result?.items ?? []).some((item) => item.id === id) && !removed.has(id))), [picked, result, removed])
+
+  const clearPicked = useCallback(() => {
+    setPicked(new Set())
+    lastPicked.current = null
+  }, [])
+
+  /** Picks one record, or everything between the last pick and this one when Shift is held. */
+  const pickRecord = (item: SavedOutput, isRange: boolean) => {
+    setPicked((current) => {
+      const next = new Set(current)
+      const ids = (result?.items ?? []).filter((row) => !removed.has(row.id)).map((row) => row.id)
+      const from = lastPicked.current ? ids.indexOf(lastPicked.current) : -1
+      const to = ids.indexOf(item.id)
+      if (isRange && from >= 0 && to >= 0) {
+        for (const id of ids.slice(Math.min(from, to), Math.max(from, to) + 1)) next.add(id)
+      } else if (next.has(item.id)) {
+        next.delete(item.id)
+      } else {
+        next.add(item.id)
+      }
+      return next
+    })
+    lastPicked.current = item.id
+  }
+
+  const sensors = useSensors(
+    // A few pixels of movement before a drag starts, so clicking the handle still focuses it
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    // A touch presses and holds first, so the page can still be scrolled with a finger on a row
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor)
+  )
 
   if (!tool) return null
 
@@ -490,8 +626,162 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
     if (filters.folder) setReloadAttempt((attempt) => attempt + 1)
   }
 
+  /**
+   * Marks one record as used, or takes that mark off. **Marking it is how a record is run**, so a
+   * record still waiting for records that have not run is refused here as well as by the server, and
+   * the message names what to run first. The row turns green at once and goes back if the write
+   * fails, so what is on screen always says what is stored.
+   *
+   * Marking one record changes what the others may do, so every row waiting for it follows at once:
+   * the last dependency of a blocked record turns it ready without the page being read again.
+   */
+  const markApplied = async (item: SavedOutput) => {
+    const recordEndpoint = tool?.folders?.recordEndpoint
+    if (!recordEndpoint || appliedBusy) return
+    const applied = !item.appliedAt
+    const { pending } = waitingState(item)
+    if (applied && pending.length > 0) {
+      setActionError(describePending(pending.map((entry) => entry.name || "Untitled prompt")))
+      return
+    }
+    setActionError(null)
+    setAppliedBusy(item.id)
+    const showAs = (appliedAt: string | null) =>
+      setResult((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((row) => ({
+                ...row,
+                ...(row.id === item.id ? { appliedAt } : {}),
+                // Whatever waits for this record now knows whether it has run
+                ...(row.dependencies
+                  ? { dependencies: row.dependencies.map((entry) => (entry.id === item.id ? { ...entry, appliedAt } : entry)) }
+                  : {}),
+              })),
+            }
+          : current
+      )
+    showAs(applied ? new Date().toISOString() : null)
+    try {
+      const { data } = await requestApi<{ appliedAt?: string | null }>(`${recordEndpoint}/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applied }),
+      })
+      showAs(data.appliedAt ?? null)
+      // With the dependency filter on, rows that have just changed state may not belong on this page
+      if (filters.dependencies) setReloadAttempt((attempt) => attempt + 1)
+    } catch (error: unknown) {
+      showAs(item.appliedAt ?? null)
+      setActionError(error instanceof Error ? error.message : SAVED_OUTPUT_MESSAGES.appliedFailed)
+    } finally {
+      setAppliedBusy(null)
+    }
+  }
+
+  /**
+   * Saves what one record waits for. The row shows it at once, so its state follows without the page
+   * being read again; the server refuses a loop, a record that is gone and a record the account may
+   * not see, and the dialog shows what it said.
+   */
+  const saveDependencies = async (item: SavedOutput, ids: string[]) => {
+    const dependencyEndpoint = tool?.dependencies?.endpoint
+    if (!dependencyEndpoint) return
+    const { data } = await requestApi<{ dependencies?: PromptDependency[] }>(`${dependencyEndpoint}/${item.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dependencyIds: ids }),
+    })
+    setResult((current) =>
+      current
+        ? { ...current, items: current.items.map((row) => (row.id === item.id ? { ...row, dependencies: data.dependencies ?? [] } : row)) }
+        : current
+    )
+    // With the dependency filter on, the record may no longer belong on this page
+    if (filters.dependencies) setReloadAttempt((attempt) => attempt + 1)
+  }
+
   const items = result?.items ?? []
   const visibleItems = items.filter((item) => !removed.has(item.id))
+
+  /**
+   * Deletes the ticked records, or every record the filters cover, in one call. Deleting is final,
+   * so it only ever runs from the confirmation. The page is read again afterwards, because what is
+   * left may not fill the page that was on screen.
+   */
+  const deleteMany = async (which: "picked" | "all") => {
+    if (isDeletingMany) return
+    setIsDeletingMany(true)
+    setActionError(null)
+    try {
+      await requestApi<{ deleted: number }>(`${SAVED_OUTPUTS_ENDPOINT}/${tool.id}?${query}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(which === "picked" ? { ids: [...pickedIds] } : { all: true }),
+      })
+      clearPicked()
+      setConfirmingDelete(null)
+      details.current.clear()
+      setPage(1)
+      setReloadAttempt((attempt) => attempt + 1)
+    } catch (error: unknown) {
+      setActionError(error instanceof Error ? error.message : SAVED_OUTPUT_MESSAGES.deleteFailed)
+      setConfirmingDelete(null)
+    } finally {
+      setIsDeletingMany(false)
+    }
+  }
+  // Records can be filed by dragging only where there are folders to drop them on
+  const canDragToFolders = Boolean(tool?.folders)
+
+  const titleOf = (id: string) => visibleItems.find((item) => item.id === id)?.title ?? tool?.noun.one ?? "record"
+  const movingLabel = () => (movingIds.current.length > 1 ? `${movingIds.current.length} ${tool?.noun.many ?? "records"}` : titleOf(movingIds.current[0] ?? ""))
+  const dropAnnouncements: Announcements = {
+    onDragStart: ({ active }) => `Picked up ${movingLabel() || titleOf(String(active.id))}. Move over a folder and press Space to file it, or Escape to cancel.`,
+    onDragOver: ({ over }) => {
+      if (!over) return "Not over a folder."
+      const folder = folderFromDropId(String(over.id))
+      const name = folder ? (folders.folders?.find((entry) => entry.id === folder)?.name ?? "a folder") : PROMPT_FOLDER_MESSAGES.unfiled
+      return `Over ${name}.`
+    },
+    onDragEnd: () => `Dropped ${movingLabel()}.`,
+    onDragCancel: () => `Filing cancelled. ${movingLabel()} stayed where it was.`,
+  }
+
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    const id = String(active.id)
+    // Dragging a record nobody picked moves that one alone, and the picking goes with it
+    const isGroup = pickedIds.has(id) && pickedIds.size > 1
+    if (!isGroup && pickedIds.size > 0) clearPicked()
+    movingIds.current = isGroup ? visibleItems.filter((item) => pickedIds.has(item.id)).map((item) => item.id) : [id]
+    setDragging({ id, count: movingIds.current.length })
+  }
+
+  const handleDragOver = ({ over }: DragOverEvent) => setOverId(over ? String(over.id) : null)
+
+  /** Files everything that travelled into the folder it was dropped on, one write each. */
+  const handleDragEnd = async ({ over }: DragEndEvent) => {
+    const ids = movingIds.current
+    const target = over ? folderFromDropId(String(over.id)) : undefined
+    setDragging(null)
+    setOverId(null)
+    movingIds.current = []
+    if (target === undefined || ids.length === 0) return
+    const folder = target ? (folders.folders?.find((entry) => entry.id === target) ?? null) : null
+    // Records already in that folder have nothing to do
+    const moving = visibleItems.filter((item) => ids.includes(item.id) && (item.folder?.id ?? null) !== (folder?.id ?? null))
+    if (moving.length === 0) return
+    setIsFiling(true)
+    try {
+      for (const item of moving) await moveRecord(item, folder)
+      clearPicked()
+    } catch (error: unknown) {
+      setActionError(error instanceof Error ? error.message : PROMPT_FOLDER_MESSAGES.moveFailed)
+    } finally {
+      setIsFiling(false)
+    }
+  }
   // Deleted rows still waiting for the page to be read again are already out of the count
   const total = Math.max(0, (result?.total ?? 0) - (items.length - visibleItems.length))
   const totalPages = result?.totalPages ?? 1
@@ -521,6 +811,52 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
         <Trash2 size={13} aria-hidden="true" />
         Delete
       </button>
+      {tool.canMarkApplied &&
+        (() => {
+          // A record is run by applying it, so a record still waiting cannot be marked. Taking the
+          // mark off always stays possible: it says what happened, not what may happen next
+          const { pending } = waitingState(item)
+          const isBlocked = !item.appliedAt && pending.length > 0
+          return (
+            <button
+              type="button"
+              onClick={() => void markApplied(item)}
+              disabled={appliedBusy === item.id || isBlocked}
+              aria-pressed={Boolean(item.appliedAt)}
+              title={isBlocked ? describePending(pending.map((entry) => entry.name || "Untitled prompt")) : undefined}
+              aria-label={
+                isBlocked
+                  ? `${item.title} is blocked. ${describePending(pending.map((entry) => entry.name || "Untitled prompt"))}`
+                  : item.appliedAt
+                    ? `Mark ${item.title} as not used`
+                    : `Mark ${item.title} as used`
+              }
+              className={`${actionButton} ${item.appliedAt ? "border-success/50 text-on-success-container hover:bg-success-container" : isBlocked ? "" : "hover:text-success"}`}
+            >
+              {appliedBusy === item.id ? (
+                <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+              ) : isBlocked ? (
+                <Lock size={13} aria-hidden="true" />
+              ) : item.appliedAt ? (
+                <CheckCircle2 size={13} aria-hidden="true" />
+              ) : (
+                <Circle size={13} aria-hidden="true" />
+              )}
+              {isBlocked ? "Blocked" : item.appliedAt ? "Applied" : "Mark applied"}
+            </button>
+          )
+        })()}
+      {tool.dependencies && (
+        <button
+          type="button"
+          onClick={() => setWaiting(item)}
+          aria-label={`Choose what ${item.title} waits for`}
+          className={`${actionButton} hover:text-primary`}
+        >
+          <GitBranch size={13} aria-hidden="true" />
+          {(item.dependencies?.length ?? 0) > 0 ? `${PROMPT_DEPENDENCY_MESSAGES.edit} ${item.dependencies?.length}` : PROMPT_DEPENDENCY_MESSAGES.edit}
+        </button>
+      )}
       {tool.folders && (
         <button
           type="button"
@@ -589,7 +925,7 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
             )}
 
             <FilterPanel
-              columnsClassName={COLUMNS[tool.filters.length] ?? COLUMNS[1]}
+              columnsClassName={COLUMNS[filterColumns(tool)] ?? COLUMNS[1]}
               canClear={hasFilters}
               onClear={() => {
                 setFilters(NO_FILTERS)
@@ -636,6 +972,15 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                   onChange={(value) => updateFilter("folder", value)}
                 />
               )}
+              {tool.dependencies && (
+                <SelectFilter
+                  label={tool.dependencies.label}
+                  allLabel={PROMPT_DEPENDENCY_MESSAGES.allLabel}
+                  value={filters.dependencies}
+                  options={DEPENDENCY_FILTERS}
+                  onChange={(value) => updateFilter("dependencies", value)}
+                />
+              )}
               <DateRangeFilters
                 fromLabel="Written from"
                 toLabel="Written to"
@@ -676,7 +1021,44 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                 </p>
               </div>
             ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                accessibility={{ announcements: dropAnnouncements }}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={(event) => void handleDragEnd(event)}
+                onDragCancel={() => {
+                  setDragging(null)
+                  setOverId(null)
+                  movingIds.current = []
+                }}
+              >
               <div className={`flex flex-col gap-3 transition-opacity ${isLoading ? "opacity-60" : ""}`} aria-busy={isLoading}>
+                {/* The folders appear as places to drop on only while something is travelling */}
+                {canDragToFolders && dragging && (
+                  <FolderDropBar folders={folders.folders} overId={overId} movingCount={dragging.count} noun={tool.noun} />
+                )}
+                {pickedIds.size > 0 && !dragging && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2">
+                    <p className="text-[12px] font-semibold text-on-surface">
+                      {pickedIds.size} picked{canDragToFolders ? ". Drag any one of them onto a folder to file them together." : "."}
+                    </p>
+                    <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingDelete("picked")}
+                        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-error/40 px-2.5 py-1 text-[12px] font-semibold text-error transition-colors hover:bg-error/5"
+                      >
+                        <Trash2 size={13} aria-hidden="true" />
+                        Delete {pickedIds.size} picked
+                      </button>
+                      <button type="button" onClick={clearPicked} className="rounded-lg px-2 py-1 text-[12px] font-semibold text-primary hover:bg-primary/10">
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {(actionError || error) && (
                   <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
                     {actionError ?? error}
@@ -707,6 +1089,24 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                   </div>
                 )}
 
+                {total > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[12px] text-on-surface-variant">
+                      {hasFilters
+                        ? `${total} ${total === 1 ? tool.noun.one : tool.noun.many} match these filters.`
+                        : `${total} ${total === 1 ? tool.noun.one : tool.noun.many} saved.`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingDelete("all")}
+                      className={`${toolbarButton} border-error/40 text-error hover:bg-error/5`}
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                      {hasFilters ? `Delete all ${total} matching` : `Delete all ${total}`}
+                    </button>
+                  </div>
+                )}
+
                 {/* The table from xl, where it fits beside the open sidebar without scrolling sideways; cards below */}
                 <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
                   <table className="w-full min-w-[900px] border-collapse text-left [overflow-wrap:anywhere]">
@@ -724,8 +1124,24 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                     </thead>
                     <tbody>
                       {visibleItems.map((item) => (
-                        <tr key={item.id} className="border-b border-outline-variant/60 align-top last:border-b-0 hover:bg-surface-container-lowest">
+                        <tr
+                          key={item.id}
+                          className={`border-b border-outline-variant/60 align-top last:border-b-0 ${
+                            item.appliedAt ? "bg-success-container/40 hover:bg-success-container/60" : "hover:bg-surface-container-lowest"
+                          }`}
+                        >
                           <td className="w-[190px] max-w-[220px] px-3 py-2.5 2xl:w-[230px] 2xl:max-w-[250px]">
+                            <span className="mb-1 flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                checked={pickedIds.has(item.id)}
+                                disabled={isFiling || isDeletingMany}
+                                onChange={(event) => pickRecord(item, (event.nativeEvent as MouseEvent).shiftKey)}
+                                aria-label={`Pick ${item.title}`}
+                                className="h-4 w-4 shrink-0 accent-primary"
+                              />
+                              {canDragToFolders && <RowDragHandle id={item.id} label={item.title} isPicked={pickedIds.has(item.id)} />}
+                            </span>
                             <p className="break-words text-[13px] font-semibold text-on-surface">{item.title}</p>
                             {item.subtitle && <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-on-surface-variant">{item.subtitle}</p>}
                           </td>
@@ -746,7 +1162,28 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                 {/* Cards on a phone, two to a row on a tablet or a narrow laptop */}
                 <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {visibleItems.map((item) => (
-                    <li key={item.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                    <li
+                      key={item.id}
+                      className={`flex min-w-0 flex-col gap-2 rounded-2xl border p-3 shadow-sm ${
+                        item.appliedAt ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={pickedIds.has(item.id)}
+                          disabled={isFiling || isDeletingMany}
+                          onChange={(event) => pickRecord(item, (event.nativeEvent as MouseEvent).shiftKey)}
+                          aria-label={`Pick ${item.title}`}
+                          className="h-4 w-4 shrink-0 accent-primary"
+                        />
+                        {canDragToFolders && (
+                          <>
+                            <RowDragHandle id={item.id} label={item.title} isPicked={pickedIds.has(item.id)} />
+                            <span className="text-[11px] text-outline">Hold, then drag onto a folder</span>
+                          </>
+                        )}
+                      </div>
                       <div className="min-w-0">
                         <p className="break-words text-[14px] font-semibold text-on-surface">{item.title}</p>
                         {item.subtitle && <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-on-surface-variant">{item.subtitle}</p>}
@@ -764,12 +1201,58 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
 
                 <Pagination page={page} totalPages={totalPages} onPageChange={changePage} isLoading={isLoading} />
               </div>
+              {/* What travels under the pointer: this row, or how many are moving together */}
+              <DragOverlay dropAnimation={null}>
+                {dragging && <DragPreview title={titleOf(dragging.id)} count={dragging.count} noun={tool.noun} />}
+              </DragOverlay>
+              </DndContext>
             )}
           </div>
         </main>
       </div>
 
       {viewing && <RecordDialog item={viewing} loadDetail={loadDetail} onClose={() => setViewing(null)} />}
+      {/* Deleting several at once is final, so it is always confirmed and always says how many go */}
+      {confirmingDelete && (
+        <Modal
+          title={confirmingDelete === "picked" ? `Delete ${pickedIds.size} ${pickedIds.size === 1 ? tool.noun.one : tool.noun.many}?` : `Delete ${total} ${total === 1 ? tool.noun.one : tool.noun.many}?`}
+          description={
+            confirmingDelete === "picked"
+              ? "The ones you picked are removed for good."
+              : hasFilters
+                ? "Everything matching the filters on this page is removed for good, including what is on the other pages."
+                : `Every ${tool.noun.one} saved here is removed for good.`
+          }
+          onClose={() => setConfirmingDelete(null)}
+          isCloseDisabled={isDeletingMany}
+          size="compact"
+          footer={
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(null)}
+                disabled={isDeletingMany}
+                className="inline-flex items-center justify-center rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-50"
+              >
+                Keep them
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteMany(confirmingDelete)}
+                disabled={isDeletingMany}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-error px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-error/90 disabled:opacity-50"
+              >
+                {isDeletingMany ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Trash2 size={16} aria-hidden="true" />}
+                {isDeletingMany ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          }
+        >
+          <p className="text-sm leading-relaxed text-on-surface-variant">
+            This cannot be undone. What each {tool.noun.one} was written from goes with it.
+          </p>
+        </Modal>
+      )}
       {moving && (
         <MoveToFolderDialog
           title={moving.title}
@@ -778,6 +1261,16 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
           onMove={(folder) => moveRecord(moving, folder)}
           onCreate={folders.create}
           onClose={() => setMoving(null)}
+        />
+      )}
+      {waiting && tool.dependencies && (
+        <DependenciesDialog
+          title={waiting.title}
+          recordId={waiting.id}
+          endpoint={tool.dependencies.endpoint}
+          waitingFor={waiting.dependencies ?? []}
+          onSave={(ids) => saveDependencies(waiting, ids)}
+          onClose={() => setWaiting(null)}
         />
       )}
       {isManagingFolders && (

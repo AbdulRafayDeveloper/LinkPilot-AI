@@ -2,6 +2,7 @@ import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages
 import { streamTextWithFallback, type ModelProvider } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { searchMeeting, syncMeetingVectors, type MeetingMatch } from "@/services/meetingPlanner/vectors"
+import { meetingChunks } from "@/lib/meetingChunks"
 import { ANSWER_MAX_TOKENS, CHAT_CONTEXT_MESSAGES, MEETING_CHAT_MESSAGES } from "@/constants/meetingChat"
 import { UserFacingError } from "@/lib/errors"
 import type { MeetingPlanDetail } from "@/types/meetingPlanner"
@@ -39,7 +40,7 @@ const asContext = (matches: MeetingMatch[]) =>
   matches.map((match, index) => `[${index + 1}] ${match.label}\n${match.text}`).join("\n\n")
 
 export async function askMeeting({ meeting, ownerId, question, history, signal, onToken }: AskOptions): Promise<MeetingAnswer> {
-  const { pieces } = await syncMeetingVectors(meeting, ownerId, signal)
+  const { pieces } = await syncMeetingVectors(meeting.id, meetingChunks(meeting), ownerId, signal)
   if (pieces === 0) throw new UserFacingError(MEETING_CHAT_MESSAGES.notReady)
 
   const matches = await searchMeeting(meeting.id, question, signal)

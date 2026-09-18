@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import ConnectionNoteClient from "./ConnectionNoteClient"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("connection-note")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("connection-note", "/connection-note")
   return (
     <>
       {/* Breadcrumb schema markup */}

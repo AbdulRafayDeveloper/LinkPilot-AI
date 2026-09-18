@@ -12,8 +12,8 @@ interface TimeFieldProps {
 }
 
 const HOURS = Array.from({ length: 12 }, (_, index) => index + 1)
-// Meetings land on five-minute marks; a time saved on another minute is still offered, so editing never changes it
-const STEP_MINUTES = Array.from({ length: 12 }, (_, index) => `${index * 5}`.padStart(2, "0"))
+// Every minute of the hour, 00 to 59 with no gaps, so a meeting can be put at 9:07 as easily as 9:00
+const MINUTES = Array.from({ length: 60 }, (_, index) => `${index}`.padStart(2, "0"))
 const PERIODS: DayPeriod[] = ["AM", "PM"]
 
 const selectClass =
@@ -26,7 +26,6 @@ const selectClass =
  */
 export const TimeField: React.FC<TimeFieldProps> = ({ value, onChange, disabled = false, labelClass }) => {
   const { hour, minute, period } = toTwelveHour(value)
-  const minutes = STEP_MINUTES.includes(minute) ? STEP_MINUTES : [...STEP_MINUTES, minute].sort()
 
   return (
     <fieldset disabled={disabled} className="min-w-0">
@@ -53,7 +52,7 @@ export const TimeField: React.FC<TimeFieldProps> = ({ value, onChange, disabled 
           onChange={(event) => onChange(fromTwelveHour(hour, event.target.value, period))}
           className={selectClass}
         >
-          {minutes.map((option) => (
+          {MINUTES.map((option) => (
             <option key={option} value={option}>
               {option}
             </option>

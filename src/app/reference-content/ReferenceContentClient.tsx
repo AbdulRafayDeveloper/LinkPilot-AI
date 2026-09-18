@@ -5,6 +5,8 @@ import { BookMarked, Plus, Search, X } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ReferenceList } from "@/components/reference-content/ReferenceList"
+import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
+import { useRowSelection } from "@/hooks/useRowSelection"
 import { ReferenceItemDialog } from "@/components/reference-content/ReferenceItemDialog"
 import { DeleteReferenceDialog } from "@/components/reference-content/DeleteReferenceDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -38,8 +40,39 @@ export default function ReferenceContentClient() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // Deleting several at once: which delete is waiting to be confirmed, and whether it is running
+  const [confirmingMany, setConfirmingMany] = useState<"picked" | "all" | null>(null)
+  const [isDeletingMany, setIsDeletingMany] = useState(false)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const isFetchingRef = useRef(false)
+
+  const selection = useRowSelection(items.map((item) => item.id))
+
+  /**
+   * Deletes the ticked items, or everything the search covers, in one call. Deleting is final, so
+   * it only runs from the confirmation; the list is then read again from the newest item.
+   */
+  const deleteMany = async (which: "picked" | "all") => {
+    if (isDeletingMany) return
+    setIsDeletingMany(true)
+    setDeleteError(null)
+    try {
+      const query = search.trim() ? `?search=${encodeURIComponent(search.trim())}` : ""
+      await requestApi<{ deleted: number }>(`${REFERENCE_CONTENT_ENDPOINT}${query}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(which === "picked" ? { ids: [...selection.pickedIds] } : { all: true }),
+      })
+      selection.clear()
+      setConfirmingMany(null)
+      setReloadAttempt((attempt) => attempt + 1)
+    } catch (reason: unknown) {
+      setDeleteError(reason instanceof Error ? reason.message : REFERENCE_CONTENT_MESSAGES.deleteFailed)
+      setConfirmingMany(null)
+    } finally {
+      setIsDeletingMany(false)
+    }
+  }
 
   // Typing settles before the search runs, so a search is one request, not one per keystroke
   useEffect(() => {
@@ -222,6 +255,17 @@ export default function ReferenceContentClient() {
               </p>
             </div>
 
+            <BulkDeleteBar
+              pickedCount={selection.pickedIds.size}
+              total={total}
+              noun={{ one: "item", many: "items" }}
+              hasFilters={isSearching}
+              isBusy={isDeletingMany}
+              onDeletePicked={() => setConfirmingMany("picked")}
+              onDeleteAll={() => setConfirmingMany("all")}
+              onClear={selection.clear}
+            />
+
             <ReferenceList
               items={items}
               isLoading={isLoading}
@@ -230,6 +274,8 @@ export default function ReferenceContentClient() {
               error={listError}
               isSearching={isSearching}
               deletingId={deletingId}
+              pickedIds={selection.pickedIds}
+              onPick={selection.pick}
               onRetry={reload}
               onLoadMore={loadMore}
               onEdit={(item) => {
@@ -259,6 +305,16 @@ export default function ReferenceContentClient() {
         />
       )}
 
+      {confirmingMany && (
+        <ConfirmBulkDelete
+          count={confirmingMany === "picked" ? selection.pickedIds.size : total}
+          noun={{ one: "item", many: "items" }}
+          alsoGoes={confirmingMany === "all" && isSearching ? "Everything matching this search goes, including what has not been loaded yet." : undefined}
+          isDeleting={isDeletingMany}
+          onConfirm={() => void deleteMany(confirmingMany)}
+          onClose={() => setConfirmingMany(null)}
+        />
+      )}
       {pendingDelete && (
         <DeleteReferenceDialog
           item={pendingDelete}

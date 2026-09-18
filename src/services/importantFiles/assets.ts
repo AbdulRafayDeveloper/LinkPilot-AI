@@ -14,7 +14,7 @@ import {
 } from "@/constants/importantFiles"
 import type { Asset, AssetMetadataInput, AssetsPage, UploadPlan, UploadRequest } from "@/types/importantFiles"
 import type { Viewer } from "@/types/auth"
-import { visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import {
   abortMultipartUpload,
   buildStorageKey,
@@ -307,4 +307,42 @@ export async function assetText(viewer: Viewer, id: string, maxBytes: number): P
   // Read through the SDK, which retries a failed read, rather than fetching a signed link once
   const bytes = await getObjectBytes(record.storageKey)
   return bytes ? bytes.toString("utf8") : null
+}
+
+/**
+ * Deletes several files at once: the ones named by `ids`, or every file the search and type cover
+ * when `ids` is left out. **The object goes before its record**, one file at a time, which is the
+ * rule the single delete follows: a storage failure then leaves the record rather than losing track
+ * of a stored file, and the file can be deleted again. A file whose object cannot be removed keeps
+ * its record and is counted as not deleted. Ticked files follow the single delete and stay inside
+ * what the viewer may see; a whole filter only ever reaches the viewer's own files.
+ */
+export async function deleteAssets(
+  viewer: Viewer,
+  filters: { search: string; type: AssetFilterId },
+  ids?: string[]
+): Promise<{ deleted: number; failed: number }> {
+  await connectDatabase()
+  const matchingFiles = [
+    ids ? visibleTo(viewer) : ownedBy(viewer),
+    ...matching(filters.search),
+    ...inCategory(filters.type),
+    ...(ids ? [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] : []),
+  ]
+  const records = (await AssetFile.find({ $and: matchingFiles }).lean()) as unknown as StoredAsset[]
+  let deleted = 0
+  let failed = 0
+  for (const record of records) {
+    try {
+      if (record.uploadId) await abortMultipartUpload(record.storageKey, record.uploadId)
+      await deleteObject(record.storageKey)
+      await AssetFile.deleteOne({ _id: record._id })
+      deleted += 1
+    } catch (error: unknown) {
+      // The record stays, so the file is still listed and can be deleted again
+      console.error("Important Files bulk delete: one file could not be removed:", error instanceof Error ? error.message : error)
+      failed += 1
+    }
+  }
+  return { deleted, failed }
 }

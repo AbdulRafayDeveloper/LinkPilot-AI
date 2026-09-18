@@ -5,6 +5,8 @@ import { NotebookPen, Save, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { SavedNotesList } from "@/components/quick-notes/SavedNotesList"
+import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
+import { useRowSelection } from "@/hooks/useRowSelection"
 import { ClearNotesDialog } from "@/components/quick-notes/ClearNotesDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
@@ -38,6 +40,9 @@ export default function QuickNotesClient() {
   const [isConfirmingClear, setIsConfirmingClear] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
   const [clearError, setClearError] = useState<string | null>(null)
+  // Deleting the ticked notes, which is confirmed the same way Clear All is
+  const [isConfirmingPicked, setIsConfirmingPicked] = useState(false)
+  const [isDeletingPicked, setIsDeletingPicked] = useState(false)
   const { content } = useToolStore(draftStore)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
@@ -142,6 +147,30 @@ export default function QuickNotesClient() {
     }
   }
 
+  const selection = useRowSelection(feed.notes.map((note) => note.id))
+
+  /** Deletes the ticked notes in one call, behind the same kind of confirmation as Clear All. */
+  const deletePicked = async () => {
+    if (isDeletingPicked) return
+    setIsDeletingPicked(true)
+    setClearError(null)
+    try {
+      await requestApi<{ deleted: number }>(QUICK_NOTES_ENDPOINT, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...selection.pickedIds] }),
+      })
+      selection.clear()
+      setIsConfirmingPicked(false)
+      setReloadAttempt((attempt) => attempt + 1)
+    } catch (reason: unknown) {
+      setClearError(reason instanceof Error ? reason.message : QUICK_NOTES_MESSAGES.clearFailed)
+      setIsConfirmingPicked(false)
+    } finally {
+      setIsDeletingPicked(false)
+    }
+  }
+
   const clearAll = async () => {
     if (isClearing) return
     setIsClearing(true)
@@ -203,6 +232,15 @@ export default function QuickNotesClient() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0">
+              <BulkDeleteBar
+                pickedCount={selection.pickedIds.size}
+                total={null}
+                noun={{ one: "note", many: "notes" }}
+                isBusy={isDeletingPicked}
+                onDeletePicked={() => setIsConfirmingPicked(true)}
+                onClear={selection.clear}
+              />
+
               <SavedNotesList
                 notes={feed.notes}
                 total={feed.total}
@@ -211,6 +249,8 @@ export default function QuickNotesClient() {
                 hasMore={feed.nextCursor !== null}
                 error={listError}
                 deletingIds={deletingIds}
+                pickedIds={selection.pickedIds}
+                onPick={selection.pick}
                 onRetry={reload}
                 onLoadMore={loadMore}
                 onDelete={deleteNote}
@@ -283,6 +323,15 @@ export default function QuickNotesClient() {
         </main>
       </div>
 
+      {isConfirmingPicked && (
+        <ConfirmBulkDelete
+          count={selection.pickedIds.size}
+          noun={{ one: "note", many: "notes" }}
+          isDeleting={isDeletingPicked}
+          onConfirm={() => void deletePicked()}
+          onClose={() => setIsConfirmingPicked(false)}
+        />
+      )}
       {isConfirmingClear && (
         <ClearNotesDialog
           total={feed.total}

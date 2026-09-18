@@ -135,6 +135,12 @@ const TOOL_SEO: Record<string, { title: string; description: string; keywords: s
       "Make a clean post image in your own brand colours, with your own photo in it, from whatever the post is about.",
     keywords: ["post image generator", "LinkedIn post image", "brand image creator", "AI post graphic"],
   },
+  clients: {
+    title: "Clients and Projects Manager",
+    description:
+      "Keep every client with the message format they expect and their sample messages, and the projects you are doing for each of them.",
+    keywords: ["client manager", "client projects", "manage clients", "client work tracker"],
+  },
   "conversation-reply": {
     title: "LinkedIn Conversation Reply Analyzer",
     description:

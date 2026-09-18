@@ -34,6 +34,9 @@ interface AssetGridProps {
   // True while a search or a filter is in effect, so "nothing found" reads differently from "nothing saved"
   isFiltering: boolean
   busyId: string | null
+  // Which files are ticked for deleting several at once, and how a tick is made
+  pickedIds: ReadonlySet<string>
+  onPick: (id: string, isRange: boolean) => void
   onRetry: () => void
   onLoadMore: () => void
   onView: (asset: Asset) => void
@@ -81,13 +84,15 @@ const CenteredState: React.FC<{ icon: React.ReactNode; text: string; children?: 
  */
 const AssetCard: React.FC<{
   asset: Asset
+  isPicked: boolean
+  onPick: (id: string, isRange: boolean) => void
   isBusy: boolean
   onView: (asset: Asset) => void
   onDownload: (asset: Asset) => void
   onCopy: (asset: Asset) => Promise<boolean>
   onEdit: (asset: Asset) => void
   onDelete: (asset: Asset) => void
-}> = ({ asset, isBusy, onView, onDownload, onCopy, onEdit, onDelete }) => {
+}> = ({ asset, isPicked, onPick, isBusy, onView, onDownload, onCopy, onEdit, onDelete }) => {
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false)
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "failed">("idle")
   const { icon: CategoryIcon } = assetCategory(asset.category)
@@ -104,10 +109,21 @@ const AssetCard: React.FC<{
 
   return (
     <li
-      className={`flex flex-col overflow-hidden rounded-2xl border border-outline-variant bg-white shadow-sm transition-opacity ${
-        isBusy ? "opacity-50" : ""
-      }`}
+      className={`relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-opacity ${
+        isPicked ? "border-primary" : "border-outline-variant"
+      } ${isBusy ? "opacity-50" : ""}`}
     >
+      {/* Ticking a file picks it for deleting several at once */}
+      <label className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-white/90 shadow-sm">
+        <input
+          type="checkbox"
+          checked={isPicked}
+          disabled={isBusy}
+          onChange={(event) => onPick(asset.id, (event.nativeEvent as MouseEvent).shiftKey)}
+          aria-label={`Pick ${asset.name}`}
+          className="h-4 w-4 accent-primary"
+        />
+      </label>
       {/* What the file looks like, for the kinds that look like anything */}
       <button
         type="button"
@@ -243,6 +259,8 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   error,
   isFiltering,
   busyId,
+  pickedIds,
+  onPick,
   onRetry,
   onLoadMore,
   onView,
@@ -321,6 +339,8 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
           <AssetCard
             key={asset.id}
             asset={asset}
+            isPicked={pickedIds.has(asset.id)}
+            onPick={onPick}
             isBusy={busyId === asset.id}
             onView={onView}
             onDownload={onDownload}

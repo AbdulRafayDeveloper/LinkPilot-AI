@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { AlertCircle, Check, Loader2, Plus, Repeat, RefreshCw, Trash2 } from "lucide-react"
 import { SortableList } from "@/components/ui/SortableList"
+import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { fetchWithRetry, requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
 import { EMPLOYEES_ENDPOINT, EMPLOYEE_MESSAGES, PLAN_ITEM_MAX_LENGTH, PLAN_MAX_ITEMS, PLAN_NOTES_MAX_LENGTH, PLAN_SAVE_DELAY_MS } from "@/constants/employees"
@@ -28,7 +29,7 @@ const planUrl = (employeeId: string) => `${EMPLOYEES_ENDPOINT}/${employeeId}/pla
 // Every call names the day this browser is on; the day it is written to is the employee's own
 const toInput = (draft: Pick<Draft, "items" | "notes">): EmployeePlanInput => ({
   today: todayIso(),
-  items: draft.items.map(({ id, text }) => ({ id, text })),
+  items: draft.items.map(({ id, text, description, image }) => ({ id, text, description, image: image ? { assetId: image.assetId, contentType: image.contentType } : null })),
   notes: draft.notes,
 })
 const getId = (item: PlanItem) => item.id
@@ -104,6 +105,7 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
   const [tickError, setTickError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [newItem, setNewItem] = useState("")
+  const [detailsError, setDetailsError] = useState<string | null>(null)
   const [history, setHistory] = useState<PlanHistoryPage | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
@@ -280,7 +282,10 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
   const addItem = () => {
     const text = newItem.trim()
     if (!text || !draft || draft.items.length >= PLAN_MAX_ITEMS) return
-    edit((latest) => ({ items: [...latest.items, { id: newItemId(), text, done: false, completedAt: null, reason: "" }], notes: latest.notes }))
+    edit((latest) => ({
+      items: [...latest.items, { id: newItemId(), text, description: "", image: null, done: false, completedAt: null, reason: "" }],
+      notes: latest.notes,
+    }))
     setNewItem("")
   }
 
@@ -369,9 +374,9 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
             )}
           </div>
 
-          {tickError && (
+          {(tickError || detailsError) && (
             <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
-              {tickError}
+              {tickError || detailsError}
             </p>
           )}
 
@@ -381,6 +386,8 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
             getLabel={getLabel}
             onReorder={reorder}
             label="Plan items"
+            multiSelect
+            itemNoun="tasks"
             className="flex flex-col gap-1.5"
             renderItem={(item, handle) => (
               // Aligned to the top, so the handle, the checkbox and delete stay by the first line of a long task
@@ -403,6 +410,28 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
                   />
                   {/* What the employee said about this task; only they can write or change it */}
                   <TaskReason reason={item.reason} taskText={item.text} isDone={item.done} />
+                  {/* The same optional detail a Daily Task carries; the employee sees it on their link */}
+                  <TaskDetailsFields
+                    idPrefix={`plan-${item.id}`}
+                    details={{ description: item.description, file: null, image: item.image ? { assetId: item.image.assetId, contentType: item.image.contentType } : null }}
+                    savedImageUrl={item.image?.url ?? null}
+                    onChange={(details) =>
+                      edit((latest) => ({
+                        items: latest.items.map((entry) =>
+                          entry.id === item.id
+                            ? {
+                                ...entry,
+                                description: details.description,
+                                // A file just chosen has no link yet; the preview comes back with the next read
+                                image: details.image ? { ...details.image, url: entry.image?.url ?? "" } : null,
+                              }
+                            : entry
+                        ),
+                        notes: latest.notes,
+                      }))
+                    }
+                    onError={setDetailsError}
+                  />
                 </div>
                 {item.completedAt && <span className="mt-2 hidden shrink-0 text-[11px] text-outline sm:inline">Done {tickTime(item.completedAt)}</span>}
                 <button

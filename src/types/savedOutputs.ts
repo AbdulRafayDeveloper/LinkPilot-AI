@@ -1,3 +1,5 @@
+import type { PromptDependency } from "./promptCreator"
+
 /**
  * One thing a tool wrote, read back from that tool's own collection and shaped the same way for
  * every tool, so one table can list notes, messages, comments, replies and prompts alike.
@@ -27,6 +29,11 @@ export interface SavedOutput {
   provider?: string | null
   // The folder it is filed in, for a tool that has folders; null when it is in none
   folder?: { id: string; name: string } | null
+  // When the user marked it as one they have used, for a tool that can be marked; null while unused
+  appliedAt?: string | null
+  // The records this one waits for, for a tool whose records have dependencies (Prompt Creator).
+  // Empty means it waits for nothing, which is how every record saved before this reads
+  dependencies?: PromptDependency[]
 }
 
 /** One record with the whole text it was written from. */
@@ -56,6 +63,8 @@ export interface SavedOutputFilters {
   context: string
   // A folder id, UNFILED_FOLDER for the records in no folder, or "" for every folder
   folder: string
+  // "independent", "ready", "blocked", or "" for records in any state
+  dependencies: string
   from: string | null
   to: string | null
 }

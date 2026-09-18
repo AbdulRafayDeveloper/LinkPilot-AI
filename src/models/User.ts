@@ -11,6 +11,8 @@ export interface IUser {
   passwordHash: string
   role: UserRole
   sessionVersion: number
+  // The tools an admin has turned off for this account; empty for everyone by default
+  disabledTools: string[]
   // Wrong passwords in a row, for the lockout; reset by a good sign-in
   failedLogins: number
   lockedUntil: Date | null
@@ -30,6 +32,7 @@ const UserSchema = new Schema<IUser>(
     passwordHash: { type: String, required: true },
     role: { type: String, enum: USER_ROLES, required: true, default: "user" },
     sessionVersion: { type: Number, required: true, default: 1 },
+    disabledTools: { type: [String], default: [] },
     failedLogins: { type: Number, required: true, default: 0 },
     loginCount: { type: Number, required: true, default: 0 },
     failedLoginCount: { type: Number, required: true, default: 0 },

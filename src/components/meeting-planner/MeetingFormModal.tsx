@@ -8,7 +8,9 @@ import {
   MEETING_PLANNER_MESSAGES,
   PERSON_NAME_MAX_LENGTH,
   PREP_INPUT_MAX_LENGTH,
+  PROFILE_LINK_MAX_LENGTH,
 } from "@/constants/meetingPlanner"
+import { findProfileLink } from "@/lib/profileLink"
 import type { MeetingPlanDetail } from "@/types/meetingPlanner"
 import { TimeField } from "./TimeField"
 
@@ -17,6 +19,7 @@ export interface MeetingFormValues {
   meetingDate: string
   meetingTime: string
   personName: string
+  profileLink: string
   prepEnabled: boolean
   profileInfo: string
   conversationHistory: string
@@ -44,6 +47,7 @@ export const emptyMeetingForm = (date: string, time: string): MeetingFormValues 
   meetingDate: date,
   meetingTime: time,
   personName: "",
+  profileLink: "",
   prepEnabled: false,
   profileInfo: "",
   conversationHistory: "",
@@ -55,6 +59,7 @@ export const formValuesOf = (meeting: MeetingPlanDetail): MeetingFormValues => (
   meetingDate: meeting.meetingDate,
   meetingTime: meeting.meetingTime,
   personName: meeting.personName ?? "",
+  profileLink: meeting.profileLink ?? "",
   prepEnabled: meeting.prepEnabled,
   profileInfo: meeting.profileInfo ?? "",
   conversationHistory: meeting.conversationHistory ?? "",
@@ -78,6 +83,18 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
   const nameRef = useRef<HTMLInputElement>(null)
   const set = <K extends keyof MeetingFormValues>(key: K, value: MeetingFormValues[K]) =>
     setValues((current) => ({ ...current, [key]: value }))
+
+  /**
+   * A profile is usually pasted in whole, with the person's address somewhere inside it, so the
+   * link field fills itself from that paste rather than being typed a second time. It only ever
+   * fills a blank field: a link already there, whether it was typed, saved earlier or found in an
+   * earlier paste, is never replaced by a later one.
+   */
+  const setProfileInfo = (profileInfo: string) =>
+    setValues((current) => {
+      const found = current.profileLink.trim() ? "" : findProfileLink(profileInfo)
+      return { ...current, profileInfo, ...(found ? { profileLink: found } : {}) }
+    })
 
   const hasPrepInput = Boolean(
     values.profileInfo.trim() || values.conversationHistory.trim() || values.additionalInfo.trim()
@@ -176,6 +193,25 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
               className={fieldClass}
             />
           </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="meeting-profile-link" className={labelClass}>
+              Profile link <span className="normal-case tracking-normal">(optional)</span>
+            </label>
+            <input
+              id="meeting-profile-link"
+              type="url"
+              inputMode="url"
+              value={values.profileLink}
+              onChange={(event) => set("profileLink", event.target.value)}
+              maxLength={PROFILE_LINK_MAX_LENGTH}
+              disabled={isSaving}
+              placeholder="linkedin.com/in/omar-siddiqui"
+              className={fieldClass}
+            />
+            <p className="mt-1 text-[11px] text-outline">
+              Opens straight from the meeting during the call. Paste a profile below and this fills itself in.
+            </p>
+          </div>
         </div>
 
         <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-outline-variant bg-surface-container-low p-3">
@@ -237,7 +273,7 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
                 <textarea
                   id={`meeting-${key}`}
                   value={values[key]}
-                  onChange={(event) => set(key, event.target.value)}
+                  onChange={(event) => (key === "profileInfo" ? setProfileInfo(event.target.value) : set(key, event.target.value))}
                   maxLength={PREP_INPUT_MAX_LENGTH}
                   disabled={isSaving}
                   rows={rows}

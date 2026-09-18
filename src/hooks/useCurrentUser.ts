@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react"
 import { requestApi } from "@/lib/apiClient"
 import { AUTH_ENDPOINTS } from "@/constants/auth"
+import { toolsFor } from "@/constants/linkedinTools"
 import type { Viewer } from "@/types/auth"
 
 /**
@@ -43,4 +44,13 @@ export function useCurrentUser(): CurrentUser {
 export function useIsAdmin(): boolean {
   const { user } = useCurrentUser()
   return user?.role === "admin"
+}
+
+/**
+ * The tools this account may use. While the account is still loading nothing is hidden yet, which
+ * is why a tool that is off is also refused by its page and its API rather than only left out here.
+ */
+export function useVisibleTools() {
+  const { user } = useCurrentUser()
+  return toolsFor(user?.role === "admin", user?.disabledTools ?? [])
 }

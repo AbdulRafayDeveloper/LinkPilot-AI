@@ -5,6 +5,8 @@ import { Files, Plus, Search, X } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { AssetGrid } from "@/components/important-files/AssetGrid"
+import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
+import { useRowSelection } from "@/hooks/useRowSelection"
 import { AddAssetDialog } from "@/components/important-files/AddAssetDialog"
 import { EditAssetDialog } from "@/components/important-files/EditAssetDialog"
 import { DeleteAssetDialog } from "@/components/important-files/DeleteAssetDialog"
@@ -29,6 +31,9 @@ export default function ImportantFilesClient() {
   const [assets, setAssets] = useState<Asset[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
+  // Deleting several at once: which delete is waiting to be confirmed, and whether it is running
+  const [confirmingMany, setConfirmingMany] = useState<"picked" | "all" | null>(null)
+  const [isDeletingMany, setIsDeletingMany] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
@@ -240,6 +245,41 @@ export default function ImportantFilesClient() {
   }, [notice])
 
   const isFiltering = Boolean(search) || type !== "all"
+  const selection = useRowSelection(assets.map((asset) => asset.id))
+
+  /**
+   * Deletes the ticked files, or every file the search and type cover, in one call. Each file's
+   * object goes from storage before its record, so a file that cannot be removed stays listed and
+   * the answer says so. Final, and only from the confirmation.
+   */
+  const deleteMany = async (which: "picked" | "all") => {
+    if (isDeletingMany) return
+    setIsDeletingMany(true)
+    setListError(null)
+    try {
+      const params = new URLSearchParams()
+      if (search) params.set("search", search)
+      if (type !== "all") params.set("type", type)
+      const query = params.toString()
+      const { message } = await requestApi<{ deleted: number; failed: number }>(
+        `${IMPORTANT_FILES_ENDPOINT}${query ? `?${query}` : ""}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(which === "picked" ? { ids: [...selection.pickedIds] } : { all: true }),
+        }
+      )
+      selection.clear()
+      setConfirmingMany(null)
+      setNotice(message ?? IMPORTANT_FILES_MESSAGES.deleted)
+      reload()
+    } catch (reason: unknown) {
+      setListError(reason instanceof Error ? reason.message : IMPORTANT_FILES_MESSAGES.deleteFailed)
+      setConfirmingMany(null)
+    } finally {
+      setIsDeletingMany(false)
+    }
+  }
 
   return (
     <div className="font-body-md text-body-md flex h-screen min-h-screen overflow-hidden bg-background text-on-surface">
@@ -334,6 +374,17 @@ export default function ImportantFilesClient() {
               </p>
             )}
 
+            <BulkDeleteBar
+              pickedCount={selection.pickedIds.size}
+              total={total}
+              noun={{ one: "file", many: "files" }}
+              hasFilters={isFiltering}
+              isBusy={isDeletingMany}
+              onDeletePicked={() => setConfirmingMany("picked")}
+              onDeleteAll={() => setConfirmingMany("all")}
+              onClear={selection.clear}
+            />
+
             <AssetGrid
               assets={assets}
               isLoading={isLoading}
@@ -342,6 +393,8 @@ export default function ImportantFilesClient() {
               error={listError}
               isFiltering={isFiltering}
               busyId={busyId}
+              pickedIds={selection.pickedIds}
+              onPick={selection.pick}
               onRetry={reload}
               onLoadMore={loadMore}
               onView={setViewing}
@@ -362,6 +415,16 @@ export default function ImportantFilesClient() {
 
       {isAdding && (
         <AddAssetDialog progress={progress} onUpload={startUpload} onCancelUpload={cancelUpload} onClose={closeAdd} />
+      )}
+      {confirmingMany && (
+        <ConfirmBulkDelete
+          count={confirmingMany === "picked" ? selection.pickedIds.size : total}
+          noun={{ one: "file", many: "files" }}
+          alsoGoes="Each file is removed from storage as well; anything that cannot be removed stays listed."
+          isDeleting={isDeletingMany}
+          onConfirm={() => void deleteMany(confirmingMany)}
+          onClose={() => setConfirmingMany(null)}
+        />
       )}
       {viewing && (
         <AssetViewerDialog asset={viewing} onDownload={(asset) => void openLink(asset, true)} onClose={() => setViewing(null)} />

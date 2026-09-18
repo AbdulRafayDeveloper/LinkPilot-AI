@@ -1,22 +1,32 @@
 "use client"
 
-import React, { useRef } from "react"
+import React, { useRef, useState } from "react"
 import { CalendarDays, ListPlus, Loader2, Plus, X } from "lucide-react"
 import { INITIAL_TASK_ROWS, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
+import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
+import { emptyTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
+
+/** One row of the composer: the task's line, and the optional detail opened on it. */
+export interface TaskRow {
+  content: string
+  details: TaskDetailsDraft
+}
 
 interface TaskComposerProps {
   today: string
   taskDate: string
-  rows: string[]
+  rows: TaskRow[]
   isSaving: boolean
   error: string | null
   notice: string | null
   onDateChange: (date: string) => void
-  onRowsChange: (rows: string[]) => void
+  onRowsChange: (rows: TaskRow[]) => void
   onSubmit: () => void
 }
 
-export const emptyRows = (): string[] => Array.from({ length: INITIAL_TASK_ROWS }, () => "")
+export const emptyRow = (content = ""): TaskRow => ({ content, details: emptyTaskDetails() })
+
+export const emptyRows = (): TaskRow[] => Array.from({ length: INITIAL_TASK_ROWS }, () => emptyRow())
 
 const rowClass =
   "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
@@ -38,28 +48,34 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   onSubmit,
 }) => {
   const inputsRef = useRef<(HTMLInputElement | null)[]>([])
-  const filled = rows.filter((row) => row.trim()).length
+  // A file that will not upload belongs to the row it was chosen on, not to the whole save
+  const [detailsError, setDetailsError] = useState<string | null>(null)
+  const filled = rows.filter((row) => row.content.trim()).length
   const isFull = rows.length >= MAX_TASKS_PER_SUBMIT
 
   const focusRow = (index: number) => {
     window.requestAnimationFrame(() => inputsRef.current[index]?.focus())
   }
 
-  const setRow = (index: number, value: string) => {
-    onRowsChange(rows.map((row, position) => (position === index ? value : row)))
+  const setRow = (index: number, content: string) => {
+    onRowsChange(rows.map((row, position) => (position === index ? { ...row, content } : row)))
+  }
+
+  const setDetails = (index: number, details: TaskDetailsDraft) => {
+    onRowsChange(rows.map((row, position) => (position === index ? { ...row, details } : row)))
   }
 
   const addRow = (afterIndex = rows.length - 1) => {
     if (isFull) return
     const next = [...rows]
-    next.splice(afterIndex + 1, 0, "")
+    next.splice(afterIndex + 1, 0, emptyRow())
     onRowsChange(next)
     focusRow(afterIndex + 1)
   }
 
   const removeRow = (index: number) => {
     if (rows.length === 1) {
-      onRowsChange([""])
+      onRowsChange([emptyRow()])
       focusRow(0)
       return
     }
@@ -75,7 +91,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
       .filter((line) => line.trim())
     if (lines.length < 2) return
     event.preventDefault()
-    const next = [...rows.slice(0, index), ...lines, ...rows.slice(index + 1)].slice(0, MAX_TASKS_PER_SUBMIT)
+    const next = [...rows.slice(0, index), ...lines.map((line) => emptyRow(line)), ...rows.slice(index + 1)].slice(0, MAX_TASKS_PER_SUBMIT)
     onRowsChange(next)
     focusRow(Math.min(index + lines.length, next.length) - 1)
   }
@@ -93,7 +109,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
       return
     }
     // Backspace on an empty row closes it, the way a list in a notes app behaves
-    if (event.key === "Backspace" && rows[index] === "" && rows.length > 1) {
+    if (event.key === "Backspace" && rows[index].content === "" && rows.length > 1) {
       event.preventDefault()
       removeRow(index)
     }
@@ -145,32 +161,44 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         )}
       </div>
 
-      <ul className="custom-scrollbar flex max-h-[42vh] flex-col gap-2 overflow-y-auto pr-1 lg:max-h-none lg:overflow-visible">
+      <ul className="custom-scrollbar flex max-h-[52vh] flex-col gap-2 overflow-y-auto pr-1 lg:max-h-none lg:overflow-visible">
         {rows.map((row, index) => (
-          <li key={index} className="flex items-center gap-2">
-            <input
-              ref={(element) => {
-                inputsRef.current[index] = element
-              }}
-              value={row}
-              onChange={(event) => setRow(index, event.target.value)}
-              onKeyDown={(event) => handleKeyDown(index, event)}
-              onPaste={(event) => pasteRows(index, event)}
-              maxLength={TASK_MAX_LENGTH}
-              disabled={isSaving}
-              aria-label={`Task ${index + 1}`}
-              placeholder={index === 0 ? "What needs doing today?" : "Another task"}
-              className={rowClass}
-            />
-            <button
-              type="button"
-              onClick={() => removeRow(index)}
-              disabled={isSaving || (rows.length === 1 && row === "")}
-              aria-label={`Remove task ${index + 1}`}
-              className="shrink-0 rounded-lg p-2 text-outline transition-colors hover:bg-surface-container-high hover:text-error disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <X size={16} aria-hidden="true" />
-            </button>
+          <li key={index} className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <input
+                ref={(element) => {
+                  inputsRef.current[index] = element
+                }}
+                value={row.content}
+                onChange={(event) => setRow(index, event.target.value)}
+                onKeyDown={(event) => handleKeyDown(index, event)}
+                onPaste={(event) => pasteRows(index, event)}
+                maxLength={TASK_MAX_LENGTH}
+                disabled={isSaving}
+                aria-label={`Task ${index + 1}`}
+                placeholder={index === 0 ? "What needs doing today?" : "Another task"}
+                className={rowClass}
+              />
+              <button
+                type="button"
+                onClick={() => removeRow(index)}
+                disabled={isSaving || (rows.length === 1 && row.content === "")}
+                aria-label={`Remove task ${index + 1}`}
+                className="shrink-0 rounded-lg p-2 text-outline transition-colors hover:bg-surface-container-high hover:text-error disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            {/* Closed until it is asked for, so a quick list of tasks is written exactly as before */}
+            <div className="pl-1">
+              <TaskDetailsFields
+                idPrefix={`task-row-${index}`}
+                details={row.details}
+                onChange={(details) => setDetails(index, details)}
+                onError={setDetailsError}
+                disabled={isSaving}
+              />
+            </div>
           </li>
         ))}
       </ul>
@@ -189,12 +217,12 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
       </div>
 
       <div className="min-h-[20px] text-[12px]" aria-live="polite">
-        {error && (
+        {(error || detailsError) && (
           <p role="alert" className="text-error">
-            {error}
+            {error || detailsError}
           </p>
         )}
-        {!error && notice && <p className="text-primary">{notice}</p>}
+        {!error && !detailsError && notice && <p className="text-primary">{notice}</p>}
       </div>
 
       <button

@@ -1,3 +1,4 @@
+import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { allOf, createdBetween, olderThanCursor, searchCondition, toCursor } from "@/lib/listQuery"
 import { PostImageModel, type IPostImage } from "@/models/PostImage"
@@ -6,7 +7,7 @@ import { HISTORY_PAGE_SIZE } from "@/constants/historyFilters"
 import { NO_PHOTO_FILTER, type AssetPoseId, type ImageSizeId } from "@/constants/postImages"
 import type { PostImage, PostImageFilters, PostImagesPage } from "@/types/postImages"
 import type { Viewer } from "@/types/auth"
-import { visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * The images made so far, newest first, in batches. Each one carries the settings it was made
@@ -105,4 +106,42 @@ export async function deletePostImage(viewer: Viewer, id: string): Promise<boole
   await deleteObject(record.storageKey)
   await PostImageModel.deleteOne(filter)
   return true
+}
+
+/**
+ * Deletes several images at once: the ones named by `ids`, or every image the filters cover when
+ * `ids` is left out. **The picture goes before its record**, one image at a time, the rule the
+ * single delete follows: a storage failure then leaves the record rather than leaving a stored
+ * picture nothing points at, and it can be deleted again. An image whose picture cannot be removed
+ * keeps its record and counts as not deleted. Ticked images stay inside what the viewer may see; a
+ * whole filter only ever reaches the viewer's own images.
+ */
+export async function deletePostImages(
+  viewer: Viewer,
+  filters: PostImageFilters,
+  ids?: string[]
+): Promise<{ deleted: number; failed: number }> {
+  await connectDatabase()
+  const matching = allOf([
+    ids ? visibleTo(viewer) : ownedBy(viewer),
+    searchCondition(filters.search, ["postContent", "assetName", "displayName"]),
+    filters.size ? { sizeId: filters.size } : null,
+    photoCondition(filters.photo),
+    createdBetween(filters.from, filters.to),
+    ids ? { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } } : null,
+  ])
+  const records = (await PostImageModel.find(matching).lean()) as unknown as StoredImage[]
+  let deleted = 0
+  let failed = 0
+  for (const record of records) {
+    try {
+      await deleteObject(record.storageKey)
+      await PostImageModel.deleteOne({ _id: record._id })
+      deleted += 1
+    } catch (error: unknown) {
+      console.error("Post images bulk delete: one image could not be removed:", error instanceof Error ? error.message : error)
+      failed += 1
+    }
+  }
+  return { deleted, failed }
 }

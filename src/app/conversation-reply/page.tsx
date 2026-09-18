@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import ConversationReplyClient from "./ConversationReplyClient"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("conversation-reply")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("conversation-reply", "/conversation-reply")
   return (
     <>
       {/* Breadcrumb schema markup */}

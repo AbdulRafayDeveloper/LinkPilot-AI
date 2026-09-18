@@ -1,10 +1,11 @@
+import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { allOf, searchCondition } from "@/lib/listQuery"
 import { ImportantContentModel, type IImportantContent } from "@/models/ImportantContent"
 import { HISTORY_PAGE_SIZE } from "@/constants/historyFilters"
 import type { ImportantContent, ImportantContentInput, ImportantContentPage } from "@/types/importantContent"
 import type { Viewer } from "@/types/auth"
-import { visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import { accountNames } from "@/services/auth/accounts"
 
 /**
@@ -35,6 +36,11 @@ async function listTypes(viewer: Viewer): Promise<string[]> {
   return types.filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
 }
 
+/** Exactly the entries a search and a type cover, so the list and a bulk delete can never differ. */
+function matchingFilter(viewer: Viewer, filters: { search: string; type: string }): Record<string, unknown> {
+  return allOf([visibleTo(viewer), searchCondition(filters.search, ["name"]), filters.type ? { type: filters.type } : null])
+}
+
 /**
  * One page of entries. A page past the end comes back as the last page rather than as nothing,
  * so deleting the last entry on the last page never leaves an empty screen.
@@ -42,7 +48,7 @@ async function listTypes(viewer: Viewer): Promise<string[]> {
 export async function listEntries(viewer: Viewer, filters: { page: number; search: string; type: string }): Promise<ImportantContentPage> {
   await connectDatabase()
   const pageSize = HISTORY_PAGE_SIZE
-  const matching = allOf([visibleTo(viewer), searchCondition(filters.search, ["name"]), filters.type ? { type: filters.type } : null])
+  const matching = matchingFilter(viewer, filters)
   const [total, types] = await Promise.all([ImportantContentModel.countDocuments(matching), listTypes(viewer)])
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const page = Math.min(Math.max(1, filters.page), totalPages)
@@ -75,4 +81,26 @@ export async function deleteEntry(viewer: Viewer, id: string): Promise<boolean> 
   await connectDatabase()
   const { deletedCount } = await ImportantContentModel.deleteOne(filter)
   return deletedCount > 0
+}
+
+/**
+ * Deletes several entries at once: the ones named by `ids`, or every entry the search and type
+ * cover when `ids` is left out. Both stay inside what the viewer may see, so a user only ever
+ * deletes their own. Answers how many were really deleted.
+ */
+export async function deleteEntries(
+  viewer: Viewer,
+  filters: { search: string; type: string },
+  ids?: string[]
+): Promise<{ deleted: number }> {
+  await connectDatabase()
+  // Ticked rows follow the per-record delete; a whole filter never reaches another account's entries
+  const matching = allOf([
+    ids ? visibleTo(viewer) : ownedBy(viewer),
+    searchCondition(filters.search, ["name"]),
+    filters.type ? { type: filters.type } : null,
+  ])
+  const chosen = ids ? { $and: [matching, { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] } : matching
+  const { deletedCount } = await ImportantContentModel.deleteMany(chosen)
+  return { deleted: deletedCount ?? 0 }
 }

@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import FollowUpMessageClient from "./FollowUpMessageClient"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("follow-up-message")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("follow-up-message", "/follow-up-message")
   return (
     <>
       {/* Breadcrumb schema markup */}

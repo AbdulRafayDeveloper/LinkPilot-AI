@@ -11,6 +11,7 @@ import {
   UserPlus,
   type LucideIcon,
 } from "lucide-react"
+import { CLIENTS_TOOL } from "./clients"
 import { CLIENT_MESSAGING_TOOL } from "./clientMessaging"
 import { CLIENT_VOICES_TOOL } from "./clientVoices"
 import { POST_IMAGES_HISTORY_HREF, POST_IMAGES_TOOL } from "./postImages"
@@ -133,6 +134,8 @@ export const LINKEDIN_TOOLS: LinkedInTool[] = [
  */
 export const APP_TOOLS: LinkedInTool[] = [
   ...LINKEDIN_TOOLS,
+  // The people the work is for come before what is written to them
+  CLIENTS_TOOL,
   { ...CLIENT_MESSAGING_TOOL, links: savedOutputPages("client-messaging") },
   { ...MESSAGE_REWRITER_TOOL, links: savedOutputPages("message-rewriter") },
   CLIENT_VOICES_TOOL,
@@ -148,8 +151,13 @@ export const APP_TOOLS: LinkedInTool[] = [
   ADMIN_TOOL,
 ]
 
-/** The tools a signed-in account may see: everything for an admin, everything but the admin area for a user. */
-export const toolsFor = (isAdmin: boolean) => APP_TOOLS.filter((tool) => isAdmin || !tool.adminOnly)
+/**
+ * The tools a signed-in account may see: everything for an admin, everything but the admin area
+ * for a user, less any tool an admin has turned off for that account. Hiding a tool is only the
+ * courtesy; its pages and its API refuse the account as well.
+ */
+export const toolsFor = (isAdmin: boolean, disabledTools: readonly string[] = []) =>
+  APP_TOOLS.filter((tool) => (isAdmin || !tool.adminOnly) && !(!isAdmin && disabledTools.includes(tool.id)))
 
 /** The tools the public surfaces (sitemap, manifest shortcuts) list, which never include the admin area. */
 export const PUBLIC_TOOLS = APP_TOOLS.filter((tool) => !tool.adminOnly)

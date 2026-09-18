@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { env } from "@/config/env"
 import { SESSION_COOKIE, readSession } from "@/lib/sessionToken"
-import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, LOGIN_PATH, SIGNUP_PATH } from "@/constants/auth"
+import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, LOGIN_PATH, REQUEST_PATH_HEADER, SIGNUP_PATH } from "@/constants/auth"
 import { PUBLIC_PLAN_ENDPOINT, PUBLIC_PLAN_PATH } from "@/constants/employees"
 
 /**
@@ -20,16 +20,27 @@ const isPlanLink = (pathname: string) => pathname.startsWith(`${PUBLIC_PLAN_PATH
 // Only a path inside the app, so ?next= can't send someone to another site after signing in
 const safeNext = (path: string) => (path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\") ? path : "/")
 
+/**
+ * Carries the path the request came in on, so `requireViewer` can tell which tool a route belongs
+ * to without every route having to name itself. It is set here and nowhere else; a header that
+ * arrived from outside is replaced rather than trusted.
+ */
+function withPath(request: NextRequest, pathname: string) {
+  const headers = new Headers(request.headers)
+  headers.set(REQUEST_PATH_HEADER, pathname)
+  return NextResponse.next({ request: { headers } })
+}
+
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl
   const signedIn = readSession(request.cookies.get(SESSION_COOKIE)?.value, env.AUTH_SECRET) !== null
 
   if (PUBLIC_PAGES.has(pathname)) {
     // Someone already signed in has nothing to do on the sign-in page
-    if (!signedIn) return NextResponse.next()
+    if (!signedIn) return withPath(request, pathname)
     return NextResponse.redirect(new URL(safeNext(request.nextUrl.searchParams.get("next") ?? "/"), request.url))
   }
-  if (PUBLIC_API.has(pathname) || isPlanLink(pathname) || signedIn) return NextResponse.next()
+  if (PUBLIC_API.has(pathname) || isPlanLink(pathname) || signedIn) return withPath(request, pathname)
 
   if (pathname.startsWith("/api/")) {
     const response = NextResponse.json({ success: false, message: AUTH_MESSAGES.signInRequired }, { status: 401 })

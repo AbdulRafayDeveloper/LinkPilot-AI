@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import TrendingTopicsClient from "./TrendingTopicsClient"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("trending-topics")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("trending-topics", "/trending-topics")
   return (
     <>
       {/* Breadcrumb schema markup */}

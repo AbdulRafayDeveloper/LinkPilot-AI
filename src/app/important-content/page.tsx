@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { SITE_URL } from "@/config/env"
 import ImportantContentClient from "./ImportantContentClient"
+import { requireFeaturePage } from "@/app/featurePage"
 
 export const metadata: Metadata = pageMetadata("important-content")
 
-export default function Page() {
+export default async function Page() {
+  await requireFeaturePage("important-content", "/important-content")
   return (
     <>
       {/* Breadcrumb schema markup */}

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { EmployeeSchema, EmployeesQuerySchema } from "@/lib/validation/employees"
 import { EMPLOYEE_MESSAGES } from "@/constants/employees"
-import { createEmployee, listEmployees } from "@/services/employees/employees"
+import { createEmployee, deleteEmployees, listEmployees } from "@/services/employees/employees"
+import { BulkDeleteSchema } from "@/lib/validation/listFilters"
 import { requireViewer } from "@/services/auth/viewer"
 import { withIdempotency } from "@/services/idempotency"
 
@@ -44,3 +45,29 @@ async function handlePost(req: NextRequest) {
 
 // A retry of the same request (same Idempotency-Key) gets the first answer back instead of running again
 export const POST = withIdempotency("employees", handlePost)
+
+/**
+ * DELETE (?search=&status=, body `{ ids }` or `{ all: true }`): removes several employees at once,
+ * the ticked ones or everyone the filters cover. Each takes their daily plans with them. Final, and
+ * only ever within the team the viewer may see.
+ */
+export async function DELETE(req: NextRequest) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
+  const body = BulkDeleteSchema.safeParse(await req.json().catch(() => null))
+  if (!body.success) {
+    return NextResponse.json({ success: false, message: body.error.issues[0]?.message || EMPLOYEE_MESSAGES.deleteFailed }, { status: 400 })
+  }
+  try {
+    // The same filters the list takes, read the same way, so a delete matches what was on screen
+    const filters = EmployeesQuerySchema.safeParse(Object.fromEntries(req.nextUrl.searchParams))
+    if (!filters.success) {
+      return NextResponse.json({ success: false, message: filters.error.issues[0]?.message || EMPLOYEE_MESSAGES.deleteFailed }, { status: 400 })
+    }
+    const { deleted } = await deleteEmployees(auth.viewer, filters.data, body.data.ids)
+    return NextResponse.json({ success: true, message: `${deleted} ${deleted === 1 ? "employee" : "employees"} deleted.`, data: { deleted } })
+  } catch (error: unknown) {
+    console.error("DELETE Employees (bulk) Exception:", error instanceof Error ? error.message : error)
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, EMPLOYEE_MESSAGES.deleteFailed) }, { status: 500 })
+  }
+}

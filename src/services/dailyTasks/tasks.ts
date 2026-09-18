@@ -1,8 +1,11 @@
+import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { shiftDate } from "@/lib/taskDates"
 import { DailyTask as DailyTaskModel, type IDailyTask } from "@/models/DailyTask"
 import { HISTORY_DAYS_PER_PAGE, VISIBLE_DAYS } from "@/constants/dailyTasks"
-import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks"
+import type { DailyTask, DailyTaskDay, DailyTasksPage, NewDailyTask } from "@/types/dailyTasks"
+import type { TaskImage, TaskImageView } from "@/types/taskAttachment"
+import { deleteTaskImages, taskImageViews } from "@/services/taskImages"
 import type { Viewer } from "@/types/auth"
 import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 
@@ -15,19 +18,32 @@ import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
  * first covers today and the six days before it; older days are paged, never loaded at once.
  */
 // Only what the list draws
-const TASK_FIELDS = "content taskDate isCompleted completedAt"
+const TASK_FIELDS = "content description image taskDate isCompleted completedAt"
 
 type StoredTask = Pick<IDailyTask, "content" | "taskDate" | "isCompleted" | "completedAt"> & {
   _id: { toString: () => string }
+  description?: string
+  image?: TaskImage | null
 }
 
-const toTask = (record: StoredTask): DailyTask => ({
+const toTask = (record: StoredTask, image: TaskImageView | null = null): DailyTask => ({
   id: record._id.toString(),
   content: record.content,
+  description: record.description ?? "",
+  image,
   taskDate: record.taskDate,
   isCompleted: record.isCompleted,
   completedAt: record.completedAt ? record.completedAt.toISOString() : null,
 })
+
+/**
+ * The same records with their images signed, in one round rather than one per task. A task with
+ * no image, or an image that cannot be signed, simply comes back without one.
+ */
+async function toTasks(records: StoredTask[]): Promise<DailyTask[]> {
+  const signed = await taskImageViews(records, (record) => record.image)
+  return records.map((record) => toTask(record, signed.get(record) ?? null))
+}
 
 /**
  * The oldest day the default view shows: today counts as one of the seven.
@@ -91,7 +107,7 @@ export async function listTasks(viewer: Viewer, today: string, page: number): Pr
   }
 
   return {
-    days: groupByDay(records.map(toTask)),
+    days: groupByDay(await toTasks(records)),
     page: current,
     pageCount,
     windowStart,
@@ -110,14 +126,23 @@ async function nextPosition(viewer: Viewer, taskDate: string): Promise<number> {
  * Adds a day's tasks in one write, after the tasks the day already has. The caller has already
  * dropped the empty rows.
  */
-export async function createTasks(viewer: Viewer, taskDate: string, contents: string[]): Promise<DailyTask[]> {
+export async function createTasks(viewer: Viewer, taskDate: string, tasks: NewDailyTask[]): Promise<DailyTask[]> {
   await connectDatabase()
   const start = await nextPosition(viewer, taskDate)
   const records = await DailyTaskModel.insertMany(
-    contents.map((content, index) => ({ ownerId: viewer.id, content, taskDate, position: start + index, isCompleted: false, completedAt: null })),
+    tasks.map((task, index) => ({
+      ownerId: viewer.id,
+      content: task.content,
+      description: task.description,
+      image: task.image,
+      taskDate,
+      position: start + index,
+      isCompleted: false,
+      completedAt: null,
+    })),
     { ordered: true }
   )
-  return (records as unknown as StoredTask[]).map(toTask)
+  return toTasks(records as unknown as StoredTask[])
 }
 
 /**
@@ -133,7 +158,7 @@ export async function setTaskCompletion(viewer: Viewer, id: string, isCompleted:
     { $set: { isCompleted, completedAt: isCompleted ? new Date() : null } },
     { new: true, projection: TASK_FIELDS, lean: true }
   )
-  return record ? toTask(record as unknown as StoredTask) : null
+  return record ? (await toTasks([record as unknown as StoredTask]))[0] : null
 }
 
 export type MoveResult = { task: DailyTask } | { error: "missing" | "stale-order" }
@@ -183,18 +208,35 @@ export async function moveTask(viewer: Viewer, id: string, taskDate: string, ord
   )
 
   const record = await DailyTaskModel.findOne(filter, TASK_FIELDS).lean()
-  return record ? { task: toTask(record as unknown as StoredTask) } : { error: "missing" }
+  return record ? { task: (await toTasks([record as unknown as StoredTask]))[0] } : { error: "missing" }
 }
 
 /**
  * Deletes one task. Returns false when it was already gone, so the page can say so instead of
  * leaving a row that no longer exists.
  */
+/**
+ * The images of the tasks a filter matches, read before those tasks go.
+ *
+ * Every path that removes a task goes through this: one task, the picked tasks, and the week-old
+ * cleanup. Without it a deleted task would leave its object in storage with nothing pointing at
+ * it. The records are removed first and the objects after, so a storage problem leaves an object
+ * nobody can reach rather than a task showing an image that is already gone; `deleteTaskImages`
+ * logs that and never fails the delete the user asked for.
+ */
+async function imagesOf(filter: Record<string, unknown>): Promise<(TaskImage | null | undefined)[]> {
+  const records = (await DailyTaskModel.find(filter, "image").lean()) as unknown as { image?: TaskImage | null }[]
+  return records.map((record) => record.image)
+}
+
 export async function deleteTask(viewer: Viewer, id: string): Promise<boolean> {
   const filter = visibleById(viewer, id)
   if (!filter) return false
   await connectDatabase()
+  // Read first, so the image can go with the task rather than being left in storage
+  const images = await imagesOf(filter)
   const { deletedCount } = await DailyTaskModel.deleteOne(filter)
+  if (deletedCount > 0) await deleteTaskImages(images)
   return deletedCount > 0
 }
 
@@ -204,6 +246,19 @@ export async function deleteTask(viewer: Viewer, id: string): Promise<boolean> {
  */
 export async function deleteTasksBeforeWindow(viewer: Viewer, today: string): Promise<number> {
   await connectDatabase()
-  const { deletedCount } = await DailyTaskModel.deleteMany({ taskDate: { $lt: windowStartFor(today) }, ...ownedBy(viewer) })
+  const filter = { taskDate: { $lt: windowStartFor(today) }, ...ownedBy(viewer) }
+  const images = await imagesOf(filter)
+  const { deletedCount } = await DailyTaskModel.deleteMany(filter)
+  await deleteTaskImages(images)
   return deletedCount
+}
+
+/** Deletes the tasks named by `ids`, inside the viewer's own tasks. Answers how many really went. */
+export async function deleteTasks(viewer: Viewer, ids: string[]): Promise<number> {
+  await connectDatabase()
+  const filter = { ...ownedBy(viewer), _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }
+  const images = await imagesOf(filter)
+  const { deletedCount } = await DailyTaskModel.deleteMany(filter)
+  await deleteTaskImages(images)
+  return deletedCount ?? 0
 }

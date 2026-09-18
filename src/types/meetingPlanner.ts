@@ -131,6 +131,8 @@ export interface MeetingPlan {
   status: MeetingPlanStatusId
   completedAt: string | null
   personName: string | null
+  // Their profile address, when one was typed or found in the pasted profile
+  profileLink: string | null
   prepEnabled: boolean
   prepStatus: PrepStatusId
   prepError: string | null

@@ -6,7 +6,7 @@ import { connectDatabase } from "@/lib/db"
 import { env } from "@/config/env"
 import { isEmbeddingConfigured, OpenAIEmbeddings } from "@/services/ai"
 import { MeetingVectorModel, type IMeetingVector } from "@/models/MeetingVector"
-import { meetingChunks, type MeetingChunk } from "@/lib/meetingChunks"
+import type { MeetingChunk } from "@/lib/meetingChunks"
 
 export interface MeetingMatch {
   kind: string
@@ -16,7 +16,6 @@ export interface MeetingMatch {
 }
 import { MATCHES_PER_QUESTION, MEETING_CHAT_MESSAGES, MIN_MATCH_SCORE, SEARCH_CANDIDATES } from "@/constants/meetingChat"
 import { UserFacingError } from "@/lib/errors"
-import type { MeetingPlanDetail } from "@/types/meetingPlanner"
 
 /**
  * The meeting's own vector database, in MongoDB.
@@ -110,21 +109,29 @@ export interface VectorState {
  * Makes sure this meeting's vectors match what the meeting holds now: nothing to do when the
  * fingerprint is unchanged, otherwise every piece is embedded and the old ones are replaced. Called
  * before a question is answered and after a preparation is saved.
+ *
+ * The caller cuts the meeting up and hands the pieces over, so the same store serves a meeting being
+ * prepared and a meeting that has already happened without knowing which is which.
  */
-export async function syncMeetingVectors(meeting: MeetingPlanDetail, ownerId: string | null, signal?: AbortSignal): Promise<VectorState> {
+export async function syncMeetingVectors(
+  meetingId: string,
+  pieces: MeetingChunk[],
+  ownerId: string | null,
+  signal?: AbortSignal
+): Promise<VectorState> {
   if (!isEmbeddingConfigured()) throw new UserFacingError(MEETING_CHAT_MESSAGES.embeddingsUnavailable)
   await connectDatabase()
   const model = env.OPENAI_EMBEDDING_MODEL as string
-  const chunks = meetingChunks(meeting).filter((chunk) => chunk.text.trim().length > 0)
+  const chunks = pieces.filter((chunk) => chunk.text.trim().length > 0)
   if (chunks.length === 0) {
-    await MeetingVectorModel.deleteMany({ meetingId: meeting.id })
+    await MeetingVectorModel.deleteMany({ meetingId })
     return { pieces: 0, rebuilt: false }
   }
 
   const sourceHash = fingerprint(chunks, model)
   const [current, saved] = await Promise.all([
-    MeetingVectorModel.countDocuments({ meetingId: meeting.id, sourceHash }),
-    MeetingVectorModel.countDocuments({ meetingId: meeting.id }),
+    MeetingVectorModel.countDocuments({ meetingId, sourceHash }),
+    MeetingVectorModel.countDocuments({ meetingId }),
   ])
   if (current === chunks.length && saved === chunks.length) return { pieces: chunks.length, rebuilt: false }
 
@@ -133,7 +140,7 @@ export async function syncMeetingVectors(meeting: MeetingPlanDetail, ownerId: st
   await ensureVectorIndex(vectors[0].length)
   const documents: Omit<IMeetingVector, "createdAt" | "updatedAt">[] = chunks.map((chunk, index) => ({
     ownerId,
-    meetingId: meeting.id,
+    meetingId,
     kind: chunk.kind,
     label: chunk.label,
     text: chunk.text,
@@ -144,9 +151,9 @@ export async function syncMeetingVectors(meeting: MeetingPlanDetail, ownerId: st
   // The old pieces go only once the new ones are written and searchable, so a question in flight
   // always has something to read and the next one never lands in the gap
   await MeetingVectorModel.insertMany(documents)
-  await waitForIndexed(meeting.id, sourceHash, vectors[0])
-  await MeetingVectorModel.deleteMany({ meetingId: meeting.id, sourceHash: { $ne: sourceHash } })
-  console.info("🧭 Meeting vectors written", { meeting: meeting.id, pieces: chunks.length, model })
+  await waitForIndexed(meetingId, sourceHash, vectors[0])
+  await MeetingVectorModel.deleteMany({ meetingId, sourceHash: { $ne: sourceHash } })
+  console.info("🧭 Meeting vectors written", { meeting: meetingId, pieces: chunks.length, model })
   return { pieces: chunks.length, rebuilt: true }
 }
 

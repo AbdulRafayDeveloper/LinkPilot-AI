@@ -5,11 +5,11 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { ChevronDown, Loader2, Search, X } from "lucide-react"
 import { BrandLogo } from "./BrandLogo"
-import { TOOL_GROUPS, toolsFor, type LinkedInTool, type ToolLink } from "@/constants/linkedinTools"
+import { TOOL_GROUPS, type LinkedInTool, type ToolLink } from "@/constants/linkedinTools"
 import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 import { markToolSeen, useToolActivity, type ActivityState } from "@/lib/toolActivity"
 import { useSidebarDropdowns } from "@/hooks/useSidebarDropdowns"
-import { useIsAdmin } from "@/hooks/useCurrentUser"
+import { useVisibleTools } from "@/hooks/useCurrentUser"
 
 interface SidebarProps {
   isOpen: boolean
@@ -241,7 +241,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
   const activity = useToolActivity()
   const dropdowns = useSidebarDropdowns()
   // The admin area appears only once the account is known to be an admin, never flashing for a user
-  const tools = toolsFor(useIsAdmin())
+  const tools = useVisibleTools()
   const [hint, setHint] = useState<RailHint | null>(null)
   const [query, setQuery] = useState("")
   const router = useRouter()

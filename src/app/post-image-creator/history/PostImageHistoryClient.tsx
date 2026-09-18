@@ -23,6 +23,8 @@ import { copyImageToClipboard } from "@/components/post-images/PostImageResult"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { useCursorList } from "@/hooks/useCursorList"
+import { useRowSelection } from "@/hooks/useRowSelection"
+import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { requestApi } from "@/lib/apiClient"
 import { appendDayRange, isBackwardsRange } from "@/lib/dayRange"
 import { HISTORY_DEBOUNCE_MS, HISTORY_MESSAGES } from "@/constants/historyFilters"
@@ -61,6 +63,9 @@ export default function PostImageHistoryClient() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [failedCopyId, setFailedCopyId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  // Deleting several at once: which delete is waiting to be confirmed, and whether it is running
+  const [confirmingMany, setConfirmingMany] = useState<"picked" | "all" | null>(null)
+  const [isDeletingMany, setIsDeletingMany] = useState(false)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
 
   // Typing settles before the gallery is asked for again, and an emptied search box counts at once
@@ -81,7 +86,35 @@ export default function PostImageHistoryClient() {
     idOf,
   })
   const images = list.items
+  const selection = useRowSelection(images.map((image) => image.id))
   const updateFilter = (key: keyof FilterState, value: string) => setFilters((current) => ({ ...current, [key]: value }))
+
+  /**
+   * Deletes the ticked images, or every image the filters cover, in one call. Each picture goes from
+   * storage before its record, so an image that cannot be removed stays listed and the answer says
+   * so. Final, and only from the confirmation.
+   */
+  const deleteMany = async (which: "picked" | "all") => {
+    if (isDeletingMany) return
+    setIsDeletingMany(true)
+    setActionError(null)
+    try {
+      const query = params.toString()
+      await requestApi<{ deleted: number; failed: number }>(`${POST_IMAGES_ENDPOINT}${query ? `?${query}` : ""}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(which === "picked" ? { ids: [...selection.pickedIds] } : { all: true }),
+      })
+      selection.clear()
+      setConfirmingMany(null)
+      list.retry()
+    } catch (reason: unknown) {
+      setActionError(reason instanceof Error ? reason.message : POST_IMAGES_MESSAGES.deleteFailed)
+      setConfirmingMany(null)
+    } finally {
+      setIsDeletingMany(false)
+    }
+  }
 
   const copy = async (image: PostImage) => {
     if (!image.imageUrl) return
@@ -180,6 +213,19 @@ export default function PostImageHistoryClient() {
               />
             </FilterPanel>
 
+            {list.hasAnswer && list.total > 0 && (
+              <BulkDeleteBar
+                pickedCount={selection.pickedIds.size}
+                total={list.total}
+                noun={{ one: "image", many: "images" }}
+                hasFilters={hasFilters}
+                isBusy={isDeletingMany}
+                onDeletePicked={() => setConfirmingMany("picked")}
+                onDeleteAll={() => setConfirmingMany("all")}
+                onClear={selection.clear}
+              />
+            )}
+
             {actionError && (
               <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
                 {actionError}
@@ -224,7 +270,23 @@ export default function PostImageHistoryClient() {
                 )}
                 <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {images.map((image) => (
-                    <li key={image.id} className="flex flex-col overflow-hidden rounded-2xl border border-outline-variant bg-white shadow-sm">
+                    <li
+                      key={image.id}
+                      className={`relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm ${
+                        selection.isPicked(image.id) ? "border-primary" : "border-outline-variant"
+                      }`}
+                    >
+                      {/* Ticking an image picks it for deleting several at once */}
+                      <label className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-white/90 shadow-sm">
+                        <input
+                          type="checkbox"
+                          checked={selection.isPicked(image.id)}
+                          disabled={isDeletingMany}
+                          onChange={(event) => selection.pick(image.id, (event.nativeEvent as MouseEvent).shiftKey)}
+                          aria-label={`Pick this image`}
+                          className="h-4 w-4 accent-primary"
+                        />
+                      </label>
                       <button
                         type="button"
                         onClick={() => setDetail(image)}
@@ -298,6 +360,16 @@ export default function PostImageHistoryClient() {
         </main>
       </div>
 
+      {confirmingMany && (
+        <ConfirmBulkDelete
+          count={confirmingMany === "picked" ? selection.pickedIds.size : list.total}
+          noun={{ one: "image", many: "images" }}
+          alsoGoes="The picture is removed from storage as well; anything that cannot be removed stays listed."
+          isDeleting={isDeletingMany}
+          onConfirm={() => void deleteMany(confirmingMany)}
+          onClose={() => setConfirmingMany(null)}
+        />
+      )}
       {detail && (
         <Modal
           title="How this image was made"

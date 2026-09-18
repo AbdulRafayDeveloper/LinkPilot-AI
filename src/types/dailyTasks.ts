@@ -1,13 +1,26 @@
+import type { TaskImage, TaskImageView } from "./taskAttachment"
+
 /**
  * One task, as the API serves it and the list shows it.
  */
 export interface DailyTask {
   id: string
   content: string
+  // The optional note under the task; empty on a plain task
+  description: string
+  // The image saved on it, with a short-lived link to show it from; null when it has none
+  image: TaskImageView | null
   // The calendar day the task belongs to (YYYY-MM-DD)
   taskDate: string
   isCompleted: boolean
   completedAt: string | null
+}
+
+/** One task as it is written: the line, and whatever optional detail was added with it. */
+export interface NewDailyTask {
+  content: string
+  description: string
+  image: TaskImage | null
 }
 
 /**

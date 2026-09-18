@@ -11,6 +11,9 @@ import { CalendarPlus, type LucideIcon } from "lucide-react"
  */
 export const MEETING_NAME_MAX_LENGTH = 160
 export const PERSON_NAME_MAX_LENGTH = 120
+// A link straight to the person: their LinkedIn, their site, wherever the profile was read from.
+// Long enough for the tracking tails a copied profile address usually carries
+export const PROFILE_LINK_MAX_LENGTH = 500
 // The three optional preparation inputs; a LinkedIn profile and a long chat both fit
 export const PREP_INPUT_MAX_LENGTH = 30_000
 // How far the calendar goes in either direction, so a year of meetings stays reachable
@@ -124,6 +127,8 @@ export const MEETING_PLANNER_MESSAGES = {
   projectsSaveFailed: "Couldn't save the projects. Please try again.",
   projectNameMissing: "Give the project a name.",
   projectLinkInvalid: "The link must be a web address, such as https://example.com.",
+  profileLinkInvalid: "The profile link must be a web address, such as https://linkedin.com/in/name.",
+  profileLinkTooLong: `The profile link must be under ${PROFILE_LINK_MAX_LENGTH} characters.`,
   emptyToday: "Nothing scheduled today.",
   emptyMonth: "No meetings this month.",
   emptyDay: "Nothing scheduled on this day.",
