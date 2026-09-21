@@ -11,6 +11,8 @@ export interface IImportantContent {
   name: string
   description: string
   type: string
+  // The size the description is shown at, in pixels; null (entries from before sizes) reads as the default
+  textSize: number | null
   createdAt: Date
   updatedAt: Date
 }
@@ -21,11 +23,12 @@ const ImportantContentSchema = new Schema<IImportantContent>(
     name: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     type: { type: String, required: true, trim: true },
+    textSize: { type: Number, default: null },
   },
   { timestamps: true, collection: "important_content" }
 )
-// Newest first with a stable tie-break for the pages, and one account's entries of one type for the filter
-ImportantContentSchema.index({ createdAt: -1, _id: -1 })
+// Last changed first with a stable tie-break for the pages, and one account's entries of one type for the filter
+ImportantContentSchema.index({ updatedAt: -1, _id: -1 })
 ImportantContentSchema.index({ ownerId: 1, type: 1 })
 
 export const ImportantContentModel =

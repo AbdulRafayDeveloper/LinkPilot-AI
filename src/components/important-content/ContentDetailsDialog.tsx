@@ -78,7 +78,7 @@ export const ContentDetailsDialog: React.FC<ContentDetailsDialogProps> = ({ entr
         </div>
         {entry.description ? (
           <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-4">
-            <RichTextView text={entry.description} />
+            <RichTextView text={entry.description} fontSize={entry.textSize} showImages />
           </div>
         ) : (
           <p className="rounded-xl border border-dashed border-outline-variant p-4 text-[13px] text-outline">No description saved.</p>

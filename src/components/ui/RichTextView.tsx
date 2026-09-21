@@ -1,4 +1,5 @@
 import React from "react"
+import Image from "next/image"
 import { Check } from "lucide-react"
 import { isSafeHref, parseRichText, type Inline, type RichList } from "@/lib/richText"
 
@@ -106,14 +107,27 @@ const ListView: React.FC<{ list: RichList }> = ({ list }) => {
   )
 }
 
+// In em, so a larger text size (Important Content's A+) makes the headings larger with it
 const HEADING_CLASS = {
-  1: "text-[18px] font-bold",
-  2: "text-[16px] font-bold",
-  3: "text-[14px] font-semibold",
+  1: "text-[1.3em] font-bold",
+  2: "text-[1.15em] font-bold",
+  3: "text-[1em] font-semibold",
 } as const
 
-export const RichTextView: React.FC<{ text: string; className?: string }> = ({ text, className = "" }) => (
-  <div className={`flex flex-col gap-3 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-on-surface-variant ${className}`}>
+interface RichTextViewProps {
+  text: string
+  className?: string
+  // The size the text is read at, in pixels; 14 unless the entry chose another
+  fontSize?: number
+  // Images are shown only where they belong (Important Content); anywhere else an image line reads as its address
+  showImages?: boolean
+}
+
+export const RichTextView: React.FC<RichTextViewProps> = ({ text, className = "", fontSize, showImages = false }) => (
+  <div
+    style={fontSize ? { fontSize: `${fontSize}px` } : undefined}
+    className={`flex flex-col gap-3 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-on-surface-variant ${className}`}
+  >
     {parseRichText(text).map((block, index) => {
       switch (block.kind) {
         case "heading": {
@@ -142,13 +156,32 @@ export const RichTextView: React.FC<{ text: string; className?: string }> = ({ t
           return (
             <pre
               key={index}
-              className="overflow-x-auto whitespace-pre rounded-lg border border-outline-variant bg-surface-container-low p-3 font-code text-[12.5px] leading-relaxed text-on-surface"
+              className="overflow-x-auto whitespace-pre rounded-lg border border-outline-variant bg-surface-container-low p-3 font-code text-[0.9em] leading-relaxed text-on-surface"
             >
               <code>{block.text}</code>
             </pre>
           )
         case "divider":
           return <hr key={index} className="border-outline-variant" />
+        case "image":
+          return showImages ? (
+            // Any size, from the app's own route or an https address, so it is shown as it is rather than optimised
+            <Image
+              key={index}
+              src={block.src}
+              alt={block.alt}
+              width={0}
+              height={0}
+              sizes="100vw"
+              unoptimized
+              className="h-auto w-auto max-w-full rounded-lg border border-outline-variant"
+            />
+          ) : (
+            <p key={index} className="break-all">
+              {block.alt ? `${block.alt}: ` : ""}
+              {block.src}
+            </p>
+          )
       }
     })}
   </div>

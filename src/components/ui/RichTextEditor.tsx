@@ -2,25 +2,50 @@
 
 import React, { useRef, useState, useSyncExternalStore } from "react"
 import {
+  AArrowDown,
+  AArrowUp,
   Bold,
   Code,
   Eye,
+  FileCode2,
   Heading1,
   Heading2,
   Heading3,
+  ImagePlus,
   Italic,
   Link2,
   List,
   ListChecks,
   ListOrdered,
+  Loader2,
   Minus,
   Pencil,
   Quote,
   SquareCode,
   Strikethrough,
+  Type,
+  Upload,
+  X,
   type LucideIcon,
 } from "lucide-react"
 import { RichTextView } from "./RichTextView"
+import { VisualEditor, type VisualEditorHandle } from "./VisualEditor"
+
+/** Adding pictures: where the file goes, and what to say when one can't be used. */
+export interface RichTextImages {
+  accept: string
+  maxBytes: number
+  // Stores one picture and answers the address the text names it by
+  upload: (file: File) => Promise<string>
+  messages: { unsupported: string; tooLarge: string; failed: string; badAddress: string }
+}
+
+/** The size the text is written and read at, chosen from a few steps with A− and A+. */
+export interface RichTextSize {
+  value: number
+  steps: readonly number[]
+  onChange: (size: number) => void
+}
 
 interface RichTextEditorProps {
   id: string
@@ -33,6 +58,12 @@ interface RichTextEditorProps {
   compact?: boolean
   // Names the field for assistive tech when no visible label points at it
   ariaLabel?: string
+  // Opens on a visual page that shows the formatting instead of the marks, with a Markdown tab beside it
+  visual?: boolean
+  images?: RichTextImages
+  textSize?: RichTextSize
+  // Grows to fill the space its parent gives it (a tall dialog), rather than a fixed number of rows
+  fill?: boolean
 }
 
 const COMPACT_TOOLS: ReadonlySet<ToolId> = new Set<ToolId>(["bold", "italic", "bullet", "number", "link"])
@@ -102,11 +133,81 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   placeholder,
   compact = false,
   ariaLabel,
+  visual = false,
+  images,
+  textSize,
+  fill = false,
 }) => {
   const ref = useRef<HTMLTextAreaElement>(null)
-  const [mode, setMode] = useState<"write" | "preview">("write")
+  const visualRef = useRef<VisualEditorHandle>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  // "visual" is the formatted page, "write" the Markdown text, "preview" the text shown formatted
+  const [mode, setMode] = useState<"visual" | "write" | "preview">(visual ? "visual" : "write")
+  // The address bar under the toolbar, for a link or an image, and what it has to say
+  const [bar, setBar] = useState<{ kind: "link" | "image"; address: string } | null>(null)
+  const [imageStatus, setImageStatus] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null })
   const isApple = useIsApple()
   const shortcut = (key: string) => `${isApple ? "⌘" : "Ctrl+"}${key}`
+  const fontSize = textSize?.value
+
+  /** Opens the address bar, keeping where the caret was so the link or image lands there. */
+  const openBar = (kind: "link" | "image") => {
+    visualRef.current?.keepSelection()
+    setImageStatus({ busy: false, error: null })
+    setBar({ kind, address: "" })
+  }
+
+  // An image line in the Markdown text, on a line of its own at the caret
+  const insertImageLine = (src: string) => {
+    const { start, end } = selection()
+    const before = start > 0 && value[start - 1] !== "\n" ? "\n" : ""
+    const text = `${before}![](${src})\n`
+    replace(start, end, text, start + text.length, start + text.length)
+  }
+
+  const placeImage = (src: string) => (mode === "visual" ? visualRef.current?.insertImage(src) : insertImageLine(src))
+
+  /** Checks, stores and places each picture in turn; one that can't be used says why and the rest carry on. */
+  const addImageFiles = async (files: File[]) => {
+    if (!images) return
+    const accepted = images.accept.split(",")
+    setImageStatus({ busy: true, error: null })
+    let problem: string | null = null
+    for (const file of files) {
+      if (!accepted.includes(file.type)) {
+        problem = images.messages.unsupported
+        continue
+      }
+      if (file.size > images.maxBytes) {
+        problem = images.messages.tooLarge
+        continue
+      }
+      try {
+        placeImage(await images.upload(file))
+      } catch (reason: unknown) {
+        problem = reason instanceof Error ? reason.message : images.messages.failed
+      }
+    }
+    setImageStatus({ busy: false, error: problem })
+    if (!problem) setBar(null)
+  }
+
+  const applyAddress = () => {
+    if (!bar) return
+    const address = bar.address.trim()
+    if (bar.kind === "image") {
+      if (!/^https:\/\/\S+$/i.test(address) || !images) {
+        setImageStatus({ busy: false, error: images?.messages.badAddress ?? null })
+        return
+      }
+      placeImage(address)
+    } else {
+      const href = /^(?:https?:\/\/|mailto:)/i.test(address) ? address : `https://${address}`
+      if (!address || /\s/.test(address)) return
+      visualRef.current?.insertLink(href)
+    }
+    setBar(null)
+  }
 
   /** Replaces a range and then selects [selectFrom, selectTo] in the new text. */
   const replace = (from: number, to: number, text: string, selectFrom: number, selectTo: number) => {
@@ -299,6 +400,11 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     : allTools
 
   const runTool = (tool: ToolId) => {
+    if (mode === "visual") {
+      if (tool === "link") openBar("link")
+      else visualRef.current?.run(tool)
+      return
+    }
     switch (tool) {
       case "bold":
         return toggleWrap("**", "bold text")
@@ -319,10 +425,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   }
 
-  const modeButton = (target: "write" | "preview", Icon: LucideIcon, label: string) => (
+  const modeButton = (target: "visual" | "write" | "preview", Icon: LucideIcon, label: string) => (
     <button
       type="button"
-      onClick={() => setMode(target)}
+      onClick={() => {
+        setMode(target)
+        setBar(null)
+      }}
       aria-pressed={mode === target}
       className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
         mode === target ? "bg-white text-on-surface shadow-sm" : "text-on-surface-variant hover:text-on-surface"
@@ -333,8 +442,19 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     </button>
   )
 
+  const toolButton = "flex h-8 w-8 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
+  const canFormat = mode !== "preview"
+  const sizeIndex = textSize ? textSize.steps.indexOf(textSize.value) : -1
+  const stepSize = (by: number) => {
+    if (!textSize) return
+    const next = textSize.steps[Math.min(textSize.steps.length - 1, Math.max(0, (sizeIndex === -1 ? textSize.steps.indexOf(14) : sizeIndex) + by))]
+    if (next !== undefined) textSize.onChange(next)
+  }
+
   return (
-    <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25">
+    <div
+      className={`overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25 ${fill ? "flex min-h-0 flex-1 flex-col" : ""}`}
+    >
       <div
         className={`flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant bg-surface-container-low ${compact ? "px-1 py-0.5" : "px-2 py-1.5"}`}
       >
@@ -346,25 +466,174 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => runTool(toolId)}
-                disabled={mode !== "write"}
+                disabled={!canFormat}
                 aria-label={label}
                 title={label}
-                className={`flex ${compact ? "h-7 w-7" : "h-8 w-8"} items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40`}
+                className={compact ? toolButton.replace("h-8 w-8", "h-7 w-7") : toolButton}
               >
                 <Icon size={compact ? 14 : 16} aria-hidden="true" />
               </button>
             </React.Fragment>
           ))}
+          {images && (
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => openBar("image")}
+              disabled={!canFormat || imageStatus.busy}
+              aria-label="Insert image"
+              title="Insert image (or paste or drop one in)"
+              className={toolButton}
+            >
+              <ImagePlus size={16} aria-hidden="true" />
+            </button>
+          )}
+          {textSize && (
+            <>
+              <span className="mx-1 h-5 w-px bg-outline-variant" aria-hidden="true" />
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => stepSize(-1)}
+                disabled={sizeIndex === 0}
+                aria-label="Decrease text size"
+                title="Decrease text size"
+                className={toolButton}
+              >
+                <AArrowDown size={16} aria-hidden="true" />
+              </button>
+              <span className="min-w-[44px] text-center text-[11px] font-semibold tabular-nums text-on-surface-variant" aria-live="polite">
+                <span className="sr-only">Text size </span>
+                {textSize.value}px
+              </span>
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => stepSize(1)}
+                disabled={sizeIndex === textSize.steps.length - 1}
+                aria-label="Increase text size"
+                title="Increase text size"
+                className={toolButton}
+              >
+                <AArrowUp size={16} aria-hidden="true" />
+              </button>
+            </>
+          )}
         </div>
         {!compact && (
           <div className="flex rounded-lg bg-surface-container p-0.5">
-            {modeButton("write", Pencil, "Write")}
-            {modeButton("preview", Eye, "Preview")}
+            {visual ? (
+              <>
+                {modeButton("visual", Type, "Visual")}
+                {modeButton("write", FileCode2, "Markdown")}
+              </>
+            ) : (
+              <>
+                {modeButton("write", Pencil, "Write")}
+                {modeButton("preview", Eye, "Preview")}
+              </>
+            )}
           </div>
         )}
       </div>
 
-      {compact || mode === "write" ? (
+      {bar && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-outline-variant bg-white px-3 py-2">
+          {bar.kind === "image" && images && (
+            <>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={imageStatus.busy}
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+              >
+                {imageStatus.busy ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Upload size={13} aria-hidden="true" />}
+                {imageStatus.busy ? "Adding image..." : "Upload from computer"}
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept={images.accept}
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  const files = [...(event.target.files ?? [])]
+                  event.target.value = ""
+                  if (files.length > 0) void addImageFiles(files)
+                }}
+              />
+              <span className="text-[12px] text-outline">or</span>
+            </>
+          )}
+          <label className="flex min-w-[200px] flex-1 items-center gap-2">
+            <span className="sr-only">{bar.kind === "image" ? "Image address" : "Link address"}</span>
+            <input
+              autoFocus
+              value={bar.address}
+              onChange={(event) => setBar({ ...bar, address: event.target.value })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault()
+                  applyAddress()
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setBar(null)
+                }
+              }}
+              placeholder={bar.kind === "image" ? "Paste an image address (https://...)" : "Link address (https://...)"}
+              className="h-8 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 text-[13px] text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={applyAddress}
+            disabled={!bar.address.trim() || imageStatus.busy}
+            className="whitespace-nowrap rounded-lg border border-outline-variant px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-50"
+          >
+            {bar.kind === "image" ? "Add image" : "Add link"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setBar(null)}
+            aria-label="Close"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-on-surface-variant hover:bg-surface-container-high"
+          >
+            <X size={15} aria-hidden="true" />
+          </button>
+          {imageStatus.error && (
+            <p role="alert" className="w-full text-[12px] text-error">
+              {imageStatus.error}
+            </p>
+          )}
+        </div>
+      )}
+      {!bar && imageStatus.busy && (
+        <p role="status" className="flex items-center gap-2 border-b border-outline-variant bg-white px-3 py-1.5 text-[12px] text-on-surface-variant">
+          <Loader2 size={13} className="animate-spin text-primary" aria-hidden="true" />
+          Adding image...
+        </p>
+      )}
+      {!bar && imageStatus.error && (
+        <p role="alert" className="border-b border-outline-variant bg-white px-3 py-1.5 text-[12px] text-error">
+          {imageStatus.error}
+        </p>
+      )}
+
+      {mode === "visual" ? (
+        <VisualEditor
+          ref={visualRef}
+          id={id}
+          value={value}
+          onChange={onChange}
+          fontSize={fontSize ?? 14}
+          placeholder={placeholder}
+          ariaLabel={ariaLabel}
+          onImageFiles={images ? (files) => void addImageFiles(files) : undefined}
+          onRequestLink={() => openBar("link")}
+        />
+      ) : compact || mode === "write" ? (
         <textarea
           ref={ref}
           id={id}
@@ -375,12 +644,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           rows={rows}
           placeholder={placeholder}
           aria-label={ariaLabel}
-          className={`block w-full resize-y border-0 bg-transparent ${compact ? "px-2.5 py-2 font-body-md text-[14px]" : "px-3 py-2.5 font-code text-[13px]"} leading-relaxed text-on-surface placeholder:text-outline focus:outline-none`}
+          style={fontSize ? { fontSize: `${Math.max(12, fontSize - 1)}px` } : undefined}
+          className={`block w-full border-0 bg-transparent ${fill ? "min-h-[320px] flex-1 resize-none" : "resize-y"} ${compact ? "px-2.5 py-2 font-body-md text-[14px]" : "px-3 py-2.5 font-code text-[13px]"} leading-relaxed text-on-surface placeholder:text-outline focus:outline-none`}
         />
       ) : (
         <div className="custom-scrollbar max-h-[55dvh] min-h-[240px] overflow-y-auto px-4 py-3">
           {value.trim() ? (
-            <RichTextView text={value} />
+            <RichTextView text={value} fontSize={fontSize} showImages={Boolean(images)} />
           ) : (
             <p className="text-[13px] text-outline">Nothing to preview yet.</p>
           )}

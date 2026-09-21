@@ -8,6 +8,8 @@ import { UserModel } from "@/models/User"
 import { ADMIN_MESSAGES } from "@/constants/admin"
 import { abortMultipartUpload, deleteObject, isStorageConfigured } from "@/services/storage/s3"
 import { removeRecordingFiles } from "@/services/meetings/recording"
+import { removeUnusedImages } from "@/services/importantContent/images"
+import { ImportantContentModel } from "@/models/ImportantContent"
 import { recordLoginEvent, type ClientInfo } from "@/services/auth/audit"
 import type { Viewer } from "@/types/auth"
 import type { AccountDeletion } from "@/types/admin"
@@ -79,10 +81,15 @@ export async function deleteAccount(admin: Viewer, id: string, confirmEmail: str
   const meetingIds = (await Meeting.find(owner, { _id: 1 }).lean()).map((meeting) => meeting._id)
   if (meetingIds.length > 0) await MeetingChunk.deleteMany({ meetingId: { $in: meetingIds } })
 
-  // 3. Every record the account owns, in every tool
+  // 3. Every record the account owns, in every tool. The images inside its Important Content are
+  // attachments: read before, removed after, once no entry left names them
+  const withImages = (await ImportantContentModel.find({ ...owner, description: /\/api\/important-content\/images\// }, { description: 1 }).lean()) as {
+    description?: string
+  }[]
   const counts = await Promise.all(
     SOURCES.map(async (source) => ({ title: titleOf(source), count: (await source.collection().deleteMany(owner)).deletedCount }))
   )
+  await removeUnusedImages(withImages.map((record) => record.description ?? ""))
 
   // 4. The account itself, last; its sessions stop working at once, because a session is checked against it
   await UserModel.deleteOne({ _id: id })

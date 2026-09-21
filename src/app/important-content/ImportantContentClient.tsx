@@ -135,11 +135,10 @@ export default function ImportantContentClient() {
   // A type chosen in the filter stays offered even if its last entry was just edited away
   const typeOptions = [...new Set([...(result?.types ?? []), ...(type ? [type] : [])])].map((entry) => ({ id: entry, label: entry }))
 
+  // The list is ordered by last change, so a new entry and an edited one both land at the top of page 1
   const saved = () => {
-    const isNew = dialog?.entry === null
     setDialog(null)
-    // A new entry is newest, so it lands on the first page; an edit stays where it is
-    if (isNew) setPage(1)
+    setPage(1)
     reload()
   }
 
@@ -292,7 +291,7 @@ export default function ImportantContentClient() {
                         <th scope="col" className="w-[36px] px-2 py-2.5">
                           <span className="sr-only">Picked</span>
                         </th>
-                        {["Name", "Type", "Description", "Updated", "Actions"].map((heading) => (
+                        {["Name", "Type", "Description", "Last changed", "Actions"].map((heading) => (
                           <th key={heading} scope="col" className={`px-3 py-2.5 ${historyLabelClass} ${heading === "Actions" ? "text-right" : ""}`}>
                             {heading}
                           </th>
@@ -389,7 +388,15 @@ export default function ImportantContentClient() {
         />
       )}
 
-      {dialog && <ContentDialog entry={dialog.entry} knownTypes={result?.types ?? []} onClose={() => setDialog(null)} onSaved={saved} />}
+      {dialog && (
+        <ContentDialog
+          entry={dialog.entry}
+          knownTypes={result?.types ?? []}
+          // An edit that auto-saved on the way is a change like any other, and moves to the top
+          onClose={(changed) => (changed ? saved() : setDialog(null))}
+          onSaved={saved}
+        />
+      )}
 
       {deleting && (
         <Modal

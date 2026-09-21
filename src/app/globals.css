@@ -51,3 +51,90 @@ body {
     font-size: 16px !important;
   }
 }
+
+/*
+ * The visual editor (components/ui/VisualEditor): the page a description is written on. Its elements
+ * are made by the browser while typing, so they are styled here rather than one by one, sized in em
+ * so the entry's own text size (A- and A+) scales all of them, and matching components/ui/RichTextView.
+ */
+@layer components {
+  .visual-editor > * + * {
+    @apply mt-3;
+  }
+  .visual-editor h1 {
+    @apply text-[1.3em] font-bold leading-snug text-on-surface;
+  }
+  .visual-editor h2 {
+    @apply text-[1.15em] font-bold leading-snug text-on-surface;
+  }
+  .visual-editor h3,
+  .visual-editor h4,
+  .visual-editor h5,
+  .visual-editor h6 {
+    @apply text-[1em] font-semibold leading-snug text-on-surface;
+  }
+  .visual-editor b,
+  .visual-editor strong {
+    @apply font-semibold text-on-surface;
+  }
+  .visual-editor s,
+  .visual-editor strike,
+  .visual-editor del {
+    @apply text-outline;
+  }
+  .visual-editor a {
+    @apply font-medium text-primary underline underline-offset-2;
+  }
+  .visual-editor ul {
+    @apply list-disc space-y-1 pl-5 marker:text-outline;
+  }
+  .visual-editor ol {
+    @apply list-decimal space-y-1 pl-5 marker:text-outline;
+  }
+  .visual-editor ul ul,
+  .visual-editor ol ol,
+  .visual-editor ul ol,
+  .visual-editor ol ul {
+    @apply mt-1;
+  }
+  .visual-editor ul[data-checklist] {
+    @apply list-none pl-0;
+  }
+  .visual-editor ul[data-checklist] > li {
+    @apply relative pl-6;
+  }
+  .visual-editor ul[data-checklist] > li[data-checked="true"] {
+    @apply text-outline line-through;
+  }
+  .visual-editor [data-checkbox] {
+    @apply absolute left-0 top-[0.3em] flex h-4 w-4 cursor-pointer select-none items-center justify-center rounded border border-outline-variant bg-white text-[11px] font-bold leading-none text-white no-underline;
+  }
+  .visual-editor li[data-checked="true"] > [data-checkbox] {
+    @apply border-primary bg-primary;
+  }
+  .visual-editor li[data-checked="true"] > [data-checkbox]::after {
+    content: "\2713";
+  }
+  .visual-editor blockquote {
+    @apply border-l-4 border-primary/40 bg-primary-fixed/20 py-1.5 pl-3 pr-2 italic;
+  }
+  .visual-editor code {
+    @apply rounded bg-surface-container px-1 py-0.5 font-code text-[0.92em] text-on-surface;
+  }
+  .visual-editor pre {
+    @apply overflow-x-auto whitespace-pre rounded-lg border border-outline-variant bg-surface-container-low p-3 font-code text-[0.9em] leading-relaxed text-on-surface;
+  }
+  .visual-editor pre code {
+    @apply bg-transparent p-0 text-[1em];
+  }
+  .visual-editor hr {
+    @apply border-outline-variant;
+  }
+  .visual-editor img {
+    @apply my-1 block h-auto max-w-full rounded-lg border border-outline-variant;
+  }
+  .visual-editor[data-empty="true"]::before {
+    content: attr(data-placeholder);
+    @apply pointer-events-none float-left h-0 text-outline;
+  }
+}

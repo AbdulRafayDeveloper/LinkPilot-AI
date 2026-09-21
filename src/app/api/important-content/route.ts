@@ -9,7 +9,7 @@ import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
-/** GET (?page=&search=&type=): One page of 50 entries, newest first, with every type the account uses. */
+/** GET (?page=&search=&type=): One page of 50 entries, the one changed last first, with every type the account uses. */
 export async function GET(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied

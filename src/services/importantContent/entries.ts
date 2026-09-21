@@ -3,14 +3,17 @@ import { connectDatabase } from "@/lib/db"
 import { allOf, searchCondition } from "@/lib/listQuery"
 import { ImportantContentModel, type IImportantContent } from "@/models/ImportantContent"
 import { HISTORY_PAGE_SIZE } from "@/constants/historyFilters"
+import { DEFAULT_CONTENT_TEXT_SIZE } from "@/constants/importantContent"
+import { removeUnusedImages } from "./images"
 import type { ImportantContent, ImportantContentInput, ImportantContentPage } from "@/types/importantContent"
 import type { Viewer } from "@/types/auth"
 import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import { accountNames } from "@/services/auth/accounts"
 
 /**
- * Important Content entries, read a page at a time: exactly HISTORY_PAGE_SIZE (50) to a page,
- * newest first, searched by name and filtered by type in the database. An entry belongs to the
+ * Important Content entries, read a page at a time: exactly HISTORY_PAGE_SIZE (50) to a page, the
+ * one changed last first (an edit, auto-saved or not, brings an entry to the top), searched by name
+ * and filtered by type in the database. An entry belongs to the
  * account that saved it; a user sees their own, an admin everyone's. The text is never logged.
  */
 
@@ -24,6 +27,7 @@ async function toEntries(viewer: Viewer, records: StoredEntry[]): Promise<Import
     name: record.name,
     description: record.description ?? "",
     type: record.type,
+    textSize: record.textSize ?? DEFAULT_CONTENT_TEXT_SIZE,
     owner: names ? (names.get(record.ownerId ?? "") ?? "Before accounts") : null,
     createdAt: new Date(record.createdAt).toISOString(),
     updatedAt: new Date(record.updatedAt).toISOString(),
@@ -53,7 +57,7 @@ export async function listEntries(viewer: Viewer, filters: { page: number; searc
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const page = Math.min(Math.max(1, filters.page), totalPages)
   const records = (await ImportantContentModel.find(matching)
-    .sort({ createdAt: -1, _id: -1 })
+    .sort({ updatedAt: -1, _id: -1 })
     .skip((page - 1) * pageSize)
     .limit(pageSize)
     .lean()) as unknown as StoredEntry[]
@@ -62,25 +66,32 @@ export async function listEntries(viewer: Viewer, filters: { page: number; searc
 
 export async function createEntry(viewer: Viewer, input: ImportantContentInput): Promise<ImportantContent> {
   await connectDatabase()
-  const record = await ImportantContentModel.create({ ownerId: viewer.id, ...input })
+  const record = await ImportantContentModel.create({ ownerId: viewer.id, ...input, textSize: input.textSize ?? DEFAULT_CONTENT_TEXT_SIZE })
   return (await toEntries(viewer, [record.toObject() as unknown as StoredEntry]))[0]
 }
 
-/** Replaces an entry's name, description and type. Null when it's gone or belongs to another account. */
+/**
+ * Replaces an entry's name, description and type, and its text size when one is sent (a caller that
+ * doesn't know about sizes leaves it as it was). Null when it's gone or belongs to another account.
+ */
 export async function updateEntry(viewer: Viewer, id: string, input: ImportantContentInput): Promise<ImportantContent | null> {
   const filter = visibleById(viewer, id)
   if (!filter) return null
   await connectDatabase()
-  const record = (await ImportantContentModel.findOneAndUpdate(filter, input, { returnDocument: "after", runValidators: true }).lean()) as unknown as StoredEntry | null
+  const changes = { name: input.name, description: input.description, type: input.type, ...(input.textSize === undefined ? {} : { textSize: input.textSize }) }
+  const record = (await ImportantContentModel.findOneAndUpdate(filter, { $set: changes }, { returnDocument: "after", runValidators: true }).lean()) as unknown as StoredEntry | null
   return record ? (await toEntries(viewer, [record]))[0] : null
 }
 
+/** Deletes one entry, then the images in it that no other entry uses (the record goes first). */
 export async function deleteEntry(viewer: Viewer, id: string): Promise<boolean> {
   const filter = visibleById(viewer, id)
   if (!filter) return false
   await connectDatabase()
-  const { deletedCount } = await ImportantContentModel.deleteOne(filter)
-  return deletedCount > 0
+  const record = (await ImportantContentModel.findOneAndDelete(filter, { projection: { description: 1 } }).lean()) as { description?: string } | null
+  if (!record) return false
+  await removeUnusedImages([record.description ?? ""])
+  return true
 }
 
 /**
@@ -101,6 +112,11 @@ export async function deleteEntries(
     filters.type ? { type: filters.type } : null,
   ])
   const chosen = ids ? { $and: [matching, { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] } : matching
+  // Their images are looked at first and removed after, once no entry left names them
+  const withImages = (await ImportantContentModel.find({ $and: [chosen, { description: /\/api\/important-content\/images\// }] }, { description: 1 }).lean()) as {
+    description?: string
+  }[]
   const { deletedCount } = await ImportantContentModel.deleteMany(chosen)
+  await removeUnusedImages(withImages.map((record) => record.description ?? ""))
   return { deleted: deletedCount ?? 0 }
 }

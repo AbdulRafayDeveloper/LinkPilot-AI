@@ -1,5 +1,6 @@
 import { z } from "zod"
 import {
+  CONTENT_TEXT_SIZES,
   CONTENT_DESCRIPTION_MAX_LENGTH,
   CONTENT_NAME_MAX_LENGTH,
   CONTENT_TYPE_MAX_LENGTH,
@@ -25,6 +26,11 @@ export const ImportantContentSchema = z.object({
     line,
     z.string({ error: IMPORTANT_CONTENT_MESSAGES.missingType }).min(1, IMPORTANT_CONTENT_MESSAGES.missingType).max(CONTENT_TYPE_MAX_LENGTH, IMPORTANT_CONTENT_MESSAGES.typeTooLong)
   ),
+  // Optional, so a caller that never heard of sizes keeps working and leaves the size alone
+  textSize: z
+    .number({ error: IMPORTANT_CONTENT_MESSAGES.badTextSize })
+    .refine((size) => (CONTENT_TEXT_SIZES as readonly number[]).includes(size), IMPORTANT_CONTENT_MESSAGES.badTextSize)
+    .optional(),
 })
 
 export const ImportantContentQuerySchema = z.object({

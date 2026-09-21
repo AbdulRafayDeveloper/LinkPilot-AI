@@ -13,8 +13,9 @@ interface ModalProps {
   isCloseDisabled?: boolean
   footer?: React.ReactNode
   initialFocusRef?: React.RefObject<HTMLElement | null>
-  // "large" fills most of the viewport (prompt editors); the body then lays out as a flex column
-  size?: "compact" | "default" | "large"
+  // "large" fills most of the viewport (prompt editors); "editor" is a writing page, wide and tall but
+  // with a margin all round, so it never reads as full screen. Both lay the body out as a flex column
+  size?: "compact" | "default" | "large" | "editor"
   children: React.ReactNode
 }
 
@@ -22,6 +23,8 @@ const PANEL_SIZE = {
   compact: "w-full max-w-md max-h-[92dvh]",
   default: "w-full max-w-3xl max-h-[92dvh]",
   large: "w-full max-w-[min(95vw,1600px)] h-[92dvh]",
+  // 2rem above and below on a laptop, 1.5rem on a phone, centred, never wider than a comfortable page
+  editor: "w-full max-w-[min(94vw,1240px)] h-[calc(100dvh-3rem)] sm:h-[calc(100dvh-4rem)] max-h-[1000px]",
 } as const
 
 /**
@@ -121,7 +124,7 @@ export const Modal: React.FC<ModalProps> = ({
         </div>
 
         <div
-          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4 ${size === "large" ? "flex flex-col" : ""}`}
+          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4 ${size === "large" || size === "editor" ? "flex flex-col" : ""}`}
         >
           {children}
         </div>

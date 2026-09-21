@@ -4,9 +4,12 @@
  * before formatting existed reads exactly as it did), and nothing here ever produces HTML, so a
  * saved description can never inject markup into the page.
  *
- * Blocks: # / ## / ### headings, - * + bullets, 1. numbered items, - [ ] / - [x] checklists
- * (indent two spaces per level to nest), > quotes, ``` code blocks and --- dividers.
- * Inline: **bold**, *italic*, ~~strikethrough~~, `code`, [text](https://link) and bare links.
+ * Blocks: # / ## / ### headings (#### and deeper read as the smallest), - * + bullets, 1. numbered
+ * items, - [ ] / - [x] checklists (indent two spaces per level to nest), > quotes, ``` code blocks,
+ * --- dividers and images, an ![alt](src) on a line of its own.
+ * Inline: **bold**, *italic*, ***both***, ~~strikethrough~~, `code`, [text](https://link) and bare
+ * links. A backslash keeps the character after it as it is (\* is a star, not italic), which is how
+ * the visual editor writes a star or a # the user typed as text.
  */
 
 export type Inline =
@@ -35,41 +38,64 @@ export type Block =
   | { kind: "list"; list: RichList }
   | { kind: "code"; text: string }
   | { kind: "divider" }
+  | { kind: "image"; src: string; alt: string }
 
 const FENCE = /^\s*```/
 const DIVIDER = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/
-const HEADING = /^(#{1,3})\s+(.*)$/
+const HEADING = /^(#{1,6})\s+(.*)$/
 const QUOTE = /^\s*>\s?(.*)$/
 const LIST_ITEM = /^(\s*)(?:([-*+])|(\d{1,9})[.)])\s+(?:\[([ xX])\]\s+)?(.*)$/
+const IMAGE = /^\s*!\[([^\]\n]*)\]\(([^\s)]+)\)\s*$/
 
 // Only links that open a page or an email; anything else ("javascript:") stays plain text
 const SAFE_HREF = /^(?:https?:\/\/|mailto:)/i
 
-// One pass over a line: code first (its contents are never formatted), then links, then emphasis
+/**
+ * Where an image may come from: an https address, or an image stored with Important Content, which
+ * is only ever served by the app's own route (lib/contentImages.ts). Anything else stays text.
+ */
+const SAFE_IMAGE_SRC = /^(?:https:\/\/[^\s"'<>]+|\/api\/important-content\/images\/[0-9a-f]{24}\/[0-9a-f]{24}\.(?:png|jpg|webp))$/i
+
+// One pass over a line: escapes, code (its contents are never formatted), links, then emphasis
 const INLINE =
-  /`([^`\n]+)`|\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)|\*\*(?!\s)(.+?)(?<!\s)\*\*|~~(?!\s)(.+?)(?<!\s)~~|\*(?![\s*])(.+?)(?<![\s*])\*|(https?:\/\/[^\s<>]*[^\s<>.,;:!?)\]'"])/g
+  /\\([\\`*_~[\]()#>+\-.!|{}])|`([^`\n]+)`|\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)|\*\*\*(?!\s)(.+?)(?<!\s)\*\*\*|\*\*(?!\s)(.+?)(?<!\s)\*\*|~~(?!\s)(.+?)(?<!\s)~~|\*(?![\s*])(.+?)(?<![\s*])\*|(https?:\/\/[^\s<>]*[^\s<>.,;:!?)\]'"])/g
 
 export function parseInline(line: string): Inline[] {
   const nodes: Inline[] = []
   let last = 0
+  // Escaped characters and the text around them read as one run of text
+  const pushText = (text: string) => {
+    const previous = nodes[nodes.length - 1]
+    if (previous?.kind === "text") previous.text += text
+    else nodes.push({ kind: "text", text })
+  }
   for (const match of line.matchAll(INLINE)) {
     const index = match.index ?? 0
-    if (index > last) nodes.push({ kind: "text", text: line.slice(last, index) })
-    const [whole, code, linkText, linkHref, bold, strike, italic, bareUrl] = match
-    if (code !== undefined) nodes.push({ kind: "code", text: code })
+    if (index > last) pushText(line.slice(last, index))
+    const [whole, escaped, code, linkText, linkHref, boldItalic, bold, strike, italic, bareUrl] = match
+    if (escaped !== undefined) pushText(escaped)
+    else if (code !== undefined) nodes.push({ kind: "code", text: code })
     else if (linkText !== undefined && linkHref !== undefined) nodes.push({ kind: "link", href: linkHref, children: parseInline(linkText) })
+    else if (boldItalic !== undefined) nodes.push({ kind: "bold", children: [{ kind: "italic", children: parseInline(boldItalic) }] })
     else if (bold !== undefined) nodes.push({ kind: "bold", children: parseInline(bold) })
     else if (strike !== undefined) nodes.push({ kind: "strike", children: parseInline(strike) })
     else if (italic !== undefined) nodes.push({ kind: "italic", children: parseInline(italic) })
     else if (bareUrl !== undefined) nodes.push({ kind: "link", href: bareUrl, children: [{ kind: "text", text: bareUrl }] })
-    else nodes.push({ kind: "text", text: whole })
+    else pushText(whole)
     last = index + whole.length
   }
-  if (last < line.length) nodes.push({ kind: "text", text: line.slice(last) })
+  if (last < line.length) pushText(line.slice(last))
   return nodes
 }
 
 export const isSafeHref = (href: string) => SAFE_HREF.test(href)
+export const isSafeImageSrc = (src: string) => SAFE_IMAGE_SRC.test(src)
+
+/** An image line, when the line is one and its source is one the page may show. */
+function readImageLine(line: string): { src: string; alt: string } | null {
+  const match = line.match(IMAGE)
+  return match && isSafeImageSrc(match[2]) ? { alt: match[1], src: match[2] } : null
+}
 
 interface ListLine {
   depth: number
@@ -147,9 +173,16 @@ export function parseRichText(text: string): Block[] {
       continue
     }
 
+    const image = readImageLine(line)
+    if (image) {
+      blocks.push({ kind: "image", ...image })
+      index++
+      continue
+    }
+
     const heading = line.match(HEADING)
     if (heading) {
-      blocks.push({ kind: "heading", level: heading[1].length as 1 | 2 | 3, children: parseInline(heading[2]) })
+      blocks.push({ kind: "heading", level: Math.min(heading[1].length, 3) as 1 | 2 | 3, children: parseInline(heading[2]) })
       index++
       continue
     }
@@ -185,7 +218,8 @@ export function parseRichText(text: string): Block[] {
       !DIVIDER.test(lines[index]) &&
       !HEADING.test(lines[index]) &&
       !QUOTE.test(lines[index]) &&
-      !readListLine(lines[index])
+      !readListLine(lines[index]) &&
+      !readImageLine(lines[index])
     ) {
       paragraph.push(parseInline(lines[index++]))
     }
@@ -224,6 +258,7 @@ export function toPlainText(text: string): string {
         case "code":
           return [block.text]
         case "divider":
+        case "image":
           return []
       }
     })
