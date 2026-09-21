@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { DAILY_TASKS_MESSAGES, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
+import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
 import { IsoDate, TodaySchema } from "@/lib/validation/dailyTasks"
 import { TaskDetailsSchema } from "@/lib/validation/taskAttachment"
 import type { NewDailyTask } from "@/types/dailyTasks"
@@ -13,6 +14,8 @@ import { withIdempotency } from "@/services/idempotency"
 export const dynamic = "force-dynamic"
 
 const PageSchema = z.coerce.number().int().positive().catch(1)
+
+type SubmittedImage = { assetId: string; contentType: string }
 
 export const CreateSchema = z
   .object({
@@ -32,11 +35,13 @@ export const CreateSchema = z
       )
       .min(1, DAILY_TASKS_MESSAGES.missingContent)
       .max(MAX_TASKS_PER_SUBMIT, DAILY_TASKS_MESSAGES.tooManyTasks),
+    // Adds the rows as subtasks of this task, on its day; left out, they are a day's own tasks as before
+    parentTaskId: z.string().regex(/^[0-9a-f]{24}$/, TASK_ATTACHMENT_MESSAGES.missingParent).optional(),
   })
   // A task belongs to a day that has happened: a later one would never show in the seven-day view
   .refine((body) => body.taskDate <= body.today, { message: DAILY_TASKS_MESSAGES.futureDate, path: ["taskDate"] })
 
-type SubmittedRow = string | ({ content: string } & { description: string; image: { assetId: string; contentType: string } | null })
+type SubmittedRow = string | ({ content: string } & { description: string; image: SubmittedImage | null; images?: SubmittedImage[] })
 
 /**
  * Empty rows are dropped, and the same task written twice in one submission is kept once. A row
@@ -55,7 +60,8 @@ function cleanContents(contents: SubmittedRow[]): NewDailyTask[] {
     kept.push({
       content: task,
       description: typeof row === "string" ? "" : row.description,
-      image: typeof row === "string" ? null : row.image,
+      // Several images when sent, else the first version's one
+      images: typeof row === "string" ? [] : (row.images ?? (row.image ? [row.image] : [])),
     })
   }
   return kept
@@ -88,7 +94,8 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST: adds a day's tasks in one go. Empty rows are ignored, so the composer can keep spare
- * rows on screen, and a row repeated in the same submission is saved once.
+ * rows on screen, and a row repeated in the same submission is saved once. With `parentTaskId` the
+ * rows are subtasks of that task; a fourth level is refused with 400, a parent that is gone with 404.
  */
 async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
@@ -101,8 +108,13 @@ async function handlePost(req: NextRequest) {
     const rows = cleanContents(parsed.data.contents)
     if (rows.length === 0) return badRequest(DAILY_TASKS_MESSAGES.missingContent)
 
-    const tasks = await createTasks(auth.viewer, parsed.data.taskDate, rows)
-    return NextResponse.json({ success: true, message: DAILY_TASKS_MESSAGES.saved, data: { tasks } }, { status: 201 })
+    const result = await createTasks(auth.viewer, parsed.data.taskDate, rows, parsed.data.parentTaskId ?? null)
+    if ("error" in result) {
+      return result.error === "too-deep"
+        ? badRequest(TASK_ATTACHMENT_MESSAGES.tooDeep)
+        : NextResponse.json({ success: false, message: TASK_ATTACHMENT_MESSAGES.missingParent }, { status: 404 })
+    }
+    return NextResponse.json({ success: true, message: DAILY_TASKS_MESSAGES.saved, data: { tasks: result.tasks } }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Daily Tasks Exception:", error)
     return NextResponse.json(

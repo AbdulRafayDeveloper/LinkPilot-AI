@@ -6,25 +6,32 @@ import type { TaskImage, TaskImageView } from "./taskAttachment"
 export interface DailyTask {
   id: string
   content: string
-  // The optional note under the task; empty on a plain task
+  // The optional note under the task, as formatted text (lib/richText.ts); empty on a plain task
   description: string
-  // The image saved on it, with a short-lived link to show it from; null when it has none
+  // The images saved on it, each with a short-lived link to show it from
+  images: TaskImageView[]
+  // The first of them, as the first version answered, for anything still reading one image
   image: TaskImageView | null
   // The calendar day the task belongs to (YYYY-MM-DD)
   taskDate: string
   isCompleted: boolean
   completedAt: string | null
+  // The task this one is a subtask of, or null for a task of its own
+  parentTaskId: string | null
+  // Its own subtasks, in order, each with theirs: three levels at most (TASK_MAX_DEPTH)
+  subtasks: DailyTask[]
 }
 
 /** One task as it is written: the line, and whatever optional detail was added with it. */
 export interface NewDailyTask {
   content: string
   description: string
-  image: TaskImage | null
+  images: TaskImage[]
 }
 
 /**
- * One day of tasks, in the order they were written.
+ * One day of tasks, in the order they were placed. Only a day's own tasks are listed here; their
+ * subtasks are inside them.
  */
 export interface DailyTaskDay {
   date: string

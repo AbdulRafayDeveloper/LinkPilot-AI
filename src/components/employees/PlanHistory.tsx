@@ -5,6 +5,7 @@ import { CheckCircle2, ChevronDown, Circle, History, Loader2 } from "lucide-reac
 import type { PlanHistoryDay, PlanHistoryPage, PlanItem } from "@/types/employees"
 import { TaskReason } from "./TaskReason"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
+import { depthsOf } from "@/lib/taskTree"
 
 /** Ticks or unticks one task on a day gone by. Given one, the history ticks; without it, it reads. */
 export type HistoryTick = (day: PlanHistoryDay, item: PlanItem, done: boolean) => Promise<void>
@@ -38,6 +39,8 @@ const HistoryDay: React.FC<{ day: PlanHistoryDay; onTick?: HistoryTick; onReason
     }
   }
   const complete = day.doneCount === total
+  // How deep each task sits, so a subtask shows under its task as it did in the plan that day
+  const depths = depthsOf(day.items, { idOf: (item) => item.id, parentOf: (item) => item.parentId })
   return (
     <li className="rounded-xl border border-outline-variant/80 bg-white">
       <button
@@ -62,7 +65,8 @@ const HistoryDay: React.FC<{ day: PlanHistoryDay; onTick?: HistoryTick; onReason
       {isOpen && (
         <ul className="flex flex-col gap-1 border-t border-outline-variant/70 px-3 py-2" aria-label={`Tasks on ${dayHeading(day.date)}`}>
           {day.items.map((item) => (
-            <li key={item.id} className="py-1 text-[13px]">
+            // A subtask sits under its task, indented a step for each level
+            <li key={item.id} className="py-1 text-[13px]" style={{ paddingLeft: `${((depths.get(item.id) ?? 1) - 1) * 1.5}rem` }}>
               <div className="flex items-start gap-2">
               {onTick ? (
                 // A day gone by stays tickable: a task finished late is ticked off where it belongs
@@ -88,7 +92,7 @@ const HistoryDay: React.FC<{ day: PlanHistoryDay; onTick?: HistoryTick; onReason
               </div>
               {/* What the task carried on that day, and why it wasn't finished */}
               <div className="pl-6">
-                <TaskDetailsView description={item.description} image={item.image} label={item.text} />
+                <TaskDetailsView description={item.description} images={item.images} label={item.text} />
                 <TaskReason
                   reason={item.reason}
                   taskText={item.text}

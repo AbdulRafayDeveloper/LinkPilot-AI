@@ -8,31 +8,42 @@ import { TaskComposer, emptyRows, type TaskRow } from "@/components/daily-tasks/
 import { ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { TaskDayList, type TaskMove } from "@/components/daily-tasks/TaskDayList"
 import { CleanupOldTasksDialog } from "@/components/daily-tasks/CleanupOldTasksDialog"
-import { TaskDetailsDialog } from "@/components/daily-tasks/TaskDetailsDialog"
+import { TaskEditorDialog } from "@/components/daily-tasks/TaskEditorDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
+import { pathTo, removeNested, updateNested } from "@/lib/taskTree"
 import { DAILY_TASKS_ENDPOINT, DAILY_TASKS_MESSAGES, VISIBLE_DAYS } from "@/constants/dailyTasks"
-import type { DailyTask, DailyTasksPage } from "@/types/dailyTasks"
-import type { TaskDetailsDraft, TaskImage } from "@/types/taskAttachment"
+import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
+import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks"
+import { toStoredImages, type TaskDetailsDraft } from "@/types/taskAttachment"
 
 /**
- * What is half-written survives switching tools, like every other tool's input. The chosen image
- * file itself is left out of what is stored (a File cannot be), but the id it was already
- * uploaded under is kept, so a draft that comes back still has its image.
+ * What is half-written survives switching tools, like every other tool's input. The images already
+ * uploaded are kept by their ids; one still uploading when the page was left is not (it has no id yet).
  */
 const draftStore = createToolStore(
   "daily-tasks:draft",
   { taskDate: "", rows: emptyRows() as TaskRow[] },
   {
-    version: 2,
+    version: 3,
     toStored: (state) => ({
       ...state,
-      rows: state.rows.map((row) => ({ ...row, details: { ...row.details, file: null } })),
+      rows: state.rows.map((row) => ({ ...row, details: { ...row.details, uploading: 0 } })),
     }),
   }
 )
+
+// A row with details opened on it is sent with them; a plain line is sent as the string it always was
+const rowBody = (content: string, details: TaskDetailsDraft) =>
+  details.description.trim() || details.images.length > 0
+    ? { content, description: details.description.trim(), images: toStoredImages(details.images) }
+    : content
+
+// Every day's tasks with one task changed or taken away, wherever it sits
+const changeTask = (days: DailyTaskDay[], id: string, change: (task: DailyTask) => DailyTask) =>
+  days.map((day) => ({ ...day, tasks: updateNested(day.tasks, id, change) }))
 
 export default function DailyTasksClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -48,8 +59,8 @@ export default function DailyTasksClient() {
   const [notice, setNotice] = useState<string | null>(null)
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set())
   const [taskError, setTaskError] = useState<string | null>(null)
-  // The task whose description and image are open in the details popup
-  const [detailsTask, setDetailsTask] = useState<DailyTask | null>(null)
+  // The task open in the editor (its details and subtasks), and whether "Add subtask" has the focus
+  const [editing, setEditing] = useState<{ id: string; focusSubtask: boolean } | null>(null)
   // The picked tasks waiting to be confirmed for deletion, and whether that delete is running
   const [confirmingPicked, setConfirmingPicked] = useState<string[] | null>(null)
   const [isDeletingPicked, setIsDeletingPicked] = useState(false)
@@ -125,14 +136,14 @@ export default function DailyTasksClient() {
     if (isSaving || !today) return
     // A row is sent as its line alone unless details were opened on it, so a plain list of tasks
     // posts exactly the body it always did
+    if (rows.some((row) => row.details.uploading > 0)) {
+      setSaveError("Wait for the images to finish uploading.")
+      return
+    }
     const contents = rows
       .map((row) => ({ ...row, content: row.content.trim() }))
       .filter((row) => row.content)
-      .map((row) =>
-        row.details.description.trim() || row.details.image
-          ? { content: row.content, description: row.details.description.trim(), image: row.details.image }
-          : row.content
-      )
+      .map((row) => rowBody(row.content, row.details))
     if (contents.length === 0) {
       setSaveError(DAILY_TASKS_MESSAGES.missingContent)
       return
@@ -178,10 +189,8 @@ export default function DailyTasksClient() {
         current
           ? {
               ...current,
-              days: current.days.map((day) => ({
-                ...day,
-                tasks: day.tasks.map((entry) => (entry.id === updated.id ? updated : entry)),
-              })),
+              // The task keeps the subtasks the list has, since a tick answers with the task alone
+              days: changeTask(current.days, updated.id, (entry) => ({ ...updated, subtasks: entry.subtasks })),
               overdueCount:
                 updated.taskDate < today
                   ? Math.max(0, current.overdueCount + (updated.isCompleted ? -1 : 1))
@@ -214,10 +223,7 @@ export default function DailyTasksClient() {
   const addTaskToDay = async (date: string, content: string, details?: TaskDetailsDraft): Promise<boolean> => {
     setTaskError(null)
     try {
-      const row =
-        details && (details.description.trim() || details.image)
-          ? { content, description: details.description.trim(), image: details.image }
-          : content
+      const row = details ? rowBody(content, details) : content
       const { data } = await requestApi<{ tasks: DailyTask[] }>(DAILY_TASKS_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -326,25 +332,49 @@ export default function DailyTasksClient() {
   }
 
   /**
-   * The description and image of a task already written, saved from its details popup. It waits
-   * for the server rather than changing the row first, because the image needs the fresh signed
-   * link only the server can make. A failure rejects, so the popup stays open saying why.
+   * A task saved from its editor (which saves as it is typed): the row shows what the server now
+   * holds, images with their fresh links, and keeps the subtasks the list already has.
    */
-  const saveTaskDetails = async (task: DailyTask, details: { description: string; image: TaskImage | null }) => {
-    const { data } = await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(details),
-    })
-    setPage((current) =>
-      current
-        ? {
-            ...current,
-            days: current.days.map((day) => ({ ...day, tasks: day.tasks.map((entry) => (entry.id === data.id ? data : entry)) })),
-          }
-        : current
-    )
-    setDetailsTask(null)
+  const taskSaved = useCallback((data: DailyTask) => {
+    setPage((current) => (current ? { ...current, days: changeTask(current.days, data.id, (entry) => ({ ...data, subtasks: entry.subtasks })) } : current))
+  }, [])
+
+  /** A subtask added under a task, from its editor: it appears under that task at once. */
+  const addSubtask = async (parent: DailyTask, content: string): Promise<boolean> => {
+    setTaskError(null)
+    try {
+      const { data } = await requestApi<{ tasks: DailyTask[] }>(DAILY_TASKS_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ today, taskDate: parent.taskDate, contents: [content], parentTaskId: parent.id }),
+      }, { idempotent: true })
+      const added = data.tasks[0]
+      if (!added) return false
+      setPage((current) =>
+        current
+          ? {
+              ...current,
+              days: changeTask(current.days, parent.id, (entry) => ({ ...entry, subtasks: [...entry.subtasks, added] })),
+              overdueCount: added.taskDate < today ? current.overdueCount + 1 : current.overdueCount,
+            }
+          : current
+      )
+      return true
+    } catch (error: unknown) {
+      setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.addToDayFailed)
+      return false
+    }
+  }
+
+  /** A copy of a task with everything under it, straight after it: the list is read again to show it in place. */
+  const copyTask = async (task: DailyTask) => {
+    setTaskError(null)
+    try {
+      await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}/copy`, { method: "POST" }, { idempotent: true })
+      reload()
+    } catch (error: unknown) {
+      setTaskError(error instanceof Error ? error.message : TASK_ATTACHMENT_MESSAGES.copyFailed)
+    }
   }
 
   const removeTask = async (task: DailyTask) => {
@@ -356,8 +386,9 @@ export default function DailyTasksClient() {
       current
         ? {
             ...current,
+            // A subtask leaves its task; a day's own task leaves the day, taking its subtasks with it
             days: current.days
-              .map((day) => ({ ...day, tasks: day.tasks.filter((entry) => entry.id !== task.id) }))
+              .map((day) => ({ ...day, tasks: removeNested(day.tasks, task.id) }))
               .filter((day) => day.tasks.length > 0),
             overdueCount:
               !task.isCompleted && task.taskDate < today ? Math.max(0, current.overdueCount - 1) : current.overdueCount,
@@ -368,7 +399,9 @@ export default function DailyTasksClient() {
     )
     try {
       await requestApi<{ deleted: boolean }>(`${DAILY_TASKS_ENDPOINT}/${task.id}`, { method: "DELETE" })
-      // An emptied page may no longer exist, so the list asks the server what is left
+      // An emptied page may no longer exist, and the counts only knew about this one task, not the
+      // subtasks that went with it, so the list asks the server what is left
+      if (task.subtasks.length > 0) reload()
       setPage((current) => {
         if (current && current.days.length === 0) reload()
         return current
@@ -403,6 +436,8 @@ export default function DailyTasksClient() {
     }
   }
 
+  // The task open in the editor and the tasks above it, read from the list so it always shows what the list does
+  const editingPath = editing && page ? page.days.map((day) => pathTo(day.tasks, editing.id)).find((path) => path !== null) ?? null : null
   const olderTaskCount = page?.olderTaskCount ?? 0
   const overdueCount = page?.overdueCount ?? 0
 
@@ -495,7 +530,8 @@ export default function DailyTasksClient() {
                 onDeletePicked={(ids) => setConfirmingPicked(ids)}
                 onMove={moveTask}
                 onAddTask={addTaskToDay}
-                onEditDetails={setDetailsTask}
+                onOpenTask={(task, focusSubtask = false) => setEditing({ id: task.id, focusSubtask })}
+                onCopy={(task) => void copyTask(task)}
               />
             </div>
           </div>
@@ -511,12 +547,21 @@ export default function DailyTasksClient() {
           onClose={() => setConfirmingPicked(null)}
         />
       )}
-      {detailsTask && (
-        <TaskDetailsDialog
-          key={detailsTask.id}
-          task={detailsTask}
-          onSave={(details) => saveTaskDetails(detailsTask, details)}
-          onClose={() => setDetailsTask(null)}
+      {editingPath && (
+        <TaskEditorDialog
+          // A different task is a fresh editor, starting from what that task holds
+          key={editingPath[editingPath.length - 1].id}
+          task={editingPath[editingPath.length - 1]}
+          ancestors={editingPath.slice(0, -1)}
+          focusSubtask={editing?.focusSubtask ?? false}
+          pendingIds={pendingIds}
+          onSaved={taskSaved}
+          onToggle={toggleTask}
+          onCopy={(task) => void copyTask(task)}
+          onDelete={removeTask}
+          onAddSubtask={addSubtask}
+          onOpenTask={(id, focusSubtask = false) => setEditing({ id, focusSubtask })}
+          onClose={() => setEditing(null)}
         />
       )}
       {isConfirmingCleanup && (

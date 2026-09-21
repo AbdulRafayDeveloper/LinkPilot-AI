@@ -36,10 +36,14 @@ export interface EmployeesPage {
 export interface PlanItem {
   id: string
   text: string
-  // The optional note under the task; empty when it has none
+  // The optional note under the task, as formatted text (lib/richText.ts); empty when it has none
   description: string
-  // The image on it, with a short-lived link to show it from; null when it has none
+  // The images on it, each with a short-lived link to show it from
+  images: TaskImageView[]
+  // The first of them, as the first version answered
   image: TaskImageView | null
+  // The plan task this one is a subtask of, or null; three levels at most
+  parentId: string | null
   done: boolean
   // When it was ticked off, or null while it is open
   completedAt: string | null
@@ -62,7 +66,8 @@ export interface EmployeePlan {
 /** What the manager's editor saves: the plan's tasks (wording and order) and notes. Ticks are saved on their own. */
 export interface EmployeePlanInput {
   today: string
-  items: { id: string; text: string; description: string; image: TaskImage | null }[]
+  // In order, each subtask after its task; `parentId` and `images` are optional so older callers still fit
+  items: { id: string; text: string; description: string; image: TaskImage | null; images?: TaskImage[]; parentId?: string | null }[]
   notes: string
 }
 

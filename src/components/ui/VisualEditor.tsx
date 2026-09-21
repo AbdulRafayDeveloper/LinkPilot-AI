@@ -47,6 +47,8 @@ interface VisualEditorProps {
   // Asked when an image is pasted or dropped: stores it and answers the address to show it from
   onImageFiles?: (files: File[]) => void
   onRequestLink?: () => void
+  // A few lines tall, for a note under a task, rather than a whole page
+  compact?: boolean
 }
 
 const BLOCK_FORMATS: Partial<Record<VisualTool, string>> = { h1: "H1", h2: "H2", h3: "H3", quote: "BLOCKQUOTE", codeBlock: "PRE" }
@@ -93,7 +95,7 @@ function decorateChecklists(root: HTMLElement) {
 }
 
 export const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(function VisualEditor(
-  { id, value, onChange, fontSize, placeholder, ariaLabel, onImageFiles, onRequestLink },
+  { id, value, onChange, fontSize, placeholder, ariaLabel, onImageFiles, onRequestLink, compact = false },
   ref
 ) {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -325,7 +327,9 @@ export const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(fu
       onDrop={handleDrop}
       onFocus={handleFocus}
       style={{ fontSize: `${fontSize}px` }}
-      className="visual-editor custom-scrollbar min-h-[320px] flex-1 overflow-y-auto px-4 py-3 leading-relaxed text-on-surface focus:outline-none"
+      className={`visual-editor custom-scrollbar overflow-y-auto leading-relaxed text-on-surface focus:outline-none ${
+        compact ? "max-h-[45dvh] min-h-[88px] px-3 py-2" : "min-h-[320px] flex-1 px-4 py-3"
+      }`}
     />
   )
 })

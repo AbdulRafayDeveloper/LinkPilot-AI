@@ -14,9 +14,14 @@ export interface IDailyTask {
   // The account it belongs to (models/owner.ts)
   ownerId: string | null
   content: string
-  // The optional note under the task, and the one image it carries; both empty on a plain task
+  // The optional note under the task (formatted text) and the images it carries; empty on a plain task.
+  // `image` is the first version's one image: a task saved then keeps it until its images are next saved
   description: string
   image: TaskImage | null
+  images: TaskImage[]
+  // The task this one is a subtask of, on the same day, or null for a task of its own. Three levels
+  // at most (TASK_MAX_DEPTH); a task saved before subtasks existed has none
+  parentTaskId: mongoose.Types.ObjectId | null
   taskDate: string
   // Where the task sits within its day, set by dragging; ties (tasks from before positions) keep the order they were written
   position: number
@@ -42,6 +47,8 @@ const DailyTaskSchema = new Schema<IDailyTask>(
     content: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     image: { type: TaskImageSchema, default: null },
+    images: { type: [TaskImageSchema], default: [] },
+    parentTaskId: { type: Schema.Types.ObjectId, default: null },
     taskDate: { type: String, required: true, match: ISO_DATE_PATTERN },
     position: { type: Number, required: true, default: 0 },
     isCompleted: { type: Boolean, required: true, default: false },
@@ -54,6 +61,8 @@ const DailyTaskSchema = new Schema<IDailyTask>(
 DailyTaskSchema.index({ taskDate: -1, position: 1, createdAt: 1, _id: 1 })
 // Counting what is still open before today (the overdue badge)
 DailyTaskSchema.index({ isCompleted: 1, taskDate: -1 })
+// A task's subtasks, for the list, a copy and a delete that takes them with it
+DailyTaskSchema.index({ parentTaskId: 1 })
 
 export const DailyTask =
   (mongoose.models.DailyTask as Model<IDailyTask> | undefined) ?? mongoose.model<IDailyTask>("DailyTask", DailyTaskSchema)

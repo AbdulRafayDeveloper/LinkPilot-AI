@@ -45,9 +45,13 @@ export interface IEmployee {
 export interface IPlanTask {
   id: string
   text: string
-  // The optional note under the task, and the one image it carries; both empty on a plain task
+  // The optional note under the task (formatted text) and the images it carries; empty on a plain
+  // task. `image` is the first version's one image, kept until the task's images are next saved
   description: string
   image: TaskImage | null
+  images: TaskImage[]
+  // The plan task this one is a subtask of, by id, or null; three levels at most (TASK_MAX_DEPTH)
+  parentId: string | null
 }
 
 // Only ever the id the server issued and the type it was uploaded as (services/taskImages.ts)
@@ -65,6 +69,8 @@ const PlanTaskSchema = new Schema<IPlanTask>(
     text: { type: String, required: true },
     description: { type: String, default: "" },
     image: { type: TaskImageSchema, default: null },
+    images: { type: [TaskImageSchema], default: [] },
+    parentId: { type: String, default: null },
   },
   { _id: false }
 )
@@ -100,6 +106,9 @@ export interface IPlanItem {
   // The day's own copy of the detail the plan's task carried when the day was written
   description: string
   image: TaskImage | null
+  images: TaskImage[]
+  // The same subtask shape the plan had that day
+  parentId: string | null
   done: boolean
   // When it was ticked off; cleared when it is unticked
   completedAt: Date | null
@@ -126,6 +135,8 @@ const PlanItemSchema = new Schema<IPlanItem>(
     text: { type: String, required: true },
     description: { type: String, default: "" },
     image: { type: TaskImageSchema, default: null },
+    images: { type: [TaskImageSchema], default: [] },
+    parentId: { type: String, default: null },
     done: { type: Boolean, required: true, default: false },
     completedAt: { type: Date, default: null },
     reason: { type: String, default: null },

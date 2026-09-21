@@ -1,31 +1,44 @@
 import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
-import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
+import { TASK_ATTACHMENT_MESSAGES, TASK_IMAGE_MAX_BYTES } from "@/constants/taskAttachments"
 import { TaskImageUploadSchema } from "@/lib/validation/taskAttachment"
-import { planTaskImageUpload } from "@/services/taskImages"
+import { planTaskImageUpload, storeTaskImage } from "@/services/taskImages"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
 /**
- * POST { contentType, size }: a link the browser may PUT one task image to, and the id to save on
- * the task afterwards. The image itself never passes through the app.
+ * POST: stores one image for a task (Daily Tasks, or an employee's plan) and answers what to save on
+ * the task, `{ assetId, contentType, url }`, the link being short-lived and only for showing it now.
  *
- * It is not wrapped in withIdempotency: a repeat only hands out another link, which costs nothing
- * and is never written anywhere until a task is actually saved with it.
+ * - The body is **the image itself** (PNG, JPEG or WEBP, at most 4 MB): what the pages send. It goes
+ *   through the app because the bucket's CORS rule refuses browser uploads from the live site.
+ * - A JSON body `{ contentType, size }` still answers `{ assetId, url }`, a link to PUT the image to
+ *   directly, for any caller written before; it only works where the bucket allows the site.
+ *
+ * Not wrapped in withIdempotency: a repeat only stores another copy (or hands out another link), and
+ * nothing points at it until a task is saved with it.
  */
 export async function POST(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const parsed = TaskImageUploadSchema.safeParse(await req.json().catch(() => null))
-  if (!parsed.success) {
-    return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || TASK_ATTACHMENT_MESSAGES.uploadFailed }, { status: 400 })
-  }
+  const type = req.headers.get("content-type") ?? ""
   try {
-    const plan = await planTaskImageUpload(parsed.data.contentType, parsed.data.size)
-    return NextResponse.json({ success: true, message: "Upload ready", data: plan })
+    if (type.startsWith("application/json")) {
+      const parsed = TaskImageUploadSchema.safeParse(await req.json().catch(() => null))
+      if (!parsed.success) {
+        return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || TASK_ATTACHMENT_MESSAGES.uploadFailed }, { status: 400 })
+      }
+      const plan = await planTaskImageUpload(parsed.data.contentType, parsed.data.size)
+      return NextResponse.json({ success: true, message: "Upload ready", data: plan })
+    }
+    if (Number(req.headers.get("content-length") ?? 0) > TASK_IMAGE_MAX_BYTES) {
+      return NextResponse.json({ success: false, message: TASK_ATTACHMENT_MESSAGES.imageTooLarge }, { status: 413 })
+    }
+    const image = await storeTaskImage(Buffer.from(await req.arrayBuffer()))
+    return NextResponse.json({ success: true, message: "Image stored", data: image }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Task Image Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, TASK_ATTACHMENT_MESSAGES.uploadFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, TASK_ATTACHMENT_MESSAGES.uploadFailed) }, { status: 400 })
   }
 }

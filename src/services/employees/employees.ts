@@ -18,8 +18,9 @@ import type {
 } from "@/types/employees"
 import type { Viewer } from "@/types/auth"
 import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
-import type { TaskImage, TaskImageView } from "@/types/taskAttachment"
-import { deleteTaskImages, taskImageViews } from "@/services/taskImages"
+import { storedImagesOf, type TaskImage, type TaskImageView } from "@/types/taskAttachment"
+import { deleteTaskImages, taskImageLists } from "@/services/taskImages"
+import { buildTree, flattenTree } from "@/lib/taskTree"
 import { accountNames } from "@/services/auth/accounts"
 
 /**
@@ -140,10 +141,10 @@ export async function planTaskImagesOf(employeeIds: string[]): Promise<TaskImage
   ])
   const images: TaskImage[] = []
   for (const employee of employees as unknown as { planItems?: IPlanTask[] }[]) {
-    for (const task of employee.planItems ?? []) if (task.image) images.push(task.image)
+    for (const task of employee.planItems ?? []) images.push(...storedImagesOf(task))
   }
   for (const day of days as unknown as { items?: IPlanItem[] }[]) {
-    for (const item of day.items ?? []) if (item.image) images.push(item.image)
+    for (const item of day.items ?? []) images.push(...storedImagesOf(item))
   }
   // One object may be on the plan and on every day it has run, so each is only removed once
   return [...new Map(images.map((image) => [image.assetId, image])).values()]
@@ -156,7 +157,7 @@ async function unusedImages(employeeId: string, candidates: (TaskImage | null | 
   const days = (await EmployeePlanModel.find({ employeeId }, { items: 1 }).lean()) as unknown as { items?: IPlanItem[] }[]
   const stillUsed = new Set<string>()
   for (const day of days) {
-    for (const item of day.items ?? []) if (item.image) stillUsed.add(item.image.assetId)
+    for (const item of day.items ?? []) for (const image of storedImagesOf(item)) stillUsed.add(image.assetId)
   }
   return wanted.filter((image) => !stillUsed.has(image.assetId))
 }
@@ -240,11 +241,13 @@ const PLAN_FIELDS = {
   role: 1,
 } as const
 
-const toItem = (item: IPlanItem, image: TaskImageView | null = null): PlanItem => ({
+const toItem = (item: IPlanItem, images: TaskImageView[] = []): PlanItem => ({
   id: item.id,
   text: item.text,
   description: item.description ?? "",
-  image,
+  images,
+  image: images[0] ?? null,
+  parentId: item.parentId ?? null,
   done: Boolean(item.done),
   completedAt: item.done && item.completedAt ? new Date(item.completedAt).toISOString() : null,
   // A finished task has nothing to explain, so a reason only ever shows on one that is still open
@@ -253,8 +256,8 @@ const toItem = (item: IPlanItem, image: TaskImageView | null = null): PlanItem =
 
 /** The same items with their images signed, in one round rather than one per task. */
 async function toItems(items: IPlanItem[]): Promise<PlanItem[]> {
-  const signed = await taskImageViews(items, (item) => item.image)
-  return items.map((item) => toItem(item, signed.get(item) ?? null))
+  const signed = await taskImageLists(items, storedImagesOf)
+  return items.map((item) => toItem(item, signed.get(item) ?? []))
 }
 
 // One day as the history shows it: the tasks that day's plan held, and how many were ticked off
@@ -275,15 +278,25 @@ async function loadPlan(employee: PlanOwner, today: string): Promise<{ tasks: IP
   const latest = (await EmployeePlanModel.findOne({ employeeId: employee._id.toString(), period: PLAN_PERIOD, periodStart: { $lte: today }, "items.0": { $exists: true } })
     .sort({ periodStart: -1 })
     .lean()) as IEmployeePlan | null
-  const tasks = (latest?.items ?? []).map(({ id, text, description, image }) => ({ id, text, description: description ?? "", image: image ?? null }))
+  const tasks = (latest?.items ?? []).map((item) => ({
+    id: item.id,
+    text: item.text,
+    description: item.description ?? "",
+    image: null,
+    images: storedImagesOf(item),
+    parentId: item.parentId ?? null,
+  }))
   const notes = latest?.notes ?? ""
   await EmployeeModel.updateOne({ _id: employee._id, planStartedAt: null }, { $set: { planItems: tasks, planNotes: notes, planStartedAt: new Date() } })
   return { tasks, notes }
 }
 
-const sameImage = (a: TaskImage | null | undefined, b: TaskImage | null | undefined) => (a?.assetId ?? null) === (b?.assetId ?? null)
+const imageKey = (record: { image?: TaskImage | null; images?: TaskImage[] | null }) =>
+  storedImagesOf(record)
+    .map((image) => image.assetId)
+    .join(",")
 
-// The day follows the plan's wording, its detail and its order; only the ticks are the day's own
+// The day follows the plan's wording, its detail, its subtasks and its order; only the ticks are the day's own
 const sameTasks = (a: IPlanItem[], b: IPlanTask[]) =>
   a.length === b.length &&
   a.every(
@@ -291,7 +304,8 @@ const sameTasks = (a: IPlanItem[], b: IPlanTask[]) =>
       item.id === b[index].id &&
       item.text === b[index].text &&
       (item.description ?? "") === (b[index].description ?? "") &&
-      sameImage(item.image, b[index].image)
+      (item.parentId ?? null) === (b[index].parentId ?? null) &&
+      imageKey(item) === imageKey(b[index])
   )
 
 /**
@@ -309,7 +323,9 @@ async function syncToday(employee: PlanOwner, today: string): Promise<{ items: P
       id: task.id,
       text: task.text,
       description: task.description ?? "",
-      image: task.image ?? null,
+      image: null,
+      images: storedImagesOf(task),
+      parentId: task.parentId ?? null,
       done: Boolean(ticked?.done),
       completedAt: ticked?.done ? (ticked.completedAt ?? null) : null,
       // Why it wasn't finished stays with the task through a change to the plan, like its tick
@@ -375,7 +391,32 @@ export async function getPlan(viewer: Viewer, employeeId: string, today: string)
 }
 
 /**
- * Replaces the plan: its tasks (wording and order) and notes. It applies from today on; earlier days
+ * The plan's tasks as they are saved. A blank task is dropped, and a subtask of a dropped task moves up
+ * to the dropped task's own parent, so nothing under it is lost. Images come as `images`, or as the
+ * first version's one `image`.
+ */
+function planTasksFrom(items: EmployeePlanInput["items"]): IPlanTask[] {
+  const dropped = new Map(items.filter((item) => !item.text.trim()).map((item) => [item.id, item.parentId ?? null]))
+  const parentFor = (parentId: string | null | undefined): string | null => {
+    let parent = parentId ?? null
+    // Bounded by the number of dropped tasks, so even a loop in what was sent can't hang here
+    for (let step = 0; parent && dropped.has(parent) && step <= dropped.size; step++) parent = dropped.get(parent) ?? null
+    return parent && !dropped.has(parent) ? parent : null
+  }
+  return items
+    .filter((item) => item.text.trim())
+    .map((item) => ({
+      id: item.id,
+      text: item.text.trim(),
+      description: item.description.trim(),
+      image: null,
+      images: item.images ?? (item.image ? [item.image] : []),
+      parentId: parentFor(item.parentId),
+    }))
+}
+
+/**
+ * Replaces the plan: its tasks (wording, subtasks and order) and notes. It applies from today on; earlier days
  * keep the plan they had. Ticks are never taken from here, so the manager typing can't undo a tick
  * made from the employee's link. Blank tasks are dropped.
  */
@@ -383,12 +424,11 @@ export async function savePlan(viewer: Viewer, employeeId: string, input: Employ
   const employee = await planOwner(viewer, employeeId)
   if (!employee) return null
   const date = await currentDay(employee, input.today)
-  const tasks = input.items
-    .filter((item) => item.text.trim())
-    .map((item) => ({ id: item.id, text: item.text.trim(), description: item.description.trim(), image: item.image }))
-  // An image taken off a task, or a task removed outright, leaves nothing behind in storage
-  const kept = new Set(tasks.map((task) => task.image?.assetId).filter(Boolean))
-  const dropped = (employee.planItems ?? []).filter((task) => task.image && !kept.has(task.image.assetId)).map((task) => task.image)
+  const tasks = planTasksFrom(input.items)
+  // An image taken off a task, or a task removed outright, leaves nothing behind in storage (a copied
+  // task shares its original's images, so one only goes when no task in the plan has it any more)
+  const kept = new Set(tasks.flatMap((task) => task.images.map((image) => image.assetId)))
+  const dropped = (employee.planItems ?? []).flatMap(storedImagesOf).filter((image) => !kept.has(image.assetId))
   await EmployeeModel.updateOne({ _id: employee._id }, { $set: { planItems: tasks, planNotes: input.notes, planStartedAt: employee.planStartedAt ?? new Date() } })
   // Days already in the history keep their own copy, so only an image no day still points at goes
   if (dropped.length > 0) await deleteTaskImages(await unusedImages(employee._id.toString(), dropped))
@@ -503,8 +543,16 @@ type LinkedEmployee = PlanOwner & Pick<StoredEmployee, "name" | "role" | "linkOr
  * since goes right after the task it follows in the plan (or first, when nothing before it is
  * placed); a task the manager removed simply drops out.
  */
-function inLinkOrder<T extends { id: string }>(items: T[], order: string[]): T[] {
+function inLinkOrder<T extends { id: string; parentId: string | null }>(items: T[], order: string[]): T[] {
   if (order.length === 0) return items
+  return withSubtasksUnderTheirTask(inOrder(items, order))
+}
+
+// A subtask stays under its own task, whatever order the employee's link put the list in
+const withSubtasksUnderTheirTask = <T extends { id: string; parentId: string | null }>(items: T[]): T[] =>
+  flattenTree(buildTree(items, { idOf: (item) => item.id, parentOf: (item) => item.parentId }))
+
+function inOrder<T extends { id: string }>(items: T[], order: string[]): T[] {
   const byId = new Map(items.map((item) => [item.id, item]))
   const result = order.filter((id) => byId.has(id)).map((id) => byId.get(id) as T)
   const placed = new Set(result.map((item) => item.id))

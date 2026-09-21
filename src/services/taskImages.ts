@@ -1,17 +1,22 @@
 import mongoose from "mongoose"
 import { UserFacingError } from "@/lib/errors"
-import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
-import { deleteObject, isStorageConfigured, presignDownload, presignUpload } from "@/services/storage/s3"
+import { detectImageMimeType } from "@/lib/imageType"
+import { TASK_ATTACHMENT_MESSAGES, TASK_IMAGE_MAX_BYTES } from "@/constants/taskAttachments"
+import { copyObject, deleteObject, isStorageConfigured, presignDownload, presignUpload, putObject } from "@/services/storage/s3"
 import type { TaskImage, TaskImageView } from "@/types/taskAttachment"
 
 /**
- * The one image a task can carry, for Daily Tasks and for an employee's daily plan.
+ * The images a task can carry, for Daily Tasks and for an employee's daily plan.
  *
- * The bytes never pass through the app: the browser asks for a link, PUTs the image straight to
- * storage and then saves the id it was given with the task, exactly the way a brand photo is
- * stored (services/postImages/settings.ts). The key is built here from an id the server makes, so
- * nothing the browser sends can point an upload at another object or out of the prefix, and the
- * id carries nothing about the task, the day or the employee it ends up on.
+ * The browser sends each image to the app (`storeTaskImage`), which reads its type from the bytes
+ * and stores it. It used to PUT the bytes straight to storage with a signed link, but the bucket's
+ * CORS rule refuses browser uploads from the live site, so that never worked there; the signed-link
+ * path (`planTaskImageUpload`) is kept for any caller still using it. One image is at most 4 MB,
+ * which fits the 4.5 MB body a Vercel function takes.
+ *
+ * The key is always built here from an id the server makes, so nothing the browser sends can point
+ * an upload at another object or out of the prefix, and the id carries nothing about the task, the
+ * day or the employee it ends up on.
  */
 
 const KEY_PREFIX = "LinkPilot/task-images"
@@ -32,6 +37,20 @@ export async function planTaskImageUpload(contentType: string, size: number): Pr
 }
 
 /**
+ * Stores one image the browser sent, as bytes, and answers what to save on the task with a link to
+ * show it from straight away. Anything that isn't a PNG, JPEG or WEBP by its own bytes is refused.
+ */
+export async function storeTaskImage(bytes: Buffer): Promise<TaskImageView> {
+  if (!isStorageConfigured()) throw new UserFacingError(TASK_ATTACHMENT_MESSAGES.storageUnavailable)
+  if (bytes.length > TASK_IMAGE_MAX_BYTES) throw new UserFacingError(TASK_ATTACHMENT_MESSAGES.imageTooLarge)
+  const contentType = bytes.length > 0 ? detectImageMimeType(bytes) : null
+  if (!contentType) throw new UserFacingError(TASK_ATTACHMENT_MESSAGES.unsupportedImage)
+  const image: TaskImage = { assetId: new mongoose.Types.ObjectId().toString(), contentType }
+  await putObject(keyOf(image), bytes, contentType)
+  return { ...image, url: await presignDownload(keyOf(image), contentType) }
+}
+
+/**
  * A task's image with a short-lived link to show it from, or null when the task has none. A link
  * that cannot be signed (storage switched off since it was saved) leaves the task readable rather
  * than failing the whole list.
@@ -49,15 +68,34 @@ export async function taskImageView(image: TaskImage | null | undefined): Promis
 }
 
 /**
- * The same for a whole list at once, signed in parallel, so a day of tasks costs one round of
- * signing rather than one per task in sequence.
+ * Every image of every item in a list, signed in parallel, so a day of tasks costs one round of
+ * signing rather than one per image in sequence. An image that can't be signed is left out.
  */
-export async function taskImageViews<T>(
-  items: T[],
-  imageOf: (item: T) => TaskImage | null | undefined
-): Promise<Map<T, TaskImageView | null>> {
-  const signed = await Promise.all(items.map((item) => taskImageView(imageOf(item))))
+export async function taskImageLists<T>(items: T[], imagesOf: (item: T) => TaskImage[]): Promise<Map<T, TaskImageView[]>> {
+  const signed = await Promise.all(items.map(async (item) => (await Promise.all(imagesOf(item).map(taskImageView))).filter((view): view is TaskImageView => view !== null)))
   return new Map(items.map((item, index) => [item, signed[index]]))
+}
+
+/**
+ * New copies of images, for a copied task: each gets its own id and object, so deleting either task
+ * never takes the other's images. An image that can't be copied is left off the copy rather than
+ * failing it, and logged.
+ */
+export async function copyTaskImages(images: TaskImage[]): Promise<TaskImage[]> {
+  if (images.length === 0 || !isStorageConfigured()) return []
+  const copies = await Promise.all(
+    images.map(async (image) => {
+      const copy: TaskImage = { assetId: new mongoose.Types.ObjectId().toString(), contentType: image.contentType }
+      try {
+        await copyObject(keyOf(image), keyOf(copy))
+        return copy
+      } catch (error: unknown) {
+        console.warn("⚠️ Couldn't copy a task image:", error instanceof Error ? error.message : error)
+        return null
+      }
+    })
+  )
+  return copies.filter((copy): copy is TaskImage => copy !== null)
 }
 
 /**

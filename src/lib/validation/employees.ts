@@ -14,6 +14,8 @@ import {
 } from "@/constants/employees"
 import { shiftDate } from "@/lib/taskDates"
 import { TaskDetailsSchema } from "@/lib/validation/taskAttachment"
+import { treeProblem } from "@/lib/taskTree"
+import { TASK_ATTACHMENT_MESSAGES, TASK_MAX_DEPTH } from "@/constants/taskAttachments"
 import { choiceParam, cursorParam, searchParam } from "./listFilters"
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
@@ -81,11 +83,18 @@ export const PlanSchema = z.object({
         .object({
           id: ItemId,
           text: z.string().trim().max(PLAN_ITEM_MAX_LENGTH, EMPLOYEE_MESSAGES.itemTooLong),
+          // The task this one is a subtask of, by id; left out, it is a task of its own, as before
+          parentId: ItemId.nullish().transform((value) => value ?? null),
         })
         // The same optional detail a Daily Task carries, checked the same way
         .and(TaskDetailsSchema)
     )
-    .max(PLAN_MAX_ITEMS, EMPLOYEE_MESSAGES.tooManyItems),
+    .max(PLAN_MAX_ITEMS, EMPLOYEE_MESSAGES.tooManyItems)
+    // Every parent is one of these tasks, nothing loops, and nothing sits deeper than three levels
+    .superRefine((items, context) => {
+      const problem = treeProblem(items, { idOf: (item) => item.id, parentOf: (item) => item.parentId }, TASK_MAX_DEPTH)
+      if (problem) context.addIssue({ code: "custom", message: problem === "too-deep" ? TASK_ATTACHMENT_MESSAGES.tooDeep : TASK_ATTACHMENT_MESSAGES.missingParent })
+    }),
   notes: z.string().max(PLAN_NOTES_MAX_LENGTH, EMPLOYEE_MESSAGES.notesTooLong),
 })
 

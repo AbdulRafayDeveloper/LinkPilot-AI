@@ -25,9 +25,13 @@ import {
   AlertTriangle,
   Check,
   CheckCheck,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  CornerDownRight,
   GripVertical,
+  ListPlus,
   Paperclip,
   ListTodo,
   Loader2,
@@ -37,6 +41,7 @@ import {
   XCircle,
 } from "lucide-react"
 import { DAILY_TASKS_MESSAGES, TASK_MAX_LENGTH, VISIBLE_DAYS } from "@/constants/dailyTasks"
+import { TASK_ATTACHMENT_MESSAGES, TASK_MAX_DEPTH } from "@/constants/taskAttachments"
 import { dayLabel } from "@/lib/taskDates"
 import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
@@ -71,7 +76,10 @@ interface TaskDayListProps {
   onPageChange: (page: number) => void
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
-  onEditDetails: (task: DailyTask) => void
+  // Opens the task's editor: its details and subtasks; `focusSubtask` puts the caret in "Add subtask"
+  onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
+  // Copies a task and everything under it, straight after it
+  onCopy: (task: DailyTask) => void
   // Deletes every picked task at once; the page confirms first, since deleting is final
   onDeletePicked: (ids: string[]) => void
   onMove: (move: TaskMove) => void
@@ -115,8 +123,9 @@ interface TaskRowBodyProps {
   isPending: boolean
   onToggle?: (task: DailyTask, isCompleted: boolean) => void
   onDelete?: (task: DailyTask) => void
-  // Opens the popup that adds or changes the task's description and image; absent on the dragged copy
-  onEditDetails?: (task: DailyTask) => void
+  // Opens the task's editor (details and subtasks), and copies it; both absent on the dragged copy
+  onOpenTask?: (task: DailyTask, focusSubtask?: boolean) => void
+  onCopy?: (task: DailyTask) => void
   handle: React.ReactNode
   // Picking tasks to move together: one click on the circle picks a task, Shift picks a run of them
   isSelected?: boolean
@@ -137,7 +146,8 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
   isPending,
   onToggle,
   onDelete,
-  onEditDetails,
+  onOpenTask,
+  onCopy,
   handle,
   isSelected = false,
   onSelect,
@@ -195,7 +205,7 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
             {task.content}
           </span>
           {/* Whatever optional detail was added when the task was written, under its own line */}
-          <TaskDetailsView description={task.description} image={task.image} label={task.content} />
+          <TaskDetailsView description={task.description} images={task.images} label={task.content} />
         </span>
         {state === "overdue" && (
           <span className="shrink-0 rounded-full bg-error/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-error">
@@ -203,27 +213,9 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
           </span>
         )}
       </label>
-      {/* The task's description and image, in a popup rather than in the row: the whole row is the
+      {/* The task's details and subtasks open in a popup rather than in the row: the whole row is the
           drag area, so typing or picking an image inside it would start a drag */}
-      {onEditDetails && !isPending ? (
-        <button
-          type="button"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={() => onEditDetails(task)}
-          aria-label={`${task.description || task.image ? "Edit" : "Add"} details: ${task.content}`}
-          title={task.description || task.image ? "Edit the description and image" : "Add a description or an image"}
-          className={`mt-1 shrink-0 rounded-lg p-2 transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-            task.description || task.image ? "text-primary" : "text-outline"
-          }`}
-        >
-          <Paperclip size={15} aria-hidden="true" />
-        </button>
-      ) : (
-        // The dragged copy and a task still saving keep the same width, so nothing shifts under it
-        <span className="mt-1 shrink-0 p-2 text-outline" aria-hidden="true">
-          <Paperclip size={15} />
-        </span>
-      )}
+      <RowActions task={task} depth={1} isPending={isPending} onOpenTask={onOpenTask} onCopy={onCopy} />
       {isPending ? (
         <span className="p-2.5" aria-hidden="true">
           <Loader2 size={15} className="animate-spin text-outline" />
@@ -247,6 +239,195 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
   )
 }
 
+const actionClass =
+  "mt-1 shrink-0 rounded-lg p-2 transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
+
+/**
+ * What can be done to a task besides ticking and deleting it: open its details, add a subtask (the
+ * third level has none, so its button says why instead) and copy it with everything under it. Every
+ * button stops the press from reaching the row, which is the drag area. Without handlers (the copy
+ * under the pointer, or a task still saving) the same space is kept, so nothing shifts.
+ */
+const RowActions: React.FC<{
+  task: DailyTask
+  depth: number
+  isPending: boolean
+  onOpenTask?: (task: DailyTask, focusSubtask?: boolean) => void
+  onCopy?: (task: DailyTask) => void
+}> = ({ task, depth, isPending, onOpenTask, onCopy }) => {
+  const hasDetails = Boolean(task.description || task.images.length > 0)
+  if (!onOpenTask || !onCopy || isPending) {
+    return (
+      <span className="mt-1 flex shrink-0 text-outline" aria-hidden="true">
+        <span className="p-2"><Paperclip size={15} /></span>
+        <span className="p-2"><ListPlus size={15} /></span>
+        <span className="p-2"><Copy size={15} /></span>
+      </span>
+    )
+  }
+  const canNest = depth < TASK_MAX_DEPTH
+  const addLabel = depth === 1 ? TASK_ATTACHMENT_MESSAGES.addSubtask : TASK_ATTACHMENT_MESSAGES.addSubSubtask
+  const stop = (event: React.SyntheticEvent) => event.stopPropagation()
+  return (
+    <>
+      <button
+        type="button"
+        onPointerDown={stop}
+        onMouseDown={stop}
+        onClick={() => onOpenTask(task)}
+        aria-label={`${hasDetails ? "Edit" : "Add"} details: ${task.content}`}
+        title={hasDetails ? "Open the details and subtasks" : "Add a description, images or subtasks"}
+        className={`${actionClass} ${hasDetails ? "text-primary" : "text-outline"}`}
+      >
+        <Paperclip size={15} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onPointerDown={stop}
+        onMouseDown={stop}
+        onClick={() => onOpenTask(task, true)}
+        disabled={!canNest}
+        aria-label={canNest ? `${addLabel}: ${task.content}` : TASK_ATTACHMENT_MESSAGES.depthReached}
+        title={canNest ? addLabel : TASK_ATTACHMENT_MESSAGES.depthReached}
+        className={`${actionClass} text-outline`}
+      >
+        <ListPlus size={15} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onPointerDown={stop}
+        onMouseDown={stop}
+        onClick={() => onCopy(task)}
+        aria-label={`${TASK_ATTACHMENT_MESSAGES.copyTask}: ${task.content}`}
+        title={task.subtasks.length > 0 ? "Copy this task with its subtasks" : TASK_ATTACHMENT_MESSAGES.copyTask}
+        className={`${actionClass} text-outline`}
+      >
+        <Copy size={15} aria-hidden="true" />
+      </button>
+    </>
+  )
+}
+
+interface SubtaskTreeProps {
+  tasks: DailyTask[]
+  // 2 for a task's subtasks, 3 for theirs
+  depth: number
+  today: string
+  pendingIds: ReadonlySet<string>
+  onToggle: (task: DailyTask, isCompleted: boolean) => void
+  onDelete: (task: DailyTask) => void
+  onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
+  onCopy: (task: DailyTask) => void
+}
+
+/** One subtask: its tick box and line, its details, its actions, and its own subtasks under it. */
+const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, depth, today, pendingIds, onToggle, onDelete, onOpenTask, onCopy }) => {
+  const [isOpen, setIsOpen] = useState(true)
+  const isPending = pendingIds.has(task.id)
+  const state = taskState(task, today)
+  const done = task.subtasks.filter((entry) => entry.isCompleted).length
+  return (
+    <li className="flex flex-col">
+      <div className="flex items-start gap-1">
+        {task.subtasks.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setIsOpen((current) => !current)}
+            aria-expanded={isOpen}
+            aria-label={`${isOpen ? "Hide" : "Show"} the subtasks of ${task.content}`}
+            className="mt-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-outline hover:bg-surface-container-high hover:text-on-surface"
+          >
+            <ChevronDown size={14} className={`transition-transform ${isOpen ? "" : "-rotate-90"}`} aria-hidden="true" />
+          </button>
+        ) : (
+          <CornerDownRight size={13} className="ml-1.5 mr-1 mt-3 shrink-0 text-outline/70" aria-hidden="true" />
+        )}
+        <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 py-2 pr-1">
+          <input
+            type="checkbox"
+            checked={task.isCompleted}
+            onChange={(event) => onToggle(task, event.target.checked)}
+            disabled={isPending}
+            className="peer sr-only"
+          />
+          <span
+            aria-hidden="true"
+            className={`mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40 ${boxStyles[state]}`}
+          >
+            {state === "overdue" ? <XCircle size={12} aria-hidden="true" /> : <Check size={12} aria-hidden="true" />}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span
+              className={`block whitespace-pre-wrap break-words text-[12.5px] leading-relaxed ${
+                task.isCompleted ? "text-outline line-through" : state === "overdue" ? "text-on-error-container" : "text-on-surface"
+              }`}
+            >
+              {task.content}
+              {task.subtasks.length > 0 && (
+                <span className="ml-2 text-[11px] font-semibold text-outline no-underline">
+                  {done} of {task.subtasks.length}
+                </span>
+              )}
+            </span>
+            <TaskDetailsView description={task.description} images={task.images} label={task.content} />
+          </span>
+        </label>
+        <RowActions task={task} depth={depth} isPending={isPending} onOpenTask={onOpenTask} onCopy={onCopy} />
+        {isPending ? (
+          <span className="p-2.5" aria-hidden="true">
+            <Loader2 size={15} className="animate-spin text-outline" />
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onDelete(task)}
+            aria-label={`Delete: ${task.content}`}
+            className="mt-1 shrink-0 rounded-lg p-2 text-outline transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
+          >
+            <Trash2 size={15} aria-hidden="true" />
+          </button>
+        )}
+      </div>
+      {isOpen && task.subtasks.length > 0 && <SubtaskTree {...{ depth: depth + 1, today, pendingIds, onToggle, onDelete, onOpenTask, onCopy }} tasks={task.subtasks} />}
+    </li>
+  )
+}
+
+/**
+ * A task's subtasks, indented under it with a line down their left, each with theirs under it: three
+ * levels at most. It sits inside the task's row but is not part of the drag area, so pressing,
+ * selecting or ticking in here never picks the task up; the task and everything under it move
+ * together when the task's own line is dragged. The top level can be folded away.
+ */
+const SubtaskTree: React.FC<SubtaskTreeProps> = (props) => {
+  const [isOpen, setIsOpen] = useState(true)
+  const { tasks, depth } = props
+  const done = tasks.filter((task) => task.isCompleted).length
+  const stop = (event: React.SyntheticEvent) => event.stopPropagation()
+  return (
+    <div onPointerDown={stop} onMouseDown={stop} onTouchStart={stop} className={`cursor-default ${depth === 2 ? "mb-2 ml-9 mr-2" : "ml-6"}`}>
+      {depth === 2 && (
+        <button
+          type="button"
+          onClick={() => setIsOpen((current) => !current)}
+          aria-expanded={isOpen}
+          className="mb-0.5 inline-flex items-center gap-1 rounded-md px-1 py-1 text-[11px] font-semibold text-outline hover:bg-surface-container-high hover:text-on-surface"
+        >
+          <ChevronDown size={13} className={`transition-transform ${isOpen ? "" : "-rotate-90"}`} aria-hidden="true" />
+          {tasks.length} {tasks.length === 1 ? "subtask" : "subtasks"}, {done} done
+        </button>
+      )}
+      {isOpen && (
+        <ul className="flex flex-col border-l-2 border-outline-variant/70 pl-1.5" aria-label={depth === 2 ? "Subtasks" : "Sub-subtasks"}>
+          {tasks.map((task) => (
+            <SubtaskItem key={task.id} {...props} task={task} />
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 const handleClass =
   "mt-2 ml-1 flex h-8 w-6 shrink-0 touch-none items-center justify-center rounded-md text-outline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
@@ -261,9 +442,11 @@ const SortableTaskRow = memo(function SortableTaskRow({
   isSelected,
   onToggle,
   onDelete,
-  onEditDetails,
+  onOpenTask,
+  onCopy,
   onSelect,
   wasDragging,
+  pendingIds,
 }: {
   task: DailyTask
   today: string
@@ -271,9 +454,11 @@ const SortableTaskRow = memo(function SortableTaskRow({
   isSelected: boolean
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
-  onEditDetails: (task: DailyTask) => void
+  onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
+  onCopy: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
   wasDragging: () => boolean
+  pendingIds: ReadonlySet<string>
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -286,36 +471,51 @@ const SortableTaskRow = memo(function SortableTaskRow({
       ref={setNodeRef}
       {...listeners}
       style={{ transform: CSS.Translate.toString(transform), transition, touchAction: "manipulation" }}
-      className={`relative flex items-start gap-1 rounded-xl border pr-1 ${isPending ? "" : "cursor-grab active:cursor-grabbing"} ${
+      className={`relative flex flex-col rounded-xl border ${isPending ? "" : "cursor-grab active:cursor-grabbing"} ${
         isDragging
           ? "border-dashed border-primary/40 bg-primary-fixed/20 [&>*]:opacity-0"
           : `transition-colors ${stateStyles[state]} ${isSelected ? "ring-2 ring-primary/50 ring-offset-1" : ""}`
       }`}
     >
-      <TaskRowBody
-        task={task}
-        today={today}
-        isPending={isPending}
-        isSelected={isSelected}
-        onToggle={onToggle}
-        onDelete={onDelete}
-        onEditDetails={onEditDetails}
-        onSelect={onSelect}
-        wasDragging={wasDragging}
-        handle={
-          // The whole row drags with a pointer; this is what the keyboard uses, and what says so
-          <button
-            type="button"
-            ref={setActivatorNodeRef}
-            {...attributes}
-            onKeyDown={listeners?.onKeyDown as React.KeyboardEventHandler<HTMLButtonElement> | undefined}
-            aria-label={isSelected ? `Move the picked tasks, starting with: ${task.content}` : `Move task: ${task.content}`}
-            className={`${handleClass} ${isPending ? "cursor-not-allowed opacity-40" : "cursor-grab hover:bg-surface-container-high hover:text-on-surface active:cursor-grabbing"}`}
-          >
-            <GripVertical size={16} aria-hidden="true" />
-          </button>
-        }
-      />
+      <div className="flex items-start gap-1 pr-1">
+        <TaskRowBody
+          task={task}
+          today={today}
+          isPending={isPending}
+          isSelected={isSelected}
+          onToggle={onToggle}
+          onDelete={onDelete}
+          onOpenTask={onOpenTask}
+          onCopy={onCopy}
+          onSelect={onSelect}
+          wasDragging={wasDragging}
+          handle={
+            // The whole row drags with a pointer; this is what the keyboard uses, and what says so
+            <button
+              type="button"
+              ref={setActivatorNodeRef}
+              {...attributes}
+              onKeyDown={listeners?.onKeyDown as React.KeyboardEventHandler<HTMLButtonElement> | undefined}
+              aria-label={isSelected ? `Move the picked tasks, starting with: ${task.content}` : `Move task: ${task.content}`}
+              className={`${handleClass} ${isPending ? "cursor-not-allowed opacity-40" : "cursor-grab hover:bg-surface-container-high hover:text-on-surface active:cursor-grabbing"}`}
+            >
+              <GripVertical size={16} aria-hidden="true" />
+            </button>
+          }
+        />
+      </div>
+      {task.subtasks.length > 0 && (
+        <SubtaskTree
+          tasks={task.subtasks}
+          depth={2}
+          today={today}
+          pendingIds={pendingIds}
+          onToggle={onToggle}
+          onDelete={onDelete}
+          onOpenTask={onOpenTask}
+          onCopy={onCopy}
+        />
+      )}
     </li>
   )
 })
@@ -428,7 +628,8 @@ const DayGroup = memo(function DayGroup({
   isOverDay,
   onToggle,
   onDelete,
-  onEditDetails,
+  onOpenTask,
+  onCopy,
   onSelect,
   onAddTask,
   wasDragging,
@@ -442,7 +643,8 @@ const DayGroup = memo(function DayGroup({
   isOverDay: boolean
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
-  onEditDetails: (task: DailyTask) => void
+  onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
+  onCopy: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
   onAddTask: AddTaskHandler
   wasDragging: () => boolean
@@ -486,9 +688,11 @@ const DayGroup = memo(function DayGroup({
                 isSelected={selectedIds.has(task.id)}
                 onToggle={onToggle}
                 onDelete={onDelete}
-                onEditDetails={onEditDetails}
+                onOpenTask={onOpenTask}
+                onCopy={onCopy}
                 onSelect={onSelect}
                 wasDragging={wasDragging}
+                pendingIds={pendingIds}
               />
             ))
           )}
@@ -528,7 +732,8 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   onPageChange,
   onToggle,
   onDelete,
-  onEditDetails,
+  onOpenTask,
+  onCopy,
   onDeletePicked,
   onMove,
   onAddTask,
@@ -817,7 +1022,8 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 isOverDay={overDate === day.date}
                 onToggle={onToggle}
                 onDelete={onDelete}
-                onEditDetails={onEditDetails}
+                onOpenTask={onOpenTask}
+                onCopy={onCopy}
                 onSelect={selectTask}
                 onAddTask={onAddTask}
                 wasDragging={wasDragging}

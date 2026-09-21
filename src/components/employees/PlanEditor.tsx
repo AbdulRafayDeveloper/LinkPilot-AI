@@ -1,11 +1,15 @@
 "use client"
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { AlertCircle, Check, Loader2, Plus, Repeat, RefreshCw, Trash2 } from "lucide-react"
+import { AlertCircle, Check, ChevronDown, Copy, CornerDownRight, ListPlus, Loader2, Plus, Repeat, RefreshCw, Trash2 } from "lucide-react"
 import { SortableList } from "@/components/ui/SortableList"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { fetchWithRetry, requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
+import { buildTree, copySubtree, subtreeOf, type TreeNode } from "@/lib/taskTree"
+import { writeTaskDetails } from "@/lib/taskDetailsAi"
+import { TASK_ATTACHMENT_MESSAGES, TASK_MAX_DEPTH } from "@/constants/taskAttachments"
+import { toStoredImages } from "@/types/taskAttachment"
 import { EMPLOYEES_ENDPOINT, EMPLOYEE_MESSAGES, PLAN_ITEM_MAX_LENGTH, PLAN_MAX_ITEMS, PLAN_NOTES_MAX_LENGTH, PLAN_SAVE_DELAY_MS } from "@/constants/employees"
 import type { Employee, EmployeePlan, EmployeePlanInput, PlanHistoryDay, PlanHistoryPage, PlanItem } from "@/types/employees"
 import { PlanHistory, dayHeading, mergeHistory, replaceHistoryDay, tickTime } from "./PlanHistory"
@@ -29,10 +33,13 @@ const planUrl = (employeeId: string) => `${EMPLOYEES_ENDPOINT}/${employeeId}/pla
 // Every call names the day this browser is on; the day it is written to is the employee's own
 const toInput = (draft: Pick<Draft, "items" | "notes">): EmployeePlanInput => ({
   today: todayIso(),
-  items: draft.items.map(({ id, text, description, image }) => ({ id, text, description, image: image ? { assetId: image.assetId, contentType: image.contentType } : null })),
+  items: draft.items.map(({ id, text, description, images, parentId }) => ({ id, text, description, image: null, images: toStoredImages(images), parentId })),
   notes: draft.notes,
 })
-const getId = (item: PlanItem) => item.id
+// The plan as a tree: a task's subtasks under it, three levels at most
+const byParent = { idOf: (item: PlanItem) => item.id, parentOf: (item: PlanItem) => item.parentId }
+const getNodeId = (node: TreeNode<PlanItem>) => node.item.id
+const getNodeLabel = (node: TreeNode<PlanItem>) => node.item.text || "empty task"
 
 /**
  * A task's text, edited in place. It wraps onto as many lines as the task needs and grows to fit,
@@ -83,7 +90,6 @@ const PlanItemText: React.FC<{ value: string; isDone: boolean; onChange: (text: 
     />
   )
 }
-const getLabel = (item: PlanItem) => item.text || "empty task"
 
 /**
  * One employee's daily plan: **one** list of tasks that repeats every day. Add a task with Enter,
@@ -107,6 +113,12 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
   const [newItem, setNewItem] = useState("")
   const [detailsError, setDetailsError] = useState<string | null>(null)
   const [history, setHistory] = useState<PlanHistoryPage | null>(null)
+  // Images still uploading on each task, which a save never waits for but the details area shows
+  const [uploading, setUploading] = useState<Record<string, number>>({})
+  // The task with its "Add subtask" field open, what is typed in it, and the tasks whose subtasks are folded away
+  const [addingUnder, setAddingUnder] = useState<string | null>(null)
+  const [subtaskText, setSubtaskText] = useState("")
+  const [folded, setFolded] = useState<ReadonlySet<string>>(new Set())
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const key = employee.id
@@ -279,23 +291,235 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
     }
   }
 
+  const blankItem = (text: string, parentId: string | null): PlanItem => ({
+    id: newItemId(),
+    text,
+    description: "",
+    images: [],
+    image: null,
+    parentId,
+    done: false,
+    completedAt: null,
+    reason: "",
+  })
+
   const addItem = () => {
     const text = newItem.trim()
     if (!text || !draft || draft.items.length >= PLAN_MAX_ITEMS) return
-    edit((latest) => ({
-      items: [...latest.items, { id: newItemId(), text, description: "", image: null, done: false, completedAt: null, reason: "" }],
-      notes: latest.notes,
-    }))
+    edit((latest) => ({ items: [...latest.items, blankItem(text, null)], notes: latest.notes }))
     setNewItem("")
   }
 
-  const reorder = (ids: string[]) =>
+  /** A subtask under a task, after the ones it already has; refused past the third level. */
+  const addSubtask = (parent: PlanItem, depth: number) => {
+    const text = subtaskText.trim()
+    if (!text || !draft || draft.items.length >= PLAN_MAX_ITEMS || depth >= TASK_MAX_DEPTH) return
     edit((latest) => {
-      const byId = new Map(latest.items.map((entry) => [entry.id, entry]))
-      return { items: ids.map((id) => byId.get(id)).filter((entry): entry is PlanItem => Boolean(entry)), notes: latest.notes }
+      const under = subtreeOf(latest.items, parent.id, byParent)
+      const last = latest.items.indexOf(under[under.length - 1])
+      return { items: [...latest.items.slice(0, last + 1), blankItem(text, parent.id), ...latest.items.slice(last + 1)], notes: latest.notes }
+    })
+    setSubtaskText("")
+    setFolded((current) => {
+      const next = new Set(current)
+      next.delete(parent.id)
+      return next
+    })
+  }
+
+  /** A copy of a task and everything under it, straight after it, all open. Images are shared, and only go when no task has them. */
+  const copyItem = (item: PlanItem) => {
+    if (!draft) return
+    const size = subtreeOf(draft.items, item.id, byParent).length
+    if (draft.items.length + size > PLAN_MAX_ITEMS) {
+      setDetailsError(EMPLOYEE_MESSAGES.tooManyItems)
+      return
+    }
+    edit((latest) => ({
+      items: copySubtree(latest.items, item.id, byParent, (entry, id, parentId) => ({ ...entry, id, parentId, done: false, completedAt: null, reason: "" }), newItemId).items,
+      notes: latest.notes,
+    }))
+  }
+
+  // A task goes with everything under it
+  const removeItem = (item: PlanItem) =>
+    edit((latest) => {
+      const gone = new Set(subtreeOf(latest.items, item.id, byParent).map((entry) => entry.id))
+      return { items: latest.items.filter((entry) => !gone.has(entry.id)), notes: latest.notes }
     })
 
+  // The tasks of the plan's top level in their new order, each still followed by everything under it
+  const reorder = (ids: string[]) =>
+    edit((latest) => ({ items: ids.flatMap((id) => subtreeOf(latest.items, id, byParent)), notes: latest.notes }))
+
+  const changeItem = (id: string, change: (item: PlanItem) => PlanItem) =>
+    edit((latest) => ({ items: latest.items.map((entry) => (entry.id === id ? change(entry) : entry)), notes: latest.notes }))
+
+  /**
+   * One task: its tick box, its line, the employee's reason, its details (formatted text, images, AI)
+   * and its actions, then its subtasks under it. The top level has the drag handle; a subtask moves
+   * with its task. `ancestors` are the lines above it, for writing its details with AI in context.
+   */
+  const renderTask = (node: TreeNode<PlanItem>, ancestors: string[], handle: React.ReactNode | null): React.ReactNode => {
+    const { item, depth, children } = node
+    const canNest = depth < TASK_MAX_DEPTH
+    const isFolded = folded.has(item.id)
+    const addLabel = depth === 1 ? TASK_ATTACHMENT_MESSAGES.addSubtask : TASK_ATTACHMENT_MESSAGES.addSubSubtask
+    const iconButton = "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-outline opacity-70 transition-colors group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+    return (
+      <div className={depth === 1 ? "" : "mt-1.5"}>
+        {/* Aligned to the top, so the handle, the checkbox and the buttons stay by the first line of a long task */}
+        <div className={`group flex items-start gap-2 rounded-xl border border-outline-variant/70 bg-surface-container-lowest py-1.5 pr-2 ${handle ? "pl-1" : "pl-2"}`}>
+          {handle ??
+            (children.length > 0 ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setFolded((current) => {
+                    const next = new Set(current)
+                    if (next.has(item.id)) next.delete(item.id)
+                    else next.add(item.id)
+                    return next
+                  })
+                }
+                aria-expanded={!isFolded}
+                aria-label={`${isFolded ? "Show" : "Hide"} the subtasks of "${item.text}"`}
+                className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-outline hover:bg-surface-container-high"
+              >
+                <ChevronDown size={14} className={`transition-transform ${isFolded ? "-rotate-90" : ""}`} aria-hidden="true" />
+              </button>
+            ) : (
+              <CornerDownRight size={13} className="mt-2.5 shrink-0 text-outline/70" aria-hidden="true" />
+            ))}
+          <input
+            type="checkbox"
+            checked={item.done}
+            onChange={(event) => void tick(item, event.target.checked)}
+            aria-label={`Mark "${item.text}" as ${item.done ? "not done" : "done"} today`}
+            className="mt-2 h-4 w-4 shrink-0 accent-primary"
+          />
+          <div className="min-w-0 flex-1">
+            <PlanItemText value={item.text} isDone={item.done} onChange={(text) => changeItem(item.id, (entry) => ({ ...entry, text }))} />
+            {/* What the employee said about this task; only they can write or change it */}
+            <TaskReason reason={item.reason} taskText={item.text} isDone={item.done} />
+            {/* The same optional detail a Daily Task carries; the employee sees it on their link */}
+            <TaskDetailsFields
+              idPrefix={`plan-${item.id}`}
+              details={{ description: item.description, images: item.images, uploading: uploading[item.id] ?? 0 }}
+              onChange={(details) => {
+                setUploading((current) => ({ ...current, [item.id]: details.uploading }))
+                if (details.description === item.description && details.images === item.images) return
+                changeItem(item.id, (entry) => ({ ...entry, description: details.description, images: details.images, image: details.images[0] ?? null }))
+              }}
+              onError={setDetailsError}
+              onGenerate={
+                item.text.trim()
+                  ? async () => (await writeTaskDetails("employees", { title: item.text, parents: ancestors, description: item.description })).details
+                  : undefined
+              }
+            />
+            {addingUnder === item.id && canNest && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  addSubtask(item, depth)
+                }}
+                className="mt-2 flex gap-2"
+              >
+                <input
+                  autoFocus
+                  value={subtaskText}
+                  maxLength={PLAN_ITEM_MAX_LENGTH}
+                  onChange={(event) => setSubtaskText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setAddingUnder(null)
+                  }}
+                  aria-label={`${addLabel} under "${item.text}"`}
+                  placeholder={`${TASK_ATTACHMENT_MESSAGES.subtaskPlaceholder} (Enter to add)`}
+                  className="h-9 min-w-0 flex-1 rounded-xl border border-outline-variant bg-white px-3 text-[13px] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+                />
+                <button
+                  type="submit"
+                  disabled={!subtaskText.trim() || items.length >= PLAN_MAX_ITEMS}
+                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl bg-primary px-3 text-[12px] font-semibold text-white hover:bg-on-primary-fixed-variant disabled:opacity-50"
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  Add
+                </button>
+              </form>
+            )}
+          </div>
+          {item.completedAt && <span className="mt-2 hidden shrink-0 text-[11px] text-outline sm:inline">Done {tickTime(item.completedAt)}</span>}
+          <button
+            type="button"
+            onClick={() => {
+              setSubtaskText("")
+              setAddingUnder((current) => (current === item.id ? null : item.id))
+            }}
+            disabled={!canNest || items.length >= PLAN_MAX_ITEMS}
+            aria-label={canNest ? `${addLabel} under "${item.text}"` : TASK_ATTACHMENT_MESSAGES.depthReached}
+            title={canNest ? addLabel : TASK_ATTACHMENT_MESSAGES.depthReached}
+            className={`${iconButton} hover:bg-primary/10 hover:text-primary`}
+          >
+            <ListPlus size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => copyItem(item)}
+            aria-label={`${TASK_ATTACHMENT_MESSAGES.copyTask}: "${item.text}"`}
+            title={children.length > 0 ? "Copy this task with its subtasks" : TASK_ATTACHMENT_MESSAGES.copyTask}
+            className={`${iconButton} hover:bg-primary/10 hover:text-primary`}
+          >
+            <Copy size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => removeItem(item)}
+            aria-label={`Remove "${item.text}"${children.length > 0 ? " and its subtasks" : ""}`}
+            className={`${iconButton} hover:bg-error-container hover:text-error`}
+          >
+            <Trash2 size={14} aria-hidden="true" />
+          </button>
+        </div>
+        {children.length > 0 && !isFolded && (
+          <div className="ml-6 border-l-2 border-outline-variant/70 pl-2" role="group" aria-label={`Subtasks of "${item.text}"`}>
+            {handle && (
+              <button
+                type="button"
+                onClick={() => setFolded((current) => new Set(current).add(item.id))}
+                className="mt-1 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-[11px] font-semibold text-outline hover:bg-surface-container-high"
+              >
+                <ChevronDown size={12} aria-hidden="true" />
+                {children.length} {children.length === 1 ? "subtask" : "subtasks"}, {children.filter((child) => child.item.done).length} done
+              </button>
+            )}
+            {children.map((child) => (
+              <React.Fragment key={child.item.id}>{renderTask(child, [...ancestors, item.text], null)}</React.Fragment>
+            ))}
+          </div>
+        )}
+        {children.length > 0 && isFolded && handle && (
+          <button
+            type="button"
+            onClick={() =>
+              setFolded((current) => {
+                const next = new Set(current)
+                next.delete(item.id)
+                return next
+              })
+            }
+            className="ml-8 mt-1 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-[11px] font-semibold text-outline hover:bg-surface-container-high"
+          >
+            <ChevronDown size={12} className="-rotate-90" aria-hidden="true" />
+            {children.length} {children.length === 1 ? "subtask" : "subtasks"} folded away
+          </button>
+        )}
+      </div>
+    )
+  }
+
   const items = isLoaded ? draft.items : []
+  const tree = buildTree(items, byParent)
   const doneCount = items.filter((item) => item.done).length
   const failed = loadError?.key === key ? loadError.message : null
 
@@ -381,69 +605,15 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
           )}
 
           <SortableList
-            items={items}
-            getId={getId}
-            getLabel={getLabel}
+            items={tree}
+            getId={getNodeId}
+            getLabel={getNodeLabel}
             onReorder={reorder}
             label="Plan items"
             multiSelect
             itemNoun="tasks"
             className="flex flex-col gap-1.5"
-            renderItem={(item, handle) => (
-              // Aligned to the top, so the handle, the checkbox and delete stay by the first line of a long task
-              <div className="group flex items-start gap-2 rounded-xl border border-outline-variant/70 bg-surface-container-lowest py-1.5 pl-1 pr-2">
-                {handle}
-                <input
-                  type="checkbox"
-                  checked={item.done}
-                  onChange={(event) => void tick(item, event.target.checked)}
-                  aria-label={`Mark "${item.text}" as ${item.done ? "not done" : "done"} today`}
-                  className="mt-2 h-4 w-4 shrink-0 accent-primary"
-                />
-                <div className="min-w-0 flex-1">
-                  <PlanItemText
-                    value={item.text}
-                    isDone={item.done}
-                    onChange={(text) =>
-                      edit((latest) => ({ items: latest.items.map((entry) => (entry.id === item.id ? { ...entry, text } : entry)), notes: latest.notes }))
-                    }
-                  />
-                  {/* What the employee said about this task; only they can write or change it */}
-                  <TaskReason reason={item.reason} taskText={item.text} isDone={item.done} />
-                  {/* The same optional detail a Daily Task carries; the employee sees it on their link */}
-                  <TaskDetailsFields
-                    idPrefix={`plan-${item.id}`}
-                    details={{ description: item.description, file: null, image: item.image ? { assetId: item.image.assetId, contentType: item.image.contentType } : null }}
-                    savedImageUrl={item.image?.url ?? null}
-                    onChange={(details) =>
-                      edit((latest) => ({
-                        items: latest.items.map((entry) =>
-                          entry.id === item.id
-                            ? {
-                                ...entry,
-                                description: details.description,
-                                // A file just chosen has no link yet; the preview comes back with the next read
-                                image: details.image ? { ...details.image, url: entry.image?.url ?? "" } : null,
-                              }
-                            : entry
-                        ),
-                        notes: latest.notes,
-                      }))
-                    }
-                    onError={setDetailsError}
-                  />
-                </div>
-                {item.completedAt && <span className="mt-2 hidden shrink-0 text-[11px] text-outline sm:inline">Done {tickTime(item.completedAt)}</span>}
-                <button
-                  type="button"
-                  onClick={() => edit((latest) => ({ items: latest.items.filter((entry) => entry.id !== item.id), notes: latest.notes }))}
-                  aria-label={`Remove "${item.text}"`}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-outline opacity-70 transition-colors hover:bg-error-container hover:text-error group-hover:opacity-100"
-                >
-                  <Trash2 size={14} aria-hidden="true" />
-                </button>
-              </div>
-            )}
+            renderItem={(node, handle) => renderTask(node, [], handle)}
           />
 
           <form

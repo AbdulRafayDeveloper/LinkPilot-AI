@@ -632,6 +632,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           ariaLabel={ariaLabel}
           onImageFiles={images ? (files) => void addImageFiles(files) : undefined}
           onRequestLink={() => openBar("link")}
+          compact={compact}
         />
       ) : compact || mode === "write" ? (
         <textarea

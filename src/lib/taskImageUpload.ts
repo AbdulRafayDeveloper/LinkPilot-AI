@@ -1,36 +1,24 @@
 "use client"
 
-import { fetchWithRetry, requestApi } from "@/lib/apiClient"
-import { TASK_ATTACHMENT_MESSAGES, TASK_IMAGES_ENDPOINT } from "@/constants/taskAttachments"
-import type { TaskImage } from "@/types/taskAttachment"
+import { requestApi } from "@/lib/apiClient"
+import { TASK_ATTACHMENT_MESSAGES, TASK_IMAGE_MAX_BYTES, TASK_IMAGE_TYPES, TASK_IMAGES_ENDPOINT } from "@/constants/taskAttachments"
+import type { TaskImageView } from "@/types/taskAttachment"
 
 /**
- * Sends one task image from the browser straight to storage: the app hands out a signed link, the
- * bytes go to S3, and what comes back is only the id to save on the task. The same two steps a
- * brand photo takes (`components/post-images/BrandSettingsDialog`), kept here so Daily Tasks and
- * the employee plan editor both upload the same way.
+ * Sends one task image to the app, which stores it and answers what to save on the task, with a
+ * short-lived link to show it from straight away. Through the app rather than straight to storage,
+ * because the bucket refuses browser uploads from the live site. Daily Tasks and the employee plan
+ * editor both upload this way.
  */
-export async function uploadTaskImage(file: File, signal?: AbortSignal): Promise<TaskImage> {
-  const { data } = await requestApi<{ assetId: string; url: string }>(
+export async function uploadTaskImage(file: File, signal?: AbortSignal): Promise<TaskImageView> {
+  // Checked here too, so a file the server would refuse never makes the trip
+  if (!TASK_IMAGE_TYPES.includes(file.type)) throw new Error(TASK_ATTACHMENT_MESSAGES.unsupportedImage)
+  if (file.size > TASK_IMAGE_MAX_BYTES) throw new Error(TASK_ATTACHMENT_MESSAGES.imageTooLarge)
+  const { data } = await requestApi<TaskImageView>(
     TASK_IMAGES_ENDPOINT,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contentType: file.type, size: file.size }),
-      signal,
-    },
-    // Asking for a link saves nothing, so a dropped request is safe to send again
+    { method: "POST", headers: { "Content-Type": file.type }, body: file, signal },
+    // A repeat only stores another copy nothing points at, so a dropped request is safe to send again
     { retry: true }
   )
-
-  // Straight to storage, retried on a dropped connection the way every other upload here is
-  const put = await fetchWithRetry(data.url, {
-    method: "PUT",
-    body: file,
-    headers: { "Content-Type": file.type },
-    signal,
-  })
-  if (!put.ok) throw new Error(TASK_ATTACHMENT_MESSAGES.uploadFailed)
-
-  return { assetId: data.assetId, contentType: file.type }
+  return data
 }

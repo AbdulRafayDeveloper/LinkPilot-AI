@@ -5,6 +5,7 @@ import { CalendarDays, ListPlus, Loader2, Plus, X } from "lucide-react"
 import { INITIAL_TASK_ROWS, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { emptyTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
+import { writeTaskDetails } from "@/lib/taskDetailsAi"
 
 /** One row of the composer: the task's line, and the optional detail opened on it. */
 export interface TaskRow {
@@ -195,6 +196,8 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
                 idPrefix={`task-row-${index}`}
                 details={row.details}
                 onChange={(details) => setDetails(index, details)}
+                // Written from the row's own line; there is nothing to write about until it has one
+                onGenerate={row.content.trim() ? async () => (await writeTaskDetails("daily-tasks", { title: row.content, description: row.details.description })).details : undefined}
                 onError={setDetailsError}
                 disabled={isSaving}
               />

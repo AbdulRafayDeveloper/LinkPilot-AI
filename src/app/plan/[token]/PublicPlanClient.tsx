@@ -10,9 +10,13 @@ import { TaskReason } from "@/components/employees/TaskReason"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 import { requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
+import { buildTree, subtreeOf, type TreeNode } from "@/lib/taskTree"
 import { SITE_LOGO_PNG, SITE_SHORT_NAME } from "@/config/site"
 import { EMPLOYEE_MESSAGES, PUBLIC_PLAN_ENDPOINT } from "@/constants/employees"
 import type { PlanHistoryDay, PlanHistoryPage, PlanItem, PublicPlan } from "@/types/employees"
+
+// The day's tasks as a tree: each task's subtasks under it, as the manager's plan has them
+const byParent = { idOf: (item: PlanItem) => item.id, parentOf: (item: PlanItem) => item.parentId }
 
 /**
  * The page an employee opens from their link, without an account. The tasks of the day they are
@@ -94,9 +98,11 @@ export default function PublicPlanClient({ token }: { token: string }) {
    * and on later days) until Reset today. The manager's plan keeps its own order.
    * If the plan changed meanwhile (the manager edited it), the page reloads it rather than guessing.
    */
-  const reorder = async (ids: string[]) => {
+  const reorder = async (topIds: string[]) => {
     if (!plan) return
     const previous = plan.today
+    // Only the top level is dragged; each task takes its subtasks along, right after it
+    const ids = topIds.flatMap((id) => subtreeOf(previous.items, id, byParent).map((entry) => entry.id))
     const byId = new Map(previous.items.map((entry) => [entry.id, entry]))
     setToday({ ...previous, ownOrder: true, items: ids.map((id) => byId.get(id)).filter((entry): entry is PlanItem => Boolean(entry)) })
     setIsMoving(true)
@@ -243,6 +249,53 @@ export default function PublicPlanClient({ token }: { token: string }) {
   }
 
   const items = plan?.today.items ?? []
+
+  /**
+   * One task on the link: its tick, its line, what the manager put on it and the employee's reason, then
+   * its subtasks under it, each ticked on its own. Only the top level has a handle; a subtask moves with its task.
+   */
+  const renderLinkTask = (node: TreeNode<PlanItem>, handle: React.ReactNode | null): React.ReactNode => {
+    const item = node.item
+    return (
+      <div className={node.depth === 1 ? "" : "mt-2"}>
+        <div
+          className={`flex items-start gap-1.5 rounded-xl border py-1.5 pr-3 transition-colors ${handle ? "pl-1" : "pl-3"} ${
+            item.done ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-surface-container-lowest hover:bg-white"
+          }`}
+        >
+          {handle && <span className="mt-1.5">{handle}</span>}
+          <div className="min-w-0 flex-1 py-1.5">
+            <label className="flex cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                checked={item.done}
+                disabled={savingId === item.id}
+                onChange={(event) => void tick(item, event.target.checked)}
+                className="h-5 w-5 shrink-0 accent-primary"
+              />
+              <span className={`min-w-0 flex-1 break-words text-[15px] ${item.done ? "text-on-surface-variant line-through" : "text-on-surface"}`}>{item.text}</span>
+              {savingId === item.id ? (
+                <Loader2 size={14} className="shrink-0 animate-spin text-primary" aria-hidden="true" />
+              ) : (
+                item.completedAt && <span className="shrink-0 text-[12px] text-outline">{tickTime(item.completedAt)}</span>
+              )}
+            </label>
+            {/* What the manager put on this task, then why it isn't done */}
+            <TaskDetailsView description={item.description} images={item.images} label={item.text} />
+            {/* Why it isn't done, written by the employee and shown to their manager */}
+            <TaskReason reason={item.reason} taskText={item.text} isDone={item.done} onSave={(reason) => saveReason(item, reason)} />
+          </div>
+        </div>
+        {node.children.length > 0 && (
+          <div role="group" aria-label={`Subtasks of ${item.text}`} className="ml-6 border-l-2 border-outline-variant/70 pl-2">
+            {node.children.map((child) => (
+              <React.Fragment key={child.item.id}>{renderLinkTask(child, null)}</React.Fragment>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
   const doneCount = items.filter((item) => item.done).length
   // The day on the plan is the employee's own, so it can sit behind the calendar until they move it on
   const isBehindToday = Boolean(plan && plan.today.date < todayIso())
@@ -349,45 +402,16 @@ export default function PublicPlanClient({ token }: { token: string }) {
                     </p>
                   )}
                   <SortableList
-                    items={items}
-                    getId={(item) => item.id}
-                    getLabel={(item) => item.text}
+                    items={buildTree(items, byParent)}
+                    getId={(node) => node.item.id}
+                    getLabel={(node) => node.item.text}
                     onReorder={(ids) => void reorder(ids)}
                     disabled={isMoving}
                     label="Today's tasks"
                     multiSelect
                     itemNoun="tasks"
                     className="flex flex-col gap-2"
-                    renderItem={(item, handle) => (
-                      <div
-                        className={`flex items-start gap-1.5 rounded-xl border py-1.5 pl-1 pr-3 transition-colors ${
-                          item.done ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-surface-container-lowest hover:bg-white"
-                        }`}
-                      >
-                        <span className="mt-1.5">{handle}</span>
-                        <div className="min-w-0 flex-1 py-1.5">
-                          <label className="flex cursor-pointer items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={item.done}
-                              disabled={savingId === item.id}
-                              onChange={(event) => void tick(item, event.target.checked)}
-                              className="h-5 w-5 shrink-0 accent-primary"
-                            />
-                            <span className={`min-w-0 flex-1 break-words text-[15px] ${item.done ? "text-on-surface-variant line-through" : "text-on-surface"}`}>{item.text}</span>
-                            {savingId === item.id ? (
-                              <Loader2 size={14} className="shrink-0 animate-spin text-primary" aria-hidden="true" />
-                            ) : (
-                              item.completedAt && <span className="shrink-0 text-[12px] text-outline">{tickTime(item.completedAt)}</span>
-                            )}
-                          </label>
-                          {/* What the manager put on this task, then why it isn't done */}
-                          <TaskDetailsView description={item.description} image={item.image} label={item.text} />
-                          {/* Why it isn't done, written by the employee and shown to their manager */}
-                          <TaskReason reason={item.reason} taskText={item.text} isDone={item.done} onSave={(reason) => saveReason(item, reason)} />
-                        </div>
-                      </div>
-                    )}
+                    renderItem={(node, handle) => renderLinkTask(node, handle)}
                   />
                 </>
               )}

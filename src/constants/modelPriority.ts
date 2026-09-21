@@ -20,6 +20,9 @@ export const AI_MODULE_IDS = [
   "meeting-planner",
   "meetings",
   "prompt-creator",
+  // Writing a task's details with AI, in Daily Tasks and in an employee's plan
+  "daily-tasks",
+  "employees",
 ] as const
 export type AiModuleId = (typeof AI_MODULE_IDS)[number]
 
@@ -43,6 +46,8 @@ export const AI_MODULE_NEEDS: Record<AiModuleId, readonly AiNeed[]> = {
   "meeting-planner": [],
   "meetings": ["speech"],
   "prompt-creator": ["speech"],
+  "daily-tasks": [],
+  employees: [],
 }
 export const AI_NEED_LABELS: Record<AiNeed, string> = { "web-search": "web search", screenshots: "screenshots", speech: "speech" }
 

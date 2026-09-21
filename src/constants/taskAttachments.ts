@@ -20,8 +20,17 @@ export const TASK_DESCRIPTION_MAX_LENGTH = 2000
 export const TASK_IMAGE_TYPES = POST_IMAGE_TYPES
 export const TASK_IMAGE_MAX_BYTES = POST_IMAGE_MAX_BYTES
 
-// Where the browser asks for a link to upload one image to
+// Where the browser sends one image to be stored (through the app, so it works on the live site)
 export const TASK_IMAGES_ENDPOINT = "/api/task-images"
+
+// How many images one task can carry; a task saved before several were allowed has its one image as the first
+export const TASK_MAX_IMAGES = 6
+
+/**
+ * How deep tasks nest: a task (1), its subtask (2) and that subtask's own subtask (3). One more is
+ * refused by the server, and the button that would add it is disabled.
+ */
+export const TASK_MAX_DEPTH = 3
 
 export const TASK_ATTACHMENT_MESSAGES = {
   descriptionTooLong: `A description must be under ${TASK_DESCRIPTION_MAX_LENGTH.toLocaleString()} characters.`,
@@ -36,4 +45,26 @@ export const TASK_ATTACHMENT_MESSAGES = {
   descriptionLabel: "Description",
   descriptionHint: "Anything worth remembering about this task.",
   imageLabel: "Image",
+  imagesLabel: "Images",
+  addImages: "Add images",
+  tooManyImages: `A task can carry up to ${TASK_MAX_IMAGES} images.`,
+  // Subtasks, in Daily Tasks and in an employee's plan alike
+  tooDeep: `Tasks go ${TASK_MAX_DEPTH} levels deep at most: a task, its subtask and that subtask's own subtask.`,
+  missingParent: "The task this was added under no longer exists.",
+  addSubtask: "Add subtask",
+  addSubSubtask: "Add sub-subtask",
+  subtaskPlaceholder: "A smaller step of this task",
+  depthReached: "This is already a sub-subtask, the deepest a task goes.",
+  copyTask: "Copy task",
+  copied: "Task copied, with its subtasks.",
+  copyFailed: "Couldn't copy that task. Please try again.",
+  // Writing the details with AI, from the task's own line (and the tasks above it)
+  generate: "Write with AI",
+  generating: "Writing...",
+  generateFailed: "Couldn't write the details. Please try again.",
+  generateNeedsTitle: "Give the task a name first, so there is something to write about.",
+  // Saving the details of a task already written, as they are typed
+  autosaving: "Saving...",
+  autosaved: (time: string) => `Saved at ${time}`,
+  autosaveFailed: "Couldn't save the last change. Save tries again.",
 } as const
