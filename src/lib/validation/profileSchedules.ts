@@ -1,9 +1,11 @@
 import { z } from "zod"
 import {
+  DEFAULT_PROFILE_PAGE_SIZE,
   PERSON_FIELD_MAX_LENGTH,
   PERSON_TEXT_MAX_LENGTH,
   PERSON_TYPE_IDS,
   PROFILE_SCHEDULER_MESSAGES,
+  PROFILE_PAGE_SIZES,
   PROFILE_URL_MAX_LENGTH,
   WEEK_DAY_IDS,
   type PersonTypeId,
@@ -83,6 +85,12 @@ export const ProfileScheduleSchema = ProfilePersonEditSchema.refine((person) => 
 
 export const ProfileScheduleQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(100_000).catch(1),
+  // How many to a page, one of PROFILE_PAGE_SIZES; anything else opens on the default
+  pageSize: z.coerce
+    .number()
+    .int()
+    .refine((size) => (PROFILE_PAGE_SIZES as readonly number[]).includes(size))
+    .catch(DEFAULT_PROFILE_PAGE_SIZE),
   search: searchParam,
   // One day of the week, or "" for every profile
   day: choiceParam(WEEK_DAY_IDS),

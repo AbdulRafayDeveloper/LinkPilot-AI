@@ -3,8 +3,15 @@ import { connectDatabase } from "@/lib/db"
 import { UserFacingError } from "@/lib/errors"
 import { allOf, searchCondition } from "@/lib/listQuery"
 import { ProfileScheduleModel, type IProfileSchedule } from "@/models/ProfileSchedule"
-import { HISTORY_PAGE_SIZE } from "@/constants/historyFilters"
-import { PERSON_TYPE_IDS, PROFILE_SCHEDULER_MESSAGES, WEEK_DAY_IDS, type PersonTypeId, type WeekDayId } from "@/constants/profileScheduler"
+import {
+  DEFAULT_PROFILE_PAGE_SIZE,
+  PERSON_TYPE_IDS,
+  PROFILE_PAGE_SIZES,
+  PROFILE_SCHEDULER_MESSAGES,
+  WEEK_DAY_IDS,
+  type PersonTypeId,
+  type WeekDayId,
+} from "@/constants/profileScheduler"
 import type { ProfilePersonFields, ProfileSchedule, ProfileSchedulePage } from "@/types/profileScheduler"
 import type { Viewer } from "@/types/auth"
 import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
@@ -12,7 +19,8 @@ import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 /**
  * Comment Writer's Profile Scheduler: the people an account comments on (name, role, location,
  * sector, types and LinkedIn link) and the days of the week for each, read a page at a time, exactly
- * HISTORY_PAGE_SIZE (50) to a page, newest first, searched by the link and the details and filtered
+ * as many to a page as the page asks for (PROFILE_PAGE_SIZES, 100 by default), newest first,
+ * searched by the link and the details and filtered
  * by day and type in the database. A person belongs to the account that saved them; a user sees
  * their own, an admin everyone's. One account keeps a LinkedIn link once; people still waiting for
  * their link are kept apart by name only in the page, never refused.
@@ -89,9 +97,10 @@ const asDuplicate = (error: unknown) =>
  * One page of profiles. A page past the end comes back as the last page rather than as nothing,
  * so deleting the last profile on the last page never leaves an empty screen.
  */
-export async function listProfileSchedules(viewer: Viewer, filters: Filters & { page: number }): Promise<ProfileSchedulePage> {
+export async function listProfileSchedules(viewer: Viewer, filters: Filters & { page: number; pageSize?: number }): Promise<ProfileSchedulePage> {
   await connectDatabase()
-  const pageSize = HISTORY_PAGE_SIZE
+  // A size nobody offered reads as the default, so the service never reads more than the largest page
+  const pageSize = (PROFILE_PAGE_SIZES as readonly number[]).includes(filters.pageSize ?? 0) ? (filters.pageSize as number) : DEFAULT_PROFILE_PAGE_SIZE
   const matching = matchingFilter(visibleTo(viewer), filters)
   const [total, dayCounts, typeCounts] = await Promise.all([ProfileScheduleModel.countDocuments(matching), countDays(viewer), countTypes(viewer)])
   const totalPages = Math.max(1, Math.ceil(total / pageSize))

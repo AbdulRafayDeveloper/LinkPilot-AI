@@ -20,7 +20,9 @@ import { EMPTY_PERSON, personInputProblem, personName, typeLabel } from "@/lib/p
 import { HISTORY_DEBOUNCE_MS } from "@/constants/historyFilters"
 import {
   DAY_PARAM,
+  DEFAULT_PROFILE_PAGE_SIZE,
   PERSON_TYPES,
+  PROFILE_PAGE_SIZES,
   PROFILE_PARAM,
   PROFILE_SCHEDULER_MESSAGES,
   PROFILE_SCHEDULES_ENDPOINT,
@@ -40,9 +42,11 @@ interface Remembered {
   type: PersonTypeId | ""
   search: string
   page: number
+  // How many people a page holds, one of PROFILE_PAGE_SIZES
+  pageSize: number
   draft: ProfileScheduleInput
 }
-const remembered: Remembered = { day: "", type: "", search: "", page: 1, draft: EMPTY_PERSON }
+const remembered: Remembered = { day: "", type: "", search: "", page: 1, pageSize: DEFAULT_PROFILE_PAGE_SIZE, draft: EMPTY_PERSON }
 
 function useRemembered<K extends keyof Remembered>(key: K) {
   const [value, setValue] = useState<Remembered[K]>(() => remembered[key])
@@ -116,6 +120,7 @@ export default function ProfileSchedulerClient() {
   const [type, setType] = useRemembered("type")
   const [search, setSearch] = useRemembered("search")
   const [page, setPage] = useRemembered("page")
+  const [rowsPerPage, setRowsPerPage] = useRemembered("pageSize")
   const [draft, setDraft] = useRemembered("draft")
   const [result, setResult] = useState<ProfileSchedulePage | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -134,7 +139,7 @@ export default function ProfileSchedulerClient() {
 
   // Typing settles before the list is asked for again, and an emptied search box counts at once
   const settledSearch = useDebouncedValue(search.trim(), HISTORY_DEBOUNCE_MS)
-  const params = new URLSearchParams({ page: String(page) })
+  const params = new URLSearchParams({ page: String(page), pageSize: String(rowsPerPage) })
   if (search.trim() && settledSearch) params.set("search", settledSearch)
   if (day) params.set("day", day)
   if (type) params.set("type", type)
@@ -538,7 +543,30 @@ export default function ProfileSchedulerClient() {
                   ))}
                 </ul>
 
-                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} isLoading={isLoading} />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 whitespace-nowrap text-[12px] text-on-surface-variant" htmlFor="rows-per-page">
+                    People on a page
+                    <select
+                      id="rows-per-page"
+                      value={rowsPerPage}
+                      disabled={isLoading}
+                      onChange={(event) => {
+                        setRowsPerPage(Number(event.target.value))
+                        setPage(1)
+                      }}
+                      className="h-8 rounded-lg border border-outline-variant bg-white px-2 text-[12px] font-semibold text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+                    >
+                      {PROFILE_PAGE_SIZES.map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="min-w-[240px] flex-1">
+                    <Pagination page={page} totalPages={totalPages} onPageChange={setPage} isLoading={isLoading} />
+                  </div>
+                </div>
               </div>
             )}
           </div>

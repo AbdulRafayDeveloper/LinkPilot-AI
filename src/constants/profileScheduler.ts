@@ -72,6 +72,14 @@ export const PERSON_FIELD_MAX_LENGTH = 150
 // Why now and the notes are a sentence or two; the source is a link to where the person was found
 export const PERSON_TEXT_MAX_LENGTH = 500
 
+/**
+ * How many people a page holds. The list is long (a whole week of outreach), so it opens on 100 and
+ * the page offers the others; anything else asked for falls back to the default rather than being
+ * refused, and the service caps what it reads at the largest of these.
+ */
+export const PROFILE_PAGE_SIZES = [25, 50, 100, 200] as const
+export const DEFAULT_PROFILE_PAGE_SIZE = 100
+
 // Comment Writer reads these from its address when a profile is opened from the scheduler
 export const PROFILE_PARAM = "profile"
 export const DAY_PARAM = "day"
