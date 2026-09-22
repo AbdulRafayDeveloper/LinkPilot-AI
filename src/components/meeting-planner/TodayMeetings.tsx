@@ -8,6 +8,7 @@ import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
 import { MeetingStatusButton } from "./MeetingStatusButton"
 import { PrepBadge } from "./PrepBadge"
+import { SeriesBadge } from "./SeriesBadge"
 
 interface TodayMeetingsProps {
   meetings: MeetingPlan[]
@@ -74,6 +75,7 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                 </span>
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
                 <PrepBadge meeting={meeting} className="mt-1" />
+                <SeriesBadge meeting={meeting} className="mt-1" />
               </Link>
               <MeetingStatusButton
                 meeting={meeting}

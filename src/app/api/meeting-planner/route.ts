@@ -11,8 +11,10 @@ import {
   PERSON_NAME_MAX_LENGTH,
   PREP_INPUT_MAX_LENGTH,
   PROFILE_LINK_MAX_LENGTH,
+  RECURRENCE_PATTERN_IDS,
   TIME_PATTERN,
 } from "@/constants/meetingPlanner"
+import { latestUntil, recurrenceDates } from "@/lib/meetingRecurrence"
 import { isUsableProfileLink, normalizeProfileLink } from "@/lib/profileLink"
 import { createMeeting, listMonth } from "@/services/meetingPlanner/plans"
 import { requireViewer } from "@/services/auth/viewer"
@@ -75,6 +77,28 @@ export const MeetingInputSchema = z.object({
   additionalInfo: optionalText(PREP_INPUT_MAX_LENGTH),
 })
 
+/**
+ * A new meeting may also repeat (optional; without it the request is exactly what it always was).
+ * Only the create route takes it, so the edit route's partial schema never offers to turn a saved
+ * meeting into a series. The series must end on or after the first meeting, within a month of it,
+ * and hold at least two meetings.
+ */
+export const CreateMeetingSchema = MeetingInputSchema.extend({
+  recurrence: z
+    .object({
+      pattern: z.enum(RECURRENCE_PATTERN_IDS, { error: MEETING_PLANNER_MESSAGES.recurrenceInvalid }),
+      until: IsoDateSchema,
+    })
+    .nullish(),
+}).superRefine((body, context) => {
+  if (!body.recurrence) return
+  const { pattern, until } = body.recurrence
+  const fail = (message: string) => context.addIssue({ code: "custom", message, path: ["recurrence", "until"] })
+  if (until < body.meetingDate) return fail(MEETING_PLANNER_MESSAGES.recurrenceUntilBefore)
+  if (until > latestUntil(body.meetingDate)) return fail(MEETING_PLANNER_MESSAGES.recurrenceUntilTooFar)
+  if (recurrenceDates(body.meetingDate, pattern, until).length < 2) fail(MEETING_PLANNER_MESSAGES.recurrenceTooShort)
+})
+
 /** Preparation has to have something of the lead's to read; the meeting itself never does. */
 export const hasPrepInput = (input: {
   profileInfo: string | null
@@ -109,7 +133,8 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST: saves one meeting. Only the name, day and time are needed. When preparation is switched
+ * POST: saves one meeting, or with `recurrence` a whole series of them (see createMeeting), and
+ * answers with the first. Only the name, day and time are needed. When preparation is switched
  * on the meeting is saved as "generating" and the page asks for the preparation next, so a slow
  * or failing model can never cost the meeting itself.
  */
@@ -118,14 +143,16 @@ async function handlePost(req: NextRequest) {
   if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
-    const parsed = MeetingInputSchema.safeParse(body)
+    const parsed = CreateMeetingSchema.safeParse(body)
     if (!parsed.success) return badRequest(parsed.error.issues[0]?.message || MEETING_PLANNER_MESSAGES.saveFailed)
     if (parsed.data.prepEnabled && !hasPrepInput(parsed.data)) {
       return badRequest(MEETING_PLANNER_MESSAGES.prepNeedsInput)
     }
 
-    const meeting = await createMeeting(auth.viewer, parsed.data)
-    return NextResponse.json({ success: true, message: MEETING_PLANNER_MESSAGES.created, data: meeting }, { status: 201 })
+    const { recurrence, ...input } = parsed.data
+    const meeting = await createMeeting(auth.viewer, input, recurrence)
+    const message = meeting.seriesSize ? MEETING_PLANNER_MESSAGES.seriesCreated(meeting.seriesSize) : MEETING_PLANNER_MESSAGES.created
+    return NextResponse.json({ success: true, message, data: meeting }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Meeting Planner Exception:", error)
     return NextResponse.json(

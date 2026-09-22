@@ -3,7 +3,16 @@ import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { MeetingPlan as MeetingPlanModel, type IMeetingPlan } from "@/models/MeetingPlan"
 import { monthEnd, monthStart } from "@/lib/meetingDates"
-import type { MeetingPlan, MeetingPlanDetail, MeetingPlannerPage, MeetingPrep, ProjectToShow, ScriptStage } from "@/types/meetingPlanner"
+import { recurrenceDates } from "@/lib/meetingRecurrence"
+import type {
+  MeetingPlan,
+  MeetingPlanDetail,
+  MeetingPlannerPage,
+  MeetingPrep,
+  MeetingRecurrence,
+  ProjectToShow,
+  ScriptStage,
+} from "@/types/meetingPlanner"
 import type { Viewer } from "@/types/auth"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { STALE_PREP_MS, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
@@ -19,7 +28,7 @@ import { clearMeetingChat } from "@/services/meetingPlanner/chatHistory"
  */
 // What the calendar, today's list and the history rows draw; the long preparation inputs stay out
 const LIST_FIELDS =
-  "name meetingDate meetingTime status completedAt personName profileLink prepEnabled prepStatus prepError preparedAt createdAt"
+  "name meetingDate meetingTime status completedAt personName profileLink prepEnabled prepStatus prepError preparedAt seriesId recurrencePattern recurrenceUntil createdAt"
 
 type StoredPlan = IMeetingPlan & { _id: { toString: () => string } }
 
@@ -36,6 +45,10 @@ const toMeeting = (record: StoredPlan): MeetingPlan => ({
   prepStatus: record.prepStatus,
   prepError: record.prepError ?? null,
   preparedAt: record.preparedAt ? record.preparedAt.toISOString() : null,
+  // Meetings saved before series existed have none of the three
+  seriesId: record.seriesId ?? null,
+  recurrencePattern: record.recurrencePattern ?? null,
+  recurrenceUntil: record.recurrenceUntil ?? null,
   createdAt: record.createdAt.toISOString(),
 })
 
@@ -86,20 +99,49 @@ export interface NewMeetingPlan {
 /**
  * Saves the meeting itself. Preparation, when it is switched on, runs afterwards in its own
  * request, so a slow or failing model never costs the meeting.
+ *
+ * With `recurrence`, one meeting is written for every day of the series (lib/meetingRecurrence.ts,
+ * never more than a month ahead), in one insert, all sharing a new series id and copying the name,
+ * time, person and what was pasted. Preparation is asked for on the first meeting only: writing it
+ * for every occurrence would call the model once a day for the same person, and any later occurrence
+ * can switch it on for itself. The answer is the first meeting, with how many the series holds.
  */
-export async function createMeeting(viewer: Viewer, input: NewMeetingPlan): Promise<MeetingPlanDetail> {
+export async function createMeeting(viewer: Viewer, input: NewMeetingPlan, recurrence?: MeetingRecurrence | null): Promise<MeetingPlanDetail> {
   await connectDatabase()
-  const record = await MeetingPlanModel.create({
+  const base = {
     ...input,
     ownerId: viewer.id,
-    status: "pending",
+    status: "pending" as const,
     completedAt: null,
-    prepStatus: input.prepEnabled ? "queued" : "off",
     prepError: null,
     prep: null,
     preparedAt: null,
-  })
-  return toDetail(record as unknown as StoredPlan)
+  }
+  if (!recurrence) {
+    const record = await MeetingPlanModel.create({ ...base, prepStatus: input.prepEnabled ? "queued" : "off" })
+    return toDetail(record as unknown as StoredPlan)
+  }
+  const seriesId = new mongoose.Types.ObjectId().toString()
+  const dates = recurrenceDates(input.meetingDate, recurrence.pattern, recurrence.until)
+  const records = await MeetingPlanModel.insertMany(
+    dates.map((meetingDate, index) => ({
+      ...base,
+      meetingDate,
+      prepEnabled: index === 0 && input.prepEnabled,
+      prepStatus: index === 0 && input.prepEnabled ? "queued" : "off",
+      seriesId,
+      recurrencePattern: recurrence.pattern,
+      recurrenceUntil: dates[dates.length - 1],
+    })),
+    { ordered: true }
+  )
+  return { ...toDetail(records[0] as unknown as StoredPlan), seriesSize: records.length }
+}
+
+/** How many meetings a series still holds, counting only what the viewer may see. */
+export async function seriesSizeOf(viewer: Viewer, seriesId: string): Promise<number> {
+  await connectDatabase()
+  return MeetingPlanModel.countDocuments({ seriesId, ...visibleTo(viewer) })
 }
 
 export async function getMeeting(viewer: Viewer, id: string): Promise<MeetingPlanDetail | null> {
@@ -153,6 +195,26 @@ export async function deleteMeeting(viewer: Viewer, id: string): Promise<boolean
   // The meeting's vectors and its chat go with it; neither means anything without the meeting
   if (deletedCount > 0) await Promise.all([deleteMeetingVectors(id), clearMeetingChat(id)])
   return deletedCount > 0
+}
+
+/**
+ * Deletes every meeting of the series this meeting belongs to, each with its vectors and its chat,
+ * and answers how many went (0 when the meeting is gone or not the viewer's). A meeting that is in
+ * no series is deleted on its own, so asking for the series of a one-off meeting is never an error.
+ * Only meetings the viewer may see are touched, the same rule as deleting one.
+ */
+export async function deleteSeries(viewer: Viewer, id: string): Promise<number> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return 0
+  await connectDatabase()
+  const meeting = await MeetingPlanModel.findOne(filter, "seriesId").lean()
+  if (!meeting) return 0
+  if (!meeting.seriesId) return (await deleteMeeting(viewer, id)) ? 1 : 0
+  const seriesFilter = { seriesId: meeting.seriesId, ...visibleTo(viewer) }
+  const ids = (await MeetingPlanModel.find(seriesFilter, "_id").lean()).map((record) => String(record._id))
+  const { deletedCount } = await MeetingPlanModel.deleteMany({ ...seriesFilter, _id: { $in: ids } })
+  await Promise.all(ids.flatMap((meetingId) => [deleteMeetingVectors(meetingId), clearMeetingChat(meetingId)]))
+  return deletedCount
 }
 
 export type SavePrepPartResult =

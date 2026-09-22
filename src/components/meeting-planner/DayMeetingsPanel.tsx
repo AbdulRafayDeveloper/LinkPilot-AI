@@ -2,12 +2,13 @@
 
 import React from "react"
 import Link from "next/link"
-import { CalendarPlus, ChevronRight } from "lucide-react"
+import { CalendarPlus, ChevronRight, Pencil, Trash2 } from "lucide-react"
 import { MEETING_PLANNER_MESSAGES } from "@/constants/meetingPlanner"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
 import { MeetingStatusButton } from "./MeetingStatusButton"
 import { PrepBadge } from "./PrepBadge"
+import { SeriesBadge } from "./SeriesBadge"
 
 interface DayMeetingsPanelProps {
   date: string
@@ -15,11 +16,19 @@ interface DayMeetingsPanelProps {
   savingIds: ReadonlySet<string>
   onToggleStatus: (meeting: MeetingPlan) => void
   onAddMeeting: (date: string) => void
+  // Moving this one meeting to another day or time, and deleting it (or its whole series)
+  onEdit: (meeting: MeetingPlan) => void
+  onDelete: (meeting: MeetingPlan) => void
 }
+
+const iconButton =
+  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-outline transition-colors disabled:cursor-not-allowed disabled:opacity-50"
 
 /**
  * Every meeting on the selected day, in time order. However many there are, they are all here
- * with their name, exact time and status, so a full calendar cell never hides one.
+ * with their name, exact time and status, so a full calendar cell never hides one. Each can be
+ * moved (the pencil) or deleted (the bin) here; for a meeting in a repeating series both act on
+ * that one occurrence, and deleting also offers the whole series.
  */
 export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
   date,
@@ -27,6 +36,8 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
   savingIds,
   onToggleStatus,
   onAddMeeting,
+  onEdit,
+  onDelete,
 }) => (
   <section
     aria-label={`Meetings on ${date}`}
@@ -62,6 +73,7 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                 <span className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[13px] font-bold tabular-nums text-primary">{formatTime(meeting.meetingTime)}</span>
                   <PrepBadge meeting={meeting} />
+                  <SeriesBadge meeting={meeting} />
                 </span>
                 <span className="mt-0.5 flex items-center gap-1 text-[13px] font-semibold text-on-surface group-hover:text-primary">
                   <span className="truncate">{meeting.name}</span>
@@ -69,7 +81,29 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                 </span>
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
               </Link>
-              <MeetingStatusButton meeting={meeting} isSaving={savingIds.has(meeting.id)} onToggle={onToggleStatus} />
+              <div className="flex shrink-0 items-center gap-0.5">
+                <MeetingStatusButton meeting={meeting} isSaving={savingIds.has(meeting.id)} onToggle={onToggleStatus} />
+                <button
+                  type="button"
+                  onClick={() => onEdit(meeting)}
+                  disabled={savingIds.has(meeting.id)}
+                  aria-label={`Change the day or time of ${meeting.name}`}
+                  title={meeting.seriesId ? "Change the day or time of this meeting only" : "Change the day or time"}
+                  className={`${iconButton} hover:bg-primary/5 hover:text-primary`}
+                >
+                  <Pencil size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(meeting)}
+                  disabled={savingIds.has(meeting.id)}
+                  aria-label={`Delete ${meeting.name}`}
+                  title={meeting.seriesId ? "Delete this meeting or its whole series" : "Delete this meeting"}
+                  className={`${iconButton} hover:bg-error/5 hover:text-error`}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
+              </div>
             </div>
           </li>
         ))}

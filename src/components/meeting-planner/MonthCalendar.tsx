@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useMemo } from "react"
-import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Sparkles } from "lucide-react"
+import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Repeat, Sparkles } from "lucide-react"
 import { DAY_CELL_MAX_MEETINGS } from "@/constants/meetingPlanner"
 import { WEEKDAY_LABELS, calendarDays, dayOfMonth, formatTime, monthLabel, monthOf } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
@@ -91,7 +91,9 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
           <Sparkles size={9} className="text-primary" />
           10:00
         </span>
-        A spark on a meeting means its preparation is written.
+        A spark on a meeting means its preparation is written;
+        <Repeat size={11} className="text-on-secondary-fixed-variant" aria-hidden="true" />
+        means it repeats.
       </p>
 
       <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wider text-outline">
@@ -132,7 +134,7 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
                   return (
                     <span
                       key={meeting.id}
-                      title={`${formatTime(meeting.meetingTime)} ${meeting.name}${hasPrep ? " · preparation ready" : ""}`}
+                      title={`${formatTime(meeting.meetingTime)} ${meeting.name}${hasPrep ? " · preparation ready" : ""}${meeting.seriesId ? " · repeats" : ""}`}
                       className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${
                         meeting.status === "completed"
                           ? "bg-success-container text-on-success-container"
@@ -143,6 +145,12 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
                         <>
                           <Sparkles size={9} className="mr-0.5 inline-block align-[-1px] text-primary" aria-hidden="true" />
                           <span className="sr-only">Preparation ready: </span>
+                        </>
+                      )}
+                      {meeting.seriesId && (
+                        <>
+                          <Repeat size={9} className="mr-0.5 inline-block align-[-1px] text-on-secondary-fixed-variant" aria-hidden="true" />
+                          <span className="sr-only">Repeats: </span>
                         </>
                       )}
                       <span className="font-bold tabular-nums">{formatTime(meeting.meetingTime)}</span> {meeting.name}

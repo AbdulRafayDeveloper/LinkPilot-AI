@@ -10,8 +10,11 @@ import { DayMeetingsPanel } from "@/components/meeting-planner/DayMeetingsPanel"
 import {
   MeetingFormModal,
   emptyMeetingForm,
+  recurrenceOf,
   type MeetingFormValues,
 } from "@/components/meeting-planner/MeetingFormModal"
+import { MoveMeetingModal } from "@/components/meeting-planner/MoveMeetingModal"
+import { DeleteMeetingDialog } from "@/components/meeting-planner/DeleteMeetingDialog"
 import { MeetingPlannerPromptsModal } from "@/components/meeting-planner/MeetingPlannerPromptsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
@@ -20,6 +23,7 @@ import {
   CALENDAR_MONTH_RANGE,
   MEETING_PLANNER_ENDPOINT,
   MEETING_PLANNER_MESSAGES,
+  type DeleteScopeId,
 } from "@/constants/meetingPlanner"
 import type { MeetingPlan, MeetingPlanDetail, MeetingPlannerPage } from "@/types/meetingPlanner"
 
@@ -41,6 +45,13 @@ export default function MeetingPlannerClient() {
   const [notice, setNotice] = useState<string | null>(null)
   const [preparingName, setPreparingName] = useState<string | null>(null)
   const [isPromptsOpen, setIsPromptsOpen] = useState(false)
+  // One meeting being moved, or being deleted (alone or with its series), from the day list
+  const [moving, setMoving] = useState<MeetingPlan | null>(null)
+  const [isMoving, setIsMoving] = useState(false)
+  const [moveError, setMoveError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<MeetingPlan | null>(null)
+  const [deletingScope, setDeletingScope] = useState<DeleteScopeId | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
 
   // The day is read on arrival and again when the tab comes back, so a page left open overnight
@@ -148,18 +159,65 @@ export default function MeetingPlannerClient() {
           profileInfo: values.profileInfo || null,
           conversationHistory: values.conversationHistory || null,
           additionalInfo: values.additionalInfo || null,
+          recurrence: recurrenceOf(values),
         }),
       }, { idempotent: true })
       setIsFormOpen(false)
       setSelectedDate(data.meetingDate)
       if (monthOf(data.meetingDate) !== month) setMonth(monthOf(data.meetingDate))
-      setNotice(data.prepEnabled ? `"${data.name}" saved. Writing the preparation...` : MEETING_PLANNER_MESSAGES.created)
+      const saved = data.seriesSize ? MEETING_PLANNER_MESSAGES.seriesCreated(data.seriesSize) : MEETING_PLANNER_MESSAGES.created
+      setNotice(data.prepEnabled ? `"${data.name}" saved. Writing the preparation...` : saved)
       reload()
       if (data.prepEnabled) void runPreparation(data)
     } catch (error: unknown) {
       setFormError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.saveFailed)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  /**
+   * Moves one meeting to another day or time. In a series it moves that occurrence only: the others
+   * keep their own days, since each is its own record. The calendar is read again afterwards, so a
+   * meeting moved into another month leaves this one.
+   */
+  const moveMeeting = async (meetingDate: string, meetingTime: string) => {
+    if (!moving || isMoving) return
+    setIsMoving(true)
+    setMoveError(null)
+    try {
+      await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${moving.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meetingDate, meetingTime }),
+      })
+      setMoving(null)
+      setNotice(MEETING_PLANNER_MESSAGES.moved)
+      reload()
+    } catch (error: unknown) {
+      setMoveError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.updateFailed)
+    } finally {
+      setIsMoving(false)
+    }
+  }
+
+  /** Deletes one meeting, or with `series` every meeting of its series, then reads the calendar again. */
+  const deleteMeeting = async (scope: DeleteScopeId) => {
+    if (!deleting || deletingScope) return
+    setDeletingScope(scope)
+    setDeleteError(null)
+    try {
+      const query = scope === "series" ? "?scope=series" : ""
+      const { message } = await requestApi<{ deleted: boolean; count: number }>(`${MEETING_PLANNER_ENDPOINT}/${deleting.id}${query}`, {
+        method: "DELETE",
+      })
+      setDeleting(null)
+      setNotice(message || MEETING_PLANNER_MESSAGES.deleted)
+      reload()
+    } catch (error: unknown) {
+      setDeleteError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.deleteFailed)
+    } finally {
+      setDeletingScope(null)
     }
   }
 
@@ -291,6 +349,14 @@ export default function MeetingPlannerClient() {
                 savingIds={savingIds}
                 onToggleStatus={toggleStatus}
                 onAddMeeting={openForm}
+                onEdit={(meeting) => {
+                  setMoveError(null)
+                  setMoving(meeting)
+                }}
+                onDelete={(meeting) => {
+                  setDeleteError(null)
+                  setDeleting(meeting)
+                }}
               />
             </div>
 
@@ -305,6 +371,7 @@ export default function MeetingPlannerClient() {
       {isFormOpen && (
         <MeetingFormModal
           title="New meeting"
+          allowRepeat
           initial={emptyMeetingForm(formDate || today, nextHalfHour())}
           isSaving={isSaving}
           error={formError}
@@ -317,6 +384,25 @@ export default function MeetingPlannerClient() {
         />
       )}
       {isPromptsOpen && <MeetingPlannerPromptsModal onClose={() => setIsPromptsOpen(false)} />}
+      {moving && (
+        <MoveMeetingModal
+          key={moving.id}
+          meeting={moving}
+          isSaving={isMoving}
+          error={moveError}
+          onSubmit={(meetingDate, meetingTime) => void moveMeeting(meetingDate, meetingTime)}
+          onClose={() => setMoving(null)}
+        />
+      )}
+      {deleting && (
+        <DeleteMeetingDialog
+          meeting={deleting}
+          deleting={deletingScope}
+          error={deleteError}
+          onDelete={(scope) => void deleteMeeting(scope)}
+          onClose={() => setDeleting(null)}
+        />
+      )}
     </div>
   )
 }

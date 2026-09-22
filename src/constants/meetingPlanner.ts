@@ -60,6 +60,29 @@ export const STALE_PREP_MS = 6 * 60_000
 export const MEETING_PLANNER_ENDPOINT = "/api/meeting-planner"
 
 /**
+ * A repeating meeting is saved as one meeting per day it happens, all sharing a series id, so each
+ * one can be moved, ticked off, prepared or deleted on its own. Only a limited window is ever
+ * written: at most RECURRENCE_MAX_DAYS after the first meeting, never an open-ended series.
+ */
+export const RECURRENCE_PATTERNS = [
+  { id: "daily", label: "Every day", description: "Every day, weekends included", defaultDays: 6 },
+  { id: "weekdays", label: "Every weekday", description: "Monday to Friday", defaultDays: 6 },
+  { id: "weekly", label: "Every week", description: "The same day each week", defaultDays: 28 },
+] as const
+export type RecurrencePatternId = (typeof RECURRENCE_PATTERNS)[number]["id"]
+export const RECURRENCE_PATTERN_IDS = RECURRENCE_PATTERNS.map((pattern) => pattern.id) as [
+  RecurrencePatternId,
+  ...RecurrencePatternId[],
+]
+export const DEFAULT_RECURRENCE_PATTERN: RecurrencePatternId = "weekly"
+// How far past the first meeting a series may run: about a month
+export const RECURRENCE_MAX_DAYS = 31
+
+// Deleting one meeting of a series, or every meeting still in it
+export const DELETE_SCOPES = ["one", "series"] as const
+export type DeleteScopeId = (typeof DELETE_SCOPES)[number]
+
+/**
  * The conversation is a script: stages in order, each an ordered list of steps. A step is one
  * thing to do on the call, so the page can say plainly when to talk, when to ask, when to stop and
  * listen, and when to open a project and show it.
@@ -132,6 +155,13 @@ export const MEETING_PLANNER_MESSAGES = {
   emptyToday: "Nothing scheduled today.",
   emptyMonth: "No meetings this month.",
   emptyDay: "Nothing scheduled on this day.",
+  recurrenceInvalid: "Pick how often the meeting repeats.",
+  recurrenceUntilBefore: "The series has to end on or after the first meeting.",
+  recurrenceUntilTooFar: `A repeating meeting is set up for at most ${RECURRENCE_MAX_DAYS} days ahead.`,
+  recurrenceTooShort: "Pick an end date that leaves at least two meetings in the series.",
+  seriesCreated: (count: number) => `${count} meetings saved.`,
+  seriesDeleted: (count: number) => `${count} ${count === 1 ? "meeting" : "meetings"} deleted.`,
+  moved: "Meeting moved.",
 } as const
 
 // The module's sidebar entry, next to the meeting minutes module

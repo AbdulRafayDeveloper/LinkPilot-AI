@@ -1,17 +1,23 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { Loader2, Save, Sparkles } from "lucide-react"
+import { Loader2, Repeat, Save, Sparkles } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import {
+  DEFAULT_RECURRENCE_PATTERN,
   MEETING_NAME_MAX_LENGTH,
   MEETING_PLANNER_MESSAGES,
   PERSON_NAME_MAX_LENGTH,
   PREP_INPUT_MAX_LENGTH,
   PROFILE_LINK_MAX_LENGTH,
+  RECURRENCE_PATTERNS,
+  type RecurrencePatternId,
 } from "@/constants/meetingPlanner"
 import { findProfileLink } from "@/lib/profileLink"
-import type { MeetingPlanDetail } from "@/types/meetingPlanner"
+import { dayLabel } from "@/lib/meetingDates"
+import { defaultUntil, latestUntil, recurrenceDates } from "@/lib/meetingRecurrence"
+import type { MeetingPlanDetail, MeetingRecurrence } from "@/types/meetingPlanner"
+import { describeSeries } from "./SeriesBadge"
 import { TimeField } from "./TimeField"
 
 export interface MeetingFormValues {
@@ -24,10 +30,30 @@ export interface MeetingFormValues {
   profileInfo: string
   conversationHistory: string
   additionalInfo: string
+  // A new meeting only: whether it repeats, how, and the last day chosen ("" for the pattern's default)
+  repeat: boolean
+  repeatPattern: RecurrencePatternId
+  repeatUntil: string
 }
+
+/**
+ * The last day of the series the form will ask for: the one picked, when it still fits the first
+ * meeting's day, otherwise the pattern's default (a week of days, a month of weeks).
+ */
+export function effectiveUntil(values: Pick<MeetingFormValues, "meetingDate" | "repeatPattern" | "repeatUntil">): string {
+  const { meetingDate, repeatPattern, repeatUntil } = values
+  const fits = repeatUntil && repeatUntil >= meetingDate && repeatUntil <= latestUntil(meetingDate)
+  return fits ? repeatUntil : defaultUntil(meetingDate, repeatPattern)
+}
+
+/** What a new meeting sends about repeating: nothing for a one-off meeting. */
+export const recurrenceOf = (values: MeetingFormValues): MeetingRecurrence | null =>
+  values.repeat && values.meetingDate ? { pattern: values.repeatPattern, until: effectiveUntil(values) } : null
 
 interface MeetingFormModalProps {
   title: string
+  // Offers "Repeat this meeting"; only when creating, since a saved meeting is never turned into a series
+  allowRepeat?: boolean
   // The values to start from: a blank meeting on the selected day, or the one being edited
   initial: MeetingFormValues
   // Set when editing, so the form can say what preparation already exists
@@ -52,6 +78,9 @@ export const emptyMeetingForm = (date: string, time: string): MeetingFormValues 
   profileInfo: "",
   conversationHistory: "",
   additionalInfo: "",
+  repeat: false,
+  repeatPattern: DEFAULT_RECURRENCE_PATTERN,
+  repeatUntil: "",
 })
 
 export const formValuesOf = (meeting: MeetingPlanDetail): MeetingFormValues => ({
@@ -64,6 +93,9 @@ export const formValuesOf = (meeting: MeetingPlanDetail): MeetingFormValues => (
   profileInfo: meeting.profileInfo ?? "",
   conversationHistory: meeting.conversationHistory ?? "",
   additionalInfo: meeting.additionalInfo ?? "",
+  repeat: false,
+  repeatPattern: meeting.recurrencePattern ?? DEFAULT_RECURRENCE_PATTERN,
+  repeatUntil: "",
 })
 
 /**
@@ -72,6 +104,7 @@ export const formValuesOf = (meeting: MeetingPlanDetail): MeetingFormValues => (
  */
 export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
   title,
+  allowRepeat = false,
   initial,
   existing,
   isSaving,
@@ -100,6 +133,13 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
     values.profileInfo.trim() || values.conversationHistory.trim() || values.additionalInfo.trim()
   )
   const willRegenerate = Boolean(existing?.prep) && values.prepEnabled
+  // The days the series will meet on, worked out the same way the server will
+  const seriesDates = allowRepeat && values.repeat && values.meetingDate
+    ? recurrenceDates(values.meetingDate, values.repeatPattern, effectiveUntil(values))
+    : []
+  const seriesTooShort = allowRepeat && values.repeat && seriesDates.length < 2
+  const shortDay = (date: string) => dayLabel(date, { weekday: "short", month: "short" })
+  const existingSeries = existing ? describeSeries(existing) : null
 
   return (
     <Modal
@@ -119,6 +159,7 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
             {!error && values.prepEnabled && !hasPrepInput && (
               <p className="text-on-surface-variant">{MEETING_PLANNER_MESSAGES.prepNeedsInput}</p>
             )}
+            {!error && seriesTooShort && <p className="text-on-surface-variant">{MEETING_PLANNER_MESSAGES.recurrenceTooShort}</p>}
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             <button
@@ -132,11 +173,11 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
             <button
               type="button"
               onClick={() => onSubmit(values)}
-              disabled={isSaving || !values.name.trim() || (values.prepEnabled && !hasPrepInput)}
+              disabled={isSaving || !values.name.trim() || (values.prepEnabled && !hasPrepInput) || seriesTooShort}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
-              {isSaving ? "Saving..." : "Save meeting"}
+              {isSaving ? "Saving..." : seriesDates.length > 1 ? `Save ${seriesDates.length} meetings` : "Save meeting"}
             </button>
           </div>
         </div>
@@ -213,6 +254,97 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
             </p>
           </div>
         </div>
+
+        {existingSeries && (
+          <p className="flex items-start gap-2 rounded-xl border border-secondary/40 bg-secondary-fixed px-3 py-2.5 text-[12px] leading-relaxed text-on-secondary-fixed-variant">
+            <Repeat size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+            This meeting is part of a repeating series ({existingSeries}). Changes here apply to this meeting only.
+          </p>
+        )}
+
+        {allowRepeat && (
+          <div className="flex flex-col gap-3 rounded-xl border border-outline-variant bg-surface-container-low p-3">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={values.repeat}
+                onChange={(event) => set("repeat", event.target.checked)}
+                disabled={isSaving}
+                className="peer sr-only"
+              />
+              <span
+                aria-hidden="true"
+                className={`mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40 peer-focus-visible:ring-offset-2 ${
+                  values.repeat ? "border-primary bg-primary text-white" : "border-outline-variant text-transparent"
+                }`}
+              >
+                <Repeat size={12} aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-semibold text-on-surface">Repeat this meeting</span>
+                <span className="block text-[12px] leading-relaxed text-on-surface-variant">
+                  Puts the same meeting on every day it repeats, up to a month ahead. Each one can be moved or deleted on its own later.
+                </span>
+              </span>
+            </label>
+
+            {values.repeat && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="meeting-repeat-pattern" className={labelClass}>
+                    Repeats
+                  </label>
+                  <select
+                    id="meeting-repeat-pattern"
+                    value={values.repeatPattern}
+                    onChange={(event) =>
+                      setValues((current) => ({
+                        ...current,
+                        repeatPattern: event.target.value as RecurrencePatternId,
+                        // A new pattern starts from its own default length
+                        repeatUntil: "",
+                      }))
+                    }
+                    disabled={isSaving}
+                    className={fieldClass}
+                  >
+                    {RECURRENCE_PATTERNS.map((pattern) => (
+                      <option key={pattern.id} value={pattern.id}>
+                        {pattern.label} ({pattern.description.toLowerCase()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="meeting-repeat-until" className={labelClass}>
+                    Until
+                  </label>
+                  <input
+                    id="meeting-repeat-until"
+                    type="date"
+                    value={values.meetingDate ? effectiveUntil(values) : ""}
+                    min={values.meetingDate}
+                    max={values.meetingDate ? latestUntil(values.meetingDate) : undefined}
+                    onChange={(event) => set("repeatUntil", event.target.value)}
+                    disabled={isSaving || !values.meetingDate}
+                    className={fieldClass}
+                  />
+                </div>
+                {seriesDates.length > 0 && (
+                  <p className="text-[12px] leading-relaxed text-on-surface-variant sm:col-span-2" aria-live="polite">
+                    <span className="font-semibold text-on-surface">
+                      {seriesDates.length} {seriesDates.length === 1 ? "meeting" : "meetings"}
+                    </span>
+                    : {seriesDates.length <= 6
+                      ? seriesDates.map(shortDay).join(", ")
+                      : `${shortDay(seriesDates[0])} to ${shortDay(seriesDates[seriesDates.length - 1])}`}
+                    .{values.prepEnabled && " Preparation is written for the first one; switch it on for any other from its own page."}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-outline-variant bg-surface-container-low p-3">
           <input

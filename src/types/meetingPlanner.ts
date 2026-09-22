@@ -1,4 +1,4 @@
-import type { MeetingPlanStatusId, PrepStatusId, ScriptStepKindId } from "@/constants/meetingPlanner"
+import type { MeetingPlanStatusId, PrepStatusId, RecurrencePatternId, ScriptStepKindId } from "@/constants/meetingPlanner"
 import type { WithAiSource } from "./ai"
 
 /**
@@ -137,7 +137,17 @@ export interface MeetingPlan {
   prepStatus: PrepStatusId
   prepError: string | null
   preparedAt: string | null
+  // Set on every meeting of a repeating series, null on a one-off meeting
+  seriesId: string | null
+  recurrencePattern: RecurrencePatternId | null
+  recurrenceUntil: string | null
   createdAt: string
+}
+
+/** How a new meeting repeats: the pattern, and the last day the series may meet on. */
+export interface MeetingRecurrence {
+  pattern: RecurrencePatternId
+  until: string
 }
 
 /**
@@ -149,6 +159,9 @@ export interface MeetingPlanDetail extends MeetingPlan {
   conversationHistory: string | null
   additionalInfo: string | null
   prep: MeetingPrep | null
+  // How many meetings its series still holds, this one included; only the meeting's own GET and a
+  // new series carry it, since counting it costs a query
+  seriesSize?: number
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   TIME_PATTERN,
   type MeetingPlanStatusId,
   type PrepStatusId,
+  type RecurrencePatternId,
 } from "@/constants/meetingPlanner"
 import { OWNER_ID } from "./owner"
 
@@ -39,6 +40,11 @@ export interface IMeetingPlan {
   // The whole MeetingPrep, validated against its schema before it is written
   prep: unknown
   preparedAt: Date | null
+  // A repeating meeting: every occurrence shares the series id and says how the series was set up.
+  // All null on a one-off meeting, and on every meeting saved before series existed
+  seriesId: string | null
+  recurrencePattern: RecurrencePatternId | null
+  recurrenceUntil: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -61,6 +67,10 @@ const MeetingPlanSchema = new Schema<IMeetingPlan>(
     prepError: { type: String, default: null },
     prep: { type: Schema.Types.Mixed, default: null },
     preparedAt: { type: Date, default: null },
+    seriesId: { type: String, default: null },
+    // Checked against RECURRENCE_PATTERN_IDS by the route before it is ever written
+    recurrencePattern: { type: String, default: null },
+    recurrenceUntil: { type: String, default: null, match: ISO_DATE_PATTERN },
   },
   { timestamps: true, collection: "meeting_plans" }
 )
@@ -68,6 +78,8 @@ const MeetingPlanSchema = new Schema<IMeetingPlan>(
 MeetingPlanSchema.index({ meetingDate: 1, meetingTime: 1, _id: 1 })
 // Counting what is still pending on a day
 MeetingPlanSchema.index({ status: 1, meetingDate: 1 })
+// Finding every meeting of one series, to count it or delete it; one-off meetings stay out of the index
+MeetingPlanSchema.index({ seriesId: 1 }, { partialFilterExpression: { seriesId: { $type: "string" } } })
 
 export const MeetingPlan =
   (mongoose.models.MeetingPlan as Model<IMeetingPlan> | undefined) ??
