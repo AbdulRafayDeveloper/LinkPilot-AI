@@ -58,5 +58,5 @@ next-env.d.ts
 /*.local.mjs
 /*.out
 
-# Lists of LinkedIn profiles for scripts/add-profile-schedules.mjs: people's profiles, kept off the public repository
+# Lists of LinkedIn profiles and sheets for scripts/import-profile-people.mjs: people's profiles, kept off the public repository
 /scripts/profile-lists/

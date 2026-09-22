@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { UserFacingError, toUserFacingMessage } from "@/lib/errors"
-import { ProfileScheduleSchema } from "@/lib/validation/profileSchedules"
+import { ProfilePersonEditSchema } from "@/lib/validation/profileSchedules"
 import { PROFILE_SCHEDULER_MESSAGES } from "@/constants/profileScheduler"
 import { deleteProfileSchedule, updateProfileSchedule } from "@/services/commentWriter/profileSchedules"
 import { requireViewer } from "@/services/auth/viewer"
@@ -11,11 +11,15 @@ type RouteContext = { params: Promise<{ id: string }> }
 
 const notFound = () => NextResponse.json({ success: false, message: PROFILE_SCHEDULER_MESSAGES.notFound }, { status: 404 })
 
-/** PUT { profileUrl, days }: Replaces one profile's link and days. Another account's profile reads as not found. */
+/**
+ * PUT { days, profileUrl?, name?, role?, location?, sector?, types? }: changes one person. A field left
+ * out keeps what was saved, so `{ profileUrl, days }` still changes just those; a blank or null link
+ * takes the link away. Another account's person reads as not found.
+ */
 export async function PUT(req: NextRequest, { params }: RouteContext) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  const parsed = ProfileScheduleSchema.safeParse(await req.json().catch(() => null))
+  const parsed = ProfilePersonEditSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
     return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || PROFILE_SCHEDULER_MESSAGES.saveFailed }, { status: 400 })
   }
@@ -25,6 +29,9 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   } catch (error: unknown) {
     if (error instanceof UserFacingError && error.message === PROFILE_SCHEDULER_MESSAGES.duplicate) {
       return NextResponse.json({ success: false, message: error.message }, { status: 409 })
+    }
+    if (error instanceof UserFacingError && error.message === PROFILE_SCHEDULER_MESSAGES.missingPerson) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 })
     }
     console.error("PUT Profile Schedule Exception:", error instanceof Error ? error.message : error)
     return NextResponse.json({ success: false, message: toUserFacingMessage(error, PROFILE_SCHEDULER_MESSAGES.saveFailed) }, { status: 500 })

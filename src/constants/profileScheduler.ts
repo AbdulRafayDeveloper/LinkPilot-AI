@@ -38,6 +38,22 @@ export const WORK_DAY_IDS: WeekDayId[] = ["monday", "tuesday", "wednesday", "thu
 // A profile address is short; this is room for a long name plus the parts of a pasted link that are dropped
 export const PROFILE_URL_MAX_LENGTH = 300
 
+/**
+ * Why a person is on the list, as the outreach sheet names it. A person can be more than one: a
+ * founder who just raised (Signal) may also be worth commenting on for reach, or know someone.
+ */
+export const PERSON_TYPES = [
+  { id: "signal", label: "Signal", description: "Recently funded or hiring, a reason to reach out now" },
+  { id: "reach", label: "Reach", description: "Widely followed, commenting puts you in front of their audience" },
+  { id: "referral", label: "Referral", description: "Can pass work or introductions your way" },
+] as const
+
+export type PersonTypeId = (typeof PERSON_TYPES)[number]["id"]
+export const PERSON_TYPE_IDS = PERSON_TYPES.map((type) => type.id) as [PersonTypeId, ...PersonTypeId[]]
+
+// Name, role, location and sector are one line each
+export const PERSON_FIELD_MAX_LENGTH = 150
+
 // Comment Writer reads these from its address when a profile is opened from the scheduler
 export const PROFILE_PARAM = "profile"
 export const DAY_PARAM = "day"
@@ -46,6 +62,9 @@ export const PROFILE_SCHEDULER_MESSAGES = {
   missingUrl: "Paste the LinkedIn profile link.",
   badUrl: "That isn't a LinkedIn profile link. It looks like https://www.linkedin.com/in/their-name.",
   urlTooLong: `A profile link is at most ${PROFILE_URL_MAX_LENGTH} characters.`,
+  missingPerson: "Add the person's name or their LinkedIn profile link.",
+  fieldTooLong: `Name, role, location and sector are at most ${PERSON_FIELD_MAX_LENGTH} characters each.`,
+  badType: "That isn't a type this list uses (Signal, Reach or Referral).",
   missingDays: "Pick at least one day.",
   badDay: "That isn't a day of the week.",
   duplicate: "That profile is already in your list. Edit it to change its days.",

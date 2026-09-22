@@ -4,7 +4,7 @@ import React, { useRef, useState } from "react"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { ProfileScheduleFields } from "./ProfileScheduleFields"
-import { profileHandle } from "@/lib/linkedinProfile"
+import { inputOf, personName } from "@/lib/profilePeople"
 import type { ProfileSchedule, ProfileScheduleInput } from "@/types/profileScheduler"
 
 interface ProfileScheduleDialogProps {
@@ -14,9 +14,9 @@ interface ProfileScheduleDialogProps {
   onClose: () => void
 }
 
-/** Edits one profile's link and days, starting from what was saved. */
+/** Edits one person, starting from what was saved. */
 export const ProfileScheduleDialog: React.FC<ProfileScheduleDialogProps> = ({ schedule, onSave, onClose }) => {
-  const [form, setForm] = useState<ProfileScheduleInput>({ profileUrl: schedule.profileUrl, days: schedule.days })
+  const [form, setForm] = useState<ProfileScheduleInput>(() => inputOf(schedule))
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const urlRef = useRef<HTMLInputElement>(null)
@@ -36,8 +36,8 @@ export const ProfileScheduleDialog: React.FC<ProfileScheduleDialogProps> = ({ sc
 
   return (
     <Modal
-      title={`Edit ${profileHandle(schedule.profileUrl)}`}
-      description="Change the profile's link or the days you comment on its posts."
+      title={`Edit ${personName(schedule)}`}
+      description="Change who they are, their LinkedIn link, their type or the days you comment on their posts."
       onClose={onClose}
       isCloseDisabled={isSaving}
       initialFocusRef={urlRef}

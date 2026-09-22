@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { AlertCircle, AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { AlertCircle, AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Link2, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
@@ -16,30 +16,33 @@ import { useRowSelection } from "@/hooks/useRowSelection"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { requestApi } from "@/lib/apiClient"
-import { normalizeProfileUrl, profileHandle } from "@/lib/linkedinProfile"
+import { EMPTY_PERSON, personInputProblem, personName, typeLabel } from "@/lib/profilePeople"
 import { HISTORY_DEBOUNCE_MS } from "@/constants/historyFilters"
 import {
   DAY_PARAM,
+  PERSON_TYPES,
   PROFILE_PARAM,
   PROFILE_SCHEDULER_MESSAGES,
   PROFILE_SCHEDULES_ENDPOINT,
   WEEK_DAYS,
+  type PersonTypeId,
   type WeekDayId,
 } from "@/constants/profileScheduler"
 import type { ProfileSchedule, ProfileScheduleInput, ProfileSchedulePage } from "@/types/profileScheduler"
 
 /**
- * What the page remembers while the app is open: the day filter, the search, the page and the add
+ * What the page remembers while the app is open: the day and type filters, the search, the page and the add
  * form's draft. It lives in this module rather than in browser storage on purpose, so moving to
  * another page and back keeps it, while a full reload of the browser starts it fresh.
  */
 interface Remembered {
   day: WeekDayId | ""
+  type: PersonTypeId | ""
   search: string
   page: number
   draft: ProfileScheduleInput
 }
-const remembered: Remembered = { day: "", search: "", page: 1, draft: { profileUrl: "", days: [] } }
+const remembered: Remembered = { day: "", type: "", search: "", page: 1, draft: EMPTY_PERSON }
 
 function useRemembered<K extends keyof Remembered>(key: K) {
   const [value, setValue] = useState<Remembered[K]>(() => remembered[key])
@@ -53,26 +56,30 @@ function useRemembered<K extends keyof Remembered>(key: K) {
   return [value, set] as const
 }
 
-const NOUN = { one: "profile", many: "profiles" }
+const NOUN = { one: "person", many: "people" }
 
 const addedOn = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
 
 // Comment Writer, told which profile (and which day, when one is chosen here) is being commented on
-const openHref = (schedule: ProfileSchedule, day: WeekDayId | "") => {
-  const params = new URLSearchParams({ [PROFILE_PARAM]: schedule.profileUrl })
+const openHref = (profileUrl: string, day: WeekDayId | "") => {
+  const params = new URLSearchParams({ [PROFILE_PARAM]: profileUrl })
   if (day) params.set(DAY_PARAM, day)
   return `/comment-writer?${params.toString()}`
 }
 
-// The fields are checked here first so a plain mistake is named at once; the server checks them again
-const inputProblem = (input: ProfileScheduleInput) =>
-  !input.profileUrl.trim()
-    ? PROFILE_SCHEDULER_MESSAGES.missingUrl
-    : !normalizeProfileUrl(input.profileUrl)
-      ? PROFILE_SCHEDULER_MESSAGES.badUrl
-      : input.days.length === 0
-        ? PROFILE_SCHEDULER_MESSAGES.missingDays
-        : null
+// Why each person is on the list, as short tags
+const TypeTags: React.FC<{ types: PersonTypeId[] }> = ({ types }) =>
+  types.length === 0 ? (
+    <span className="text-[12px] text-outline">No type</span>
+  ) : (
+    <ul className="flex flex-wrap gap-1" aria-label={`Type: ${types.map(typeLabel).join(", ")}`}>
+      {types.map((type) => (
+        <li key={type} aria-hidden="true" className="rounded-full bg-secondary-fixed px-2 py-0.5 text-[11px] font-semibold text-on-secondary-fixed-variant">
+          {typeLabel(type)}
+        </li>
+      ))}
+    </ul>
+  )
 
 const actionButton =
   "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[12px] font-semibold text-outline transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
@@ -106,6 +113,7 @@ export default function ProfileSchedulerClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const [day, setDay] = useRemembered("day")
+  const [type, setType] = useRemembered("type")
   const [search, setSearch] = useRemembered("search")
   const [page, setPage] = useRemembered("page")
   const [draft, setDraft] = useRemembered("draft")
@@ -129,6 +137,7 @@ export default function ProfileSchedulerClient() {
   const params = new URLSearchParams({ page: String(page) })
   if (search.trim() && settledSearch) params.set("search", settledSearch)
   if (day) params.set("day", day)
+  if (type) params.set("type", type)
   const query = params.toString()
   const requestKey = `${query}#${attempt}`
   const isLoading = answered !== requestKey
@@ -154,7 +163,7 @@ export default function ProfileSchedulerClient() {
   }, [query, requestKey, page, setPage])
 
   const reload = () => setAttempt((count) => count + 1)
-  const hasFilters = Boolean(search || day)
+  const hasFilters = Boolean(search || day || type)
   const selection = useRowSelection((result?.items ?? []).map((schedule) => schedule.id))
   const items = result?.items ?? []
   const total = result?.total ?? 0
@@ -163,16 +172,19 @@ export default function ProfileSchedulerClient() {
   const firstShown = total === 0 ? 0 : (page - 1) * pageSize + 1
   const lastShown = Math.min(total, (page - 1) * pageSize + items.length)
   const dayOptions = WEEK_DAYS.map((entry) => ({ id: entry.id, label: `${entry.label} (${result?.dayCounts[entry.id] ?? 0})` }))
+  const typeOptions = PERSON_TYPES.map((entry) => ({ id: entry.id, label: `${entry.label} (${result?.typeCounts[entry.id] ?? 0})` }))
+  // Open all reaches only the people whose LinkedIn link has been found
+  const linkedUrls = items.flatMap((schedule) => (schedule.profileUrl ? [schedule.profileUrl] : []))
 
   /** Adds the profile in the form. The days are kept for the next one, since a batch is often added for the same days. */
   const add = async (event: React.FormEvent) => {
     event.preventDefault()
     if (isAdding) return
-    const problem = inputProblem(draft)
+    const problem = personInputProblem(draft)
     if (problem) {
       setAddError(problem)
       setNotice(null)
-      if (problem !== PROFILE_SCHEDULER_MESSAGES.missingDays) urlRef.current?.focus()
+      if (problem === PROFILE_SCHEDULER_MESSAGES.badUrl) urlRef.current?.focus()
       return
     }
     setIsAdding(true)
@@ -184,7 +196,7 @@ export default function ProfileSchedulerClient() {
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) },
         { idempotent: true }
       )
-      setDraft({ profileUrl: "", days: draft.days })
+      setDraft({ ...EMPTY_PERSON, days: draft.days, types: draft.types })
       setNotice(PROFILE_SCHEDULER_MESSAGES.created)
       setPage(1)
       reload()
@@ -199,7 +211,7 @@ export default function ProfileSchedulerClient() {
   // An edit is refused in the dialog, which stays open and shows why
   const saveEdit = async (input: ProfileScheduleInput) => {
     if (!editing) return
-    const problem = inputProblem(input)
+    const problem = personInputProblem(input)
     if (problem) throw new Error(problem)
     await requestApi<ProfileSchedule>(`${PROFILE_SCHEDULES_ENDPOINT}/${editing.id}`, {
       method: "PUT",
@@ -257,19 +269,26 @@ export default function ProfileSchedulerClient() {
       checked={selection.isPicked(schedule.id)}
       disabled={isDeletingMany}
       onChange={(event) => selection.pick(schedule.id, (event.nativeEvent as MouseEvent).shiftKey)}
-      aria-label={`Pick ${profileHandle(schedule.profileUrl)}`}
+      aria-label={`Pick ${personName(schedule)}`}
       className={`h-4 w-4 accent-primary ${extra}`}
     />
   )
 
   const actions = (schedule: ProfileSchedule) => {
-    const name = profileHandle(schedule.profileUrl)
+    const name = personName(schedule)
     return (
       <div className="flex flex-wrap items-center justify-end gap-0.5">
-        <Link href={openHref(schedule, day)} aria-label={`Open ${name} in Comment Writer`} className={`${actionButton} text-primary hover:text-primary`}>
-          <ExternalLink size={13} aria-hidden="true" />
-          Open
-        </Link>
+        {schedule.profileUrl ? (
+          <Link href={openHref(schedule.profileUrl, day)} aria-label={`Open ${name} in Comment Writer`} className={`${actionButton} text-primary hover:text-primary`}>
+            <ExternalLink size={13} aria-hidden="true" />
+            Open
+          </Link>
+        ) : (
+          <button type="button" onClick={() => setEditing(schedule)} aria-label={`Add the LinkedIn link of ${name}`} className={`${actionButton} text-primary hover:text-primary`}>
+            <Link2 size={13} aria-hidden="true" />
+            Add link
+          </button>
+        )}
         <button type="button" onClick={() => setEditing(schedule)} aria-label={`Edit ${name}`} className={`${actionButton} hover:text-primary`}>
           <Pencil size={13} aria-hidden="true" />
           Edit
@@ -290,12 +309,23 @@ export default function ProfileSchedulerClient() {
     )
   }
 
-  const profileCell = (schedule: ProfileSchedule) => (
-    <div className="min-w-0">
-      <p className="break-all text-[13px] font-semibold text-on-surface">{profileHandle(schedule.profileUrl)}</p>
-      <p className="break-all text-[12px] text-on-surface-variant">{schedule.profileUrl}</p>
-    </div>
-  )
+  const profileCell = (schedule: ProfileSchedule) => {
+    const about = [schedule.role, schedule.location].filter(Boolean).join(" · ")
+    return (
+      <div className="min-w-0">
+        <p className="break-words text-[13px] font-semibold text-on-surface">{personName(schedule)}</p>
+        {about && <p className="break-words text-[12px] text-on-surface-variant">{about}</p>}
+        {schedule.sector && <p className="break-words text-[12px] text-on-surface-variant">{schedule.sector}</p>}
+        {schedule.profileUrl ? (
+          <a href={schedule.profileUrl} target="_blank" rel="noopener noreferrer" className="break-all text-[12px] text-primary hover:underline">
+            {schedule.profileUrl}
+          </a>
+        ) : (
+          <p className="text-[12px] italic text-outline">No LinkedIn link yet</p>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="font-body-md text-body-md flex h-screen min-h-screen overflow-hidden bg-background text-on-surface">
@@ -311,11 +341,11 @@ export default function ProfileSchedulerClient() {
                 <CalendarDays size={24} className="shrink-0 text-primary" aria-hidden="true" />
                 Profile Scheduler
               </h1>
-              <p className="mt-1 text-sm text-on-surface-variant">The LinkedIn profiles you comment on, and the days you look at each one&apos;s posts.</p>
+              <p className="mt-1 text-sm text-on-surface-variant">The people you comment on, why each is on your list, and the days you look at their posts.</p>
             </div>
 
             <form onSubmit={add} noValidate className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
-              <h2 className="text-[15px] font-bold text-on-surface">Add a profile</h2>
+              <h2 className="text-[15px] font-bold text-on-surface">Add a person</h2>
               <ProfileScheduleFields
                 idPrefix="add-profile"
                 value={draft}
@@ -347,17 +377,18 @@ export default function ProfileSchedulerClient() {
                   className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
                 >
                   {isAdding ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
-                  Add profile
+                  Add person
                 </button>
               </div>
             </form>
 
             <FilterPanel
-              columnsClassName="lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
+              columnsClassName="lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
               canClear={hasFilters}
               onClear={() => {
                 setSearch("")
                 setDay("")
+                setType("")
                 setPage(1)
               }}
               summary={result ? `Showing ${firstShown.toLocaleString()} to ${lastShown.toLocaleString()} of ${total.toLocaleString()}` : "Loading your profiles..."}
@@ -368,7 +399,7 @@ export default function ProfileSchedulerClient() {
                   setSearch(value)
                   setPage(1)
                 }}
-                placeholder="Search by profile link or name"
+                placeholder="Search by name, role, location, sector or link"
               />
               <SelectFilter
                 label="Day"
@@ -380,11 +411,19 @@ export default function ProfileSchedulerClient() {
                   setPage(1)
                 }}
               />
+              <SelectFilter
+                label="Type"
+                allLabel="Every type"
+                value={type}
+                options={typeOptions}
+                onChange={(value) => {
+                  setType(value as PersonTypeId | "")
+                  setPage(1)
+                }}
+              />
             </FilterPanel>
 
-            {items.length > 0 && (
-              <OpenAllProfiles urls={items.map((schedule) => schedule.profileUrl)} listKey={requestKey} disabled={isLoading} buttonClassName={pagerButton} />
-            )}
+            {linkedUrls.length > 0 && <OpenAllProfiles urls={linkedUrls} listKey={requestKey} disabled={isLoading} buttonClassName={pagerButton} />}
 
             {result && total > 0 && (
               <BulkDeleteBar
@@ -436,14 +475,14 @@ export default function ProfileSchedulerClient() {
 
                 {/* The table from xl, where it fits beside the open sidebar; cards below, two to a row on a tablet */}
                 <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
-                  <table className="w-full min-w-[760px] border-collapse text-left">
+                  <table className="w-full min-w-[880px] border-collapse text-left">
                     <caption className="sr-only">Scheduled profiles, page {page} of {totalPages}</caption>
                     <thead className="bg-surface-container-lowest">
                       <tr className="border-b border-outline-variant">
                         <th scope="col" className="w-[36px] px-2 py-2.5">
                           <span className="sr-only">Picked</span>
                         </th>
-                        {["Profile", "Days", "Added", "Actions"].map((heading) => (
+                        {["Person", "Type", "Days", "Added", "Actions"].map((heading) => (
                           <th key={heading} scope="col" className={`px-3 py-2.5 ${historyLabelClass} ${heading === "Actions" ? "text-right" : ""}`}>
                             {heading}
                           </th>
@@ -455,6 +494,9 @@ export default function ProfileSchedulerClient() {
                         <tr key={schedule.id} className="border-b border-outline-variant/60 align-top last:border-b-0 hover:bg-surface-container-lowest">
                           <td className="w-[36px] px-2 py-2.5">{pickBox(schedule)}</td>
                           <td className="max-w-[380px] px-3 py-2.5">{profileCell(schedule)}</td>
+                          <td className="px-3 py-2.5">
+                            <TypeTags types={schedule.types} />
+                          </td>
                           <td className="px-3 py-2.5">
                             <DayTags days={schedule.days} highlight={day} />
                           </td>
@@ -473,6 +515,7 @@ export default function ProfileSchedulerClient() {
                         {pickBox(schedule, "mt-0.5 shrink-0")}
                         {profileCell(schedule)}
                       </div>
+                      <TypeTags types={schedule.types} />
                       <DayTags days={schedule.days} highlight={day} />
                       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant/70 pt-2">
                         <span className="whitespace-nowrap text-[11px] text-outline">Added {addedOn(schedule.createdAt)}</span>
@@ -493,7 +536,7 @@ export default function ProfileSchedulerClient() {
         <ConfirmBulkDelete
           count={confirmingMany === "picked" ? selection.pickedIds.size : total}
           noun={NOUN}
-          alsoGoes={confirmingMany === "all" && hasFilters ? "Everything matching the search and the day goes, including profiles on the other pages." : undefined}
+          alsoGoes={confirmingMany === "all" && hasFilters ? "Everyone matching the search, the day and the type goes, including people on the other pages." : undefined}
           isDeleting={isDeletingMany}
           onConfirm={() => void deleteMany(confirmingMany)}
           onClose={() => setConfirmingMany(null)}
@@ -504,8 +547,8 @@ export default function ProfileSchedulerClient() {
 
       {deleting && (
         <Modal
-          title={`Delete ${profileHandle(deleting.profileUrl)}?`}
-          description="This removes the profile and its days from your list. The comments already written stay where they are."
+          title={`Delete ${personName(deleting)}?`}
+          description="This removes the person, their details and their days from your list. The comments already written stay where they are."
           onClose={() => setDeleting(null)}
           isCloseDisabled={isDeleting}
           size="compact"
@@ -521,7 +564,7 @@ export default function ProfileSchedulerClient() {
                 className="inline-flex items-center gap-2 rounded-xl bg-error px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {isDeleting && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
-                Delete profile
+                Delete person
               </button>
             </div>
           }
@@ -532,7 +575,7 @@ export default function ProfileSchedulerClient() {
             </p>
           ) : (
             <div className="flex flex-col gap-2 text-sm text-on-surface-variant">
-              <p className="break-all">{deleting.profileUrl}</p>
+              <p className="break-all">{deleting.profileUrl ?? "No LinkedIn link"}</p>
               <DayTags days={deleting.days} highlight="" />
             </div>
           )}

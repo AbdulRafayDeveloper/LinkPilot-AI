@@ -9,7 +9,7 @@ import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
 
-/** GET (?page=&search=&day=): One page of 50 profiles, newest first, with how many each day has. */
+/** GET (?page=&search=&day=&type=): One page of 50 people, newest first, with how many each day and each type has. */
 export async function GET(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
@@ -26,7 +26,10 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** POST { profileUrl, days }: Saves one profile to this account. The same profile again answers 409. */
+/**
+ * POST { days, profileUrl?, name?, role?, location?, sector?, types? }: saves one person to this
+ * account; a name or a link is required. The same LinkedIn link again answers 409.
+ */
 async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
@@ -50,7 +53,7 @@ async function handlePost(req: NextRequest) {
 export const POST = withIdempotency("comment-writer-profiles", handlePost)
 
 /**
- * DELETE (?search=&day=, body `{ ids }` or `{ all: true }`): removes several profiles at once, the
+ * DELETE (?search=&day=&type=, body `{ ids }` or `{ all: true }`): removes several profiles at once, the
  * ticked ones or everything the filters cover. Final.
  */
 export async function DELETE(req: NextRequest) {
