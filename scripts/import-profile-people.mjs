@@ -1,17 +1,20 @@
 // Imports the outreach sheet into Comment Writer's Profile Scheduler (/comment-writer/profiles) for one
-// account: each person's name, role, location, sector, LinkedIn link and type (Signal, Reach, Referral,
-// several allowed), on the days given. It replaces scripts/add-profile-schedules.mjs, which read a list
-// of links only and so saved nobody's details.
+// account: each person's name, role, company, location, sector, why now (what happened, when and where
+// it was read), notes, LinkedIn link and types (Funded Founder, Investor, Creator, Agency, several
+// allowed), on the days given. It replaces scripts/add-profile-schedules.mjs, which read a list of links
+// only and so saved nobody's details.
 //
 //   node scripts/import-profile-people.mjs --file scripts/profile-lists/outreach.csv --days monday
 //   node scripts/import-profile-people.mjs --file <sheet.csv> --days monday,thursday --email someone@example.com
 //   node scripts/import-profile-people.mjs --file <sheet.csv> --days monday --dry-run      shows what it would do
 //
 // The sheet is the outreach sheet saved as CSV (File, Save as, CSV). Its first row names the columns;
-// Type, Name, Role, Location, Sector and LinkedIn are read, whatever their order, and every other
-// column (company, signal, source, notes) is left alone. A Type cell may hold several types
-// ("Signal, Reach"). A LinkedIn cell that isn't a profile link ("Search: ... (URL not verified)")
-// keeps the person, without a link, to be added on the page later.
+// Type, Name, Role, Company, Location, Sector, Signal / Why now, Funding or data date, LinkedIn, Source
+// and Notes are read, whatever their order, and the columns the list doesn't keep (the row number, and
+// the Commented and Reply columns, which are the user's own tracking) are left alone. A Type cell may
+// hold several types ("Agency, Creator"), and the sheet's older headings (Signal, Reach, Referral) still
+// read. A LinkedIn cell that isn't a profile link ("Search: ... (URL not verified)") keeps the person,
+// without a link, to be added on the page later.
 //
 // Nothing is ever deleted and nothing is saved twice. A person already on the list is found by their
 // link, or, while they have none, by their name; they keep what they have, gain the sheet's details
@@ -70,6 +73,9 @@ function mongoUri() {
   return uri
 }
 
+// Every field of a person the sheet can fill, so adding one to the list means adding it here only
+const FIELDS = ["profileUrl", "name", "role", "company", "location", "sector", "whyNow", "whyNowDate", "source", "notes"]
+
 const inOrder = (all, values) => all.filter((value) => values.includes(value))
 const escaped = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 const describe = (person) => `${person.name || person.profileUrl}${person.types.length ? ` [${person.types.join(", ")}]` : ""}`
@@ -113,11 +119,7 @@ async function main() {
           const now = new Date()
           await schedules.insertOne({
             ownerId,
-            profileUrl: person.profileUrl ?? null,
-            name: person.name,
-            role: person.role,
-            location: person.location,
-            sector: person.sector,
+            ...Object.fromEntries(FIELDS.map((field) => [field, person[field] ?? (field === "profileUrl" ? null : "")])),
             types: person.types,
             days: person.days,
             createdAt: now,
@@ -128,7 +130,7 @@ async function main() {
         continue
       }
       const changes = {}
-      for (const field of ["profileUrl", "name", "role", "location", "sector"]) {
+      for (const field of FIELDS) {
         if (person[field] && person[field] !== existing[field]) changes[field] = person[field]
       }
       const types = inOrder(PERSON_TYPE_IDS, [...(existing.types ?? []), ...person.types])
