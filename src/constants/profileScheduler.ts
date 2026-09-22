@@ -58,4 +58,8 @@ export const PROFILE_SCHEDULER_MESSAGES = {
   deleteFailed: "Couldn't delete the profile.",
   empty: "No profiles yet. Add a LinkedIn profile and the days you want to comment on its posts.",
   noResults: "No profiles match the search or the day.",
+  // Opening every profile on the page is one click opening many tabs, which a browser treats as pop-ups
+  popupsBlocked: (opened: number, total: number) =>
+    `Your browser blocked ${total - opened} of the ${total} tabs. Allow pop-ups for this site (the icon at the right of the address bar), then press Open all again.`,
+  openedAll: (count: number) => `Opened ${count} ${count === 1 ? "profile" : "profiles"} on LinkedIn.`,
 } as const

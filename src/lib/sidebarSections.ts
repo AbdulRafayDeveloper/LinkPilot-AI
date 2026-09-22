@@ -1,25 +1,29 @@
 /**
- * Which of the sidebar's sections (its headings in TOOL_GROUPS) is open. They work as an
- * accordion: one open at a time, and opening one closes the one that was open. Kept apart from
- * the component so the rule can be tested on its own.
+ * Which of the sidebar's sections (its headings in TOOL_GROUPS) are open. Each one opens and
+ * closes on its own, so any number can be open at once, all of them or none. Kept apart from the
+ * component so the rule can be tested on its own.
  *
- * The stored choice is a section's id, "" when the user closed the open one and left none open,
- * or null when they have never chosen.
+ * The stored choices are the user's own, one per section: true for open, false for closed. A
+ * section the user has never touched has none.
  */
+export type SectionChoices = Record<string, boolean>
 
 /**
- * The open section: the user's own choice while that section is still on show; otherwise, the
- * first time, the section of the page being viewed (so it is never hidden on arrival), or the
- * first section when the page belongs to none. A choice that can no longer be shown (every tool
- * under it turned off) falls back the same way, rather than leaving the list closed for no reason.
+ * Whether a section is open: the user's own choice for it, or, for a section they have never
+ * touched, open while the page on screen is one of its tools, so that page is never hidden.
  */
-export function openSectionOf<Id extends string>(stored: string | null, activeSection: Id | null, available: readonly Id[]): Id | null {
-  if (stored === "") return null
-  const chosen = available.find((id) => id === stored)
-  if (chosen) return chosen
-  if (activeSection && available.includes(activeSection)) return activeSection
-  return available[0] ?? null
-}
+export const isSectionOpen = (choices: SectionChoices, id: string, containsCurrentPage: boolean) => choices[id] ?? containsCurrentPage
 
-/** What a click on a section's heading stores: that section, or "" when it was the open one. */
-export const toggledSection = (open: string | null, clicked: string) => (open === clicked ? "" : clicked)
+/** What a click on one heading stores: that section flipped, every other section left as it was. */
+export const withSectionToggled = (choices: SectionChoices, id: string, isOpen: boolean): SectionChoices => ({ ...choices, [id]: !isOpen })
+
+/** Reads stored choices, keeping only true/false per section, so anything else stored reads as untouched. */
+export function parseSectionChoices(raw: string | null): SectionChoices {
+  try {
+    const value: unknown = JSON.parse(raw ?? "{}")
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {}
+    return Object.fromEntries(Object.entries(value).filter(([, open]) => typeof open === "boolean")) as SectionChoices
+  } catch {
+    return {}
+  }
+}

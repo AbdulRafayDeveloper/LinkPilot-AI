@@ -10,7 +10,6 @@ import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 import { markToolSeen, useToolActivity, type ActivityState } from "@/lib/toolActivity"
 import { useSidebarDropdowns } from "@/hooks/useSidebarDropdowns"
 import { useSidebarSections } from "@/hooks/useSidebarSections"
-import { openSectionOf, toggledSection } from "@/lib/sidebarSections"
 import { useVisibleTools } from "@/hooks/useCurrentUser"
 
 interface SidebarProps {
@@ -234,9 +233,9 @@ const SidebarDropdown: React.FC<SidebarDropdownProps> = ({
 
 /**
  * App navigation: the brand, every tool under the four headings in TOOL_GROUPS, and Global AI
- * Prompts pinned at the bottom. The headings are an accordion: one section open at a time, the
- * user's choice kept across pages (hooks/useSidebarSections.ts), every section open while
- * searching and on the collapsed rail. A drawer on small screens; on desktop a full column that
+ * Prompts pinned at the bottom. Each heading opens and closes its own section, any number at once,
+ * each kept as the user left it across pages (hooks/useSidebarSections.ts); every section shows
+ * while searching and on the collapsed rail. A drawer on small screens; on desktop a full column that
  * collapses to an icon rail. Every tool shows when it's writing in the background or has a
  * result waiting. A tool with several pages is a dropdown that stays as the user left it.
  */
@@ -303,12 +302,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
   const firstMatch = firstTool?.links?.[0]?.href ?? firstTool?.href ?? (showGlobalPrompts ? GLOBAL_PROMPTS_LINK.href : undefined)
   // Every page a tool has (its dropdown's pages, or itself), for what a closed section carries
   const pagesOf = (tool: LinkedInTool) => (tool.links ? tool.links.map((link) => link.href) : [tool.href])
-  const activeSection = tools.find((tool) => pagesOf(tool).includes(pathname))?.group ?? null
-  const openSection = openSectionOf(
-    sections.stored,
-    activeSection,
-    TOOL_GROUPS.map((group) => group.id).filter((id) => tools.some((tool) => tool.group === id))
-  )
+
   const matchCount = visibleTools.length + (isSearching && showGlobalPrompts ? 1 : 0)
 
   // Opening a tool means its finished result has been seen
@@ -438,9 +432,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
             <p className={`px-2 py-3 text-[12px] text-outline ${whenCollapsed(isCollapsed, "lg:hidden")}`}>No tool matches &ldquo;{query.trim()}&rdquo;.</p>
           )}
           {groups.map(({ group, tools: groupTools }, index) => {
-            // A search shows every section with a match; otherwise only the open one shows its tools
-            const isShown = isSearching || openSection === group.id
             const hasActivePage = groupTools.some((tool) => pagesOf(tool).includes(pathname))
+            // Each section is open or closed on its own; a search shows every section with a match
+            const isOpen = sections.isOpen(group.id, hasActivePage)
+            const isShown = isSearching || isOpen
             // Closed, the heading carries what its hidden tools would have shown, like a closed dropdown
             const hiddenActivity = isShown
               ? undefined
@@ -457,7 +452,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
                   {hasActivePage && !isShown && <ActiveBar />}
                   <button
                     type="button"
-                    onClick={() => sections.setStored(toggledSection(openSection, group.id))}
+                    onClick={() => sections.toggle(group.id, isOpen)}
                     aria-expanded={isShown}
                     aria-controls={listId}
                     title={isShown ? `Hide ${group.label}` : `Show ${group.label}`}

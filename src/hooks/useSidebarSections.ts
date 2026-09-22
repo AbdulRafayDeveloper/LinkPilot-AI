@@ -1,19 +1,21 @@
 "use client"
 
 import { useCallback, useSyncExternalStore } from "react"
+import { isSectionOpen, parseSectionChoices, withSectionToggled } from "@/lib/sidebarSections"
 
 /**
- * The sidebar section the user last opened (lib/sidebarSections.ts has the rule).
+ * Which sidebar sections the user has opened or closed (lib/sidebarSections.ts has the rule).
  *
  * Every page renders its own sidebar, so, like the dropdowns (hooks/useSidebarDropdowns.ts), the
- * choice is kept in localStorage: the open section stays open across pages and reloads until
- * the user clicks another heading.
+ * choices are kept in localStorage: each section stays as the user left it across pages and
+ * reloads, and only a click on its own heading changes it. The key is its own, because a section
+ * and a tool can share an id ("clients").
  */
-const STORAGE_KEY = "sidebarSection"
-const CHANGE_EVENT = "sidebar-section-change"
+const STORAGE_KEY = "sidebarSections"
+const CHANGE_EVENT = "sidebar-sections-change"
 
-// Where the choice lives when the browser refuses storage (private mode), so a click still works
-let inMemory: string | null = null
+// Where the choices live when the browser refuses storage (private mode), so a click still works
+let inMemory = "{}"
 
 function subscribe(onChange: () => void) {
   window.addEventListener("storage", onChange)
@@ -24,7 +26,8 @@ function subscribe(onChange: () => void) {
   }
 }
 
-function read(): string | null {
+// The raw string is the snapshot, because a parsed object would be a new value on every read
+function readRaw(): string {
   try {
     return localStorage.getItem(STORAGE_KEY) ?? inMemory
   } catch {
@@ -33,19 +36,23 @@ function read(): string | null {
 }
 
 export function useSidebarSections() {
-  // The server has no storage, so it opens the section of the page being viewed
-  const stored = useSyncExternalStore(subscribe, read, () => null)
+  // The server has no storage, so it opens only the section of the page being viewed
+  const raw = useSyncExternalStore(subscribe, readRaw, () => "{}")
+  const choices = parseSectionChoices(raw)
 
-  /** Remembers the open section: its id, or "" for none. */
-  const setStored = useCallback((value: string) => {
-    inMemory = value
+  /** Whether a section is open: the user's own choice, or open while one of its tools is on screen. */
+  const isOpen = (id: string, containsCurrentPage: boolean) => isSectionOpen(choices, id, containsCurrentPage)
+
+  /** Opens or closes one section, and remembers it. Every other section stays as it was. */
+  const toggle = useCallback((id: string, open: boolean) => {
+    inMemory = JSON.stringify(withSectionToggled(parseSectionChoices(readRaw()), id, open))
     try {
-      localStorage.setItem(STORAGE_KEY, value)
+      localStorage.setItem(STORAGE_KEY, inMemory)
     } catch {
       // Storage unavailable (private mode): the choice holds until the page is reloaded
     }
     window.dispatchEvent(new Event(CHANGE_EVENT))
   }, [])
 
-  return { stored, setStored }
+  return { isOpen, toggle }
 }

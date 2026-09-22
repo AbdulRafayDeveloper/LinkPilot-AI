@@ -3,18 +3,19 @@
  * (prompt record: comment-writer-<id> in the prompts collection). Adding a tune means adding
  * an entry here plus its default template; the generation pipeline stays unchanged.
  */
+// In the owner's order, which is the order the page, the prompt editor's tabs and the filters show
 export const COMMENT_TUNES = [
   { id: "thoughtful", label: "Thoughtful", shortLabel: "Thoughtful", description: "A nuanced observation" },
   // The post's most interesting point, the gap it leaves, what to add, a respectful challenge and a tip
   { id: "value-add", label: "Value Add", shortLabel: "Value Add", description: "Fills a gap + a question + a tip" },
-  { id: "past-experience", label: "Based on My Past Experience", shortLabel: "My Experience", description: "Your real experience" },
-  { id: "latest-trends", label: "Latest Trends / Informative", shortLabel: "Latest Trends", description: "Recent, sourced context" },
-  { id: "concerning", label: "Concerning", shortLabel: "Concerning", description: "A fair risk or question" },
   // Was "appreciative" (RENAMED_COMMENT_TUNES): now a deep read of the post, why it matters and what to add
   { id: "supportive", label: "Supportive", shortLabel: "Supportive", description: "Why it matters + support" },
-  { id: "impressive", label: "Impressive", shortLabel: "Impressive", description: "A sharp, memorable idea" },
+  { id: "concerning", label: "Concerning", shortLabel: "Concerning", description: "A fair risk or question" },
   // The point said in a friendly way that is easy to remember and relate to, with a practical tip
   { id: "relatable", label: "Relatable", shortLabel: "Relatable", description: "Memorable, friendly + a tip" },
+  { id: "past-experience", label: "Based on My Past Experience", shortLabel: "My Experience", description: "Your real experience" },
+  { id: "latest-trends", label: "Latest Trends / Informative", shortLabel: "Latest Trends", description: "Recent, sourced context" },
+  { id: "impressive", label: "Impressive", shortLabel: "Impressive", description: "A sharp, memorable idea" },
 ] as const
 
 export type CommentTuneId = (typeof COMMENT_TUNES)[number]["id"]

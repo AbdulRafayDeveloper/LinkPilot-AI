@@ -57,3 +57,6 @@ next-env.d.ts
 # One-off scripts and their output left in the project root while testing
 /*.local.mjs
 /*.out
+
+# Lists of LinkedIn profiles for scripts/add-profile-schedules.mjs: people's profiles, kept off the public repository
+/scripts/profile-lists/
