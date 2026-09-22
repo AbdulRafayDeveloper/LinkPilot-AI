@@ -1,4 +1,5 @@
 import { ABOUT_ME_TAB_ID, ABOUT_ME_TAB_LABEL } from "./outreachTunes"
+import { RESTATES_THANKS, RESTATES_VIEW, type OpeningLine } from "@/lib/openingLine"
 
 /**
  * InMail's own tones, in recommended order (most effective first). Each tone owns an
@@ -11,11 +12,30 @@ export const INMAIL_TUNES = [
   { id: "credibility-play", label: "Credibility Play", description: "Achievement + proof" },
   { id: "curiosity-hook", label: "Curiosity Hook", description: "Data, intrigue or a pattern" },
   { id: "pitch", label: "Pitch", description: "Your matching work + a clear offer" },
+  // For someone who engaged with your post or your comment: a thank-you line first, then a curiosity hook
+  { id: "post-interaction", label: "Post Interaction", description: "Thanks for your post + curiosity hook" },
+  { id: "comment-interaction", label: "Comment Interaction", description: "Thanks for your comment + curiosity hook" },
+  // Someone who viewed your profile and accepted your connection request: say you noticed, then a soft offer to help
+  { id: "viewed-accepted", label: "Viewed + Accepted", description: "Viewed your profile + a soft offer to help" },
 ] as const
 
 export type InMailTuneId = (typeof INMAIL_TUNES)[number]["id"]
 
 export const INMAIL_TUNE_IDS = INMAIL_TUNES.map((tune) => tune.id) as [InMailTuneId, ...InMailTuneId[]]
+
+/**
+ * The sentence these tones' messages always open with, straight after "Hi <first name>,", the same
+ * sentences First Message's tones of the same name use. The prompt asks for it, and lib/openingLine.ts
+ * puts it back in code when a draft or the humanizer's rewrite says it differently.
+ */
+export const OPENING_LINES: Partial<Record<InMailTuneId, OpeningLine>> = {
+  "post-interaction": { sentence: "thanks for interacting with my recent post.", restates: RESTATES_THANKS },
+  "comment-interaction": { sentence: "thanks for interacting with my recent comment.", restates: RESTATES_THANKS },
+  "viewed-accepted": {
+    sentence: "I noticed you viewed my profile and accepted my connection request.",
+    restates: RESTATES_VIEW,
+  },
+}
 
 // The recommended first choice, selected by default
 export const DEFAULT_INMAIL_TUNE: InMailTuneId = "trigger-event"

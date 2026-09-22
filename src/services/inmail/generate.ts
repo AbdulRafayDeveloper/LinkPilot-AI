@@ -6,7 +6,8 @@ import { NO_SENDER_PROFILE_TEXT, generateWithoutSenderClaims } from "@/services/
 import { humanizeTexts } from "@/services/humanizer"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
 import { INMAIL_BODY_MAX_CHARS, INMAIL_SUBJECT_MAX_CHARS } from "@/constants/linkedinLimits"
-import { getInMailTuneLabel, type InMailTuneId } from "@/constants/inmail"
+import { OPENING_LINES, getInMailTuneLabel, type InMailTuneId } from "@/constants/inmail"
+import { hasOpeningLine, withOpeningLine } from "@/lib/openingLine"
 import type { GeneratedInMail } from "@/types/inmail"
 import { getInMailGenerationInputs } from "./prompts"
 
@@ -124,6 +125,11 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
   })
 
   const draftSubject = cleanSubject(data.subject)
+  // A tone with an opening line (OPENING_LINES) opens its message with that exact sentence: put right in
+  // the draft, kept by the humanizer (a rewrite that changes it is sent back), and checked once more at the end
+  const opener = OPENING_LINES[tune]
+  const draftMessage = cleanMessage(data.message, draftSubject)
+  const draft = opener ? withOpeningLine(draftMessage, opener) : { text: draftMessage, fixed: false }
   const humanization = await humanizeTexts({
     fields: [
       {
@@ -136,14 +142,25 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
       {
         id: "message",
         kind: "LinkedIn InMail message body (without the subject)",
-        text: cleanMessage(data.message, draftSubject),
+        text: draft.text,
         maxChars: INMAIL_BODY_MAX_CHARS,
       },
     ],
+    // Each of these tones ends on one open question: the Curiosity Hook's open loop, or a soft offer of help
+    validate: opener
+      ? (id, text) => {
+          if (id !== "message") return null
+          if (!hasOpeningLine(text, opener)) return `Keep the opening exactly "Hi <first name>, ${opener.sentence}"`
+          if (!/\?\s*$/.test(text)) return "End the message with one open question, ending with a question mark"
+          return null
+        }
+      : undefined,
     signal,
   })
   const subject = cleanSubject(humanization.texts.subject)
-  const message = cleanMessage(humanization.texts.message, subject)
+  const cleaned = cleanMessage(humanization.texts.message, subject)
+  const final = opener ? withOpeningLine(cleaned, opener) : { text: cleaned, fixed: false }
+  const message = final.text
 
   // Serialized so the details also survive Next's dev file log, which drops object arguments
   console.info(
@@ -155,6 +172,7 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
       senderClaimRewrite,
       unsupportedSenderClaim,
       humanized: humanization.humanized,
+      ...(opener ? { openerFixed: draft.fixed || final.fixed, openerPresent: hasOpeningLine(message, opener) } : {}),
       subjectCharacters: subject.length,
       messageCharacters: message.length,
     })

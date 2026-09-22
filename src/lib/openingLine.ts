@@ -1,6 +1,6 @@
 /**
- * The opening some First Message tones must have: "Hi <first name>, <their sentence>" and then the rest
- * of the message (OPENING_LINES in constants/firstMessage.ts). A model asked for it usually writes it,
+ * The opening some First Message and InMail tones must have: "Hi <first name>, <their sentence>" and then
+ * the rest of the message (OPENING_LINES in constants/firstMessage.ts and constants/inmail.ts). A model asked for it usually writes it,
  * but sometimes says the same thing its own way ("thank you for engaging with my post", "I saw you
  * checked out my profile") or the humanizer does, so the opening is checked and put back here. Kept
  * free of the database and of any model, so the rules are testable on their own.
@@ -13,6 +13,12 @@ export interface OpeningLine {
   // left beside the exact one, so it is never said twice
   restates: RegExp
 }
+
+// A first sentence that already thanks them for the post or comment, in whatever words
+export const RESTATES_THANKS = /\bthank\w*\b.*\b(?:post|comment|interact|engag|like|react|share)/i
+// A first sentence that already mentions the profile view or the accepted request, in whatever words
+export const RESTATES_VIEW =
+  /\b(?:view|viewed|visited|checked out|looked at|stopped by)\b.*\bprofile\b|\baccept\w*\b.*\b(?:connection|request|invit\w*)|\bthank\w*\b.*\bconnect/i
 
 // "Hi Sara," / "Hello Sara" / "Hey Sara!" at the very start, capturing the name
 // (the case is spelled out rather than an `i` flag, which would let \p{Lu} match a lowercase letter)

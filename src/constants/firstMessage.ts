@@ -1,5 +1,5 @@
 import { ABOUT_ME_TAB_ID, ABOUT_ME_TAB_LABEL } from "./outreachTunes"
-import type { OpeningLine } from "@/lib/openingLine"
+import { RESTATES_THANKS, RESTATES_VIEW, type OpeningLine } from "@/lib/openingLine"
 
 // Kept as re-exports so existing imports from this module keep working
 export { ABOUT_ME_TAB_ID } from "./outreachTunes"
@@ -24,11 +24,6 @@ export const FIRST_MESSAGE_TUNES = [
 ] as const
 
 export type FirstMessageTuneId = (typeof FIRST_MESSAGE_TUNES)[number]["id"]
-
-// A first sentence that already thanks them for the post or comment, in whatever words
-const RESTATES_THANKS = /\bthank\w*\b.*\b(?:post|comment|interact|engag|like|react|share)/i
-// A first sentence that already mentions the profile view or the accepted request, in whatever words
-const RESTATES_VIEW = /\b(?:view|viewed|visited|checked out|looked at|stopped by)\b.*\bprofile\b|\baccept\w*\b.*\b(?:connection|request|invit\w*)|\bthank\w*\b.*\bconnect/i
 
 /**
  * The sentence these tones always open with, straight after "Hi <first name>,". The prompt asks
