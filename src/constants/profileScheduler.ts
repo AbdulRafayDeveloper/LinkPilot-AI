@@ -58,8 +58,27 @@ export const PROFILE_SCHEDULER_MESSAGES = {
   deleteFailed: "Couldn't delete the profile.",
   empty: "No profiles yet. Add a LinkedIn profile and the days you want to comment on its posts.",
   noResults: "No profiles match the search or the day.",
-  // Opening every profile on the page is one click opening many tabs, which a browser treats as pop-ups
+  openAllHint: (count: number) =>
+    `Opens the ${count === 1 ? "profile" : `${count} profiles`} on this page on LinkedIn, one tab every ${OPEN_ALL_GAP_MS / 1000} seconds.`,
+  opening: (opened: number, total: number) => `Opened ${opened} of ${total} on LinkedIn. The next one opens in ${OPEN_ALL_GAP_MS / 1000} seconds.`,
+  // A browser lets a page open a tab by itself only once the site is allowed pop-ups, so the rest go one click each
   popupsBlocked: (opened: number, total: number) =>
-    `Your browser blocked ${total - opened} of the ${total} tabs. Allow pop-ups for this site (the icon at the right of the address bar), then press Open all again.`,
+    `Opened ${opened} of ${total}. Your browser stops this page opening tabs by itself, so open the rest one click at a time below, or allow pop-ups for this site and press Open all again.`,
   openedAll: (count: number) => `Opened ${count} ${count === 1 ? "profile" : "profiles"} on LinkedIn.`,
+  stopped: (opened: number, total: number) => `Stopped after ${opened} of ${total}.`,
 } as const
+
+/**
+ * The pause between two profiles Open all opens. Opening profiles from their links in your own
+ * signed-in browser is ordinary browsing; the gap keeps it at a person's pace rather than a burst of
+ * tabs, and it is well above the one-second floor a background tab's timers are held to.
+ */
+export const OPEN_ALL_GAP_MS = 2000
+
+// How to let the site open tabs by itself, in Chrome and Edge, where the blocked-pop-up icon is easy to miss
+export const allowPopupsSteps = (host: string) => [
+  "Click the small window icon with a red cross at the right end of the address bar (it shows after tabs were blocked).",
+  `Choose "Always allow pop-ups and redirects from ${host}", then Done.`,
+  `No icon? Open Chrome's Settings, Privacy and security, Site settings, Pop-ups and redirects, and add ${host} under "Allowed to send pop-ups".`,
+  "Come back here and press Open all again.",
+]

@@ -11,6 +11,7 @@ import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { FilterPanel, SearchFilter, SelectFilter, historyLabelClass } from "@/components/history/HistoryFilters"
 import { ProfileScheduleFields } from "@/components/comment-writer/ProfileScheduleFields"
 import { ProfileScheduleDialog } from "@/components/comment-writer/ProfileScheduleDialog"
+import { OpenAllProfiles } from "@/components/comment-writer/OpenAllProfiles"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
@@ -99,7 +100,7 @@ const DayTags: React.FC<{ days: WeekDayId[]; highlight: WeekDayId | "" }> = ({ d
  * Profile Scheduler, a page of Comment Writer: the LinkedIn profiles worth commenting on and the
  * days of the week each one is looked at. Search and the day filter run on the server, 50 to a page;
  * Open takes a profile to Comment Writer, which links to its posts; Open all opens every profile on
- * the page, as the search, the day and the page leave it, straight on LinkedIn, one tab each.
+ * the page, as the search, the day and the page leave it, straight on LinkedIn (OpenAllProfiles).
  */
 export default function ProfileSchedulerClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -114,8 +115,6 @@ export default function ProfileSchedulerClient() {
   const [attempt, setAttempt] = useState(0)
   const [addError, setAddError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  // What the last Open all did, kept with the list it was pressed on, so another page or filter never shows it
-  const [opening, setOpening] = useState<{ opened: number; total: number; list: string } | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const [editing, setEditing] = useState<ProfileSchedule | null>(null)
   const [deleting, setDeleting] = useState<ProfileSchedule | null>(null)
@@ -164,24 +163,6 @@ export default function ProfileSchedulerClient() {
   const firstShown = total === 0 ? 0 : (page - 1) * pageSize + 1
   const lastShown = Math.min(total, (page - 1) * pageSize + items.length)
   const dayOptions = WEEK_DAYS.map((entry) => ({ id: entry.id, label: `${entry.label} (${result?.dayCounts[entry.id] ?? 0})` }))
-
-  /**
-   * Opens every profile on this page on LinkedIn, one tab each, in the order shown. A browser lets one
-   * click open one tab and holds the rest back as pop-ups until the site is allowed them, so a tab it
-   * refused is counted and the page says how to let them through rather than looking as if it worked.
-   */
-  const openAll = () => {
-    // While another page or filter is on its way, the rows on screen are the old list's
-    if (isLoading) return
-    let opened = 0
-    for (const schedule of items) {
-      const tab = window.open(schedule.profileUrl, "_blank")
-      if (!tab) continue
-      tab.opener = null
-      opened++
-    }
-    setOpening({ opened, total: items.length, list: requestKey })
-  }
 
   /** Adds the profile in the form. The days are kept for the next one, since a batch is often added for the same days. */
   const add = async (event: React.FormEvent) => {
@@ -402,29 +383,7 @@ export default function ProfileSchedulerClient() {
             </FilterPanel>
 
             {items.length > 0 && (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p role="status" className="min-w-0 flex-1 text-[12px]">
-                  {opening?.list !== requestKey ? (
-                    <span className="text-on-surface-variant">
-                      Opens the {items.length === 1 ? "profile" : `${items.length} profiles`} on this page on LinkedIn, one tab each.
-                    </span>
-                  ) : opening.opened < opening.total ? (
-                    <span className="flex gap-1.5 rounded-lg bg-secondary-fixed px-2.5 py-1.5 text-on-secondary-fixed-variant">
-                      <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
-                      {PROFILE_SCHEDULER_MESSAGES.popupsBlocked(opening.opened, opening.total)}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1.5 text-on-success-container">
-                      <CheckCircle2 size={14} className="text-success" aria-hidden="true" />
-                      {PROFILE_SCHEDULER_MESSAGES.openedAll(opening.opened)}
-                    </span>
-                  )}
-                </p>
-                <button type="button" onClick={openAll} disabled={isLoading} className={`${pagerButton} whitespace-nowrap disabled:opacity-60`}>
-                  <ExternalLink size={14} aria-hidden="true" />
-                  Open all {items.length} on LinkedIn
-                </button>
-              </div>
+              <OpenAllProfiles urls={items.map((schedule) => schedule.profileUrl)} listKey={requestKey} disabled={isLoading} buttonClassName={pagerButton} />
             )}
 
             {result && total > 0 && (
