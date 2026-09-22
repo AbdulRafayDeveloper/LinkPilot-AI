@@ -51,10 +51,10 @@ const IMAGE = /^\s*!\[([^\]\n]*)\]\(([^\s)]+)\)\s*$/
 const SAFE_HREF = /^(?:https?:\/\/|mailto:)/i
 
 /**
- * Where an image may come from: an https address, or an image stored with Important Content, which
- * is only ever served by the app's own route (lib/contentImages.ts). Anything else stays text.
+ * Where an image may come from: an https address, or an image stored with Important Content or a Quick Note,
+ * which is only ever served by the app's own route (lib/storedImages.ts). Anything else stays text.
  */
-const SAFE_IMAGE_SRC = /^(?:https:\/\/[^\s"'<>]+|\/api\/important-content\/images\/[0-9a-f]{24}\/[0-9a-f]{24}\.(?:png|jpg|webp))$/i
+const SAFE_IMAGE_SRC = /^(?:https:\/\/[^\s"'<>]+|\/api\/(?:important-content|quick-notes)\/images\/[0-9a-f]{24}\/[0-9a-f]{24}\.(?:png|jpg|webp))$/i
 
 // One pass over a line: escapes, code (its contents are never formatted), links, then emphasis
 const INLINE =

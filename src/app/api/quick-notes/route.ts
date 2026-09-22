@@ -1,22 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
-import { NOTE_MAX_LENGTH, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
+import { QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
 import { clearNotes, deleteNotes, listNotes, saveNote } from "@/services/quickNotes/notes"
 import { BulkDeleteSchema } from "@/lib/validation/listFilters"
+import { QuickNoteSchema } from "@/lib/validation/quickNotes"
 import { requireViewer } from "@/services/auth/viewer"
 import { withIdempotency } from "@/services/idempotency"
 
 export const dynamic = "force-dynamic"
-
-
-const NoteSchema = z.object({
-  content: z
-    .string({ error: QUICK_NOTES_MESSAGES.missingContent })
-    .trim()
-    .min(1, QUICK_NOTES_MESSAGES.missingContent)
-    .max(NOTE_MAX_LENGTH, QUICK_NOTES_MESSAGES.contentTooLong),
-})
 
 /**
  * GET (?cursor=): One batch of saved notes, newest first. Without a cursor the batch starts at
@@ -38,14 +29,15 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST: Saves one note. Saving the same text again keeps both, newest first.
+ * POST `{ content, title? }`: Saves one note, with or without a title. Saving the same text again
+ * keeps both, newest first.
  */
 async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
-    const parsed = NoteSchema.safeParse(body)
+    const parsed = QuickNoteSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json(
         { success: false, message: parsed.error.issues[0]?.message || QUICK_NOTES_MESSAGES.missingContent },
@@ -53,7 +45,7 @@ async function handlePost(req: NextRequest) {
       )
     }
 
-    const note = await saveNote(auth.viewer, parsed.data.content)
+    const note = await saveNote(auth.viewer, parsed.data)
     return NextResponse.json({ success: true, message: QUICK_NOTES_MESSAGES.saved, data: note }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Quick Note Exception:", error)

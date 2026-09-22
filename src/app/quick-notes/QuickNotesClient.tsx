@@ -1,21 +1,24 @@
 "use client"
 
-import React, { useCallback, useEffect, useRef, useState } from "react"
+import React, { useCallback, useEffect, useId, useRef, useState } from "react"
 import { NotebookPen, Save, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
+import { RichTextEditor } from "@/components/ui/RichTextEditor"
 import { SavedNotesList } from "@/components/quick-notes/SavedNotesList"
+import { NoteEditorDialog } from "@/components/quick-notes/NoteEditorDialog"
+import { NOTE_EDITOR_IMAGES } from "@/components/quick-notes/noteEditorImages"
 import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { ClearNotesDialog } from "@/components/quick-notes/ClearNotesDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { requestApi } from "@/lib/apiClient"
-import { NOTE_MAX_LENGTH, QUICK_NOTES_ENDPOINT, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
+import { NOTE_MAX_LENGTH, NOTE_TITLE_MAX_LENGTH, QUICK_NOTES_ENDPOINT, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
 import type { QuickNote, QuickNotesFeed } from "@/types/quickNotes"
 
-// What is being typed survives switching tools, like every other tool's input
-const draftStore = createToolStore("quick-notes:draft", { content: "" }, { version: 1 })
+// What is being written survives switching tools, like every other tool's input (version 2 added the title)
+const draftStore = createToolStore("quick-notes:draft", { title: "", content: "" }, { version: 2 })
 
 type SaveState = { type: "idle" } | { type: "saving" } | { type: "saved"; message: string } | { type: "error"; message: string }
 
@@ -43,8 +46,11 @@ export default function QuickNotesClient() {
   // Deleting the ticked notes, which is confirmed the same way Clear All is
   const [isConfirmingPicked, setIsConfirmingPicked] = useState(false)
   const [isDeletingPicked, setIsDeletingPicked] = useState(false)
-  const { content } = useToolStore(draftStore)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  // The note open in the editor, which saves itself as it is edited
+  const [editing, setEditing] = useState<QuickNote | null>(null)
+  const { title, content } = useToolStore(draftStore)
+  const titleRef = useRef<HTMLInputElement>(null)
+  const contentId = useId()
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   // Only the newest batch is fetched here; scrolling asks for the ones after it
   const isFetchingRef = useRef(false)
@@ -105,7 +111,6 @@ export default function QuickNotesClient() {
     if (saveState.type === "saving") return
     if (!content.trim()) {
       setSaveState({ type: "error", message: QUICK_NOTES_MESSAGES.missingContent })
-      inputRef.current?.focus()
       return
     }
     setSaveState({ type: "saving" })
@@ -113,13 +118,13 @@ export default function QuickNotesClient() {
       const { message } = await requestApi<QuickNote>(QUICK_NOTES_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ title, content }),
       }, { idempotent: true })
-      draftStore.update({ content: "" })
+      draftStore.update({ title: "", content: "" })
       setSaveState({ type: "saved", message: message || QUICK_NOTES_MESSAGES.saved })
       // The list starts again from the newest note, so the one just saved is at the top
       reload()
-      inputRef.current?.focus()
+      titleRef.current?.focus()
     } catch (error: unknown) {
       setSaveState({ type: "error", message: error instanceof Error ? error.message : QUICK_NOTES_MESSAGES.saveFailed })
     }
@@ -146,6 +151,11 @@ export default function QuickNotesClient() {
       setDeletingIds((current) => current.filter((id) => id !== note.id))
     }
   }
+
+  // An edit the server confirmed shows in its place in the list; the order stays by when it was saved
+  const noteSaved = useCallback((saved: QuickNote) => {
+    setFeed((current) => ({ ...current, notes: current.notes.map((note) => (note.id === saved.id ? saved : note)) }))
+  }, [])
 
   const selection = useRowSelection(feed.notes.map((note) => note.id))
 
@@ -254,6 +264,7 @@ export default function QuickNotesClient() {
                 onRetry={reload}
                 onLoadMore={loadMore}
                 onDelete={deleteNote}
+                onEdit={setEditing}
               />
 
               {/* Save something new */}
@@ -262,33 +273,49 @@ export default function QuickNotesClient() {
                 className="flex min-h-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
               >
                 <h2 className="text-sm font-bold text-on-surface">Save Content</h2>
-                <label htmlFor="quick-note-content" className="text-[10px] font-bold uppercase tracking-wider text-outline">
+                <label htmlFor="quick-note-title" className="text-[10px] font-bold uppercase tracking-wider text-outline">
+                  Title <span className="font-normal normal-case tracking-normal">(optional)</span>
+                </label>
+                <input
+                  id="quick-note-title"
+                  ref={titleRef}
+                  value={title}
+                  onChange={(event) => draftStore.update({ title: event.target.value })}
+                  maxLength={NOTE_TITLE_MAX_LENGTH}
+                  disabled={isSaving}
+                  autoComplete="off"
+                  placeholder="e.g. Client login steps"
+                  className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+                />
+                <label htmlFor={contentId} className="text-[10px] font-bold uppercase tracking-wider text-outline">
                   Paste or write anything
                 </label>
-                <textarea
-                  id="quick-note-content"
-                  ref={inputRef}
-                  value={content}
-                  onChange={(event) => {
-                    draftStore.update({ content: event.target.value })
-                    if (saveState.type !== "saving") setSaveState({ type: "idle" })
-                  }}
+                {/* Ctrl/⌘+Enter saves, the way a send field does; the editor's own keys bubble up to here */}
+                <div
+                  className={`flex min-h-[320px] flex-1 flex-col rounded-xl ${saveState.type === "error" ? "ring-2 ring-error/60" : ""} ${isSaving ? "pointer-events-none opacity-60" : ""}`}
                   onKeyDown={(event) => {
-                    // Ctrl/⌘+Enter saves, the way a send field does
                     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                       event.preventDefault()
                       void save()
                     }
                   }}
-                  maxLength={NOTE_MAX_LENGTH}
-                  disabled={isSaving}
-                  aria-invalid={saveState.type === "error"}
-                  aria-describedby="quick-note-status"
-                  placeholder="Paste a message, a link, a snippet you want to reuse, or write a note to yourself."
-                  className={`w-full flex-1 min-h-[220px] resize-none rounded-xl border bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
-                    saveState.type === "error" ? "border-error" : "border-outline-variant focus:border-primary/50"
-                  }`}
-                />
+                >
+                  <RichTextEditor
+                    id={contentId}
+                    value={content}
+                    onChange={(value) => {
+                      draftStore.update({ content: value })
+                      if (saveState.type !== "saving") setSaveState({ type: "idle" })
+                    }}
+                    maxLength={NOTE_MAX_LENGTH}
+                    rows={10}
+                    placeholder="Paste a message, a link, a snippet or an image you want to reuse, or write a note to yourself."
+                    ariaLabel="Note"
+                    visual
+                    fill
+                    images={NOTE_EDITOR_IMAGES}
+                  />
+                </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-outline">
                   <span className={isOverLimit ? "font-semibold text-error" : ""}>
                     {content.length.toLocaleString()} / {NOTE_MAX_LENGTH.toLocaleString()} characters
@@ -323,6 +350,7 @@ export default function QuickNotesClient() {
         </main>
       </div>
 
+      {editing && <NoteEditorDialog key={editing.id} note={editing} onSaved={noteSaved} onClose={() => setEditing(null)} />}
       {isConfirmingPicked && (
         <ConfirmBulkDelete
           count={selection.pickedIds.size}

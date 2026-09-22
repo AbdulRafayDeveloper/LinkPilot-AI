@@ -1,10 +1,20 @@
 /**
- * One saved note, as the API serves it and the list shows it.
+ * One saved note, as the API serves it and the list shows it. `content` is formatted text (the
+ * Markdown subset of lib/richText.ts), so a note saved as plain text reads exactly as it was typed.
  */
 export interface QuickNote {
   id: string
+  // "" when the note has no title
+  title: string
   content: string
   createdAt: string
+  updatedAt: string
+}
+
+/** What a note is saved or edited with. The title is optional. */
+export interface QuickNoteInput {
+  title?: string
+  content: string
 }
 
 /**
