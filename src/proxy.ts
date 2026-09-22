@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { env } from "@/config/env"
 import { SESSION_COOKIE, readSession } from "@/lib/sessionToken"
-import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, LOGIN_PATH, REQUEST_PATH_HEADER, SIGNUP_PATH } from "@/constants/auth"
+import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, HOME_PATH, LOGIN_PATH, REQUEST_PATH_HEADER, SIGNUP_PATH } from "@/constants/auth"
 import { PUBLIC_PLAN_ENDPOINT, PUBLIC_PLAN_PATH } from "@/constants/employees"
 
 /**
@@ -17,8 +17,9 @@ const PUBLIC_API = new Set(["/api/auth/login", "/api/auth/signup", "/api/auth/lo
 // An employee's own plan link: the signed token in the address is the key, checked by the route
 const isPlanLink = (pathname: string) => pathname.startsWith(`${PUBLIC_PLAN_PATH}/`) || pathname.startsWith(`${PUBLIC_PLAN_ENDPOINT}/`)
 
-// Only a path inside the app, so ?next= can't send someone to another site after signing in
-const safeNext = (path: string) => (path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\") ? path : "/")
+// Only a path inside the app, so ?next= can't send someone to another site after signing in; nowhere
+// to go back to is the home page itself, never "/" (a browser may still hold the root's old permanent redirect)
+const safeNext = (path: string) => (path !== "/" && path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\") ? path : HOME_PATH)
 
 /**
  * Carries the path the request came in on, so `requireViewer` can tell which tool a route belongs
@@ -38,7 +39,7 @@ export function proxy(request: NextRequest) {
   if (PUBLIC_PAGES.has(pathname)) {
     // Someone already signed in has nothing to do on the sign-in page
     if (!signedIn) return withPath(request, pathname)
-    return NextResponse.redirect(new URL(safeNext(request.nextUrl.searchParams.get("next") ?? "/"), request.url))
+    return NextResponse.redirect(new URL(safeNext(request.nextUrl.searchParams.get("next") ?? HOME_PATH), request.url))
   }
   if (PUBLIC_API.has(pathname) || isPlanLink(pathname) || signedIn) return withPath(request, pathname)
 

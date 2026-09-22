@@ -8,6 +8,7 @@ import {
   SITE_SHORT_NAME,
   SITE_THEME_COLOR,
 } from "@/config/site"
+import { HOME_PATH } from "@/constants/auth"
 
 const png = ({ url, size }: { url: string; size: number }, purpose: "any" | "maskable" | "monochrome") => ({
   src: url,
@@ -29,7 +30,8 @@ export default function manifest(): MetadataRoute.Manifest {
     name: SITE_NAME,
     short_name: SITE_SHORT_NAME,
     description: SITE_DESCRIPTION,
-    start_url: "/",
+    // Straight to the home page, not through "/", whose old permanent redirect a browser may still hold
+    start_url: HOME_PATH,
     scope: "/",
     display: "standalone",
     orientation: "any",

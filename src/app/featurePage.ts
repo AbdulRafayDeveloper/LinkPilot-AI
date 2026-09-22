@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { getViewer } from "@/services/auth/viewer"
 import { LOGIN_PATH } from "@/constants/auth"
-import { HOME_HREF } from "@/components/ui/BrandLogo"
+import { homeFor } from "@/lib/homePath"
 import { isFeatureDisabled } from "@/lib/featureAccess"
 
 /**
@@ -15,5 +15,5 @@ import { isFeatureDisabled } from "@/lib/featureAccess"
 export async function requireFeaturePage(toolId: string, path: string): Promise<void> {
   const viewer = await getViewer().catch(() => null)
   if (!viewer) redirect(`${LOGIN_PATH}?next=${encodeURIComponent(path)}`)
-  if (isFeatureDisabled(viewer, toolId)) redirect(HOME_HREF)
+  if (isFeatureDisabled(viewer, toolId)) redirect(homeFor(viewer.role === "admin", viewer.disabledTools))
 }

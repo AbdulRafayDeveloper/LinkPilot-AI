@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { getViewer } from "@/services/auth/viewer"
 import { LOGIN_PATH } from "@/constants/auth"
-import { HOME_HREF } from "@/components/ui/BrandLogo"
+import { homeFor } from "@/lib/homePath"
 
 /**
  * The admin pages check the role before rendering anything, so a user who types the address is
@@ -10,5 +10,5 @@ import { HOME_HREF } from "@/components/ui/BrandLogo"
 export async function requireAdminPage(path: string): Promise<void> {
   const viewer = await getViewer().catch(() => null)
   if (!viewer) redirect(`${LOGIN_PATH}?next=${encodeURIComponent(path)}`)
-  if (viewer.role !== "admin") redirect(HOME_HREF)
+  if (viewer.role !== "admin") redirect(homeFor(false, viewer.disabledTools))
 }

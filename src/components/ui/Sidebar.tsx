@@ -427,7 +427,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
               {index > 0 && <div className={`mx-2 mb-3 hidden h-px bg-outline-variant/70 ${whenCollapsed(isCollapsed, "lg:block")}`} aria-hidden="true" />}
               <h2
                 id={`nav-group-${group.id}`}
-                className={`mb-1 px-2 text-[10px] font-semibold uppercase leading-4 tracking-[0.11em] text-outline ${whenCollapsed(isCollapsed, "lg:sr-only")}`}
+                className={`mb-1 px-2 text-[10px] font-bold uppercase leading-4 tracking-[0.11em] text-on-surface-variant ${whenCollapsed(isCollapsed, "lg:sr-only")}`}
               >
                 {group.label}
               </h2>

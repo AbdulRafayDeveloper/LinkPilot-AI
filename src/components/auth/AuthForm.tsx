@@ -8,6 +8,7 @@ import {
   AUTH_ENDPOINTS,
   AUTH_MESSAGES,
   EMAIL_MAX_LENGTH,
+  HOME_PATH,
   LOGIN_PATH,
   NAME_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
@@ -60,8 +61,11 @@ const Field: React.FC<FieldProps> = ({ label, icon: Icon, trailing, inputRef, in
   )
 }
 
-// Only a path inside the app, so a crafted ?next= can't send someone to another site
-const safeNext = (value: string | null) => (value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\") ? value : "/")
+// Only a path inside the app, so a crafted ?next= can't send someone to another site. Nowhere to go
+// back to means the home page itself, never "/": a browser may still hold the root's old permanent
+// redirect to Trending Topics, and would follow it without asking the server
+const safeNext = (value: string | null) =>
+  value && value !== "/" && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\") ? value : HOME_PATH
 
 /**
  * The sign-in and sign-up form. On success the page reloads at the page the person was trying

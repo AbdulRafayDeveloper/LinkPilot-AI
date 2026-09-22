@@ -13,16 +13,20 @@ interface ModalProps {
   isCloseDisabled?: boolean
   footer?: React.ReactNode
   initialFocusRef?: React.RefObject<HTMLElement | null>
-  // "large" fills most of the viewport (prompt editors); "editor" is a writing page, wide and tall but
-  // with a margin all round, so it never reads as full screen. Both lay the body out as a flex column
+  // Every popup opens at the Update Prompt size (POPUP_PANEL), except "editor", a writing page that is
+  // wide and tall but with a margin all round, so it never reads as full screen. "large" and "editor"
+  // lay the body out as a flex column; the other sizes keep their content in normal flow
   size?: "compact" | "default" | "large" | "editor"
   children: React.ReactNode
 }
 
+// The Update Prompt panel: nearly the whole screen, with a small margin all round
+const POPUP_PANEL = "w-full max-w-[min(95vw,1600px)] h-[92dvh]"
+
 const PANEL_SIZE = {
-  compact: "w-full max-w-md max-h-[92dvh]",
-  default: "w-full max-w-3xl max-h-[92dvh]",
-  large: "w-full max-w-[min(95vw,1600px)] h-[92dvh]",
+  compact: POPUP_PANEL,
+  default: POPUP_PANEL,
+  large: POPUP_PANEL,
   // 2rem above and below on a laptop, 1.5rem on a phone, centred, never wider than a comfortable page
   editor: "w-full max-w-[min(94vw,1240px)] h-[calc(100dvh-3rem)] sm:h-[calc(100dvh-4rem)] max-h-[1000px]",
 } as const

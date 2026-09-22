@@ -2,10 +2,10 @@ import React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { SITE_LOGO_PNG, SITE_NAME, SITE_SHORT_NAME } from "@/config/site"
-import { LINKEDIN_TOOLS } from "@/constants/linkedinTools"
+import { HOME_PATH } from "@/constants/auth"
 
-// "/" only redirects to the first tool, so home links go straight there
-export const HOME_HREF = LINKEDIN_TOOLS[0].href
+// "/" only redirects to the home page, so home links go straight there
+export const HOME_HREF = HOME_PATH
 
 interface BrandLogoProps {
   // Extra classes for the name and AI badge, e.g. to hide them in the collapsed sidebar

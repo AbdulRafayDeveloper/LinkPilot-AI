@@ -7,6 +7,13 @@ export const USER_ROLES = ["user", "admin"] as const
 export type UserRole = (typeof USER_ROLES)[number]
 
 export const LOGIN_PATH = "/login"
+// Where the app opens: the root, a sign-in with nowhere else to go back to, the logo and the installed
+// app all land here. Connection Note, at the owner's request (it used to be the first tool, Trending
+// Topics). A plain path rather than a lookup in the tool list, so the sign-in gate can read it without
+// loading every tool; tests/homePath.test.mjs checks that it names a tool that exists
+export const HOME_PATH = "/connection-note"
+// Somewhere every signed-in account can always open, for an account with every tool turned off
+export const ALWAYS_OPEN_PATH = "/global-prompts"
 export const SIGNUP_PATH = "/signup"
 export const AUTH_ENDPOINTS = {
   login: "/api/auth/login",
