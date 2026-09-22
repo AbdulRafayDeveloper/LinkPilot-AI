@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
-import { COMMENT_TUNE_IDS, getTuneLabel } from "@/constants/commentWriter"
+import { getTuneLabel } from "@/constants/commentWriter"
+import { commentTuneSchema } from "@/lib/validation/commentTunes"
 import { saveTunePrompt } from "@/services/commentWriter/prompts"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
-const TuneSchema = z.enum(COMMENT_TUNE_IDS)
+const TuneSchema = commentTuneSchema()
 
 /**
  * PUT: Saves the prompt for one tune only. The other tunes' prompts are untouched.

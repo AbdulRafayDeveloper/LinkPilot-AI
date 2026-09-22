@@ -5,14 +5,30 @@
  */
 export const COMMENT_TUNES = [
   { id: "thoughtful", label: "Thoughtful", shortLabel: "Thoughtful", description: "A nuanced observation" },
+  // The post's most interesting point, the gap it leaves, what to add, a respectful challenge and a tip
+  { id: "value-add", label: "Value Add", shortLabel: "Value Add", description: "Fills a gap + a question + a tip" },
   { id: "past-experience", label: "Based on My Past Experience", shortLabel: "My Experience", description: "Your real experience" },
   { id: "latest-trends", label: "Latest Trends / Informative", shortLabel: "Latest Trends", description: "Recent, sourced context" },
   { id: "concerning", label: "Concerning", shortLabel: "Concerning", description: "A fair risk or question" },
-  { id: "appreciative", label: "Appreciative", shortLabel: "Appreciative", description: "Credits a specific point" },
+  // Was "appreciative" (RENAMED_COMMENT_TUNES): now a deep read of the post, why it matters and what to add
+  { id: "supportive", label: "Supportive", shortLabel: "Supportive", description: "Why it matters + support" },
   { id: "impressive", label: "Impressive", shortLabel: "Impressive", description: "A sharp, memorable idea" },
+  // The point said in a friendly way that is easy to remember and relate to, with a practical tip
+  { id: "relatable", label: "Relatable", shortLabel: "Relatable", description: "Memorable, friendly + a tip" },
 ] as const
 
 export type CommentTuneId = (typeof COMMENT_TUNES)[number]["id"]
+
+/**
+ * Tunes that were renamed, old id to new. A browser that remembered the old tune, an old link to a
+ * filtered "view all" page, or a caller written before still sends the old id, so the routes read it
+ * as the new one (lib/validation/commentTunes.ts) instead of refusing it. Saved comments and the prompt
+ * were moved to the new id by `node scripts/update-comment-tunes.mjs`.
+ */
+export const RENAMED_COMMENT_TUNES: Readonly<Record<string, CommentTuneId>> = { appreciative: "supportive" }
+
+/** The current id for a tune id: a renamed tune's old id becomes its new one, anything else is unchanged. */
+export const currentTuneId = (id: string): string => RENAMED_COMMENT_TUNES[id] ?? id
 
 // Preselected so a comment can be generated right away; the user can pick another style
 export const DEFAULT_COMMENT_TUNE: CommentTuneId = COMMENT_TUNES[0].id

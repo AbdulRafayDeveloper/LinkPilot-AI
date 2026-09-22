@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { createEventStream } from "@/lib/sse"
 import { parsePostInput } from "@/lib/validation/postInput"
-import { COMMENT_TUNE_IDS, COMMENT_WRITER_MESSAGES } from "@/constants/commentWriter"
+import { COMMENT_WRITER_MESSAGES } from "@/constants/commentWriter"
+import { commentTuneSchema } from "@/lib/validation/commentTunes"
 import { generateComment } from "@/services/commentWriter/generate"
 import { recordComment } from "@/services/generationRecords"
 import type { CommentStreamEvent } from "@/types/commentWriter"
@@ -16,7 +16,7 @@ export const maxDuration = 300
 
 const { missingPost, missingTune, generationFailed } = COMMENT_WRITER_MESSAGES
 
-const TuneSchema = z.enum(COMMENT_TUNE_IDS, { error: missingTune })
+const TuneSchema = commentTuneSchema(missingTune)
 
 /**
  * POST (multipart form: tune, inputMode, postText | image): writes one comment with the
