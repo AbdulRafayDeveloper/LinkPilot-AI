@@ -21,6 +21,7 @@ import { PostImageModel } from "@/models/PostImage"
 import { QuickNote } from "@/models/QuickNote"
 import { ReferenceItem } from "@/models/ReferenceItem"
 import { ImportantContentModel } from "@/models/ImportantContent"
+import { ProfileScheduleModel } from "@/models/ProfileSchedule"
 import { TrendingSearch } from "@/models/TrendingSearch"
 import { APP_TOOLS } from "@/constants/linkedinTools"
 import type { ToolUsage } from "@/types/admin"
@@ -51,7 +52,8 @@ export const SOURCES: ActivitySource[] = [
   { href: "/connection-note", collection: () => ConnectionNoteRecord.collection },
   { href: "/first-message", collection: () => FirstMessageRecord.collection },
   { href: "/inmail-message", collection: () => InMailMessageRecord.collection },
-  { href: "/comment-writer", collection: () => CommentRecord.collection },
+  { href: "/comment-writer", label: "comments", collection: () => CommentRecord.collection },
+  { href: "/comment-writer", label: "profiles", collection: () => ProfileScheduleModel.collection },
   { href: "/post-comment-replies", collection: () => PostCommentReplyRecord.collection },
   { href: "/follow-up-message", collection: () => FollowUpMessageRecord.collection },
   { href: "/conversation-reply", collection: () => ConversationReplyRecord.collection },

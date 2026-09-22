@@ -11,6 +11,7 @@ import { TunePromptsModal } from "@/components/comment-writer/TunePromptsModal"
 import { ResetButton } from "@/components/ui/ResetButton"
 import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
 import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
+import { ProfilePostsBanner } from "@/components/comment-writer/ProfilePostsBanner"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useCommentGenerator } from "@/hooks/useCommentGenerator"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
@@ -117,6 +118,9 @@ export default function CommentWriterClient() {
                 </button>
               </div>
             </div>
+
+            {/* Only when a profile was opened from Profile Scheduler; otherwise it renders nothing */}
+            <ProfilePostsBanner />
 
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0">
               {/* Input */}

@@ -28,22 +28,24 @@ import { REFERENCE_CONTENT_TOOL } from "./referenceContent"
 import { EMPLOYEES_TOOL } from "./employees"
 import { ADMIN_TOOL } from "./admin"
 import { TRENDING_HISTORY_HREF } from "./trending"
+import { PROFILE_SCHEDULER_LINK } from "./profileScheduler"
 import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./savedOutputs"
 
 /**
- * The four areas of the app, in sidebar order. Each one is a heading in the sidebar, so keep
+ * The four areas of the app, in sidebar order (the owner's: Prompts, Workspace, LinkedIn Tools,
+ * Client Work). Each one is a heading in the sidebar that opens and closes its tools, so keep
  * them few and meaningful: a tool that needs a heading of its own belongs in one of these.
  */
 export const TOOL_GROUPS = [
+  // Prompts written for other AI tools
+  { id: "prompts", label: "Prompts" },
+  // What the day and the work are kept in: tasks, notes and files
+  { id: "workspace", label: "Workspace" },
   // Everything written for LinkedIn itself, from the post to the reply
   { id: "linkedin", label: "LinkedIn Tools" },
   // The people the work is for: what you send them, what they send back, the text you reuse with
   // them, and the meetings
   { id: "clients", label: "Client Work" },
-  // Prompts written for other AI tools
-  { id: "prompts", label: "Prompts" },
-  // What the day and the work are kept in: tasks, notes and files
-  { id: "workspace", label: "Workspace" },
 ] as const
 
 export type ToolGroupId = (typeof TOOL_GROUPS)[number]["id"]
@@ -122,7 +124,8 @@ export const LINKEDIN_TOOLS: LinkedInTool[] = [
   { id: "connection-note", title: "Connection Note", description: "Personalized connection requests", icon: UserPlus, href: "/connection-note", group: "linkedin", links: savedOutputPages("connection-note") },
   { id: "first-message", title: "First Message", description: "Personalized first messages", icon: Hand, href: "/first-message", group: "linkedin", links: savedOutputPages("first-message") },
   { id: "inmail-composer", title: "InMail Message", description: "InMail with subject line", icon: Mail, href: "/inmail-message", group: "linkedin", links: savedOutputPages("inmail-message") },
-  { id: "comment-writer", title: "Comment Writer", description: "Thoughtful LinkedIn comments", icon: MessageSquareText, href: "/comment-writer", group: "linkedin", links: savedOutputPages("comment-writer") },
+  // A third page beside its two: the profiles to comment on, and the days each is looked at
+  { id: "comment-writer", title: "Comment Writer", description: "Thoughtful LinkedIn comments", icon: MessageSquareText, href: "/comment-writer", group: "linkedin", links: [...savedOutputPages("comment-writer"), PROFILE_SCHEDULER_LINK] },
   { id: "post-comment-replies", title: "Post Comment Replies", description: "Reply to post comments", icon: Reply, href: "/post-comment-replies", group: "linkedin", links: savedOutputPages("post-comment-replies") },
   { id: "follow-up-message", title: "Follow-Up Message", description: "Pitch & non-pitch follow-ups", icon: Repeat, href: "/follow-up-message", group: "linkedin", links: savedOutputPages("follow-up-message") },
   { id: "conversation-reply", title: "Conversation Reply", description: "Next reply + deal signals", icon: MessagesSquare, href: "/conversation-reply", group: "linkedin", links: savedOutputPages("conversation-reply") },

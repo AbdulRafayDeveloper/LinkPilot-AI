@@ -33,6 +33,7 @@ const OWNED_COLLECTIONS = [
   "quick_notes",
   "reference_content",
   "important_content",
+  "profile_schedules",
   "meeting_plans",
   "meetings",
   "employees",

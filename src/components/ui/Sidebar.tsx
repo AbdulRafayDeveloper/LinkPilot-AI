@@ -9,6 +9,8 @@ import { TOOL_GROUPS, type LinkedInTool, type ToolLink } from "@/constants/linke
 import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 import { markToolSeen, useToolActivity, type ActivityState } from "@/lib/toolActivity"
 import { useSidebarDropdowns } from "@/hooks/useSidebarDropdowns"
+import { useSidebarSections } from "@/hooks/useSidebarSections"
+import { openSectionOf, toggledSection } from "@/lib/sidebarSections"
 import { useVisibleTools } from "@/hooks/useCurrentUser"
 
 interface SidebarProps {
@@ -232,7 +234,9 @@ const SidebarDropdown: React.FC<SidebarDropdownProps> = ({
 
 /**
  * App navigation: the brand, every tool under the four headings in TOOL_GROUPS, and Global AI
- * Prompts pinned at the bottom. A drawer on small screens; on desktop a full column that
+ * Prompts pinned at the bottom. The headings are an accordion: one section open at a time, the
+ * user's choice kept across pages (hooks/useSidebarSections.ts), every section open while
+ * searching and on the collapsed rail. A drawer on small screens; on desktop a full column that
  * collapses to an icon rail. Every tool shows when it's writing in the background or has a
  * result waiting. A tool with several pages is a dropdown that stays as the user left it.
  */
@@ -240,6 +244,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
   const pathname = usePathname()
   const activity = useToolActivity()
   const dropdowns = useSidebarDropdowns()
+  const sections = useSidebarSections()
   // The admin area appears only once the account is known to be an admin, never flashing for a user
   const tools = useVisibleTools()
   const [hint, setHint] = useState<RailHint | null>(null)
@@ -292,7 +297,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
     return links && links.length > 0 ? [{ ...tool, links }] : []
   })
   const showGlobalPrompts = !isSearching || matchesSearch(GLOBAL_PROMPTS_LINK.title, query)
-  const firstMatch = visibleTools[0]?.links?.[0]?.href ?? visibleTools[0]?.href ?? (showGlobalPrompts ? GLOBAL_PROMPTS_LINK.href : undefined)
+  // The sections in heading order, each with its tools, so the list and Enter's first match agree
+  const groups = TOOL_GROUPS.map((group) => ({ group, tools: visibleTools.filter((tool) => tool.group === group.id) })).filter((entry) => entry.tools.length > 0)
+  const firstTool = groups[0]?.tools[0]
+  const firstMatch = firstTool?.links?.[0]?.href ?? firstTool?.href ?? (showGlobalPrompts ? GLOBAL_PROMPTS_LINK.href : undefined)
+  // Every page a tool has (its dropdown's pages, or itself), for what a closed section carries
+  const pagesOf = (tool: LinkedInTool) => (tool.links ? tool.links.map((link) => link.href) : [tool.href])
+  const activeSection = tools.find((tool) => pagesOf(tool).includes(pathname))?.group ?? null
+  const openSection = openSectionOf(
+    sections.stored,
+    activeSection,
+    TOOL_GROUPS.map((group) => group.id).filter((id) => tools.some((tool) => tool.group === id))
+  )
   const matchCount = visibleTools.length + (isSearching && showGlobalPrompts ? 1 : 0)
 
   // Opening a tool means its finished result has been seen
@@ -421,19 +437,46 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
           {isSearching && matchCount === 0 && (
             <p className={`px-2 py-3 text-[12px] text-outline ${whenCollapsed(isCollapsed, "lg:hidden")}`}>No tool matches &ldquo;{query.trim()}&rdquo;.</p>
           )}
-          {TOOL_GROUPS.filter((group) => visibleTools.some((tool) => tool.group === group.id)).map((group, index) => (
-            <section key={group.id} aria-labelledby={`nav-group-${group.id}`} className={index > 0 ? "mt-1" : ""}>
-              {/* Collapsed, a thin line separates the groups instead of their names */}
-              {index > 0 && <div className={`mx-2 mb-3 hidden h-px bg-outline-variant/70 ${whenCollapsed(isCollapsed, "lg:block")}`} aria-hidden="true" />}
-              <h2
-                id={`nav-group-${group.id}`}
-                className={`mb-1 px-2 text-[10px] font-bold uppercase leading-4 tracking-[0.11em] text-on-surface-variant ${whenCollapsed(isCollapsed, "lg:sr-only")}`}
-              >
-                {group.label}
-              </h2>
-              <ul>{visibleTools.filter((tool) => tool.group === group.id).map(renderTool)}</ul>
-            </section>
-          ))}
+          {groups.map(({ group, tools: groupTools }, index) => {
+            // A search shows every section with a match; otherwise only the open one shows its tools
+            const isShown = isSearching || openSection === group.id
+            const hasActivePage = groupTools.some((tool) => pagesOf(tool).includes(pathname))
+            // Closed, the heading carries what its hidden tools would have shown, like a closed dropdown
+            const hiddenActivity = isShown
+              ? undefined
+              : groupTools
+                  .flatMap(pagesOf)
+                  .map((href) => (href === pathname ? undefined : activityOf(href)))
+                  .find((state) => state !== undefined)
+            const listId = `nav-group-${group.id}-tools`
+            return (
+              <section key={group.id} aria-labelledby={`nav-group-${group.id}`} className={index > 0 ? "mt-1" : ""}>
+                {/* Collapsed, a thin line separates the groups instead of their names */}
+                {index > 0 && <div className={`mx-2 mb-3 hidden h-px bg-outline-variant/70 ${whenCollapsed(isCollapsed, "lg:block")}`} aria-hidden="true" />}
+                <h2 id={`nav-group-${group.id}`} className={`relative mb-0.5 ${whenCollapsed(isCollapsed, "lg:sr-only")}`}>
+                  {hasActivePage && !isShown && <ActiveBar />}
+                  <button
+                    type="button"
+                    onClick={() => sections.setStored(toggledSection(openSection, group.id))}
+                    aria-expanded={isShown}
+                    aria-controls={listId}
+                    title={isShown ? `Hide ${group.label}` : `Show ${group.label}`}
+                    className={`flex w-full items-center gap-2 rounded-lg bg-surface-container-low px-2 py-1 text-left text-[10px] font-bold uppercase leading-4 tracking-[0.11em] transition-colors duration-150 hover:bg-surface-container hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                      hasActivePage && !isShown ? "text-primary" : isShown ? "text-on-surface" : "text-on-surface-variant"
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{group.label}</span>
+                    {hiddenActivity && <ActivityMark state={hiddenActivity} />}
+                    <ChevronDown size={13} aria-hidden="true" className={`shrink-0 text-outline transition-transform duration-150 ${isShown ? "rotate-180" : ""}`} />
+                  </button>
+                </h2>
+                {/* A closed section's tools stay out of view and out of the reading order; the rail always shows its icons */}
+                <ul id={listId} className={isShown ? "" : `hidden ${whenCollapsed(isCollapsed, "lg:block")}`}>
+                  {groupTools.map(renderTool)}
+                </ul>
+              </section>
+            )
+          })}
         </nav>
 
         {/* Global AI Prompts: shared settings for every tool, not a LinkedIn tool */}
