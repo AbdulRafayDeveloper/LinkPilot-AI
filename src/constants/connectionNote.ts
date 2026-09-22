@@ -13,6 +13,10 @@ export const CONNECTION_NOTE_TONES = [
   { id: "recently-funded", label: "Recently Funded", description: "Congrats + how you can help" },
   // For a decision maker at a growing startup that is hiring: your matching expertise, portfolio and a short call
   { id: "hiring-startup", label: "Hiring Startup", description: "Your fit + portfolio + a call" },
+  // For someone who reacted to or shared one of your posts: thank them, with one touch from their profile
+  { id: "post-interaction", label: "Post Interaction", description: "Thanks for engaging with your post" },
+  // For someone who commented on one of your posts: thank them for their view, with one touch from their profile
+  { id: "post-comment", label: "Post Comment", description: "Thanks for commenting on your post" },
 ] as const
 
 export type ConnectionNoteToneId = (typeof CONNECTION_NOTE_TONES)[number]["id"]

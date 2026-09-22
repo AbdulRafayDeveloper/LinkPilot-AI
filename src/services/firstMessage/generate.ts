@@ -5,7 +5,8 @@ import { composePromptMessage } from "@/services/promptComposer"
 import { NO_SENDER_PROFILE_TEXT, generateWithoutSenderClaims } from "@/services/senderGuard"
 import { humanizeTexts } from "@/services/humanizer"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
-import { LINKEDIN_MESSAGE_MAX_CHARS, getTuneLabel, type FirstMessageTuneId } from "@/constants/firstMessage"
+import { LINKEDIN_MESSAGE_MAX_CHARS, OPENING_LINES, getTuneLabel, type FirstMessageTuneId } from "@/constants/firstMessage"
+import { hasOpeningLine, withOpeningLine } from "@/lib/openingLine"
 import type { GeneratedFirstMessage } from "@/types/firstMessage"
 import { getGenerationInputs } from "./prompts"
 
@@ -77,18 +78,31 @@ export async function generateFirstMessage({ profileData, tune, signal }: Genera
     claimText: (output) => output.message,
     describeDraft: (output) => cleanGeneratedText(output.message),
   })
+  // A tone with an opening line (OPENING_LINES) opens with its exact sentence: put right in the draft,
+  // kept by the humanizer (a rewrite that changes it is sent back), and checked once more at the end
+  const opener = OPENING_LINES[tune]
+  const draft = opener ? withOpeningLine(cleanGeneratedText(data.message), opener) : { text: cleanGeneratedText(data.message), fixed: false }
   const humanization = await humanizeTexts({
     fields: [
       {
         id: "message",
         kind: "LinkedIn first message (DM) to someone new",
-        text: cleanGeneratedText(data.message),
+        text: draft.text,
         maxChars: LINKEDIN_MESSAGE_MAX_CHARS,
       },
     ],
+    // Each of these tones ends on one open question: the Curiosity Hook's open loop, or a soft offer of help
+    validate: opener
+      ? (_id, text) => {
+          if (!hasOpeningLine(text, opener)) return `Keep the opening exactly "Hi <first name>, ${opener.sentence}"`
+          if (!/\?\s*$/.test(text)) return "End the message with one open question, ending with a question mark"
+          return null
+        }
+      : undefined,
     signal,
   })
-  const message = humanization.texts.message
+  const final = opener ? withOpeningLine(humanization.texts.message, opener) : { text: humanization.texts.message, fixed: false }
+  const message = final.text
 
   const warnings = [
     unsupportedSenderClaim &&
@@ -107,6 +121,7 @@ export async function generateFirstMessage({ profileData, tune, signal }: Genera
       senderClaimRewrite,
       unsupportedSenderClaim,
       humanized: humanization.humanized,
+      ...(opener ? { openerFixed: draft.fixed || final.fixed, openerPresent: hasOpeningLine(message, opener) } : {}),
       characters: message.length,
     })
   )
