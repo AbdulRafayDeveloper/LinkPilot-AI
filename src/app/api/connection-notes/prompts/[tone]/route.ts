@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
-import { CONNECTION_NOTE_TONE_IDS, getToneLabel } from "@/constants/connectionNote"
+import { CONNECTION_NOTE_TONE_IDS, RENAMED_CONNECTION_NOTE_TONES, getToneLabel } from "@/constants/connectionNote"
+import { idWithRenamesSchema } from "@/lib/validation/renamedIds"
 import { saveTonePrompt } from "@/services/connectionNote/prompts"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
-const ToneSchema = z.enum(CONNECTION_NOTE_TONE_IDS)
+const ToneSchema = idWithRenamesSchema(CONNECTION_NOTE_TONE_IDS, RENAMED_CONNECTION_NOTE_TONES)
 
 /**
  * PUT: Saves the prompt for one tone only. Other tones' prompts are untouched.

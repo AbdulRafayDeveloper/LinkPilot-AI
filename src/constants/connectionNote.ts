@@ -15,11 +15,20 @@ export const CONNECTION_NOTE_TONES = [
   { id: "hiring-startup", label: "Hiring Startup", description: "Your fit + portfolio + a call" },
   // For someone who reacted to or shared one of your posts: thank them, with one touch from their profile
   { id: "post-interaction", label: "Post Interaction", description: "Thanks for engaging with your post" },
-  // For someone who commented on one of your posts: thank them for their view, with one touch from their profile
-  { id: "post-comment", label: "Post Comment", description: "Thanks for commenting on your post" },
+  // For someone who interacted with one of your comments (was "post-comment", RENAMED_CONNECTION_NOTE_TONES):
+  // thank them, with one touch from their profile. The same pair of names First Message uses
+  { id: "comment-interaction", label: "Comment Interaction", description: "Thanks for engaging with your comment" },
 ] as const
 
 export type ConnectionNoteToneId = (typeof CONNECTION_NOTE_TONES)[number]["id"]
+
+/**
+ * Tones that were renamed, old id to new. A browser that remembered the old tone, or a caller written
+ * before, still sends the old id, so the routes read it as the new one (lib/validation/renamedIds.ts)
+ * instead of refusing it. The prompt and any saved notes were moved to the new id by
+ * `node scripts/update-connection-note-tones.mjs`.
+ */
+export const RENAMED_CONNECTION_NOTE_TONES: Readonly<Record<string, ConnectionNoteToneId>> = { "post-comment": "comment-interaction" }
 
 // Preselected when the page opens; the user can pick another tone
 export const DEFAULT_CONNECTION_NOTE_TONE: ConnectionNoteToneId = "professional"

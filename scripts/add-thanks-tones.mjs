@@ -63,12 +63,12 @@ Write ONLY the message. No meta-commentary.
 
 ${HUMAN_STYLE}`
 
-const shared = (who) => `PERSONALIZATION:
+const shared = (who, what = "post") => `PERSONALIZATION:
 
 * Use the person's first name exactly once at the beginning.
 * Add one slight personal touch from their profile: their current role, company, field or a specific project. One detail only, mentioned naturally.
 * The personal touch must come from the profile below. Never invent or assume anything that is not stated there.
-* You do not know what the post was about, so never name its topic or quote it. Refer to it only as "my post".
+* You do not know what my ${what} was about, so never name its topic or quote it. Refer to it only as "my ${what}".
 * ${who}
 
 LENGTH:
@@ -189,22 +189,22 @@ Profile:
 ${HUMAN_STYLE}`,
   },
   {
-    key: "connection-note-post-comment",
+    key: "connection-note-comment-interaction",
     tool: "connection-note",
-    content: `Write a short LinkedIn connection note thanking this person for commenting on my post, based only on the profile provided below.
+    content: `Write a short LinkedIn connection note thanking this person for interacting with my recent comment, based only on the profile provided below.
 
 GOAL:
-They left a comment on one of my LinkedIn posts. Thank them for taking the time to comment and share their view, and start a genuine professional connection. It should feel personally written for them.
+They interacted with a comment I left on LinkedIn. I do not know whether they liked it or replied to it, so never say which: always say "interacting with my recent comment". Thank them for it and start a genuine professional connection, in a note that feels personally written for them.
 
-${shared(`The thanks comes first, right after their name ("Sara thank you for commenting on my post..."), then the personal touch, for example that their view means more coming from someone in their role or field.`)}
+${shared(`The thanks comes first, right after their name ("Sara thank you for interacting with my recent comment..."), then the personal touch.`, "comment")}
 
 FINAL CHECK:
 Before returning the note silently verify:
 
 1. The first name appears exactly once and is at the beginning, with no comma after it.
-2. The note thanks them for commenting on my post.
+2. The note says "thank you for interacting with my recent comment", never "replying", "liking" or "reacting".
 3. It has one slight personal touch taken from the profile, and nothing invented.
-4. It never names or guesses what the post or the comment said.
+4. It never names or guesses what my comment or the post it was on said.
 5. There is no selling or ask.
 6. There are no emojis, hashtags, sign-offs or contractions.
 7. The total length is 190 characters or fewer including spaces.
@@ -216,6 +216,14 @@ Profile:
 
 ${HUMAN_STYLE}`,
   },
+]
+
+// A tone renamed after it shipped: its prompt document takes the new key and text (the old text is kept as a
+// revision and on the document as `renamedFrom`, so --down restores it exactly), and saved records move to
+// the new id, each marked so --down moves exactly those back. RENAMED_CONNECTION_NOTE_TONES keeps the old id
+// working in the routes meanwhile.
+const RENAMES = [
+  { from: "connection-note-post-comment", to: "connection-note-comment-interaction", records: "connection_notes", field: "tone", oldId: "post-comment", newId: "comment-interaction" },
 ]
 
 function fail(message) {
@@ -241,7 +249,47 @@ const force = process.argv.includes("--force")
 const client = new MongoClient(mongoUri())
 try {
   await client.connect()
-  const prompts = client.db().collection("prompts")
+  const db = client.db()
+  const prompts = db.collection("prompts")
+  const revisions = db.collection("prompt_revisions")
+
+  // Renames always go first: on the way up so the new key is not also inserted fresh, and on the way down so
+  // the renamed document gets its old key and text back before the loop below removes the new prompts
+  const rename = async () => {
+    for (const { from, to, records, field, oldId, newId } of RENAMES) {
+      const content = PROMPTS.find((prompt) => prompt.key === to).content
+      const now = new Date()
+      if (!down) {
+        const old = await prompts.findOne({ key: from })
+        if (old && !(await prompts.findOne({ key: to }))) {
+          const moved = await revisions.updateMany({ promptKey: from }, { $set: { promptKey: to } })
+          await revisions.insertOne({ promptKey: to, content: old.content, fromRename: from, createdAt: now, updatedAt: now })
+          await prompts.updateOne(
+            { _id: old._id },
+            { $set: { key: to, content, defaultContent: content, renamedFrom: { key: from, content: old.content, defaultContent: old.defaultContent }, updatedAt: now } }
+          )
+          console.log(`✓ ${from} → ${to}: renamed with the new prompt (old text kept as a revision; ${moved.modifiedCount} earlier revisions moved)`)
+        }
+        const saved = await db.collection(records).updateMany({ [field]: oldId }, { $set: { [field]: newId, renamedFrom: oldId } })
+        console.log(`✓ ${records}: ${saved.modifiedCount} moved from ${oldId} to ${newId}`)
+        continue
+      }
+      const saved = await db.collection(records).updateMany({ renamedFrom: oldId }, { $set: { [field]: oldId }, $unset: { renamedFrom: "" } })
+      console.log(`✓ ${records}: ${saved.modifiedCount} moved back to ${oldId}`)
+      const renamed = await prompts.findOne({ key: to, "renamedFrom.key": from })
+      if (renamed && !(await prompts.findOne({ key: from }))) {
+        await revisions.deleteMany({ promptKey: to, fromRename: from })
+        await revisions.updateMany({ promptKey: to }, { $set: { promptKey: from } })
+        await prompts.updateOne(
+          { _id: renamed._id },
+          { $set: { key: from, content: renamed.renamedFrom.content, defaultContent: renamed.renamedFrom.defaultContent, updatedAt: now }, $unset: { renamedFrom: "" } }
+        )
+        console.log(`✓ ${to} → ${from}: its old text is back`)
+      }
+    }
+  }
+  await rename()
+
   for (const { key, tool, content } of PROMPTS) {
     const existing = await prompts.findOne({ key })
     if (down) {

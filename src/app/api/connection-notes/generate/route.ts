@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
+import { idWithRenamesSchema } from "@/lib/validation/renamedIds"
 import {
   COMPANY_NAME_MAX_LENGTH,
   CONNECTION_NOTE_MESSAGES,
   CONNECTION_NOTE_TONE_IDS,
+  RENAMED_CONNECTION_NOTE_TONES,
   PROFILE_DATA_MAX_LENGTH,
 } from "@/constants/connectionNote"
 import { generateConnectionNote } from "@/services/connectionNote/generate"
@@ -22,7 +24,8 @@ const GenerateSchema = z.object({
     .trim()
     .min(1, CONNECTION_NOTE_MESSAGES.missingProfile)
     .max(PROFILE_DATA_MAX_LENGTH, CONNECTION_NOTE_MESSAGES.profileTooLong),
-  tone: z.enum(CONNECTION_NOTE_TONE_IDS, { error: CONNECTION_NOTE_MESSAGES.missingTone }),
+  // An old tone id (RENAMED_CONNECTION_NOTE_TONES) is read as its new one
+  tone: idWithRenamesSchema(CONNECTION_NOTE_TONE_IDS, RENAMED_CONNECTION_NOTE_TONES, CONNECTION_NOTE_MESSAGES.missingTone),
   // Only the company tones (COMPANY_TONES) use it; blank means "take the company from the profile"
   companyName: z
     .string()
