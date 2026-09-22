@@ -22,7 +22,7 @@ type StoredSchedule = IProfileSchedule & { _id: { toString: () => string } }
 type Filters = { search: string; day: WeekDayId | ""; type?: PersonTypeId | "" }
 
 // What a search reads: the link and every detail typed about the person
-const SEARCHED = ["profileUrl", "name", "role", "location", "sector"]
+const SEARCHED = ["profileUrl", "name", "role", "company", "location", "sector", "whyNow", "notes"]
 
 const DUPLICATE_KEY = 11000
 
@@ -32,8 +32,13 @@ const toSchedule = (record: StoredSchedule): ProfileSchedule => ({
   // A person saved before people had details reads with them empty
   name: record.name ?? "",
   role: record.role ?? "",
+  company: record.company ?? "",
   location: record.location ?? "",
   sector: record.sector ?? "",
+  whyNow: record.whyNow ?? "",
+  whyNowDate: record.whyNowDate ?? "",
+  source: record.source ?? "",
+  notes: record.notes ?? "",
   types: PERSON_TYPE_IDS.filter((type) => (record.types ?? []).includes(type)),
   days: WEEK_DAY_IDS.filter((day) => record.days.includes(day)),
   createdAt: new Date(record.createdAt).toISOString(),
@@ -113,8 +118,13 @@ export async function createProfileSchedule(viewer: Viewer, input: ProfilePerson
       profileUrl: input.profileUrl ?? null,
       name: input.name ?? "",
       role: input.role ?? "",
+      company: input.company ?? "",
       location: input.location ?? "",
       sector: input.sector ?? "",
+      whyNow: input.whyNow ?? "",
+      whyNowDate: input.whyNowDate ?? "",
+      source: input.source ?? "",
+      notes: input.notes ?? "",
       types: input.types ?? [],
       days: input.days,
     })

@@ -310,18 +310,31 @@ export default function ProfileSchedulerClient() {
   }
 
   const profileCell = (schedule: ProfileSchedule) => {
-    const about = [schedule.role, schedule.location].filter(Boolean).join(" · ")
+    const about = [schedule.role, schedule.company].filter(Boolean).join(", ")
+    const place = [schedule.location, schedule.sector].filter(Boolean).join(" · ")
+    const whyNow = [schedule.whyNow, schedule.whyNowDate].filter(Boolean).join(" · ")
     return (
       <div className="min-w-0">
         <p className="break-words text-[13px] font-semibold text-on-surface">{personName(schedule)}</p>
         {about && <p className="break-words text-[12px] text-on-surface-variant">{about}</p>}
-        {schedule.sector && <p className="break-words text-[12px] text-on-surface-variant">{schedule.sector}</p>}
+        {place && <p className="break-words text-[12px] text-on-surface-variant">{place}</p>}
+        {whyNow && (
+          <p className="break-words text-[12px] text-on-surface-variant">
+            <span className="font-semibold text-on-surface">Why now:</span> {whyNow}
+          </p>
+        )}
+        {schedule.notes && <p className="break-words text-[12px] italic text-on-surface-variant">{schedule.notes}</p>}
         {schedule.profileUrl ? (
           <a href={schedule.profileUrl} target="_blank" rel="noopener noreferrer" className="break-all text-[12px] text-primary hover:underline">
             {schedule.profileUrl}
           </a>
         ) : (
           <p className="text-[12px] italic text-outline">No LinkedIn link yet</p>
+        )}
+        {schedule.source && (
+          <a href={schedule.source} target="_blank" rel="noopener noreferrer" className="block break-all text-[11px] text-outline hover:underline">
+            Source: {schedule.source}
+          </a>
         )}
       </div>
     )
@@ -399,7 +412,7 @@ export default function ProfileSchedulerClient() {
                   setSearch(value)
                   setPage(1)
                 }}
-                placeholder="Search by name, role, location, sector or link"
+                placeholder="Search by name, role, company, sector, why now or link"
               />
               <SelectFilter
                 label="Day"

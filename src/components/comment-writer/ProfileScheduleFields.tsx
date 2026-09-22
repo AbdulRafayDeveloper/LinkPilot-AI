@@ -4,6 +4,7 @@ import React from "react"
 import { Link2 } from "lucide-react"
 import {
   PERSON_FIELD_MAX_LENGTH,
+  PERSON_TEXT_MAX_LENGTH,
   PERSON_TYPES,
   PERSON_TYPE_IDS,
   PROFILE_URL_MAX_LENGTH,
@@ -36,14 +37,23 @@ interface ProfileScheduleFieldsProps {
 const DETAILS = [
   { key: "name", label: "Name", placeholder: "Sara Khan", autoComplete: "name" },
   { key: "role", label: "Role", placeholder: "Co-founder & CEO", autoComplete: "organization-title" },
+  { key: "company", label: "Company", placeholder: "Comp AI", autoComplete: "organization" },
   { key: "location", label: "Location", placeholder: "US (Raleigh)", autoComplete: "off" },
   { key: "sector", label: "Sector", placeholder: "AI compliance SaaS", autoComplete: "off" },
+  { key: "whyNowDate", label: "Date", placeholder: "Sep 17 2026", autoComplete: "off" },
+] as const
+
+// Why this person is worth a comment now, and anything else worth keeping beside them
+const NOTES = [
+  { key: "whyNow", label: "Why now", placeholder: "Series A $34M" },
+  { key: "source", label: "Source", placeholder: "https://example.com/raises/" },
+  { key: "notes", label: "Notes", placeholder: "Anything worth remembering" },
 ] as const
 
 /**
  * A person, the same on the page's add form and in the edit dialog: their LinkedIn link (optional
- * while it hasn't been found, as long as there is a name), who they are, why they are on the list
- * (any of the types) and the days their posts are looked at. Types and days are real checkboxes in
+ * while it hasn't been found, as long as there is a name), who they are and where they work, why now
+ * and where that was read, any notes, what they are (any of the types) and the days their posts are looked at. Types and days are real checkboxes in
  * labelled groups, so a keyboard and a screen reader get them as they are; Weekdays and Every day
  * fill the days in one go.
  */
@@ -99,11 +109,31 @@ export const ProfileScheduleFields: React.FC<ProfileScheduleFieldsProps> = ({ id
         ))}
       </div>
 
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {NOTES.map((note) => (
+          <label key={note.key} className="flex min-w-0 flex-col gap-1.5" htmlFor={`${idPrefix}-${note.key}`}>
+            <span className={labelClass}>{note.label}</span>
+            <input
+              id={`${idPrefix}-${note.key}`}
+              type={note.key === "source" ? "url" : "text"}
+              inputMode={note.key === "source" ? "url" : undefined}
+              autoComplete="off"
+              value={value[note.key]}
+              maxLength={PERSON_TEXT_MAX_LENGTH}
+              onChange={(event) => onChange({ ...value, [note.key]: event.target.value })}
+              placeholder={note.placeholder}
+              disabled={disabled}
+              className={`${scheduleFieldClass} h-10`}
+            />
+          </label>
+        ))}
+      </div>
+
       <div role="group" aria-labelledby={`${idPrefix}-types`} className="flex flex-col gap-2">
         <span id={`${idPrefix}-types`} className={labelClass}>
           Type <span className="font-normal text-on-surface-variant">(pick every one that fits)</span>
         </span>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {PERSON_TYPES.map((type) => {
             const isOn = value.types.includes(type.id)
             return (

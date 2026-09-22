@@ -39,20 +39,38 @@ export const WORK_DAY_IDS: WeekDayId[] = ["monday", "tuesday", "wednesday", "thu
 export const PROFILE_URL_MAX_LENGTH = 300
 
 /**
- * Why a person is on the list, as the outreach sheet names it. A person can be more than one: a
- * founder who just raised (Signal) may also be worth commenting on for reach, or know someone.
+ * What a person is, in plain words, so a row says for itself why it is on the list. A person can be
+ * more than one: an agency owner who posts every day is an Agency and a Creator. These replaced the
+ * outreach sheet's own headings (Signal, Reach, Referral), which said nothing about the person;
+ * `TYPE_ALIASES` still reads those words, so a sheet written with them imports as it always did.
  */
 export const PERSON_TYPES = [
-  { id: "signal", label: "Signal", description: "Recently funded or hiring, a reason to reach out now" },
-  { id: "reach", label: "Reach", description: "Widely followed, commenting puts you in front of their audience" },
-  { id: "referral", label: "Referral", description: "Can pass work or introductions your way" },
+  { id: "funded-founder", label: "Funded Founder", description: "Just raised, so there is a reason to reach out now" },
+  { id: "investor", label: "Investor", description: "VC, angel or fundraising advisor whose posts founders read" },
+  { id: "creator", label: "Creator", description: "Large following, so a comment is seen by their audience" },
+  { id: "agency", label: "Agency", description: "Runs an agency or consultancy and can pass client work on" },
 ] as const
 
 export type PersonTypeId = (typeof PERSON_TYPES)[number]["id"]
 export const PERSON_TYPE_IDS = PERSON_TYPES.map((type) => type.id) as [PersonTypeId, ...PersonTypeId[]]
 
-// Name, role, location and sector are one line each
+// The outreach sheet's older headings, and the short words a sheet may use, read as the types above
+export const TYPE_ALIASES: Record<string, PersonTypeId> = {
+  signal: "funded-founder",
+  reach: "creator",
+  referral: "agency",
+  founder: "funded-founder",
+  funded: "funded-founder",
+  vc: "investor",
+  angel: "investor",
+  consultancy: "agency",
+}
+
+// Name, role, company, location, sector and the date are one line each
 export const PERSON_FIELD_MAX_LENGTH = 150
+
+// Why now and the notes are a sentence or two; the source is a link to where the person was found
+export const PERSON_TEXT_MAX_LENGTH = 500
 
 // Comment Writer reads these from its address when a profile is opened from the scheduler
 export const PROFILE_PARAM = "profile"
@@ -63,8 +81,10 @@ export const PROFILE_SCHEDULER_MESSAGES = {
   badUrl: "That isn't a LinkedIn profile link. It looks like https://www.linkedin.com/in/their-name.",
   urlTooLong: `A profile link is at most ${PROFILE_URL_MAX_LENGTH} characters.`,
   missingPerson: "Add the person's name or their LinkedIn profile link.",
-  fieldTooLong: `Name, role, location and sector are at most ${PERSON_FIELD_MAX_LENGTH} characters each.`,
-  badType: "That isn't a type this list uses (Signal, Reach or Referral).",
+  fieldTooLong: `Name, role, company, location, sector and the date are at most ${PERSON_FIELD_MAX_LENGTH} characters each.`,
+  textTooLong: `Why now and the notes are at most ${PERSON_TEXT_MAX_LENGTH} characters each.`,
+  badSource: "The source is a web address, starting http:// or https://.",
+  badType: `That isn't a type this list uses (${PERSON_TYPES.map((type) => type.label).join(", ")}).`,
   missingDays: "Pick at least one day.",
   badDay: "That isn't a day of the week.",
   duplicate: "That profile is already in your list. Edit it to change its days.",

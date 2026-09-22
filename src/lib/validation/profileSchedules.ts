@@ -1,6 +1,7 @@
 import { z } from "zod"
 import {
   PERSON_FIELD_MAX_LENGTH,
+  PERSON_TEXT_MAX_LENGTH,
   PERSON_TYPE_IDS,
   PROFILE_SCHEDULER_MESSAGES,
   PROFILE_URL_MAX_LENGTH,
@@ -28,9 +29,19 @@ const ProfileUrl = z.preprocess(
 )
 
 // One line of text, its spaces tidied
-const Line = z.preprocess(
-  (value) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : value),
-  z.string().max(PERSON_FIELD_MAX_LENGTH, PROFILE_SCHEDULER_MESSAGES.fieldTooLong)
+const tidy = (value: unknown) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : value)
+const Line = z.preprocess(tidy, z.string().max(PERSON_FIELD_MAX_LENGTH, PROFILE_SCHEDULER_MESSAGES.fieldTooLong))
+
+// A sentence or two: why now, or a note to self
+const Text = z.preprocess(tidy, z.string().max(PERSON_TEXT_MAX_LENGTH, PROFILE_SCHEDULER_MESSAGES.textTooLong))
+
+// Where the person was read about; blank for nowhere, any http(s) address otherwise
+const Source = z.preprocess(
+  tidy,
+  z
+    .string()
+    .max(PERSON_TEXT_MAX_LENGTH, PROFILE_SCHEDULER_MESSAGES.textTooLong)
+    .refine((value) => !value || /^https?:\/\/\S+$/i.test(value), PROFILE_SCHEDULER_MESSAGES.badSource)
 )
 
 const Types = z
@@ -53,8 +64,13 @@ export const ProfilePersonEditSchema = z.object({
   profileUrl: ProfileUrl.optional(),
   name: Line.optional(),
   role: Line.optional(),
+  company: Line.optional(),
   location: Line.optional(),
   sector: Line.optional(),
+  whyNow: Text.optional(),
+  whyNowDate: Line.optional(),
+  source: Source.optional(),
+  notes: Text.optional(),
   types: Types.optional(),
   days: Days,
 })

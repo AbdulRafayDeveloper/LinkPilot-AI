@@ -1,10 +1,12 @@
 // Moves Comment Writer's Profile Scheduler (`profile_schedules`) from "a LinkedIn link and its days" to
-// "a person": name, role, location, sector, types (several allowed) and a link that may still be missing.
+// "a person": name, role, company, location, sector, why now (what happened, when, and the source),
+// notes, types (several allowed) and a link that may still be missing.
 //
 //   node scripts/migrate-profile-people.mjs up       [--dry-run]
 //   node scripts/migrate-profile-people.mjs down     [--dry-run]
 //
-// up    gives every record the new fields, empty (name, role, location, sector "", types []), and
+// up    gives every record the new fields, empty (the text fields "", types []), renames the types the
+//       first version used (signal, reach, referral) to the words the list uses now, and
 //       replaces the unique index on { ownerId, profileUrl } with one that only covers records that have
 //       a link, so any number of people can wait for theirs while a link is still kept once per account.
 //       No record loses anything; running it twice changes nothing.
@@ -23,7 +25,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const OLD_INDEX = "ownerId_1_profileUrl_1"
 const NEW_INDEX = "ownerId_1_profileUrl_1_linked"
 const TYPES_INDEX = "ownerId_1_types_1"
-const FIELDS = { name: "", role: "", location: "", sector: "", types: [] }
+const FIELDS = { name: "", role: "", company: "", location: "", sector: "", whyNow: "", whyNowDate: "", source: "", notes: "", types: [] }
+// The first version's type ids, and what each is called now (constants/profileScheduler.ts PERSON_TYPES)
+const RENAMED = { signal: "funded-founder", reach: "creator", referral: "agency" }
 
 const fail = (message) => {
   console.error(`\n${message}\n`)
@@ -58,6 +62,13 @@ try {
       say(`${field}: ${missing} records given ${JSON.stringify(empty)}`)
       if (!dryRun && missing) await schedules.updateMany({ [field]: { $exists: false } }, { $set: { [field]: empty } })
     }
+    for (const [was, now] of Object.entries(RENAMED)) {
+      const carrying = await schedules.countDocuments({ types: was })
+      if (carrying) {
+        say(`type ${was}: renamed to ${now} on ${carrying} records`)
+        if (!dryRun) await schedules.updateMany({ types: was }, { $set: { "types.$[old]": now } }, { arrayFilters: [{ old: was }] })
+      }
+    }
     // The new index is built before the old one goes, so a link is never unguarded in between
     if (!names.includes(NEW_INDEX)) {
       say(`index ${NEW_INDEX}: created (unique, records with a link only)`)
@@ -89,6 +100,13 @@ try {
     if (names.includes(NEW_INDEX)) {
       say(`index ${NEW_INDEX}: dropped`)
       if (!dryRun) await schedules.dropIndex(NEW_INDEX)
+    }
+    for (const [was, now] of Object.entries(RENAMED)) {
+      const carrying = await schedules.countDocuments({ types: now })
+      if (carrying) {
+        say(`type ${now}: put back to ${was} on ${carrying} records`)
+        if (!dryRun) await schedules.updateMany({ types: now }, { $set: { "types.$[current]": was } }, { arrayFilters: [{ current: now }] })
+      }
     }
     const unset = Object.fromEntries(Object.keys(FIELDS).map((field) => [field, ""]))
     const carrying = await schedules.countDocuments({ $or: Object.keys(FIELDS).map((field) => ({ [field]: { $exists: true } })) })

@@ -3,9 +3,10 @@ import { OWNER_ID } from "./owner"
 import { PERSON_TYPE_IDS, WEEK_DAY_IDS, type PersonTypeId, type WeekDayId } from "@/constants/profileScheduler"
 
 /**
- * One person in Comment Writer's Profile Scheduler: who they are (name, role, location, sector), why
- * they are on the list (their types), their LinkedIn link, kept in one form (lib/linkedinProfile.ts),
- * and the days of the week their posts are looked at. The link is null for someone whose profile
+ * One person in Comment Writer's Profile Scheduler: who they are (name, role, company, location,
+ * sector), what they are (their types), why now (what happened and when, and where it was read), any
+ * notes, their LinkedIn link, kept in one form (lib/linkedinProfile.ts), and the days of the week
+ * their posts are looked at. The link is null for someone whose profile
  * hasn't been found yet; a record saved before people had details reads with those fields empty.
  */
 export interface IProfileSchedule {
@@ -14,8 +15,14 @@ export interface IProfileSchedule {
   profileUrl: string | null
   name: string
   role: string
+  company: string
   location: string
   sector: string
+  // What happened that makes now the moment ("Series A $34M"), when ("Sep 17 2026") and where it was read
+  whyNow: string
+  whyNowDate: string
+  source: string
+  notes: string
   // In PERSON_TYPES order, each once
   types: PersonTypeId[]
   // In week order, Monday first, each once
@@ -30,8 +37,13 @@ const ProfileScheduleSchema = new Schema<IProfileSchedule>(
     profileUrl: { type: String, default: null, trim: true },
     name: { type: String, default: "", trim: true },
     role: { type: String, default: "", trim: true },
+    company: { type: String, default: "", trim: true },
     location: { type: String, default: "", trim: true },
     sector: { type: String, default: "", trim: true },
+    whyNow: { type: String, default: "", trim: true },
+    whyNowDate: { type: String, default: "", trim: true },
+    source: { type: String, default: "", trim: true },
+    notes: { type: String, default: "", trim: true },
     types: { type: [{ type: String, enum: PERSON_TYPE_IDS }], default: [] },
     days: { type: [{ type: String, enum: WEEK_DAY_IDS }], required: true },
   },

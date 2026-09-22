@@ -1,5 +1,5 @@
 import { normalizeProfileUrl, profileHandle } from "@/lib/linkedinProfile"
-import { PERSON_TYPES, PROFILE_SCHEDULER_MESSAGES, type PersonTypeId } from "@/constants/profileScheduler"
+import { PERSON_TYPES, PROFILE_SCHEDULER_MESSAGES, TYPE_ALIASES, type PersonTypeId } from "@/constants/profileScheduler"
 import type { ProfileSchedule, ProfileScheduleInput } from "@/types/profileScheduler"
 
 /**
@@ -8,7 +8,20 @@ import type { ProfileSchedule, ProfileScheduleInput } from "@/types/profileSched
  * how a row of the outreach sheet becomes a person. Nothing here touches the database or the page.
  */
 
-export const EMPTY_PERSON: ProfileScheduleInput = { profileUrl: "", name: "", role: "", location: "", sector: "", types: [], days: [] }
+export const EMPTY_PERSON: ProfileScheduleInput = {
+  profileUrl: "",
+  name: "",
+  role: "",
+  company: "",
+  location: "",
+  sector: "",
+  whyNow: "",
+  whyNowDate: "",
+  source: "",
+  notes: "",
+  types: [],
+  days: [],
+}
 
 /** The person's name, or the name in their link when none was typed. */
 export const personName = (person: Pick<ProfileSchedule, "name" | "profileUrl">) =>
@@ -19,8 +32,13 @@ export const inputOf = (person: ProfileSchedule): ProfileScheduleInput => ({
   profileUrl: person.profileUrl ?? "",
   name: person.name,
   role: person.role,
+  company: person.company,
   location: person.location,
   sector: person.sector,
+  whyNow: person.whyNow,
+  whyNowDate: person.whyNowDate,
+  source: person.source,
+  notes: person.notes,
   types: person.types,
   days: person.days,
 })
@@ -73,7 +91,19 @@ export function parseCsv(text: string): string[][] {
 }
 
 // The sheet's own headings, read without regard to case, spacing or anything after them
-const COLUMNS = { type: /^type/, name: /^name/, role: /^role/, location: /^location/, sector: /^sector/, profileUrl: /^linkedin/ } as const
+const COLUMNS = {
+  type: /^type/,
+  name: /^name/,
+  role: /^role/,
+  company: /^company/,
+  location: /^location/,
+  sector: /^sector/,
+  whyNow: /^(signal|why)/,
+  whyNowDate: /^(funding|date)/,
+  profileUrl: /^linkedin/,
+  source: /^source/,
+  notes: /^notes?/,
+} as const
 type Column = keyof typeof COLUMNS
 
 export interface SheetPerson {
@@ -82,8 +112,13 @@ export interface SheetPerson {
   profileUrl: string | null
   name: string
   role: string
+  company: string
   location: string
   sector: string
+  whyNow: string
+  whyNowDate: string
+  source: string
+  notes: string
   types: PersonTypeId[]
   // What was in the LinkedIn cell when it isn't a profile link ("Search: … (URL not verified)")
   unlinked: string | null
@@ -94,21 +129,30 @@ export interface SheetReading {
   problems: string[]
 }
 
-/** The types in a Type cell: "Signal", "Signal, Reach", "Signal + Referral"... */
+/**
+ * The types in a Type cell: the list's own words ("Funded Founder", "Agency, Creator"), the outreach
+ * sheet's older headings (Signal, Reach, Referral) and the short words people write (VC, founder),
+ * through TYPE_ALIASES. Anything else comes back as unknown rather than being guessed at.
+ */
 export function typesOf(cell: string): { types: PersonTypeId[]; unknown: string[] } {
   const words = cell
     .split(/[,/+&;|]| and /i)
-    .map((word) => word.trim().toLowerCase())
+    .map((word: string) => word.trim().toLowerCase().replace(/\s+/g, "-"))
     .filter(Boolean)
-  const types = PERSON_TYPES.filter((type) => words.includes(type.id)).map((type) => type.id)
-  return { types, unknown: words.filter((word) => !types.includes(word as PersonTypeId)) }
+  const read = (word: string) => PERSON_TYPES.find((type) => type.id === word || type.label.toLowerCase().replace(/\s+/g, "-") === word)?.id ?? TYPE_ALIASES[word]
+  const found = words.map(read)
+  return {
+    types: PERSON_TYPES.filter((type) => found.includes(type.id)).map((type) => type.id),
+    unknown: words.filter((word: string) => !read(word)),
+  }
 }
 
 /**
  * The people in the outreach sheet, exported as CSV. The heading row must have a Name or a LinkedIn
- * column; the other columns are optional and the rest of the sheet (company, signal, source, notes)
- * is left alone. A row with neither a name nor a link, or a type the list doesn't use, is reported,
- * never guessed at. A LinkedIn cell that isn't a profile link keeps the person, without a link.
+ * column; every other column is optional, and the ones the list doesn't keep (the row number, and the
+ * Commented and Reply columns, which are the user's own tracking) are left alone. A row with neither a
+ * name nor a link, or a type the list doesn't use, is reported, never guessed at. A LinkedIn cell that
+ * isn't a profile link keeps the person, without a link.
  */
 export function peopleFromSheet(csv: string): SheetReading {
   const [heading, ...rows] = parseCsv(csv)
@@ -133,7 +177,7 @@ export function peopleFromSheet(csv: string): SheetReading {
     }
     const { types, unknown } = typesOf(read("type"))
     if (unknown.length) {
-      problems.push(`Row ${line} (${name || linkCell}): "${unknown.join(", ")}" isn't Signal, Reach or Referral, skipped.`)
+      problems.push(`Row ${line} (${name || linkCell}): "${unknown.join(", ")}" is not a type this list uses, skipped.`)
       return
     }
     people.push({
@@ -141,8 +185,13 @@ export function peopleFromSheet(csv: string): SheetReading {
       profileUrl,
       name,
       role: read("role"),
+      company: read("company"),
       location: read("location"),
       sector: read("sector"),
+      whyNow: read("whyNow"),
+      whyNowDate: read("whyNowDate"),
+      source: read("source"),
+      notes: read("notes"),
       types,
       unlinked: linkCell && !profileUrl ? linkCell : null,
     })

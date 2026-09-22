@@ -6,8 +6,13 @@ export interface ProfileSchedule {
   profileUrl: string | null
   name: string
   role: string
+  company: string
   location: string
   sector: string
+  whyNow: string
+  whyNowDate: string
+  source: string
+  notes: string
   // In PERSON_TYPES order, each once
   types: PersonTypeId[]
   // In week order, Monday first, each once
@@ -21,8 +26,13 @@ export interface ProfileScheduleInput {
   profileUrl: string
   name: string
   role: string
+  company: string
   location: string
   sector: string
+  whyNow: string
+  whyNowDate: string
+  source: string
+  notes: string
   types: PersonTypeId[]
   days: WeekDayId[]
 }
@@ -36,8 +46,13 @@ export interface ProfilePersonFields {
   profileUrl?: string | null
   name?: string
   role?: string
+  company?: string
   location?: string
   sector?: string
+  whyNow?: string
+  whyNowDate?: string
+  source?: string
+  notes?: string
   types?: PersonTypeId[]
   days: WeekDayId[]
 }
