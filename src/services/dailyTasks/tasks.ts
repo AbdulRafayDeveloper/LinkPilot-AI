@@ -7,7 +7,7 @@ import { HISTORY_DAYS_PER_PAGE, VISIBLE_DAYS } from "@/constants/dailyTasks"
 import { TASK_MAX_DEPTH } from "@/constants/taskAttachments"
 import type { DailyTask, DailyTaskDay, DailyTasksPage, NewDailyTask } from "@/types/dailyTasks"
 import { storedImagesOf, type TaskImage, type TaskImageView } from "@/types/taskAttachment"
-import { copyTaskImages, deleteTaskImages, taskImageLists } from "@/services/taskImages"
+import { deleteTaskImages, taskImageLists } from "@/services/taskImages"
 import type { Viewer } from "@/types/auth"
 import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 
@@ -372,46 +372,6 @@ export async function moveOverdueToToday(viewer: Viewer, today: string, ids?: st
     { ordered: true }
   )
   return { moved: roots.length }
-}
-
-/**
- * A copy of a task and everything under it: the same line, description, images (copied, so each
- * task keeps its own) and subtasks in the same shape, placed straight after the original, under the
- * same parent on the same day. The copy starts open: ticks are the work done on the original, not
- * part of what is copied. Returns null when the task is gone or belongs to another account.
- */
-export async function copyTask(viewer: Viewer, id: string): Promise<DailyTask | null> {
-  const filter = visibleById(viewer, id)
-  if (!filter) return null
-  await connectDatabase()
-  const root = (await DailyTaskModel.findOne(filter).lean()) as unknown as (StoredTask & { _id: mongoose.Types.ObjectId; parentTaskId?: mongoose.Types.ObjectId | null; position: number }) | null
-  if (!root) return null
-  const below = await descendantsOf(viewer, [root._id])
-  const others = below.length > 0 ? ((await DailyTaskModel.find({ _id: { $in: below }, ...visibleTo(viewer) }).sort({ position: 1, createdAt: 1, _id: 1 }).lean()) as unknown as typeof root[]) : []
-  const originals = [root, ...others]
-
-  const newIds = new Map(originals.map((record) => [record._id.toString(), new mongoose.Types.ObjectId()]))
-  const images = await Promise.all(originals.map((record) => copyTaskImages(storedImagesOf(record))))
-  const copies = originals.map((record, index) => ({
-    _id: newIds.get(record._id.toString()),
-    ownerId: viewer.id,
-    content: record.content,
-    description: record.description ?? "",
-    image: null,
-    images: images[index],
-    // The copy has the original's parent; each copied subtask has the copy of its own parent
-    parentTaskId: index === 0 ? (root.parentTaskId ?? null) : (newIds.get(String(record.parentTaskId)) ?? null),
-    taskDate: root.taskDate,
-    // Straight after the original, ahead of the next sibling, until the day is next reordered
-    position: index === 0 ? root.position + 0.5 : record.position,
-    isCompleted: false,
-    completedAt: null,
-  }))
-  await DailyTaskModel.insertMany(copies, { ordered: true })
-  const stored = (await DailyTaskModel.find({ _id: { $in: [...newIds.values()] } }, TASK_FIELDS).sort({ position: 1, createdAt: 1, _id: 1 }).lean()) as unknown as StoredTask[]
-  // The copy first, then its subtasks nested inside it
-  const nested = nest(await toTasks(stored))
-  return nested.find((task) => task.id === newIds.get(root._id.toString())?.toString()) ?? null
 }
 
 /**

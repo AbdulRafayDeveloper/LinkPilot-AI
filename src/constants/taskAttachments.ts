@@ -59,11 +59,6 @@ export const TASK_ATTACHMENT_MESSAGES = {
   // The fold on a task that already carries something, as against one that has nothing yet
   showDetails: "Show details",
   copyText: "Copy the task text",
-  // The icon that makes a second task just like this one, which the copy icon used to do
-  duplicateTask: "Duplicate task",
-  copyTask: "Copy task",
-  copied: "Task copied, with its subtasks.",
-  copyFailed: "Couldn't copy that task. Please try again.",
   // Writing the details with AI, from the task's own line (and the tasks above it)
   generate: "Write with AI",
   generating: "Writing...",

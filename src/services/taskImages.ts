@@ -2,7 +2,7 @@ import mongoose from "mongoose"
 import { UserFacingError } from "@/lib/errors"
 import { detectImageMimeType } from "@/lib/imageType"
 import { TASK_ATTACHMENT_MESSAGES, TASK_IMAGE_MAX_BYTES } from "@/constants/taskAttachments"
-import { copyObject, deleteObject, isStorageConfigured, presignDownload, presignUpload, putObject } from "@/services/storage/s3"
+import { deleteObject, isStorageConfigured, presignDownload, presignUpload, putObject } from "@/services/storage/s3"
 import type { TaskImage, TaskImageView } from "@/types/taskAttachment"
 
 /**
@@ -76,27 +76,6 @@ export async function taskImageLists<T>(items: T[], imagesOf: (item: T) => TaskI
   return new Map(items.map((item, index) => [item, signed[index]]))
 }
 
-/**
- * New copies of images, for a copied task: each gets its own id and object, so deleting either task
- * never takes the other's images. An image that can't be copied is left off the copy rather than
- * failing it, and logged.
- */
-export async function copyTaskImages(images: TaskImage[]): Promise<TaskImage[]> {
-  if (images.length === 0 || !isStorageConfigured()) return []
-  const copies = await Promise.all(
-    images.map(async (image) => {
-      const copy: TaskImage = { assetId: new mongoose.Types.ObjectId().toString(), contentType: image.contentType }
-      try {
-        await copyObject(keyOf(image), keyOf(copy))
-        return copy
-      } catch (error: unknown) {
-        console.warn("⚠️ Couldn't copy a task image:", error instanceof Error ? error.message : error)
-        return null
-      }
-    })
-  )
-  return copies.filter((copy): copy is TaskImage => copy !== null)
-}
 
 /**
  * Removes the objects of images a task no longer has. A failure is logged and swallowed: losing

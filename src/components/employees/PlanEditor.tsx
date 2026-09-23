@@ -1,12 +1,12 @@
 "use client"
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { AlertCircle, Check, ChevronDown, CopyPlus, CornerDownRight, ListPlus, Loader2, Plus, Repeat, RefreshCw, Trash2 } from "lucide-react"
+import { AlertCircle, Check, ChevronDown, CornerDownRight, ListPlus, Loader2, Plus, Repeat, RefreshCw, Trash2 } from "lucide-react"
 import { SortableList } from "@/components/ui/SortableList"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { fetchWithRetry, requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
-import { buildTree, completedLast, copySubtree, subtreeOf, type TreeNode } from "@/lib/taskTree"
+import { buildTree, completedLast, subtreeOf, type TreeNode } from "@/lib/taskTree"
 import { writeTaskDetails } from "@/lib/taskDetailsAi"
 import { TASK_ATTACHMENT_MESSAGES, TASK_MAX_DEPTH } from "@/constants/taskAttachments"
 import { CopyTaskText } from "@/components/tasks/CopyTaskText"
@@ -337,20 +337,6 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
     })
   }
 
-  /** A copy of a task and everything under it, straight after it, all open. Images are shared, and only go when no task has them. */
-  const copyItem = (item: PlanItem) => {
-    if (!draft) return
-    const size = subtreeOf(draft.items, item.id, byParent).length
-    if (draft.items.length + size > PLAN_MAX_ITEMS) {
-      setDetailsError(EMPLOYEE_MESSAGES.tooManyItems)
-      return
-    }
-    edit((latest) => ({
-      items: copySubtree(latest.items, item.id, byParent, (entry, id, parentId) => ({ ...entry, id, parentId, done: false, completedAt: null, reason: "" }), newItemId).items,
-      notes: latest.notes,
-    }))
-  }
-
   // A task goes with everything under it
   const removeItem = (item: PlanItem) =>
     edit((latest) => {
@@ -479,15 +465,6 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
             label={`${TASK_ATTACHMENT_MESSAGES.copyText}: "${item.text}"`}
             className={`${iconButton} hover:bg-primary/10 hover:text-primary`}
           />
-          <button
-            type="button"
-            onClick={() => copyItem(item)}
-            aria-label={`${TASK_ATTACHMENT_MESSAGES.duplicateTask}: "${item.text}"`}
-            title={children.length > 0 ? "Make a second copy of this task with its subtasks" : TASK_ATTACHMENT_MESSAGES.duplicateTask}
-            className={`${iconButton} hover:bg-primary/10 hover:text-primary`}
-          >
-            <CopyPlus size={14} aria-hidden="true" />
-          </button>
           <button
             type="button"
             onClick={() => removeItem(item)}

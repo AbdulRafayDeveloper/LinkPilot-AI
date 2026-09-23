@@ -15,7 +15,6 @@ import { requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
 import { completedLastNested, pathTo, removeNested, updateNested } from "@/lib/taskTree"
 import { DAILY_TASKS_ENDPOINT, DAILY_TASKS_MESSAGES, VISIBLE_DAYS } from "@/constants/dailyTasks"
-import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
 import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks"
 import { toStoredImages, type TaskDetailsDraft } from "@/types/taskAttachment"
 
@@ -371,17 +370,6 @@ export default function DailyTasksClient() {
     }
   }
 
-  /** A copy of a task with everything under it, straight after it: the list is read again to show it in place. */
-  const copyTask = async (task: DailyTask) => {
-    setTaskError(null)
-    try {
-      await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}/copy`, { method: "POST" }, { idempotent: true })
-      reload()
-    } catch (error: unknown) {
-      setTaskError(error instanceof Error ? error.message : TASK_ATTACHMENT_MESSAGES.copyFailed)
-    }
-  }
-
   /**
    * Brings what was left open on earlier days onto today, at the end of the list, each task with its
    * subtasks: the same move a drag across days makes, without the drag. With a task named it is that
@@ -572,7 +560,6 @@ export default function DailyTasksClient() {
                 onMove={moveTask}
                 onAddTask={addTaskToDay}
                 onOpenTask={(task, focusSubtask = false) => setEditing({ id: task.id, focusSubtask })}
-                onCopy={(task) => void copyTask(task)}
                 onMoveToToday={(task) => void moveOverdue(task)}
               />
             </div>
@@ -599,7 +586,6 @@ export default function DailyTasksClient() {
           pendingIds={pendingIds}
           onSaved={taskSaved}
           onToggle={toggleTask}
-          onCopy={(task) => void copyTask(task)}
           onDelete={removeTask}
           onAddSubtask={addSubtask}
           onOpenTask={(id, focusSubtask = false) => setEditing({ id, focusSubtask })}

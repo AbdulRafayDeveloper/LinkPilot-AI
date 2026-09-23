@@ -1,7 +1,6 @@
 import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
-  CopyObjectCommand,
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
   GetObjectCommand,
@@ -199,12 +198,6 @@ export function presignDownload(key: string, contentType: string, downloadAs?: s
     }),
     { expiresIn: SIGNED_URL_TTL_SECONDS }
   )
-}
-
-/** Copies one object to another key in the same bucket, on the storage side: the bytes never pass through here. */
-export async function copyObject(fromKey: string, toKey: string): Promise<void> {
-  const source = `${bucket()}/${fromKey.split("/").map(encodeURIComponent).join("/")}`
-  await s3().send(new CopyObjectCommand({ Bucket: bucket(), Key: toKey, CopySource: source }))
 }
 
 /** Removes the object. A key that is already gone counts as removed. */

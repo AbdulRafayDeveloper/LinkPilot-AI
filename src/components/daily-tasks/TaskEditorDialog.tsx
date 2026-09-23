@@ -1,10 +1,11 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { AlertCircle, Check, CheckCircle2, ChevronRight, Copy, CornerDownRight, Loader2, Plus, Trash2 } from "lucide-react"
+import { AlertCircle, Check, CheckCircle2, ChevronRight, CornerDownRight, Loader2, Plus, Trash2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
+import { CopyTaskText } from "@/components/tasks/CopyTaskText"
 import { requestApi } from "@/lib/apiClient"
 import { writeTaskDetails } from "@/lib/taskDetailsAi"
 import { DAILY_TASKS_ENDPOINT, DAILY_TASKS_MESSAGES, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
@@ -26,7 +27,6 @@ interface TaskEditorDialogProps {
   // The saved task, answered by the server; the page keeps its subtasks as they are
   onSaved: (task: DailyTask) => void
   onToggle: (task: DailyTask, isCompleted: boolean) => void
-  onCopy: (task: DailyTask) => void
   onDelete: (task: DailyTask) => void
   // Adds one subtask under a task; resolves true when it was added
   onAddSubtask: (parent: DailyTask, content: string) => Promise<boolean>
@@ -76,7 +76,6 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
   pendingIds,
   onSaved,
   onToggle,
-  onCopy,
   onDelete,
   onAddSubtask,
   onOpenTask,
@@ -359,16 +358,12 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
                         <CornerDownRight size={14} aria-hidden="true" />
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => onCopy(entry)}
-                      disabled={isPending}
-                      aria-label={`${TASK_ATTACHMENT_MESSAGES.copyTask}: ${entry.content}`}
-                      title={TASK_ATTACHMENT_MESSAGES.copyTask}
-                      className="shrink-0 rounded-lg p-1.5 text-outline hover:bg-primary/10 hover:text-primary disabled:opacity-40"
-                    >
-                      <Copy size={14} aria-hidden="true" />
-                    </button>
+                    <CopyTaskText
+                      text={entry.content}
+                      size={14}
+                      label={`${TASK_ATTACHMENT_MESSAGES.copyText}: ${entry.content}`}
+                      className="shrink-0 rounded-lg p-1.5 text-outline hover:bg-primary/10 hover:text-primary"
+                    />
                     <button
                       type="button"
                       onClick={() => onDelete(entry)}

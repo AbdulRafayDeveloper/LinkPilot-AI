@@ -152,33 +152,6 @@ export function treeProblem<T>(items: readonly T[], accessors: Accessors<T>, max
   return null
 }
 
-/**
- * A copy of a task and everything under it, placed straight after the original's own subtasks, with
- * new ids and the same shape: the copy has the original's parent, and each copied subtask points at
- * the copy of its own parent. `clone` makes one copied item from an original, its new id and its new
- * parent. Answers the whole new list and the id of the copy; the list is unchanged when the task isn't in it.
- */
-export function copySubtree<T>(
-  items: readonly T[],
-  rootId: string,
-  accessors: Accessors<T>,
-  clone: (item: T, id: string, parentId: string | null) => T,
-  newId: () => string
-): { items: T[]; copyId: string | null } {
-  const subtree = subtreeOf(items, rootId, accessors)
-  if (subtree.length === 0) return { items: [...items], copyId: null }
-  const ids = new Map(subtree.map((item) => [accessors.idOf(item), newId()]))
-  const copies = subtree.map((item) => {
-    const id = accessors.idOf(item)
-    const parent = accessors.parentOf(item) ?? null
-    return clone(item, ids.get(id) as string, id === rootId ? parent : (ids.get(parent as string) ?? null))
-  })
-  // After the last task of the original's subtree, wherever the list has it
-  const inSubtree = new Set(subtree.map(accessors.idOf))
-  const lastIndex = items.reduce((last, item, index) => (inSubtree.has(accessors.idOf(item)) ? index : last), -1)
-  return { items: [...items.slice(0, lastIndex + 1), ...copies, ...items.slice(lastIndex + 1)], copyId: ids.get(rootId) ?? null }
-}
-
 /* ------------------------------------------------------------------ tasks already nested */
 
 /** The same tasks with one of them changed, wherever it sits. */
