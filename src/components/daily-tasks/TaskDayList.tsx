@@ -23,12 +23,14 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
 import { CSS } from "@dnd-kit/utilities"
 import {
   AlertTriangle,
+  CalendarArrowUp,
   Check,
   CheckCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
+  CopyPlus,
   CornerDownRight,
   GripVertical,
   ListPlus,
@@ -46,6 +48,7 @@ import { dayLabel } from "@/lib/taskDates"
 import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
+import { CopyTaskText } from "@/components/tasks/CopyTaskText"
 import { emptyTaskDetails, hasTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
 
 /** Tasks dropped somewhere new: the day they now belong to, that day's whole order, and every day as it now looks. */
@@ -80,6 +83,8 @@ interface TaskDayListProps {
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   // Copies a task and everything under it, straight after it
   onCopy: (task: DailyTask) => void
+  // Brings one overdue task, with its subtasks, onto today
+  onMoveToToday: (task: DailyTask) => void
   // Deletes every picked task at once; the page confirms first, since deleting is final
   onDeletePicked: (ids: string[]) => void
   onMove: (move: TaskMove) => void
@@ -126,6 +131,7 @@ interface TaskRowBodyProps {
   // Opens the task's editor (details and subtasks), and copies it; both absent on the dragged copy
   onOpenTask?: (task: DailyTask, focusSubtask?: boolean) => void
   onCopy?: (task: DailyTask) => void
+  onMoveToToday?: (task: DailyTask) => void
   handle: React.ReactNode
   // Picking tasks to move together: one click on the circle picks a task, Shift picks a run of them
   isSelected?: boolean
@@ -148,6 +154,7 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
   onDelete,
   onOpenTask,
   onCopy,
+  onMoveToToday,
   handle,
   isSelected = false,
   onSelect,
@@ -215,7 +222,15 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
       </label>
       {/* The task's details and subtasks open in a popup rather than in the row: the whole row is the
           drag area, so typing or picking an image inside it would start a drag */}
-      <RowActions task={task} depth={1} isPending={isPending} onOpenTask={onOpenTask} onCopy={onCopy} />
+      <RowActions
+        task={task}
+        depth={1}
+        isPending={isPending}
+        isOverdue={state === "overdue"}
+        onOpenTask={onOpenTask}
+        onCopy={onCopy}
+        onMoveToToday={onMoveToToday}
+      />
       {isPending ? (
         <span className="p-2.5" aria-hidden="true">
           <Loader2 size={15} className="animate-spin text-outline" />
@@ -244,7 +259,8 @@ const actionClass =
 
 /**
  * What can be done to a task besides ticking and deleting it: open its details, add a subtask (the
- * third level has none, so its button says why instead) and copy it with everything under it. Every
+ * third level has none, so its button says why instead), **copy its line** to the clipboard, make a
+ * second copy of it with everything under it, and, while it is overdue, bring it onto today. Every
  * button stops the press from reaching the row, which is the drag area. Without handlers (the copy
  * under the pointer, or a task still saving) the same space is kept, so nothing shifts.
  */
@@ -252,9 +268,12 @@ const RowActions: React.FC<{
   task: DailyTask
   depth: number
   isPending: boolean
+  // Only a task of an earlier day that still has open work, so the button says what it will do
+  isOverdue?: boolean
   onOpenTask?: (task: DailyTask, focusSubtask?: boolean) => void
   onCopy?: (task: DailyTask) => void
-}> = ({ task, depth, isPending, onOpenTask, onCopy }) => {
+  onMoveToToday?: (task: DailyTask) => void
+}> = ({ task, depth, isPending, isOverdue = false, onOpenTask, onCopy, onMoveToToday }) => {
   const hasDetails = Boolean(task.description || task.images.length > 0)
   if (!onOpenTask || !onCopy || isPending) {
     return (
@@ -262,6 +281,7 @@ const RowActions: React.FC<{
         <span className="p-2"><Paperclip size={15} /></span>
         <span className="p-2"><ListPlus size={15} /></span>
         <span className="p-2"><Copy size={15} /></span>
+        <span className="p-2"><CopyPlus size={15} /></span>
       </span>
     )
   }
@@ -293,17 +313,31 @@ const RowActions: React.FC<{
       >
         <ListPlus size={15} aria-hidden="true" />
       </button>
+      <CopyTaskText text={task.content} label={`${TASK_ATTACHMENT_MESSAGES.copyText}: ${task.content}`} className={`${actionClass} text-outline`} />
       <button
         type="button"
         onPointerDown={stop}
         onMouseDown={stop}
         onClick={() => onCopy(task)}
-        aria-label={`${TASK_ATTACHMENT_MESSAGES.copyTask}: ${task.content}`}
-        title={task.subtasks.length > 0 ? "Copy this task with its subtasks" : TASK_ATTACHMENT_MESSAGES.copyTask}
+        aria-label={`${TASK_ATTACHMENT_MESSAGES.duplicateTask}: ${task.content}`}
+        title={task.subtasks.length > 0 ? "Make a second copy of this task with its subtasks" : TASK_ATTACHMENT_MESSAGES.duplicateTask}
         className={`${actionClass} text-outline`}
       >
-        <Copy size={15} aria-hidden="true" />
+        <CopyPlus size={15} aria-hidden="true" />
       </button>
+      {isOverdue && onMoveToToday && (
+        <button
+          type="button"
+          onPointerDown={stop}
+          onMouseDown={stop}
+          onClick={() => onMoveToToday(task)}
+          aria-label={`${DAILY_TASKS_MESSAGES.moveThisOverdue}: ${task.content}`}
+          title={DAILY_TASKS_MESSAGES.moveThisOverdue}
+          className={`${actionClass} text-error`}
+        >
+          <CalendarArrowUp size={15} aria-hidden="true" />
+        </button>
+      )}
     </>
   )
 }
@@ -444,6 +478,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onDelete,
   onOpenTask,
   onCopy,
+  onMoveToToday,
   onSelect,
   wasDragging,
   pendingIds,
@@ -456,6 +491,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onDelete: (task: DailyTask) => void
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   onCopy: (task: DailyTask) => void
+  onMoveToToday: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
   wasDragging: () => boolean
   pendingIds: ReadonlySet<string>
@@ -487,6 +523,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
           onDelete={onDelete}
           onOpenTask={onOpenTask}
           onCopy={onCopy}
+          onMoveToToday={onMoveToToday}
           onSelect={onSelect}
           wasDragging={wasDragging}
           handle={
@@ -630,6 +667,7 @@ const DayGroup = memo(function DayGroup({
   onDelete,
   onOpenTask,
   onCopy,
+  onMoveToToday,
   onSelect,
   onAddTask,
   wasDragging,
@@ -645,6 +683,7 @@ const DayGroup = memo(function DayGroup({
   onDelete: (task: DailyTask) => void
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   onCopy: (task: DailyTask) => void
+  onMoveToToday: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
   onAddTask: AddTaskHandler
   wasDragging: () => boolean
@@ -690,6 +729,7 @@ const DayGroup = memo(function DayGroup({
                 onDelete={onDelete}
                 onOpenTask={onOpenTask}
                 onCopy={onCopy}
+                onMoveToToday={onMoveToToday}
                 onSelect={onSelect}
                 wasDragging={wasDragging}
                 pendingIds={pendingIds}
@@ -734,6 +774,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   onDelete,
   onOpenTask,
   onCopy,
+  onMoveToToday,
   onDeletePicked,
   onMove,
   onAddTask,
@@ -1024,6 +1065,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 onDelete={onDelete}
                 onOpenTask={onOpenTask}
                 onCopy={onCopy}
+                onMoveToToday={onMoveToToday}
                 onSelect={selectTask}
                 onAddTask={onAddTask}
                 wasDragging={wasDragging}

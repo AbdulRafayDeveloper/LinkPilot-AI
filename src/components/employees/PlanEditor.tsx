@@ -1,14 +1,15 @@
 "use client"
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { AlertCircle, Check, ChevronDown, Copy, CornerDownRight, ListPlus, Loader2, Plus, Repeat, RefreshCw, Trash2 } from "lucide-react"
+import { AlertCircle, Check, ChevronDown, CopyPlus, CornerDownRight, ListPlus, Loader2, Plus, Repeat, RefreshCw, Trash2 } from "lucide-react"
 import { SortableList } from "@/components/ui/SortableList"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { fetchWithRetry, requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
-import { buildTree, copySubtree, subtreeOf, type TreeNode } from "@/lib/taskTree"
+import { buildTree, completedLast, copySubtree, subtreeOf, type TreeNode } from "@/lib/taskTree"
 import { writeTaskDetails } from "@/lib/taskDetailsAi"
 import { TASK_ATTACHMENT_MESSAGES, TASK_MAX_DEPTH } from "@/constants/taskAttachments"
+import { CopyTaskText } from "@/components/tasks/CopyTaskText"
 import { toStoredImages } from "@/types/taskAttachment"
 import { EMPLOYEES_ENDPOINT, EMPLOYEE_MESSAGES, PLAN_ITEM_MAX_LENGTH, PLAN_MAX_ITEMS, PLAN_NOTES_MAX_LENGTH, PLAN_SAVE_DELAY_MS } from "@/constants/employees"
 import type { Employee, EmployeePlan, EmployeePlanInput, PlanHistoryDay, PlanHistoryPage, PlanItem } from "@/types/employees"
@@ -253,7 +254,16 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
     const planKey = key
     const setLocal = (value: boolean, completedAt: string | null) =>
       setDraft((latest) =>
-        latest && latest.key === planKey ? { ...latest, items: latest.items.map((entry) => (entry.id === item.id ? { ...entry, done: value, completedAt } : entry)) } : latest
+        latest && latest.key === planKey
+          ? {
+              ...latest,
+              // Ticked tasks sit at the end of their own list, here as on the employee's own link
+              items: completedLast(
+                latest.items.map((entry) => (entry.id === item.id ? { ...entry, done: value, completedAt } : entry)),
+                { idOf: (entry) => entry.id, parentOf: (entry) => entry.parentId, doneOf: (entry) => entry.done }
+              ),
+            }
+          : latest
       )
     setLocal(done, done ? new Date().toISOString() : null)
     setTickError(null)
@@ -463,14 +473,20 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
           >
             <ListPlus size={14} aria-hidden="true" />
           </button>
+          <CopyTaskText
+            text={item.text}
+            size={14}
+            label={`${TASK_ATTACHMENT_MESSAGES.copyText}: "${item.text}"`}
+            className={`${iconButton} hover:bg-primary/10 hover:text-primary`}
+          />
           <button
             type="button"
             onClick={() => copyItem(item)}
-            aria-label={`${TASK_ATTACHMENT_MESSAGES.copyTask}: "${item.text}"`}
-            title={children.length > 0 ? "Copy this task with its subtasks" : TASK_ATTACHMENT_MESSAGES.copyTask}
+            aria-label={`${TASK_ATTACHMENT_MESSAGES.duplicateTask}: "${item.text}"`}
+            title={children.length > 0 ? "Make a second copy of this task with its subtasks" : TASK_ATTACHMENT_MESSAGES.duplicateTask}
             className={`${iconButton} hover:bg-primary/10 hover:text-primary`}
           >
-            <Copy size={14} aria-hidden="true" />
+            <CopyPlus size={14} aria-hidden="true" />
           </button>
           <button
             type="button"

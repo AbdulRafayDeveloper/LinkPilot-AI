@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { AlertTriangle, ListTodo, Trash2 } from "lucide-react"
+import { AlertTriangle, CalendarArrowUp, ListTodo, Loader2, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { TaskComposer, emptyRows, type TaskRow } from "@/components/daily-tasks/TaskComposer"
@@ -13,7 +13,7 @@ import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
-import { pathTo, removeNested, updateNested } from "@/lib/taskTree"
+import { completedLastNested, pathTo, removeNested, updateNested } from "@/lib/taskTree"
 import { DAILY_TASKS_ENDPOINT, DAILY_TASKS_MESSAGES, VISIBLE_DAYS } from "@/constants/dailyTasks"
 import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
 import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks"
@@ -57,6 +57,7 @@ export default function DailyTasksClient() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [isMovingOverdue, setIsMovingOverdue] = useState(false)
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set())
   const [taskError, setTaskError] = useState<string | null>(null)
   // The task open in the editor (its details and subtasks), and whether "Add subtask" has the focus
@@ -189,8 +190,12 @@ export default function DailyTasksClient() {
         current
           ? {
               ...current,
-              // The task keeps the subtasks the list has, since a tick answers with the task alone
-              days: changeTask(current.days, updated.id, (entry) => ({ ...updated, subtasks: entry.subtasks })),
+              // The task keeps the subtasks the list has, since a tick answers with the task alone,
+              // and a ticked task drops to the end of its own list at once, as the next load would show it
+              days: changeTask(current.days, updated.id, (entry) => ({ ...updated, subtasks: entry.subtasks })).map((day) => ({
+                ...day,
+                tasks: completedLastNested(day.tasks),
+              })),
               overdueCount:
                 updated.taskDate < today
                   ? Math.max(0, current.overdueCount + (updated.isCompleted ? -1 : 1))
@@ -377,6 +382,30 @@ export default function DailyTasksClient() {
     }
   }
 
+  /**
+   * Brings what was left open on earlier days onto today, at the end of the list, each task with its
+   * subtasks: the same move a drag across days makes, without the drag. With a task named it is that
+   * one, from the button on its row; without one it is every overdue task, from the header.
+   */
+  const moveOverdue = async (task?: DailyTask) => {
+    if (isMovingOverdue) return
+    setIsMovingOverdue(true)
+    setTaskError(null)
+    try {
+      const { message } = await requestApi<{ moved: number }>(
+        `${DAILY_TASKS_ENDPOINT}/move-overdue`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ today, ...(task ? { ids: [task.id] } : {}) }) },
+        { retry: true }
+      )
+      setNotice(message || null)
+      reload()
+    } catch (error: unknown) {
+      setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.moveOverdueFailed)
+    } finally {
+      setIsMovingOverdue(false)
+    }
+  }
+
   const removeTask = async (task: DailyTask) => {
     if (pendingIds.has(task.id)) return
     setTaskError(null)
@@ -467,10 +496,22 @@ export default function DailyTasksClient() {
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                 {overdueCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-error-container px-3 py-1.5 text-xs font-bold text-on-error-container">
-                    <AlertTriangle size={14} aria-hidden="true" />
-                    {overdueCount} overdue
-                  </span>
+                  <>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-error-container px-3 py-1.5 text-xs font-bold text-on-error-container">
+                      <AlertTriangle size={14} aria-hidden="true" />
+                      {overdueCount} overdue
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void moveOverdue()}
+                      disabled={isMovingOverdue}
+                      title="Every task still open on an earlier day moves to the end of today, with its subtasks"
+                      className="inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-primary px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isMovingOverdue ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <CalendarArrowUp size={16} aria-hidden="true" />}
+                      {DAILY_TASKS_MESSAGES.moveOverdue(overdueCount)}
+                    </button>
+                  </>
                 )}
                 <button
                   type="button"
@@ -532,6 +573,7 @@ export default function DailyTasksClient() {
                 onAddTask={addTaskToDay}
                 onOpenTask={(task, focusSubtask = false) => setEditing({ id: task.id, focusSubtask })}
                 onCopy={(task) => void copyTask(task)}
+                onMoveToToday={(task) => void moveOverdue(task)}
               />
             </div>
           </div>

@@ -34,6 +34,12 @@ const TaskId = z.string().regex(/^[0-9a-f]{24}$/, DAILY_TASKS_MESSAGES.invalidOr
  * A task dropped onto a day (its own or another), with that day's whole new order. Moving to a
  * later day than today is refused for the same reason adding to one is: it would never show.
  */
+/** The overdue tasks to bring onto today: all of them, or only the ones named. */
+export const MoveOverdueSchema = z.object({
+  today: TodaySchema,
+  ids: z.array(TaskId).min(1, DAILY_TASKS_MESSAGES.invalidTask).max(MAX_TASKS_PER_DAY_ORDER, DAILY_TASKS_MESSAGES.invalidOrder).optional(),
+})
+
 export const MoveTaskSchema = z
   .object({
     today: TodaySchema,

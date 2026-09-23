@@ -65,8 +65,9 @@ const Thumbnail: React.FC<{ image: TaskImageView; label: string; onRemove: () =>
  * behind it) and up to TASK_MAX_IMAGES images, chosen by browsing, dropping or pasting, each shown as
  * a thumbnail. A "Write with AI" button fills the description from the task's line when offered.
  *
- * It is closed until it is asked for, so writing a quick list of tasks is untouched by it, and a task
- * that already carries something opens showing it. Images are uploaded the moment they are chosen,
+ * It is closed until it is asked for, so a list of tasks reads as a list of lines whether or not they
+ * carry details; the button says what is there ("Details (description, 2 images)"). Only an editor
+ * whose whole subject is the details opens it by itself, with `alwaysOpen`. Images are uploaded the moment they are chosen,
  * through the app, so by the time the task is saved there is only an id to save with each one;
  * `uploading` counts the ones still on their way.
  */
@@ -81,7 +82,9 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
   onGenerate,
 }) => {
   const fieldId = useId()
-  const [isOpen, setIsOpen] = useState(() => alwaysOpen || hasTaskDetails(details))
+  // Closed even on a task that already carries details, so a plan reads as a list of lines; the
+  // button says what is there, and the editor that is only about the details passes `alwaysOpen`
+  const [isOpen, setIsOpen] = useState(() => alwaysOpen)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isDropping, setIsDropping] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -153,7 +156,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
           className="inline-flex w-fit items-center gap-1.5 rounded-lg px-1.5 py-1 text-[11px] font-semibold text-outline transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:opacity-50"
         >
           <Paperclip size={12} aria-hidden="true" />
-          {isOpen ? TASK_ATTACHMENT_MESSAGES.hideDetails : TASK_ATTACHMENT_MESSAGES.addDetails}
+          {isOpen ? TASK_ATTACHMENT_MESSAGES.hideDetails : hasTaskDetails(details) ? TASK_ATTACHMENT_MESSAGES.showDetails : TASK_ATTACHMENT_MESSAGES.addDetails}
           {!isOpen && hasTaskDetails(details) && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-label="This task has details" />}
           <ChevronDown size={12} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
         </button>

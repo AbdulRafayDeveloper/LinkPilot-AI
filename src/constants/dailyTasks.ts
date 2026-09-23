@@ -5,8 +5,8 @@ import { ListTodo, type LucideIcon } from "lucide-react"
  * so the limits here are what one task may hold, how many can be written at once, and how far
  * back the list reaches before older days move to their own pages.
  */
-// One task is a line, not a document
-export const TASK_MAX_LENGTH = 300
+// One task is a line, not a document, but a line can be a long one (it was 300)
+export const TASK_MAX_LENGTH = 900
 // Rows the composer offers at once; a bulk paste is cut to this many
 export const MAX_TASKS_PER_SUBMIT = 25
 // Rows the composer starts with
@@ -42,6 +42,12 @@ export const DAILY_TASKS_MESSAGES = {
   taskDeleted: "Task deleted.",
   deleteFailed: "Couldn't delete that task. Please try again.",
   moveFailed: "Couldn't move that task, so it is back where it was. Please try again.",
+  // Bringing what was left open on earlier days onto today, from the button rather than a drag
+  moveOverdue: (count: number) => `Move ${count} overdue ${count === 1 ? "task" : "tasks"} to today`,
+  moveThisOverdue: "Move this task to today",
+  movedOverdue: (count: number) =>
+    count === 0 ? "Nothing was overdue." : `${count} ${count === 1 ? "task" : "tasks"} moved to today.`,
+  moveOverdueFailed: "Couldn't move the overdue tasks. Please try again.",
   invalidOrder: "That new order doesn't match the tasks on that day. Reload and try again.",
   addToDayFailed: "Couldn't add that task. Please try again.",
   cleanupFailed: "Couldn't delete the older tasks. Please try again.",

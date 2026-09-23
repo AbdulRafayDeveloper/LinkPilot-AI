@@ -32,7 +32,7 @@ export const PLAN_HISTORY_DAYS = 14
 export const EMPLOYEE_NAME_MAX_LENGTH = 100
 export const EMPLOYEE_CITY_MAX_LENGTH = 80
 export const EMPLOYEE_ROLE_MAX_LENGTH = 80
-export const PLAN_ITEM_MAX_LENGTH = 300
+export const PLAN_ITEM_MAX_LENGTH = 900
 // The whole team loads at once so it can be put in order by dragging; a team larger than this pages
 export const EMPLOYEES_LIST_MAX = 500
 export const PLAN_MAX_ITEMS = 50

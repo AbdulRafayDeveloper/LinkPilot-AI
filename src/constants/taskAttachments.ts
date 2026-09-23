@@ -9,7 +9,7 @@ import { POST_IMAGE_MAX_BYTES, POST_IMAGE_TYPES } from "./postInput"
  */
 
 // A description is a note under the task, not a document; the task's own line stays the title
-export const TASK_DESCRIPTION_MAX_LENGTH = 2000
+export const TASK_DESCRIPTION_MAX_LENGTH = 6000
 
 /**
  * The image limits are deliberately the post screenshot limits. The picker is the shared
@@ -55,6 +55,12 @@ export const TASK_ATTACHMENT_MESSAGES = {
   addSubSubtask: "Add sub-subtask",
   subtaskPlaceholder: "A smaller step of this task",
   depthReached: "This is already a sub-subtask, the deepest a task goes.",
+  // The icon that copies the task's own line, so it can be pasted anywhere
+  // The fold on a task that already carries something, as against one that has nothing yet
+  showDetails: "Show details",
+  copyText: "Copy the task text",
+  // The icon that makes a second task just like this one, which the copy icon used to do
+  duplicateTask: "Duplicate task",
   copyTask: "Copy task",
   copied: "Task copied, with its subtasks.",
   copyFailed: "Couldn't copy that task. Please try again.",

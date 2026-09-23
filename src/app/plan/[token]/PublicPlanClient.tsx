@@ -8,9 +8,10 @@ import { SortableList } from "@/components/ui/SortableList"
 import { PlanHistory, dayHeading, mergeHistory, replaceHistoryDay, tickTime } from "@/components/employees/PlanHistory"
 import { TaskReason } from "@/components/employees/TaskReason"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
+import { CopyTaskText } from "@/components/tasks/CopyTaskText"
 import { requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
-import { buildTree, subtreeOf, type TreeNode } from "@/lib/taskTree"
+import { buildTree, completedLast, subtreeOf, type TreeNode } from "@/lib/taskTree"
 import { SITE_LOGO_PNG, SITE_SHORT_NAME } from "@/config/site"
 import { EMPLOYEE_MESSAGES, PUBLIC_PLAN_ENDPOINT } from "@/constants/employees"
 import type { PlanHistoryDay, PlanHistoryPage, PlanItem, PublicPlan } from "@/types/employees"
@@ -75,7 +76,14 @@ export default function PublicPlanClient({ token }: { token: string }) {
   const tick = async (item: PlanItem, done: boolean) => {
     if (!plan) return
     const previous = plan.today
-    setToday({ ...previous, items: previous.items.map((entry) => (entry.id === item.id ? { ...entry, done, completedAt: done ? new Date().toISOString() : null } : entry)) })
+    // The tick shows at once, and the task drops to the end of its own list as the answer will have it
+    setToday({
+      ...previous,
+      items: completedLast(
+        previous.items.map((entry) => (entry.id === item.id ? { ...entry, done, completedAt: done ? new Date().toISOString() : null } : entry)),
+        { idOf: (entry) => entry.id, parentOf: (entry) => entry.parentId, doneOf: (entry) => entry.done }
+      ),
+    })
     setSavingId(item.id)
     setActionError(null)
     try {
@@ -279,6 +287,12 @@ export default function PublicPlanClient({ token }: { token: string }) {
               ) : (
                 item.completedAt && <span className="shrink-0 text-[12px] text-outline">{tickTime(item.completedAt)}</span>
               )}
+              <CopyTaskText
+                text={item.text}
+                size={14}
+                label={`Copy the task text: "${item.text}"`}
+                className="shrink-0 rounded-lg p-1.5 text-outline transition-colors hover:bg-surface-container hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              />
             </label>
             {/* What the manager put on this task, then why it isn't done */}
             <TaskDetailsView description={item.description} images={item.images} label={item.text} />

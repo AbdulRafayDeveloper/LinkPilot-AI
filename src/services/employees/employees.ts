@@ -20,7 +20,7 @@ import type { Viewer } from "@/types/auth"
 import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import { storedImagesOf, type TaskImage, type TaskImageView } from "@/types/taskAttachment"
 import { deleteTaskImages, taskImageLists } from "@/services/taskImages"
-import { buildTree, flattenTree } from "@/lib/taskTree"
+import { buildTree, completedLast, flattenTree } from "@/lib/taskTree"
 import { accountNames } from "@/services/auth/accounts"
 
 /**
@@ -254,10 +254,14 @@ const toItem = (item: IPlanItem, images: TaskImageView[] = []): PlanItem => ({
   reason: item.done ? "" : (item.reason ?? ""),
 })
 
-/** The same items with their images signed, in one round rather than one per task. */
+/**
+ * The same items with their images signed, in one round rather than one per task, and the ticked ones
+ * at the end of their own list, so finishing a task sends it down without anybody dragging it.
+ */
 async function toItems(items: IPlanItem[]): Promise<PlanItem[]> {
   const signed = await taskImageLists(items, storedImagesOf)
-  return items.map((item) => toItem(item, signed.get(item) ?? []))
+  const read = items.map((item) => toItem(item, signed.get(item) ?? []))
+  return completedLast(read, { idOf: (item) => item.id, parentOf: (item) => item.parentId, doneOf: (item) => item.done })
 }
 
 // One day as the history shows it: the tasks that day's plan held, and how many were ticked off
@@ -567,7 +571,8 @@ function inOrder<T extends { id: string }>(items: T[], order: string[]): T[] {
 
 const linkToday = (employee: LinkedEmployee, today: string, items: PlanItem[]): PublicPlan["today"] => ({
   date: today,
-  items: inLinkOrder(items, employee.linkOrder ?? []),
+  // The employee's own order, with what they have ticked off at the end of it
+  items: completedLast(inLinkOrder(items, employee.linkOrder ?? []), { idOf: (item) => item.id, parentOf: (item) => item.parentId, doneOf: (item) => item.done }),
   ownOrder: (employee.linkOrder ?? []).length > 0,
 })
 

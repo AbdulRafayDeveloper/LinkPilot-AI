@@ -1,7 +1,7 @@
 import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { shiftDate } from "@/lib/taskDates"
-import { buildTree, type TreeNode } from "@/lib/taskTree"
+import { buildTree, completedLast, type TreeNode } from "@/lib/taskTree"
 import { DailyTask as DailyTaskModel, type IDailyTask } from "@/models/DailyTask"
 import { HISTORY_DAYS_PER_PAGE, VISIBLE_DAYS } from "@/constants/dailyTasks"
 import { TASK_MAX_DEPTH } from "@/constants/taskAttachments"
@@ -80,7 +80,8 @@ function groupByDay(tasks: DailyTask[]): DailyTaskDay[] {
     if (last?.date === task.taskDate) last.tasks.push(task)
     else days.push({ date: task.taskDate, tasks: [task] })
   }
-  return days.map((day) => ({ ...day, tasks: nest(day.tasks) }))
+  // Ticked tasks sit at the end of their own list, so finishing one sends it down without a drag
+  return days.map((day) => ({ ...day, tasks: nest(completedLast(day.tasks, { idOf: (task) => task.id, parentOf: (task) => task.parentTaskId, doneOf: (task) => task.isCompleted })) }))
 }
 
 // The two day filters the list uses (the recent window, or a named set of older days), inside what the viewer may see
@@ -324,6 +325,53 @@ export async function moveTask(viewer: Viewer, id: string, taskDate: string, ord
 
   const record = await DailyTaskModel.findOne(filter, TASK_FIELDS).lean()
   return record ? { task: (await toTasks([record as unknown as StoredTask]))[0] } : { error: "missing" }
+}
+
+/**
+ * Brings what is overdue onto today: every task on a day before today that still has open work,
+ * with everything under it, added to the end of today in the order the days had them. It is the
+ * button's side of a drag across days, so it writes exactly what a drag writes (the day on the task
+ * and its subtasks, then the day's positions), and a task whose work is all ticked stays where it is.
+ * `ids` narrows it to the tasks named, for the button on one row; without it every overdue task moves.
+ */
+export async function moveOverdueToToday(viewer: Viewer, today: string, ids?: string[]): Promise<{ moved: number }> {
+  await connectDatabase()
+  type PastTask = { _id: mongoose.Types.ObjectId; parentTaskId?: mongoose.Types.ObjectId | null; isCompleted: boolean }
+  const past = (await DailyTaskModel.find({ taskDate: { $lt: today }, ...visibleTo(viewer) }, { _id: 1, parentTaskId: 1, isCompleted: 1 })
+    .sort({ taskDate: 1, position: 1, createdAt: 1, _id: 1 })
+    .lean()) as unknown as PastTask[]
+
+  // Which task a subtask belongs to, so one open subtask brings its whole task along
+  const parents = new Map(past.map((task) => [String(task._id), task.parentTaskId ? String(task.parentTaskId) : null]))
+  const rootOf = (id: string): string => {
+    const seen = new Set<string>([id])
+    let current = id
+    let parent = parents.get(current) ?? null
+    while (parent && !seen.has(parent)) {
+      seen.add(parent)
+      current = parent
+      parent = parents.get(current) ?? null
+    }
+    return current
+  }
+  const withOpenWork = new Set(past.filter((task) => !task.isCompleted).map((task) => rootOf(String(task._id))))
+  const wanted = ids ? new Set(ids) : null
+  const roots = past.filter((task) => !task.parentTaskId && withOpenWork.has(String(task._id)) && (!wanted || wanted.has(String(task._id))))
+  if (roots.length === 0) return { moved: 0 }
+
+  const rootIds = roots.map((task) => task._id)
+  const carried = [...rootIds, ...(await descendantsOf(viewer, rootIds))]
+  const start = await nextPosition(viewer, { taskDate: today, ...TOP_LEVEL })
+  await DailyTaskModel.bulkWrite(
+    [
+      { updateMany: { filter: { _id: { $in: carried }, ...visibleTo(viewer) }, update: { $set: { taskDate: today } } } },
+      ...rootIds.map((entry, index) => ({
+        updateOne: { filter: { _id: entry, ...visibleTo(viewer) }, update: { $set: { position: start + index } } },
+      })),
+    ],
+    { ordered: true }
+  )
+  return { moved: roots.length }
 }
 
 /**

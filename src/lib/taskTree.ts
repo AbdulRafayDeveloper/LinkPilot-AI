@@ -7,6 +7,12 @@
  * A tree goes TASK_MAX_DEPTH (3) levels deep: a task is level 1, its subtask 2, that subtask's own 3.
  */
 
+// A task that carries its own subtasks, as Daily Tasks serves them
+interface Nested<T> {
+  id: string
+  subtasks: T[]
+}
+
 export interface TreeNode<T> {
   item: T
   // 1 for a task with no parent
@@ -97,6 +103,27 @@ export function heightOf<T>(items: readonly T[], rootId: string, accessors: Acce
   return Math.max(...depths.values())
 }
 
+/**
+ * The same tasks with the ticked ones at the end of their own list, so finishing one sends it to the
+ * bottom without anybody dragging it, and unticking brings it back where it was. Only ticked and
+ * unticked change places: tasks that are alike keep the order they had, a task takes everything under
+ * it along, and the subtasks of one task are sorted among themselves only.
+ */
+export function completedLast<T>(items: readonly T[], accessors: Accessors<T> & { doneOf: (item: T) => boolean }): T[] {
+  const sort = (nodes: TreeNode<T>[]): TreeNode<T>[] => {
+    const inOrder = [...nodes].sort((first, second) => Number(accessors.doneOf(first.item)) - Number(accessors.doneOf(second.item)))
+    return inOrder.map((node) => ({ ...node, children: sort(node.children) }))
+  }
+  return flattenTree(sort(buildTree(items, accessors)))
+}
+
+/** The same rule for tasks that already carry their own subtasks, as a page holds them after a tick. */
+export function completedLastNested<T extends Nested<T> & { isCompleted: boolean }>(tasks: readonly T[]): T[] {
+  return [...tasks]
+    .sort((first, second) => Number(first.isCompleted) - Number(second.isCompleted))
+    .map((task) => (task.subtasks.length > 0 ? { ...task, subtasks: completedLastNested(task.subtasks) } : task))
+}
+
 export type TreeProblem = "missing-parent" | "loop" | "too-deep"
 
 /**
@@ -153,12 +180,6 @@ export function copySubtree<T>(
 }
 
 /* ------------------------------------------------------------------ tasks already nested */
-
-// A task that carries its own subtasks, as Daily Tasks serves them
-interface Nested<T> {
-  id: string
-  subtasks: T[]
-}
 
 /** The same tasks with one of them changed, wherever it sits. */
 export function updateNested<T extends Nested<T>>(tasks: readonly T[], id: string, change: (task: T) => T): T[] {
