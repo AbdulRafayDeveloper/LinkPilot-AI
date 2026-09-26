@@ -77,10 +77,24 @@ export const ProfilePersonEditSchema = z.object({
   days: Days,
 })
 
-/** A new person: a name, a LinkedIn link or both, and at least one day. */
-export const ProfileScheduleSchema = ProfilePersonEditSchema.refine((person) => Boolean(person.profileUrl || person.name), {
-  message: PROFILE_SCHEDULER_MESSAGES.missingPerson,
-  path: ["name"],
+/**
+ * A new person: their LinkedIn link and at least one day. **The link is required here and optional in
+ * an edit**, so nobody new is saved without one while the people imported before this (the outreach
+ * sheet's "URL not verified" rows) can still be changed and given their link later.
+ */
+export const ProfileScheduleSchema = ProfilePersonEditSchema.extend({
+  profileUrl: z.preprocess(
+    (value) => (typeof value === "string" ? value.trim() : value),
+    z
+      .string({ error: PROFILE_SCHEDULER_MESSAGES.missingUrl })
+      .min(1, PROFILE_SCHEDULER_MESSAGES.missingUrl)
+      .max(PROFILE_URL_MAX_LENGTH, PROFILE_SCHEDULER_MESSAGES.urlTooLong)
+      .transform((value, ctx) => {
+        const url = normalizeProfileUrl(value)
+        if (!url) ctx.addIssue({ code: "custom", message: PROFILE_SCHEDULER_MESSAGES.badUrl })
+        return url ?? z.NEVER
+      })
+  ),
 })
 
 export const ProfileScheduleQuerySchema = z.object({

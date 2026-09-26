@@ -43,9 +43,14 @@ export const inputOf = (person: ProfileSchedule): ProfileScheduleInput => ({
   days: person.days,
 })
 
-/** The first thing wrong with a form, named before it is sent; the server checks it all again. */
-export function personInputProblem(input: ProfileScheduleInput): string | null {
+/**
+ * The first thing wrong with a form, named before it is sent; the server checks it all again.
+ * `requireLink` is what the add form uses: a new person is saved with their LinkedIn link, while an
+ * edit keeps the older rule (a name or a link), so the people imported without one can still be changed.
+ */
+export function personInputProblem(input: ProfileScheduleInput, { requireLink = false } = {}): string | null {
   const link = input.profileUrl.trim()
+  if (requireLink && !link) return PROFILE_SCHEDULER_MESSAGES.missingUrl
   if (!link && !input.name.trim()) return PROFILE_SCHEDULER_MESSAGES.missingPerson
   if (link && !normalizeProfileUrl(link)) return PROFILE_SCHEDULER_MESSAGES.badUrl
   if (input.days.length === 0) return PROFILE_SCHEDULER_MESSAGES.missingDays

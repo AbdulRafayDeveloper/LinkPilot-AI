@@ -27,6 +27,8 @@ export const inWeekOrder = (days: readonly WeekDayId[]) => WEEK_DAY_IDS.filter((
 
 interface ProfileScheduleFieldsProps {
   idPrefix: string
+  // The add form asks for the link; an edit does not, so a person saved without one can still be changed
+  isUrlRequired?: boolean
   value: ProfileScheduleInput
   onChange: (value: ProfileScheduleInput) => void
   disabled?: boolean
@@ -57,7 +59,7 @@ const NOTES = [
  * labelled groups, so a keyboard and a screen reader get them as they are; Weekdays and Every day
  * fill the days in one go.
  */
-export const ProfileScheduleFields: React.FC<ProfileScheduleFieldsProps> = ({ idPrefix, value, onChange, disabled, urlRef }) => {
+export const ProfileScheduleFields: React.FC<ProfileScheduleFieldsProps> = ({ idPrefix, isUrlRequired = false, value, onChange, disabled, urlRef }) => {
   const setDays = (days: readonly WeekDayId[]) => onChange({ ...value, days: inWeekOrder(days) })
   const toggle = (day: WeekDayId) => setDays(value.days.includes(day) ? value.days.filter((entry) => entry !== day) : [...value.days, day])
   const toggleType = (type: PersonTypeId) => {
@@ -69,7 +71,10 @@ export const ProfileScheduleFields: React.FC<ProfileScheduleFieldsProps> = ({ id
     <div className="flex flex-col gap-4">
       <label className="flex flex-col gap-1.5" htmlFor={`${idPrefix}-url`}>
         <span className={labelClass}>
-          LinkedIn profile link <span className="font-normal text-on-surface-variant">(can wait while you have their name)</span>
+          LinkedIn profile link{" "}
+          <span className="font-normal text-on-surface-variant">
+            {isUrlRequired ? <span className="font-semibold text-error">required</span> : "(can wait while you have their name)"}
+          </span>
         </span>
         <span className="relative">
           <Link2 size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-outline" aria-hidden="true" />
@@ -85,6 +90,8 @@ export const ProfileScheduleFields: React.FC<ProfileScheduleFieldsProps> = ({ id
             onChange={(event) => onChange({ ...value, profileUrl: event.target.value })}
             placeholder="https://www.linkedin.com/in/their-name"
             disabled={disabled}
+            required={isUrlRequired}
+            aria-required={isUrlRequired}
             className={`${scheduleFieldClass} h-10 pl-9`}
           />
         </span>

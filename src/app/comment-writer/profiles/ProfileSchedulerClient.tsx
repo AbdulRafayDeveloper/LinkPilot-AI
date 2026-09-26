@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { AlertCircle, AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Link2, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { AlertCircle, AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Link2, Loader2, Pencil, Plus, RefreshCw, SquareArrowOutUpRight, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
@@ -11,7 +11,6 @@ import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { FilterPanel, SearchFilter, SelectFilter, historyLabelClass } from "@/components/history/HistoryFilters"
 import { ProfileScheduleFields } from "@/components/comment-writer/ProfileScheduleFields"
 import { ProfileScheduleDialog } from "@/components/comment-writer/ProfileScheduleDialog"
-import { OpenAllProfiles } from "@/components/comment-writer/OpenAllProfiles"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
@@ -108,10 +107,10 @@ const DayTags: React.FC<{ days: WeekDayId[]; highlight: WeekDayId | "" }> = ({ d
 )
 
 /**
- * Profile Scheduler, a page of Comment Writer: the LinkedIn profiles worth commenting on and the
- * days of the week each one is looked at. Search and the day filter run on the server, 50 to a page;
- * Open takes a profile to Comment Writer, which links to its posts; Open all opens every profile on
- * the page, as the search, the day and the page leave it, straight on LinkedIn (OpenAllProfiles).
+ * Profile Scheduler, a page of Comment Writer: the people worth commenting on and the days of the
+ * week each one is looked at. Search, the day and the type filter run on the server, 100 to a page;
+ * **LinkedIn** on a row opens that person's profile in a new tab, and **Open** takes them to Comment
+ * Writer, which links to their posts.
  */
 export default function ProfileSchedulerClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -178,18 +177,16 @@ export default function ProfileSchedulerClient() {
   const lastShown = Math.min(total, (page - 1) * pageSize + items.length)
   const dayOptions = WEEK_DAYS.map((entry) => ({ id: entry.id, label: `${entry.label} (${result?.dayCounts[entry.id] ?? 0})` }))
   const typeOptions = PERSON_TYPES.map((entry) => ({ id: entry.id, label: `${entry.label} (${result?.typeCounts[entry.id] ?? 0})` }))
-  // Open all reaches only the people whose LinkedIn link has been found
-  const linkedUrls = items.flatMap((schedule) => (schedule.profileUrl ? [schedule.profileUrl] : []))
 
   /** Adds the profile in the form. The days are kept for the next one, since a batch is often added for the same days. */
   const add = async (event: React.FormEvent) => {
     event.preventDefault()
     if (isAdding) return
-    const problem = personInputProblem(draft)
+    const problem = personInputProblem(draft, { requireLink: true })
     if (problem) {
       setAddError(problem)
       setNotice(null)
-      if (problem === PROFILE_SCHEDULER_MESSAGES.badUrl) urlRef.current?.focus()
+      if (problem === PROFILE_SCHEDULER_MESSAGES.badUrl || problem === PROFILE_SCHEDULER_MESSAGES.missingUrl) urlRef.current?.focus()
       return
     }
     setIsAdding(true)
@@ -284,10 +281,24 @@ export default function ProfileSchedulerClient() {
     return (
       <div className="flex flex-wrap items-center justify-end gap-0.5">
         {schedule.profileUrl ? (
-          <Link href={openHref(schedule.profileUrl, day)} aria-label={`Open ${name} in Comment Writer`} className={`${actionButton} text-primary hover:text-primary`}>
-            <ExternalLink size={13} aria-hidden="true" />
-            Open
-          </Link>
+          <>
+            {/* The person's own profile, opened by this click alone, so a browser never holds it back */}
+            <a
+              href={schedule.profileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${PROFILE_SCHEDULER_MESSAGES.openOnLinkedIn}: ${name}`}
+              title={PROFILE_SCHEDULER_MESSAGES.openOnLinkedIn}
+              className={`${actionButton} text-primary hover:text-primary`}
+            >
+              <SquareArrowOutUpRight size={13} aria-hidden="true" />
+              LinkedIn
+            </a>
+            <Link href={openHref(schedule.profileUrl, day)} aria-label={`Open ${name} in Comment Writer`} className={`${actionButton} text-primary hover:text-primary`}>
+              <ExternalLink size={13} aria-hidden="true" />
+              Open
+            </Link>
+          </>
         ) : (
           <button type="button" onClick={() => setEditing(schedule)} aria-label={`Add the LinkedIn link of ${name}`} className={`${actionButton} text-primary hover:text-primary`}>
             <Link2 size={13} aria-hidden="true" />
@@ -366,6 +377,7 @@ export default function ProfileSchedulerClient() {
               <h2 className="text-[15px] font-bold text-on-surface">Add a person</h2>
               <ProfileScheduleFields
                 idPrefix="add-profile"
+                isUrlRequired
                 value={draft}
                 onChange={(next) => {
                   setDraft(next)
@@ -440,8 +452,6 @@ export default function ProfileSchedulerClient() {
                 }}
               />
             </FilterPanel>
-
-            {linkedUrls.length > 0 && <OpenAllProfiles urls={linkedUrls} listKey={requestKey} disabled={isLoading} buttonClassName={pagerButton} />}
 
             {result && total > 0 && (
               <BulkDeleteBar
