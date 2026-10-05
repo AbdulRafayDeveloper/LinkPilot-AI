@@ -39,3 +39,15 @@ export function describeSource(source: { provider?: string | null; providers?: r
   return `Source: ${AI_PROVIDER_LABELS[provider]}${also}`
 }
 
+/** Told which provider could not do a job and which one is taking it on, so a page can say so. */
+export type FallbackNotice = (failed: AiProviderId, next: AiProviderId) => void
+
+/**
+ * What a tool says while a job moves from one provider to the next. The work carries on, so it names
+ * both providers and the job as information ("Groq is busy, so OpenAI is writing your comment"),
+ * never as a failure: the first model being busy is ordinary, and the user still gets their result.
+ */
+export function describeFallback(failed: string, next: string, job: string): string {
+  const name = (id: string) => (isProviderId(id) ? AI_PROVIDER_LABELS[id] : "The first model")
+  return `${name(failed)} is busy, so ${name(next)} is ${job}`
+}

@@ -2,6 +2,7 @@ import { HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/m
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
 import { describeAllLenses, loadSearchLenses, runLiveResearch, type ResearchResult } from "@/services/liveResearch"
+import type { FallbackNotice } from "@/constants/aiProviders"
 import { postBlock, styleInstructionsBlock } from "./blocks"
 
 // One verified source is enough to back a single comment's reference
@@ -21,7 +22,7 @@ interface ResearchOptions {
   styleBrief: string
   now: Date
   signal: AbortSignal
-  onFallback: () => void
+  onFallback: FallbackNotice
 }
 
 function buildResearchMessages(

@@ -3,6 +3,7 @@
 import { readSSEStream } from "@/lib/sse"
 import { fetchWithRetry } from "@/lib/apiClient"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
+import { countedOneComment } from "@/hooks/useCommentCount"
 import { COMMENT_WRITER_MESSAGES, type CommentTuneId } from "@/constants/commentWriter"
 import type { PostInputMode } from "@/constants/postInput"
 import type { ApiEnvelope } from "@/types/api"
@@ -79,6 +80,8 @@ async function generate(request: CommentRequest) {
       if (event.status === "COMPLETE") {
         isFinished = true
         store.update({ status: "success", result: event.result })
+        // The comment is written and saved, so the reminder on the page goes up by one
+        countedOneComment()
       } else if (event.status === "ERROR") {
         isFinished = true
         fail(event.message)

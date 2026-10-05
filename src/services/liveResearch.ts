@@ -8,6 +8,7 @@ import { currentModelOrder } from "@/lib/modelOrder"
 import { loadPrompt, type PromptName } from "@/services/prompts"
 import { UserFacingError } from "@/lib/errors"
 import { hostnameOf, normalizeUrl } from "@/lib/url"
+import type { FallbackNotice } from "@/constants/aiProviders"
 
 const RESEARCH_TIMEOUT_MS = 120_000
 // Research passes are long, so a transient failure gets one retry (withProviderRetry) before the pass counts as failed
@@ -37,7 +38,7 @@ interface LiveResearchOptions {
   openAIPasses: BaseMessage[][]
   minSources: number
   signal: AbortSignal
-  onFallback: () => void
+  onFallback: FallbackNotice
 }
 
 /**
@@ -228,7 +229,7 @@ export async function runLiveResearch({ groqPasses, openAIPasses, minSources, si
       if (signal.aborted || isLast) throw error
       console.warn(`⚠️ ${provider} research failed:`, error instanceof Error ? error.message : error)
     }
-    onFallback()
+    onFallback(provider, providers[index + 1])
   }
   throw new Error("InsufficientEvidenceException: no research provider answered")
 }

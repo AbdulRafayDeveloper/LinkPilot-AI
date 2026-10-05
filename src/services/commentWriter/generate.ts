@@ -1,5 +1,6 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
+import { describeFallback, type FallbackNotice } from "@/constants/aiProviders"
 import { currentModelOrder } from "@/lib/modelOrder"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
@@ -87,17 +88,22 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
   const stylePrompt = await getActiveTunePrompt(tune)
   let providers = currentModelOrder()
   let isFallbackAnnounced = false
-  const announceModelFallback = () => {
+  /**
+   * The first model being busy is ordinary: a burst of comments runs past a Groq key's tokens for the
+   * minute, the key rests, and the next provider writes the comment. So the page is told who is doing
+   * the job, once per comment, rather than being shown something that reads as a failure.
+   */
+  const announceFallback = (job: string): FallbackNotice => (failed, next) => {
     if (isFallbackAnnounced) return
     isFallbackAnnounced = true
-    onStage("FALLBACK", "Primary model unavailable, switching to the backup model")
+    onStage("FALLBACK", describeFallback(failed, next, job))
   }
 
   let postText = post.type === "text" ? post.text : ""
   let extractedPost: string | null = null
   if (post.type === "image") {
     onStage("READING_IMAGE", "Reading the post from your screenshot")
-    const extraction = await extractPostFromImage({ image: post.image, providers, signal, onFallback: announceModelFallback })
+    const extraction = await extractPostFromImage({ image: post.image, providers, signal, onFallback: announceFallback("reading your screenshot") })
     postText = extraction.postText
     extractedPost = extraction.postText
     // A provider that just failed isn't called again within the same request
@@ -114,7 +120,7 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
           styleBrief: renderPrompt(stylePrompt, { ...RESEARCH_BRIEF_LABELS, selected_tune: getTuneLabel(tune) }),
           now,
           signal,
-          onFallback: () => onStage("FALLBACK", "Primary search unavailable, switching to backup web search"),
+          onFallback: announceFallback("searching the web"),
         })
       : undefined,
     wantsExperience ? findRelevantExperience() : undefined,
@@ -134,7 +140,7 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
       temperature: WRITING_TEMPERATURE,
       providers: writers,
       signal,
-      onFallback: announceModelFallback,
+      onFallback: announceFallback("writing your comment"),
       validate: (draft) =>
         // Claimed experience must be backed by profile-anchored text; without a profile nothing qualifies
         findUnusableReason(draft, { postText, systemPrompt, experience: experience?.text ?? null }) ??
@@ -167,7 +173,7 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
     ],
     providers: providers.slice(providers.indexOf(provider)),
     signal,
-    onFallback: announceModelFallback,
+    onFallback: announceFallback("writing your comment"),
     validate: (_id, text) =>
       findUnusableReason({ ...data, comment: text }, { postText, systemPrompt, experience: experience?.text ?? null }),
   })

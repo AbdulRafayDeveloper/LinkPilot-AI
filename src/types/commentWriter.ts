@@ -25,6 +25,12 @@ export interface GeneratedComment extends Pick<WithAiSource, "providers"> {
   extractedPost: string | null
 }
 
+/** The reminder on the Comment Writer page: comments written today, and in all. */
+export interface CommentCount {
+  today: number
+  total: number
+}
+
 export type CommentStage = "READING_IMAGE" | "RESEARCHING" | "WRITING" | "HUMANIZING" | "FALLBACK"
 
 export type CommentStreamEvent =

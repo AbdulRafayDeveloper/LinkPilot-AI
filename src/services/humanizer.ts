@@ -8,6 +8,7 @@ import { containsSenderClaim } from "@/services/senderGuard"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
 import { applyHumanStyle, findAiWords } from "@/lib/humanStyle"
 import { createTagSanitizer } from "@/lib/sanitize"
+import type { FallbackNotice } from "@/constants/aiProviders"
 
 /**
  * The last step of every tool: the drafts it wrote are rewritten with the user's saved
@@ -58,7 +59,7 @@ interface HumanizeOptions<Id extends string> {
   fields: HumanizeField<Id>[]
   signal: AbortSignal
   providers?: readonly ModelProvider[]
-  onFallback?: () => void
+  onFallback?: FallbackNotice
   // The tool's own check on one rewritten text; a reason keeps that text's draft
   validate?: (id: Id, text: string) => string | null
 }

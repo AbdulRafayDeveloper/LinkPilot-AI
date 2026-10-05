@@ -6,6 +6,7 @@ import { loadPrompt } from "@/services/prompts"
 import { UserFacingError } from "@/lib/errors"
 import type { VerifiedImage } from "@/lib/imageType"
 import { POST_INPUT_MESSAGES } from "@/constants/postInput"
+import type { FallbackNotice } from "@/constants/aiProviders"
 
 // Transcription should be literal, not creative
 const EXTRACTION_TEMPERATURE = 0
@@ -22,7 +23,7 @@ interface ExtractionOptions {
   signal: AbortSignal
   // Defaults to the request's order; only providers with a vision model are tried
   providers?: readonly ModelProvider[]
-  onFallback?: () => void
+  onFallback?: FallbackNotice
 }
 
 /**

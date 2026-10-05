@@ -12,6 +12,7 @@ import { ResetButton } from "@/components/ui/ResetButton"
 import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
 import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
 import { ProfilePostsBanner } from "@/components/comment-writer/ProfilePostsBanner"
+import { CommentCountBadge } from "@/components/comment-writer/CommentCountBadge"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useCommentGenerator } from "@/hooks/useCommentGenerator"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
@@ -104,6 +105,7 @@ export default function CommentWriterClient() {
                 <p className="text-sm text-on-surface-variant mt-1">
                   Write thoughtful, relevant comments for LinkedIn posts.
                 </p>
+                <CommentCountBadge />
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />

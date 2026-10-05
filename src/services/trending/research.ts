@@ -1,6 +1,7 @@
 import { HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { loadSearchLenses, runLiveResearch, type ResearchResult } from "@/services/liveResearch"
+import type { FallbackNotice } from "@/constants/aiProviders"
 import { sanitizeForTag } from "./sanitize"
 
 // One parallel research pass per lens, with either provider; merged they give enough candidates for every topic slot
@@ -11,7 +12,7 @@ interface ResearchOptions {
   brief: string
   now: Date
   signal: AbortSignal
-  onFallback: () => void
+  onFallback: FallbackNotice
 }
 
 function buildResearchMessages(template: string, brief: string, now: Date, searchFocus: string): BaseMessage[] {

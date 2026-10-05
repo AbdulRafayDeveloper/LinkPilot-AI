@@ -1,4 +1,5 @@
 import { TRENDING_TOPIC_COUNT } from "@/constants/trending"
+import { describeFallback } from "@/constants/aiProviders"
 import { composeTrendingPost } from "@/lib/trendingPost"
 import { getActiveTrendingPrompt } from "./prompt"
 import { runTrendingResearch } from "./research"
@@ -61,7 +62,7 @@ export async function findTrendingTopics({ signal, onStage }: FindTrendingOption
     brief: prompt,
     now,
     signal,
-    onFallback: () => onStage("FALLBACK", "Primary search unavailable, switching to backup web search"),
+    onFallback: (failed, next) => onStage("FALLBACK", describeFallback(failed, next, "searching the web")),
   })
 
   onStage("RANKING", `Comparing ${research.sources.length} sources, ranking candidates and preparing LinkedIn searches`)

@@ -33,14 +33,21 @@ const StageList: React.FC<{ stages: CommentStageEntry[] }> = ({ stages }) => (
   <ol className="space-y-2 text-left">
     {stages.map((stage, index) => {
       const isActive = index === stages.length - 1
+      // Moving to the next provider is a note about who is writing the comment, not a step that
+      // finishes, so it reads in the attention colour with an info mark instead of a tick
+      const isNote = stage.status === "FALLBACK"
       return (
         <li key={`${stage.status}-${index}`} className="flex items-center gap-2 text-[13px]">
-          {isActive ? (
+          {isNote ? (
+            <Info size={14} className="text-on-secondary-fixed-variant shrink-0" aria-hidden="true" />
+          ) : isActive ? (
             <Loader2 size={14} className="animate-spin text-primary shrink-0" aria-hidden="true" />
           ) : (
             <CheckCircle2 size={14} className="text-primary shrink-0" aria-hidden="true" />
           )}
-          <span className={isActive ? "text-on-surface font-medium" : "text-on-surface-variant"}>{stage.text}</span>
+          <span className={isNote ? "text-on-secondary-fixed-variant" : isActive ? "text-on-surface font-medium" : "text-on-surface-variant"}>
+            {stage.text}
+          </span>
         </li>
       )
     })}
