@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/add-abcd-tone-prompts.mjs && node scripts/add-voice-note-prompts.mjs && node scripts/add-conversational-reply-style.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "node --test tests/",
