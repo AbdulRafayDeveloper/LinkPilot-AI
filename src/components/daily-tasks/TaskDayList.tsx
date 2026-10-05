@@ -25,7 +25,6 @@ import {
   AlertTriangle,
   CalendarArrowUp,
   Check,
-  CheckCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -941,23 +940,8 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-on-surface">{current === 1 ? `Last ${VISIBLE_DAYS} Days` : "Older Tasks"}</h2>
         <div className="flex flex-wrap items-center gap-2">
-          {page && (
-            <span className="text-[11px] text-outline">
-              {current === 1 ? `From ${page.windowStart}` : `Page ${current} of ${pageCount}`}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* One line that says how to move one task and how to move several */}
-      {hasDays && !error && (
-        <p className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-primary/25 bg-primary-fixed/20 px-3 py-2 text-[12px] text-on-surface">
-          <span>
-            <CheckCheck size={13} className="mr-1.5 inline-block align-[-2px] text-primary" aria-hidden="true" />
-            Drag any row to move it, even to another day. Click circles to move several at once.
-          </span>
           {selectedIds.size > 0 && (
-            <span role="status" className="flex shrink-0 items-center gap-2 font-semibold">
+            <span role="status" className="flex shrink-0 items-center gap-2 text-[12px] font-semibold text-on-surface">
               {selectedIds.size} picked
               <button
                 type="button"
@@ -972,8 +956,13 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
               </button>
             </span>
           )}
-        </p>
-      )}
+          {page && (
+            <span className="text-[11px] text-outline">
+              {current === 1 ? `From ${page.windowStart}` : `Page ${current} of ${pageCount}`}
+            </span>
+          )}
+        </div>
+      </div>
 
       {error ? (
         <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center">

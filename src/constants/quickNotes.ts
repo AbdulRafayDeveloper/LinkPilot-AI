@@ -1,11 +1,12 @@
 import { NotebookPen, type LucideIcon } from "lucide-react"
+import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
 
 /**
  * Quick Notes: text the user pastes or types to keep for later reuse. No AI runs on it, so the
  * only limits here are what one note may hold and how many are listed at a time.
  */
-// The app's largest text limit (constants/prompts.ts uses the same for a whole prompt)
-export const NOTE_MAX_LENGTH = 20000
+// No AI reads a note, so it takes the shared ceiling for a plain text box (constants/textLimits.ts)
+export const NOTE_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
 // How many notes one batch of the list holds; the next batch loads as the list is scrolled
 export const NOTES_BATCH_SIZE = 40
 // How much of a long note the list shows before it is cut; copying always takes the whole note

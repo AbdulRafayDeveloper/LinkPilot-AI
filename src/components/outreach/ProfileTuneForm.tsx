@@ -3,6 +3,7 @@
 import React from "react"
 import { AlertTriangle, Loader2, type LucideIcon } from "lucide-react"
 import { RadioCardGroup, type RadioCardOption } from "@/components/ui/RadioCardGroup"
+import { OUTREACH_FORMATS, type OutreachFormatId } from "@/constants/outreachTunes"
 
 interface ProfileTuneFormProps<TuneId extends string> {
   idPrefix: string
@@ -16,6 +17,9 @@ interface ProfileTuneFormProps<TuneId extends string> {
   tuneLegend?: string
   tune: TuneId | null
   onTuneChange: (tune: TuneId) => void
+  // Text or a voice note. Left out, the form is exactly what it always was: the tones alone
+  format?: OutreachFormatId
+  onFormatChange?: (format: OutreachFormatId) => void
   formError: string | null
   profileInvalid: boolean
   tuneInvalid: boolean
@@ -40,6 +44,8 @@ export function ProfileTuneForm<TuneId extends string>({
   tuneLegend = "Tune",
   tune,
   onTuneChange,
+  format,
+  onFormatChange,
   formError,
   profileInvalid,
   tuneInvalid,
@@ -51,6 +57,8 @@ export function ProfileTuneForm<TuneId extends string>({
 }: ProfileTuneFormProps<TuneId>) {
   const inputId = `${idPrefix}-profile`
   const errorId = `${idPrefix}-form-error`
+  const formatId = `${idPrefix}-format`
+  const chosenFormat = OUTREACH_FORMATS.find((entry) => entry.id === format)
 
   return (
     <form
@@ -82,6 +90,28 @@ export function ProfileTuneForm<TuneId extends string>({
           className="flex-1 w-full min-h-[200px] lg:min-h-[120px] resize-none rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
         />
       </div>
+
+      {format && onFormatChange && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor={formatId} className="text-[10px] font-bold uppercase tracking-wider text-outline">
+            Format
+          </label>
+          <select
+            id={formatId}
+            value={format}
+            onChange={(event) => onFormatChange(event.target.value as OutreachFormatId)}
+            disabled={isGenerating}
+            className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[13px] font-semibold text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+          >
+            {OUTREACH_FORMATS.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.label}
+              </option>
+            ))}
+          </select>
+          {chosenFormat && <span className="text-[11px] text-outline">{chosenFormat.description}</span>}
+        </div>
+      )}
 
       <RadioCardGroup
         name={`${idPrefix}-tune`}

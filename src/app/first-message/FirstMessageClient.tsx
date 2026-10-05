@@ -19,11 +19,13 @@ import {
   DEFAULT_FIRST_MESSAGE_TUNE,
   FIRST_MESSAGE_MESSAGES,
   FIRST_MESSAGE_PROFILE_MAX_LENGTH,
-  FIRST_MESSAGE_TUNES,
+  FIRST_MESSAGE_TEXT_TUNES,
   getTuneLabel,
   type FirstMessagePromptId,
   type FirstMessageTuneId,
 } from "@/constants/firstMessage"
+import { DEFAULT_OUTREACH_FORMAT, VOICE_TUNE, VOICE_TUNE_ID, type OutreachFormatId } from "@/constants/outreachTunes"
+import { describeVoiceNote } from "@/lib/voiceNote"
 import type { GeneratedFirstMessage } from "@/types/firstMessage"
 
 const GENERATE_ENDPOINT = "/api/first-messages/generate"
@@ -36,9 +38,14 @@ interface GeneratePayload {
 // Inputs and the result outlive the page, so they're still here after visiting another tool
 const formStore = createToolStore(
   "first-message:form",
-  { profileData: "", tune: DEFAULT_FIRST_MESSAGE_TUNE as FirstMessageTuneId | null },
-  // v2: the tones were replaced, so a tone saved by v1 no longer exists
-  { version: 2 }
+  {
+    profileData: "",
+    // The tone of a written message; the voice note has one tone of its own, so it is not kept here
+    tune: DEFAULT_FIRST_MESSAGE_TUNE as FirstMessageTuneId | null,
+    format: DEFAULT_OUTREACH_FORMAT as OutreachFormatId,
+  },
+  // v2: the tones were replaced, so a tone saved by v1 no longer exists. v3: text or a voice note
+  { version: 3 }
 )
 const generation = createGenerationRequest<GeneratePayload, GeneratedFirstMessage>(
   "first-message",
@@ -52,7 +59,10 @@ export default function FirstMessageClient() {
   const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   // The tab the prompts modal opens on; null means the modal is closed
   const [promptsTab, setPromptsTab] = useState<FirstMessagePromptId | null>(null)
-  const { profileData, tune } = useToolStore(formStore)
+  const { profileData, tune, format } = useToolStore(formStore)
+  // A voice note is one script with one tone of its own; text keeps the tone the user last chose
+  const isVoice = format === "voice"
+  const chosenTune = isVoice ? VOICE_TUNE_ID : tune
   const [formError, setFormError] = useState<string | null>(null)
   const profileInputRef = useRef<HTMLTextAreaElement>(null)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
@@ -67,12 +77,12 @@ export default function FirstMessageClient() {
       profileInputRef.current?.focus()
       return
     }
-    if (!tune) {
+    if (!chosenTune) {
       setFormError(FIRST_MESSAGE_MESSAGES.missingTune)
       return
     }
     setFormError(null)
-    generate({ profileData, tune })
+    generate({ profileData, tune: chosenTune })
   }
 
   // A dummy profile replaces the input, and the message written for the previous profile goes with it
@@ -119,7 +129,7 @@ export default function FirstMessageClient() {
                 <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
                 <button
                   type="button"
-                  onClick={() => setPromptsTab(tune ?? DEFAULT_FIRST_MESSAGE_TUNE)}
+                  onClick={() => setPromptsTab(chosenTune ?? DEFAULT_FIRST_MESSAGE_TUNE)}
                   className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
                 >
                   <FilePenLine size={16} aria-hidden="true" />
@@ -138,12 +148,18 @@ export default function FirstMessageClient() {
                 }}
                 profileMaxLength={FIRST_MESSAGE_PROFILE_MAX_LENGTH}
                 profileInputRef={profileInputRef}
-                tunes={FIRST_MESSAGE_TUNES}
+                tunes={isVoice ? [VOICE_TUNE] : FIRST_MESSAGE_TEXT_TUNES}
                 tuneLegend="Tone"
-                tune={tune}
+                tune={chosenTune}
                 onTuneChange={(nextTune) => {
-                  formStore.update({ tune: nextTune })
+                  // In the voice format there is only its own tone, so nothing else can be chosen
+                  if (nextTune !== VOICE_TUNE_ID) formStore.update({ tune: nextTune })
                   if (formError === FIRST_MESSAGE_MESSAGES.missingTune) setFormError(null)
+                }}
+                format={format}
+                onFormatChange={(nextFormat) => {
+                  formStore.update({ format: nextFormat })
+                  setFormError(null)
                 }}
                 formError={formError}
                 profileInvalid={formError === FIRST_MESSAGE_MESSAGES.missingProfile}
@@ -169,7 +185,14 @@ export default function FirstMessageClient() {
                 copyLabel="Copy first message"
                 copyButtonText="Copy Message"
                 warning={result?.warning}
-                meta={result && <>{getTuneLabel(result.tune)} tone</>}
+                meta={
+                  result && (
+                    <>
+                      {getTuneLabel(result.tune)}
+                      {result.tune === VOICE_TUNE_ID ? ` · ${describeVoiceNote(result.wordCount ?? 0)}` : " tone"}
+                    </>
+                  )
+                }
                 source={result}
               >
                 {result && !result.usedSenderProfile && (

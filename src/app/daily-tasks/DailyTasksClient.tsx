@@ -1,10 +1,11 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { AlertTriangle, CalendarArrowUp, ListTodo, Loader2, Trash2 } from "lucide-react"
+import { AlertTriangle, CalendarArrowUp, ListTodo, Loader2, Plus, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
-import { TaskComposer, emptyRows, type TaskRow } from "@/components/daily-tasks/TaskComposer"
+import { emptyRows, type TaskRow } from "@/components/daily-tasks/TaskComposer"
+import { AddTasksDialog } from "@/components/daily-tasks/AddTasksDialog"
 import { ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { TaskDayList, type TaskMove } from "@/components/daily-tasks/TaskDayList"
 import { CleanupOldTasksDialog } from "@/components/daily-tasks/CleanupOldTasksDialog"
@@ -53,6 +54,8 @@ export default function DailyTasksClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loadAttempt, setLoadAttempt] = useState(0)
+  // The Add tasks popup. What is typed lives in the draft store, so closing it keeps the rows
+  const [isAdding, setIsAdding] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -171,6 +174,7 @@ export default function DailyTasksClient() {
           .join(" ")
       )
       showNewest()
+      setIsAdding(false)
     } catch (error: unknown) {
       setSaveError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.saveFailed)
     } finally {
@@ -483,6 +487,18 @@ export default function DailyTasksClient() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSaveError(null)
+                    setNotice(null)
+                    setIsAdding(true)
+                  }}
+                  className="inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                >
+                  <Plus size={16} aria-hidden="true" />
+                  Add task
+                </button>
                 {overdueCount > 0 && (
                   <>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-error-container px-3 py-1.5 text-xs font-bold text-on-error-container">
@@ -517,6 +533,7 @@ export default function DailyTasksClient() {
             </div>
 
             <div className="min-h-[20px] shrink-0 text-[12px]" aria-live="polite">
+              {!isAdding && notice && <p className="text-primary">{notice}</p>}
               {taskError && (
                 <p role="alert" className="flex flex-wrap items-center gap-2 text-error">
                   {taskError}
@@ -527,25 +544,8 @@ export default function DailyTasksClient() {
               )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-5 lg:flex-1 lg:min-h-0">
-              <TaskComposer
-                today={today}
-                taskDate={taskDate || today}
-                rows={rows}
-                isSaving={isSaving}
-                error={saveError}
-                notice={notice}
-                onDateChange={(date) => {
-                  draftStore.update({ taskDate: date })
-                  setSaveError(null)
-                }}
-                onRowsChange={(next) => {
-                  draftStore.update({ rows: next })
-                  if (saveError) setSaveError(null)
-                }}
-                onSubmit={addTasks}
-              />
-
+            {/* The days have the page to themselves; tasks are written in the Add task popup */}
+            <div className="flex flex-col lg:flex-1 lg:min-h-0">
               <TaskDayList
                 page={page}
                 today={today}
@@ -567,6 +567,29 @@ export default function DailyTasksClient() {
         </main>
       </div>
 
+      {isAdding && (
+        <AddTasksDialog
+          today={today}
+          taskDate={taskDate || today}
+          rows={rows}
+          isSaving={isSaving}
+          error={saveError}
+          notice={notice}
+          onDateChange={(date) => {
+            draftStore.update({ taskDate: date })
+            setSaveError(null)
+          }}
+          onRowsChange={(next) => {
+            draftStore.update({ rows: next })
+            if (saveError) setSaveError(null)
+          }}
+          onSubmit={addTasks}
+          onClose={() => {
+            if (isSaving) return
+            setIsAdding(false)
+          }}
+        />
+      )}
       {confirmingPicked && (
         <ConfirmBulkDelete
           count={confirmingPicked.length}

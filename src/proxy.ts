@@ -3,6 +3,8 @@ import { env } from "@/config/env"
 import { SESSION_COOKIE, readSession } from "@/lib/sessionToken"
 import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, HOME_PATH, LOGIN_PATH, REQUEST_PATH_HEADER, SIGNUP_PATH } from "@/constants/auth"
 import { PUBLIC_PLAN_ENDPOINT, PUBLIC_PLAN_PATH } from "@/constants/employees"
+import { PUBLIC_PROJECT_ENDPOINT, PUBLIC_PROJECT_PATH } from "@/constants/clientProjectTasks"
+import { CRON_BACKUP_PATH } from "@/constants/backups"
 
 /**
  * The sign-in gate in front of every page and API route. It checks only that the session cookie is
@@ -14,8 +16,12 @@ import { PUBLIC_PLAN_ENDPOINT, PUBLIC_PLAN_PATH } from "@/constants/employees"
 // Reachable signed out: the two account pages and the calls they make
 const PUBLIC_PAGES = new Set([LOGIN_PATH, SIGNUP_PATH])
 const PUBLIC_API = new Set(["/api/auth/login", "/api/auth/signup", "/api/auth/logout"])
-// An employee's own plan link: the signed token in the address is the key, checked by the route
-const isPlanLink = (pathname: string) => pathname.startsWith(`${PUBLIC_PLAN_PATH}/`) || pathname.startsWith(`${PUBLIC_PLAN_ENDPOINT}/`)
+// A link whose signed token in the address is the key, checked by the route it opens: an employee's
+// own daily plan, and a client project shared read only
+const PUBLIC_LINK_PREFIXES = [PUBLIC_PLAN_PATH, PUBLIC_PLAN_ENDPOINT, PUBLIC_PROJECT_PATH, PUBLIC_PROJECT_ENDPOINT]
+const isPlanLink = (pathname: string) => PUBLIC_LINK_PREFIXES.some((prefix) => pathname.startsWith(`${prefix}/`))
+// The weekly database backup: nobody is signed in for it, so the route checks CRON_SECRET itself
+const isScheduledJob = (pathname: string) => pathname === CRON_BACKUP_PATH
 
 // Only a path inside the app, so ?next= can't send someone to another site after signing in; nowhere
 // to go back to is the home page itself, never "/" (a browser may still hold the root's old permanent redirect)
@@ -41,7 +47,7 @@ export function proxy(request: NextRequest) {
     if (!signedIn) return withPath(request, pathname)
     return NextResponse.redirect(new URL(safeNext(request.nextUrl.searchParams.get("next") ?? HOME_PATH), request.url))
   }
-  if (PUBLIC_API.has(pathname) || isPlanLink(pathname) || signedIn) return withPath(request, pathname)
+  if (PUBLIC_API.has(pathname) || isPlanLink(pathname) || isScheduledJob(pathname) || signedIn) return withPath(request, pathname)
 
   if (pathname.startsWith("/api/")) {
     const response = NextResponse.json({ success: false, message: AUTH_MESSAGES.signInRequired }, { status: 401 })

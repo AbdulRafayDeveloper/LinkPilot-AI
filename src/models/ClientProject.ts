@@ -19,6 +19,13 @@ export interface IClientProject {
   name: string
   description: string
   status: ClientProjectStatus
+  /**
+   * The read-only link, if one has been made (lib/projectLink.ts). Nothing secret is stored: the
+   * version is what the token is signed with, so a new link stops every earlier one, and turning
+   * the link off stops them all without losing which version comes next.
+   */
+  publicLinkVersion: number
+  publicLinkActive: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -30,6 +37,9 @@ const ClientProjectSchema = new Schema<IClientProject>(
     name: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     status: { type: String, enum: CLIENT_PROJECT_STATUS_IDS, default: DEFAULT_CLIENT_PROJECT_STATUS },
+    // Both optional in effect: a project saved before links reads as version 0 with no link on
+    publicLinkVersion: { type: Number, default: 0 },
+    publicLinkActive: { type: Boolean, default: false },
   },
   { timestamps: true, collection: "client_projects" }
 )

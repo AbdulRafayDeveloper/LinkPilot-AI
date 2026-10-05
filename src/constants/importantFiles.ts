@@ -1,4 +1,5 @@
 import { FileAudio, FileText, FileType, FileVideo, Image, Files, type LucideIcon } from "lucide-react"
+import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
 
 /**
  * Important Files: the images, documents, videos and audio worth keeping to hand and sending
@@ -107,7 +108,8 @@ export const UPLOAD_PART_BYTES = 8 * 1024 * 1024
 export const UPLOAD_PART_RETRIES = 2
 
 export const ASSET_NAME_MAX_LENGTH = 120
-export const ASSET_DESCRIPTION_MAX_LENGTH = 2000
+// A description is only ever read by the user, so it takes the shared text box ceiling
+export const ASSET_DESCRIPTION_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
 // The most assets one request may return, enforced in the service, not just the page
 export const ASSET_PAGE_SIZE = 24
 // How much of a description a card shows before it is cut

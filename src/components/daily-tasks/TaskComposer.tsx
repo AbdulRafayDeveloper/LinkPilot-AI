@@ -23,6 +23,8 @@ interface TaskComposerProps {
   onDateChange: (date: string) => void
   onRowsChange: (rows: TaskRow[]) => void
   onSubmit: () => void
+  // Inside the Add tasks popup, which carries the card and the heading itself
+  plain?: boolean
 }
 
 export const emptyRow = (content = ""): TaskRow => ({ content, details: emptyTaskDetails() })
@@ -47,6 +49,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   onDateChange,
   onRowsChange,
   onSubmit,
+  plain = false,
 }) => {
   const inputsRef = useRef<(HTMLInputElement | null)[]>([])
   // A file that will not upload belongs to the row it was chosen on, not to the whole save
@@ -119,11 +122,12 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   return (
     <section
       aria-label="Add tasks"
-      className="flex min-h-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
+      className={`flex min-h-0 flex-1 flex-col gap-3 ${plain ? "" : "rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-bold text-on-surface">Add Tasks</h2>
-        <span className="text-[11px] text-outline">
+        {/* In the popup the dialog's own title names it, so only the row count is shown */}
+        {!plain && <h2 className="text-sm font-bold text-on-surface">Add Tasks</h2>}
+        <span className="ml-auto text-[11px] text-outline">
           {rows.length} {rows.length === 1 ? "row" : "rows"} · max {MAX_TASKS_PER_SUBMIT}
         </span>
       </div>

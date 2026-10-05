@@ -15,6 +15,10 @@ const envSchema = z.object({
   AUTH_SECRET: z.string({ error: "is required" }).min(32, { error: "must be at least 32 characters" }),
   // "true" lets anyone create a user account at /signup; anything else leaves accounts to the scripts in scripts/
   ALLOW_SIGNUP: z.enum(["true", "false"], { error: 'must be "true" or "false"' }).optional(),
+  // Lets the weekly database backup through the sign-in gate: Vercel Cron sends it as a bearer token,
+  // and the route accepts nothing else. Unset, the schedule refuses every call and says which variable
+  // to set, while an admin can still back the database up from the page
+  CRON_SECRET: z.string().min(16, { error: "must be at least 16 characters" }).optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_LIGHTWEIGHT_MODEL: z.string().optional(),
   // Reads recordings when Groq cannot (voice input); OpenAI's transcription model

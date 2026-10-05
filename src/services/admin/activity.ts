@@ -21,6 +21,8 @@ import { PostImageModel } from "@/models/PostImage"
 import { QuickNote } from "@/models/QuickNote"
 import { ReferenceItem } from "@/models/ReferenceItem"
 import { ImportantContentModel } from "@/models/ImportantContent"
+import { ContentFolderModel } from "@/models/ContentFolder"
+import { ClientProjectTaskModel } from "@/models/ClientProjectTask"
 import { ProfileScheduleModel } from "@/models/ProfileSchedule"
 import { TrendingSearch } from "@/models/TrendingSearch"
 import { APP_TOOLS } from "@/constants/linkedinTools"
@@ -59,6 +61,7 @@ export const SOURCES: ActivitySource[] = [
   { href: "/conversation-reply", collection: () => ConversationReplyRecord.collection },
   { href: "/client-messaging", label: "messages", collection: () => ClientMessageRecord.collection },
   { href: "/client-messaging", label: "clients", collection: () => Client.collection },
+  { href: "/client-projects", label: "tasks", collection: () => ClientProjectTaskModel.collection },
   { href: "/meeting-planner", collection: () => MeetingPlan.collection },
   { href: "/meetings", collection: () => Meeting.collection },
   { href: "/prompt-creator", collection: () => CreatedPromptModel.collection },
@@ -68,6 +71,7 @@ export const SOURCES: ActivitySource[] = [
   { href: "/reference-content", collection: () => ReferenceItem.collection },
   { href: "/important-files", collection: () => AssetFile.collection, match: { status: "ready" } },
   { href: "/important-content", collection: () => ImportantContentModel.collection },
+  { href: "/important-content", label: "folders", collection: () => ContentFolderModel.collection },
   { href: "/employees", label: "employees", collection: () => EmployeeModel.collection },
   { href: "/employees", label: "plans", collection: () => EmployeePlanModel.collection },
 ]

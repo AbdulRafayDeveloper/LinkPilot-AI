@@ -7,11 +7,13 @@ import { FileKey2, type LucideIcon } from "lucide-react"
  * entry belongs to the account that saved it; an admin sees everyone's.
  */
 
+import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
+
 export const IMPORTANT_CONTENT_ENDPOINT = "/api/important-content"
 
 export const CONTENT_NAME_MAX_LENGTH = 120
-// The same ceiling the app uses for any long text
-export const CONTENT_DESCRIPTION_MAX_LENGTH = 20000
+// Nothing reads a description but the user, so it takes the shared ceiling for a plain text box
+export const CONTENT_DESCRIPTION_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
 export const CONTENT_TYPE_MAX_LENGTH = 60
 // How much of a description the table shows; Copy and Edit always use the whole text
 export const CONTENT_PREVIEW_MAX_LENGTH = 220

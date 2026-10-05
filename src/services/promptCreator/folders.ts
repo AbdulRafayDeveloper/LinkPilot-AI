@@ -19,10 +19,10 @@ import { visibleById, visibleTo } from "@/services/auth/viewer"
 
 type StoredFolder = Pick<IPromptFolder, "name"> & { _id: { toString: () => string } }
 
-const toFolder = (record: StoredFolder, promptCount: number): PromptFolder => ({
+const toFolder = (record: StoredFolder, recordCount: number): PromptFolder => ({
   id: record._id.toString(),
   name: record.name,
-  promptCount,
+  recordCount,
 })
 
 // Two folders called "Client work" and "client work" would be the same folder to a reader
@@ -65,8 +65,8 @@ export async function renameFolder(viewer: Viewer, id: string, name: string): Pr
   }
   const record = (await PromptFolderModel.findOneAndUpdate(filter, { name }, { returnDocument: "after" }).lean()) as unknown as StoredFolder | null
   if (!record) return null
-  const promptCount = await CreatedPromptModel.countDocuments({ ...scope, folderId: id })
-  return toFolder(record, promptCount)
+  const recordCount = await CreatedPromptModel.countDocuments({ ...scope, folderId: id })
+  return toFolder(record, recordCount)
 }
 
 /**

@@ -13,6 +13,8 @@ export interface IImportantContent {
   type: string
   // The size the description is shown at, in pixels; null (entries from before sizes) reads as the default
   textSize: number | null
+  // The folder it is filed in (models/ContentFolder.ts), null for an entry in no folder
+  folderId: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -24,12 +26,15 @@ const ImportantContentSchema = new Schema<IImportantContent>(
     description: { type: String, default: "" },
     type: { type: String, required: true, trim: true },
     textSize: { type: Number, default: null },
+    folderId: { type: String, default: null, index: true },
   },
   { timestamps: true, collection: "important_content" }
 )
 // Last changed first with a stable tie-break for the pages, and one account's entries of one type for the filter
 ImportantContentSchema.index({ updatedAt: -1, _id: -1 })
 ImportantContentSchema.index({ ownerId: 1, type: 1 })
+// One account's entries in one folder, for the folder filter and a folder's count
+ImportantContentSchema.index({ ownerId: 1, folderId: 1 })
 
 export const ImportantContentModel =
   (mongoose.models.ImportantContent as Model<IImportantContent> | undefined) ??

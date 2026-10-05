@@ -25,6 +25,7 @@ export const FEATURE_API_PATHS: Record<string, string[]> = {
   "follow-up-message": ["/api/follow-up-messages"],
   "conversation-reply": ["/api/conversation-replies"],
   clients: ["/api/clients"],
+  "client-projects": ["/api/client-projects"],
   "client-messaging": ["/api/client-messaging"],
   "message-rewriter": ["/api/message-rewriter"],
   "client-voices": ["/api/client-voices"],
@@ -34,7 +35,7 @@ export const FEATURE_API_PATHS: Record<string, string[]> = {
   "prompt-creator": ["/api/prompt-creator"],
   // Nested under Prompt Creator's folder, but the Projects page's own; the longest path wins
   projects: ["/api/prompt-creator/projects"],
-  "daily-tasks": ["/api/daily-tasks", "/api/task-images"],
+  "daily-tasks": ["/api/daily-tasks"],
   "quick-notes": ["/api/quick-notes"],
   "important-files": ["/api/important-files"],
   "important-content": ["/api/important-content"],
@@ -57,8 +58,13 @@ export const SHARED_API_PATHS = [
   "/api/dummy-data",
   "/api/global-prompts",
   "/api/transcribe",
+  // One image, stored and named back; it writes no record and belongs to no one tool, since Daily
+  // Tasks, an employee's plan and a client project's tasks all attach images the same way
+  "/api/task-images",
   "/api/public",
   "/api/saved-outputs",
+  // The weekly database backup, called by Vercel Cron with CRON_SECRET rather than a session
+  "/api/cron",
 ]
 
 // A safety net on the request body: nobody can send more ids than the app has tools

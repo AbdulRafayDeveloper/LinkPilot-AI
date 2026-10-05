@@ -52,7 +52,8 @@ const formStore = createToolStore(
     comments: "",
   },
   {
-    version: 5,
+    // 6: Conversational became the default style, so a browser holding an older choice starts on it
+    version: 6,
     toStored: ({ context, style, postMode, postText, comments }) => ({ context, style, postMode, postText, comments }),
   }
 )

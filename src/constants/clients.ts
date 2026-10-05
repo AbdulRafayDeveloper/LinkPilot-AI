@@ -1,4 +1,5 @@
 import { Building2, type LucideIcon } from "lucide-react"
+import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
 
 /**
  * Clients Management: the clients themselves, kept in one place instead of inside the Client Tasks
@@ -15,8 +16,9 @@ export const CLIENTS_ENDPOINT = "/api/clients"
 
 // A project's name is a label, not a sentence, like a client's own name
 export const CLIENT_PROJECT_NAME_MAX_LENGTH = 80
-// What the project is, in the user's own words; the same room a client's message format gets
-export const CLIENT_PROJECT_DESCRIPTION_MAX_LENGTH = 2000
+// What the project is, in the user's own words. No model reads it (a client's message format and
+// samples are what Client Messaging sends), so it takes the shared text box ceiling
+export const CLIENT_PROJECT_DESCRIPTION_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
 // Enough for the work one client has on; a longer list is a sign of tasks, not projects
 export const MAX_CLIENT_PROJECTS = 200
 

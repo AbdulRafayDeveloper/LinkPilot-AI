@@ -1,15 +1,18 @@
-import { ListOrdered, ScrollText, ShieldCheck, UsersRound, type LucideIcon } from "lucide-react"
+import { DatabaseBackup, ListOrdered, ScrollText, ShieldCheck, UsersRound, type LucideIcon } from "lucide-react"
+import { BACKUPS_HREF } from "./backups"
 
 /**
  * The admin area: Audit Management (every sign-in, sign-up, sign-out and refused attempt, newest
- * first), User Management (every account, its sign-ins and what it has made in each tool) and AI Model
- * Priority (the order each module tries the AI providers in, for admins; constants/modelPriority.ts).
+ * first), User Management (every account, its sign-ins and what it has made in each tool), AI Model
+ * Priority (the order each module tries the AI providers in, for admins; constants/modelPriority.ts)
+ * and Database Backup (the weekly backup of the whole database, and every run of it; constants/backups.ts).
  * Only an admin sees it in the sidebar, and every route and page behind it checks the role.
  */
 
 export const AUDIT_HREF = "/admin/audit"
 export const USERS_HREF = "/admin/users"
 export const MODEL_PRIORITY_HREF = "/admin/models"
+// Database Backup keeps its own constants, since the schedule and the storage are its own (constants/backups.ts)
 export const ADMIN_ENDPOINTS = {
   audit: "/api/admin/audit",
   users: "/api/admin/users",
@@ -67,5 +70,6 @@ export const ADMIN_TOOL: {
     { title: "Audit Management", description: "Every sign-in, newest first", icon: ScrollText, href: AUDIT_HREF, pageTitle: "Audit Management" },
     { title: "User Management", description: "Every account and its activity", icon: UsersRound, href: USERS_HREF, pageTitle: "User Management" },
     { title: "AI Model Priority", description: "The order each module tries the AI models in", icon: ListOrdered, href: MODEL_PRIORITY_HREF, pageTitle: "AI Model Priority" },
+    { title: "Database Backup", description: "Weekly backups, and one on demand", icon: DatabaseBackup, href: BACKUPS_HREF, pageTitle: "Database Backup" },
   ],
 }

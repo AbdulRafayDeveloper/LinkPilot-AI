@@ -6,7 +6,11 @@ import {
   CONTENT_TYPE_MAX_LENGTH,
   IMPORTANT_CONTENT_MESSAGES,
 } from "@/constants/importantContent"
+import { CONTENT_FOLDER_MESSAGES, FOLDER_NAME_MAX_LENGTH, IN_ANY_FOLDER, UNFILED_FOLDER } from "@/constants/contentFolders"
 import { blankToEmpty, searchParam } from "./listFilters"
+
+// A folder filter is a folder's own id, or one of the two values that are not a folder
+const isFolderFilter = (value: string) => value === "" || value === IN_ANY_FOLDER || value === UNFILED_FOLDER || /^[0-9a-f]{24}$/.test(value)
 
 // One line of text: runs of spaces collapse, the ends are trimmed
 const line = (value: unknown) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : value)
@@ -38,4 +42,12 @@ export const ImportantContentQuerySchema = z.object({
   search: searchParam,
   // Any type the user made up, matched exactly as saved
   type: z.preprocess(blankToEmpty, z.string().max(CONTENT_TYPE_MAX_LENGTH)),
+  // A folder's id, "in a folder", "no folder", or "" for every entry. A value nobody could have
+  // picked falls back to every entry rather than to none
+  folder: z.preprocess(blankToEmpty, z.string().max(FOLDER_NAME_MAX_LENGTH)).transform((value) => (isFolderFilter(value) ? value : "")),
+})
+
+/** A folder id, or null for "no folder", as an entry names where it is filed. */
+export const ContentFolderIdSchema = z.object({
+  folderId: z.union([z.string().regex(/^[0-9a-f]{24}$/, CONTENT_FOLDER_MESSAGES.notFound), z.null()]),
 })

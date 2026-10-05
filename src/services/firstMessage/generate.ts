@@ -7,6 +7,9 @@ import { humanizeTexts } from "@/services/humanizer"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
 import { LINKEDIN_MESSAGE_MAX_CHARS, OPENING_LINES, getTuneLabel, type FirstMessageTuneId } from "@/constants/firstMessage"
 import { hasOpeningLine, withOpeningLine } from "@/lib/openingLine"
+import { ABCD_TUNE_ID, VOICE_NOTE_MAX_CHARS, VOICE_NOTE_MAX_WORDS, VOICE_TUNE_ID } from "@/constants/outreachTunes"
+import { abcdProblem, hasAbcdOptions, withAbcdOptions } from "@/lib/abcdMethod"
+import { countWords, speakingSeconds, voiceNoteProblem } from "@/lib/voiceNote"
 import type { GeneratedFirstMessage } from "@/types/firstMessage"
 import { getGenerationInputs } from "./prompts"
 
@@ -82,32 +85,47 @@ export async function generateFirstMessage({ profileData, tune, signal }: Genera
   // kept by the humanizer (a rewrite that changes it is sent back), and checked once more at the end
   const opener = OPENING_LINES[tune]
   const draft = opener ? withOpeningLine(cleanGeneratedText(data.message), opener) : { text: cleanGeneratedText(data.message), fixed: false }
+  // A voice note is said out loud, so it is held to its word ceiling rather than LinkedIn's characters
+  const isVoice = tune === VOICE_TUNE_ID
+  // The ABCD method's four replies are fixed in code, so they are put on the draft and checked again at the end
+  const isAbcd = tune === ABCD_TUNE_ID
+  const withOptions = isAbcd ? withAbcdOptions(draft.text) : draft
   const humanization = await humanizeTexts({
     fields: [
       {
         id: "message",
-        kind: "LinkedIn first message (DM) to someone new",
-        text: draft.text,
-        maxChars: LINKEDIN_MESSAGE_MAX_CHARS,
+        kind: isVoice ? "LinkedIn voice note script, to be read aloud and recorded" : "LinkedIn first message (DM) to someone new",
+        text: withOptions.text,
+        maxChars: isVoice ? VOICE_NOTE_MAX_CHARS : LINKEDIN_MESSAGE_MAX_CHARS,
+        ...(isVoice ? { rule: `At most ${VOICE_NOTE_MAX_WORDS} words, so it can be said in under 50 seconds. Keep it spoken English, short sentences, no corporate words.` } : {}),
       },
     ],
     // Each of these tones ends on one open question: the Curiosity Hook's open loop, or a soft offer of help
-    validate: opener
-      ? (_id, text) => {
-          if (!hasOpeningLine(text, opener)) return `Keep the opening exactly "Hi <first name>, ${opener.sentence}"`
-          if (!/\?\s*$/.test(text)) return "End the message with one open question, ending with a question mark"
-          return null
-        }
-      : undefined,
+    validate:
+      opener || isVoice || isAbcd
+        ? (_id, text) => {
+            if (opener && !hasOpeningLine(text, opener)) return `Keep the opening exactly "Hi <first name>, ${opener.sentence}"`
+            if (opener && !/\?\s*$/.test(text)) return "End the message with one open question, ending with a question mark"
+            if (isAbcd) return abcdProblem(text)
+            return isVoice ? voiceNoteProblem(text) : null
+          }
+        : undefined,
     signal,
   })
   const final = opener ? withOpeningLine(humanization.texts.message, opener) : { text: humanization.texts.message, fixed: false }
-  const message = final.text
+  // Whatever came back, the four replies are exactly the owner's own, on the end, once
+  const ending = isAbcd ? withAbcdOptions(final.text) : final
+  const message = ending.text
 
+  const words = countWords(message)
   const warnings = [
     unsupportedSenderClaim &&
       "This message may describe you, but About Me is empty. Check what it says about you before sending.",
-    message.length > LINKEDIN_MESSAGE_MAX_CHARS &&
+    isVoice &&
+      words > VOICE_NOTE_MAX_WORDS &&
+      `This script is ${words} words, about ${speakingSeconds(words)} seconds. Cut it to ${VOICE_NOTE_MAX_WORDS} words or fewer before recording.`,
+    !isVoice &&
+      message.length > LINKEDIN_MESSAGE_MAX_CHARS &&
       `This message is ${message.length.toLocaleString()} characters, over LinkedIn's ${LINKEDIN_MESSAGE_MAX_CHARS.toLocaleString()}-character limit. Shorten it before sending.`,
   ].filter((warning): warning is string => typeof warning === "string")
 
@@ -123,6 +141,8 @@ export async function generateFirstMessage({ profileData, tune, signal }: Genera
       humanized: humanization.humanized,
       ...(opener ? { openerFixed: draft.fixed || final.fixed, openerPresent: hasOpeningLine(message, opener) } : {}),
       characters: message.length,
+      ...(isVoice ? { words, speakingSeconds: speakingSeconds(words) } : {}),
+      ...(isAbcd ? { abcdFixed: withOptions.fixed || ending.fixed, abcdPresent: hasAbcdOptions(message) } : {}),
     })
   )
 
@@ -130,7 +150,8 @@ export async function generateFirstMessage({ profileData, tune, signal }: Genera
     message,
     tune,
     characterCount: message.length,
-    maxCharacters: LINKEDIN_MESSAGE_MAX_CHARS,
+    maxCharacters: isVoice ? VOICE_NOTE_MAX_CHARS : LINKEDIN_MESSAGE_MAX_CHARS,
+    ...(isVoice ? { wordCount: words, speakingSeconds: speakingSeconds(words) } : {}),
     warning: warnings.length > 0 ? warnings.join(" ") : null,
     usedSenderProfile: senderProfile !== null,
     analysis: {

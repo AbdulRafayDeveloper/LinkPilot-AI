@@ -1,12 +1,13 @@
 import { BookMarked, type LucideIcon } from "lucide-react"
+import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
 
 /**
  * Reference Content: the steps, procedures, explanations and reusable text the user sends to
  * clients again and again. Each item is a title plus its text; nothing is generated here.
  */
 export const REFERENCE_TITLE_MAX_LENGTH = 120
-// The same ceiling the app uses for any long text (constants/prompts.ts)
-export const REFERENCE_CONTENT_MAX_LENGTH = 20000
+// Nothing is generated here, so an item takes the shared ceiling for a plain text box (constants/textLimits.ts)
+export const REFERENCE_CONTENT_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
 // The most items one request may return, enforced in the service, not just the page
 export const REFERENCE_PAGE_SIZE = 50
 // How much of an item a card shows before it is cut; Copy and Edit always use the whole text

@@ -8,6 +8,9 @@ import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
 import { INMAIL_BODY_MAX_CHARS, INMAIL_SUBJECT_MAX_CHARS } from "@/constants/linkedinLimits"
 import { OPENING_LINES, getInMailTuneLabel, type InMailTuneId } from "@/constants/inmail"
 import { hasOpeningLine, withOpeningLine } from "@/lib/openingLine"
+import { ABCD_TUNE_ID, VOICE_NOTE_MAX_CHARS, VOICE_NOTE_MAX_WORDS, VOICE_TUNE_ID } from "@/constants/outreachTunes"
+import { abcdProblem, hasAbcdOptions, withAbcdOptions } from "@/lib/abcdMethod"
+import { countWords, speakingSeconds, voiceNoteProblem } from "@/lib/voiceNote"
 import type { GeneratedInMail } from "@/types/inmail"
 import { getInMailGenerationInputs } from "./prompts"
 
@@ -74,12 +77,17 @@ function findUnusableReason(output: InMailOutput): string | null {
   return null
 }
 
-function buildWarnings(subject: string, message: string, unsupportedSenderClaim: boolean): string | null {
+function buildWarnings(subject: string, message: string, unsupportedSenderClaim: boolean, isVoice = false): string | null {
+  const words = countWords(message)
   const warnings = [
     unsupportedSenderClaim && "This InMail may describe you, but About Me is empty. Check what it says about you before sending.",
     subject.length > INMAIL_SUBJECT_MAX_CHARS &&
       `The subject is ${subject.length} characters, over LinkedIn's ${INMAIL_SUBJECT_MAX_CHARS}-character limit.`,
-    message.length > INMAIL_BODY_MAX_CHARS &&
+    isVoice &&
+      words > VOICE_NOTE_MAX_WORDS &&
+      `This script is ${words} words, about ${speakingSeconds(words)} seconds. Cut it to ${VOICE_NOTE_MAX_WORDS} words or fewer before recording.`,
+    !isVoice &&
+      message.length > INMAIL_BODY_MAX_CHARS &&
       `The message is ${message.length.toLocaleString()} characters, over LinkedIn's ${INMAIL_BODY_MAX_CHARS.toLocaleString()}-character InMail limit.`,
   ].filter((warning): warning is string => typeof warning === "string")
   return warnings.length > 0 ? warnings.join(" ") : null
@@ -128,8 +136,13 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
   // A tone with an opening line (OPENING_LINES) opens its message with that exact sentence: put right in
   // the draft, kept by the humanizer (a rewrite that changes it is sent back), and checked once more at the end
   const opener = OPENING_LINES[tune]
+  // A voice note is said out loud, so it is held to its word ceiling rather than LinkedIn's characters
+  const isVoice = tune === VOICE_TUNE_ID
+  // The ABCD method's four replies are fixed in code, so they are put on the draft and checked again at the end
+  const isAbcd = tune === ABCD_TUNE_ID
   const draftMessage = cleanMessage(data.message, draftSubject)
-  const draft = opener ? withOpeningLine(draftMessage, opener) : { text: draftMessage, fixed: false }
+  const opened = opener ? withOpeningLine(draftMessage, opener) : { text: draftMessage, fixed: false }
+  const draft = isAbcd ? withAbcdOptions(opened.text) : opened
   const humanization = await humanizeTexts({
     fields: [
       {
@@ -143,24 +156,29 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
         id: "message",
         kind: "LinkedIn InMail message body (without the subject)",
         text: draft.text,
-        maxChars: INMAIL_BODY_MAX_CHARS,
+        maxChars: isVoice ? VOICE_NOTE_MAX_CHARS : INMAIL_BODY_MAX_CHARS,
+        ...(isVoice ? { rule: `At most ${VOICE_NOTE_MAX_WORDS} words, so it can be said in under 50 seconds. Keep it spoken English, short sentences, no corporate words.` } : {}),
       },
     ],
     // Each of these tones ends on one open question: the Curiosity Hook's open loop, or a soft offer of help
-    validate: opener
-      ? (id, text) => {
-          if (id !== "message") return null
-          if (!hasOpeningLine(text, opener)) return `Keep the opening exactly "Hi <first name>, ${opener.sentence}"`
-          if (!/\?\s*$/.test(text)) return "End the message with one open question, ending with a question mark"
-          return null
-        }
-      : undefined,
+    validate:
+      opener || isVoice || isAbcd
+        ? (id, text) => {
+            if (id !== "message") return null
+            if (opener && !hasOpeningLine(text, opener)) return `Keep the opening exactly "Hi <first name>, ${opener.sentence}"`
+            if (opener && !/\?\s*$/.test(text)) return "End the message with one open question, ending with a question mark"
+            if (isAbcd) return abcdProblem(text)
+            return isVoice ? voiceNoteProblem(text) : null
+          }
+        : undefined,
     signal,
   })
   const subject = cleanSubject(humanization.texts.subject)
   const cleaned = cleanMessage(humanization.texts.message, subject)
   const final = opener ? withOpeningLine(cleaned, opener) : { text: cleaned, fixed: false }
-  const message = final.text
+  // Whatever came back, the four replies are exactly the owner's own, on the end, once
+  const ending = isAbcd ? withAbcdOptions(final.text) : final
+  const message = ending.text
 
   // Serialized so the details also survive Next's dev file log, which drops object arguments
   console.info(
@@ -175,6 +193,8 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
       ...(opener ? { openerFixed: draft.fixed || final.fixed, openerPresent: hasOpeningLine(message, opener) } : {}),
       subjectCharacters: subject.length,
       messageCharacters: message.length,
+      ...(isVoice ? { words: countWords(message), speakingSeconds: speakingSeconds(countWords(message)) } : {}),
+      ...(isAbcd ? { abcdFixed: draft.fixed || ending.fixed, abcdPresent: hasAbcdOptions(message) } : {}),
     })
   )
 
@@ -185,8 +205,9 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
     subjectCharacters: subject.length,
     messageCharacters: message.length,
     subjectMaxCharacters: INMAIL_SUBJECT_MAX_CHARS,
-    messageMaxCharacters: INMAIL_BODY_MAX_CHARS,
-    warning: buildWarnings(subject, message, unsupportedSenderClaim),
+    messageMaxCharacters: isVoice ? VOICE_NOTE_MAX_CHARS : INMAIL_BODY_MAX_CHARS,
+    ...(isVoice ? { wordCount: countWords(message), speakingSeconds: speakingSeconds(countWords(message)) } : {}),
+    warning: buildWarnings(subject, message, unsupportedSenderClaim, isVoice),
     usedSenderProfile: senderProfile !== null,
     analysis: {
       keyDetail: data.key_detail.trim(),

@@ -9,6 +9,8 @@ import { EditableOutput } from "@/components/ui/EditableOutput"
 import { useEditableText } from "@/lib/outputEdits"
 import { AboutMeNotice, AnalysisDetails } from "@/components/outreach/OutreachResultExtras"
 import { getInMailTuneLabel } from "@/constants/inmail"
+import { VOICE_TUNE_ID } from "@/constants/outreachTunes"
+import { countWords, describeVoiceNote } from "@/lib/voiceNote"
 import type { GenerationStatus } from "@/hooks/useGenerationRequest"
 import type { GeneratedInMail } from "@/types/inmail"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
@@ -72,7 +74,9 @@ export const InMailResult: React.FC<InMailResultProps> = ({ status, result, erro
               <span className={message.value.length > result.messageMaxCharacters ? "text-error font-semibold" : ""}>
                 {message.value.length.toLocaleString()} / {result.messageMaxCharacters.toLocaleString()} characters
               </span>{" "}
-              · {getInMailTuneLabel(result.tune)} tone
+              {/* A voice note is read aloud, so what matters is its words and how long it takes to say */}
+              · {getInMailTuneLabel(result.tune)}
+              {result.tune === VOICE_TUNE_ID ? ` · ${describeVoiceNote(countWords(message.value))}` : " tone"}
               <AiSourceLabel source={result} />
             </p>
           </div>

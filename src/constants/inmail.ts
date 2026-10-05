@@ -1,4 +1,4 @@
-import { ABOUT_ME_TAB_ID, ABOUT_ME_TAB_LABEL } from "./outreachTunes"
+import { ABCD_TUNE, ABCD_TUNE_ID, ABOUT_ME_TAB_ID, ABOUT_ME_TAB_LABEL, VOICE_TUNE, VOICE_TUNE_ID } from "./outreachTunes"
 import { RESTATES_THANKS, RESTATES_VIEW, type OpeningLine } from "@/lib/openingLine"
 
 /**
@@ -7,7 +7,9 @@ import { RESTATES_THANKS, RESTATES_VIEW, type OpeningLine } from "@/lib/openingL
  * inmail-<id> in the prompts collection).
  */
 export const INMAIL_TUNES = [
-  { id: "trigger-event", label: "Trigger Event", description: "Recommended · Recent hire, funding or role" },
+  // The default: a short personal InMail that ends on the four replies (constants/outreachTunes.ts)
+  ABCD_TUNE,
+  { id: "trigger-event", label: "Trigger Event", description: "Recent hire, funding or role" },
   { id: "personalized-observation", label: "Personalized Observation", description: "Their post or achievement" },
   { id: "credibility-play", label: "Credibility Play", description: "Achievement + proof" },
   { id: "curiosity-hook", label: "Curiosity Hook", description: "Data, intrigue or a pattern" },
@@ -17,9 +19,14 @@ export const INMAIL_TUNES = [
   { id: "comment-interaction", label: "Comment Interaction", description: "Thanks for your comment + curiosity hook" },
   // Someone who viewed your profile and accepted your connection request: say you noticed, then a soft offer to help
   { id: "viewed-accepted", label: "Viewed + Accepted", description: "Viewed your profile + a soft offer to help" },
+  // The voice note's own tone, the only one the Voice note format has (constants/outreachTunes.ts)
+  VOICE_TUNE,
 ] as const
 
 export type InMailTuneId = (typeof INMAIL_TUNES)[number]["id"]
+
+/** The tones a written InMail has: every tone but the voice note's, which is a format of its own. */
+export const INMAIL_TEXT_TUNES = INMAIL_TUNES.filter((tune) => tune.id !== VOICE_TUNE_ID)
 
 export const INMAIL_TUNE_IDS = INMAIL_TUNES.map((tune) => tune.id) as [InMailTuneId, ...InMailTuneId[]]
 
@@ -38,7 +45,7 @@ export const OPENING_LINES: Partial<Record<InMailTuneId, OpeningLine>> = {
 }
 
 // The recommended first choice, selected by default
-export const DEFAULT_INMAIL_TUNE: InMailTuneId = "trigger-event"
+export const DEFAULT_INMAIL_TUNE: InMailTuneId = ABCD_TUNE_ID
 
 export type InMailPromptId = InMailTuneId | typeof ABOUT_ME_TAB_ID
 

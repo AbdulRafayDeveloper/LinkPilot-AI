@@ -3,15 +3,18 @@
 import React, { useRef, useState } from "react"
 import { Check, FolderPlus, Loader2, Pencil, Trash2, X } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
-import { FOLDER_NAME_MAX_LENGTH, PROMPT_FOLDER_MESSAGES } from "@/constants/promptFolders"
-import type { PromptFolder } from "@/types/promptFolders"
+import { FOLDER_NAME_MAX_LENGTH, PROMPT_FOLDER_COPY } from "@/constants/promptFolders"
+import type { FolderCopy } from "@/constants/folders"
+import type { RecordFolder } from "@/types/folders"
 
 interface FoldersDialogProps {
-  folders: PromptFolder[] | null
-  onCreate: (name: string) => Promise<PromptFolder>
+  folders: RecordFolder[] | null
+  onCreate: (name: string) => Promise<RecordFolder>
   onRename: (id: string, name: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onClose: () => void
+  // What the module files in its folders; prompts when nothing says otherwise
+  copy?: FolderCopy
 }
 
 const fieldClass =
@@ -23,8 +26,11 @@ const iconButton =
  * Making, renaming and deleting folders in one place. Deleting a folder keeps the records in it and
  * puts them back under "No folder", so a folder is only a label and never holds anything hostage;
  * a delete still asks first, because the folder itself doesn't come back.
+ *
+ * Every module's folders share this dialog: `copy` names what is being filed (a prompt, an Important
+ * Content entry), so the wording follows the module without a second copy of the dialog.
  */
-export const FoldersDialog: React.FC<FoldersDialogProps> = ({ folders, onCreate, onRename, onDelete, onClose }) => {
+export const FoldersDialog: React.FC<FoldersDialogProps> = ({ folders, onCreate, onRename, onDelete, onClose, copy = PROMPT_FOLDER_COPY }) => {
   const [newName, setNewName] = useState("")
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null)
   const [confirming, setConfirming] = useState<string | null>(null)
@@ -38,7 +44,7 @@ export const FoldersDialog: React.FC<FoldersDialogProps> = ({ folders, onCreate,
     try {
       await action()
     } catch (reason: unknown) {
-      setError(reason instanceof Error ? reason.message : PROMPT_FOLDER_MESSAGES.createFailed)
+      setError(reason instanceof Error ? reason.message : copy.failed)
     } finally {
       setBusy(null)
     }
@@ -54,7 +60,7 @@ export const FoldersDialog: React.FC<FoldersDialogProps> = ({ folders, onCreate,
   }
 
   return (
-    <Modal title="Folders" description="Make, rename and delete the folders your prompts are filed in." onClose={onClose} isCloseDisabled={busy !== null} initialFocusRef={newRef}>
+    <Modal title="Folders" description={copy.manage} onClose={onClose} isCloseDisabled={busy !== null} initialFocusRef={newRef}>
       <div className="flex flex-col gap-4">
         <form
           onSubmit={(event) => {
@@ -95,7 +101,7 @@ export const FoldersDialog: React.FC<FoldersDialogProps> = ({ folders, onCreate,
             Loading folders...
           </p>
         ) : folders.length === 0 ? (
-          <p className="text-[13px] text-on-surface-variant">No folders yet. The first one can be made above, or straight from a prompt&apos;s Move button.</p>
+          <p className="text-[13px] text-on-surface-variant">{copy.emptyHint}</p>
         ) : (
           <ul className="custom-scrollbar flex max-h-[46vh] flex-col divide-y divide-outline-variant/60 overflow-y-auto rounded-xl border border-outline-variant">
             {folders.map((folder) => (
@@ -134,7 +140,7 @@ export const FoldersDialog: React.FC<FoldersDialogProps> = ({ folders, onCreate,
                   <div className="flex items-center gap-2">
                     <span className="min-w-0 flex-1 truncate text-[13px] text-on-surface">{folder.name}</span>
                     <span className="shrink-0 text-[11px] text-outline">
-                      {folder.promptCount.toLocaleString()} {folder.promptCount === 1 ? "prompt" : "prompts"}
+                      {folder.recordCount.toLocaleString()} {folder.recordCount === 1 ? copy.noun.one : copy.noun.many}
                     </span>
                     <button
                       type="button"
@@ -163,7 +169,7 @@ export const FoldersDialog: React.FC<FoldersDialogProps> = ({ folders, onCreate,
                 {confirming === folder.id && (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-error-container/60 px-3 py-2">
                     <p className="text-[12px] text-on-surface">
-                      Delete &quot;{folder.name}&quot;? {PROMPT_FOLDER_MESSAGES.deleteExplains}
+                      Delete &quot;{folder.name}&quot;? {copy.deleteExplains}
                     </p>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setConfirming(null)} disabled={busy !== null} className="rounded-lg border border-outline-variant bg-white px-3 py-1 text-[12px] font-semibold">

@@ -70,8 +70,8 @@ export function usePromptFolders(endpoint: string | undefined) {
   const countMoved = useCallback((from: string | null, to: string | null) => {
     setFolders((current) =>
       (current ?? []).map((folder) => {
-        if (folder.id === from) return { ...folder, promptCount: Math.max(0, folder.promptCount - 1) }
-        if (folder.id === to) return { ...folder, promptCount: folder.promptCount + 1 }
+        if (folder.id === from) return { ...folder, recordCount: Math.max(0, folder.recordCount - 1) }
+        if (folder.id === to) return { ...folder, recordCount: folder.recordCount + 1 }
         return folder
       })
     )

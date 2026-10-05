@@ -83,7 +83,7 @@ export const DependenciesDialog: React.FC<DependenciesDialogProps> = ({
   const folderOptions = useMemo(
     () => [
       { id: UNFILED_FOLDER, label: PROMPT_FOLDER_MESSAGES.unfiled },
-      ...(folders ?? []).map((entry) => ({ id: entry.id, label: `${entry.name} (${entry.promptCount})`, searchText: entry.name })),
+      ...(folders ?? []).map((entry) => ({ id: entry.id, label: `${entry.name} (${entry.recordCount})`, searchText: entry.name })),
     ],
     [folders]
   )

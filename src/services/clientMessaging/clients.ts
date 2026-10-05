@@ -6,6 +6,7 @@ import { CLIENT_MESSAGING_MESSAGES, SAMPLE_MESSAGE_COUNT } from "@/constants/cli
 import type { Client, ClientInput } from "@/types/clientMessaging"
 import type { Viewer } from "@/types/auth"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
+import { deleteTasksOfProjects } from "@/services/clientProjects/tasks"
 
 /**
  * The clients the user writes to, kept in the clients collection. Each one carries its own
@@ -82,7 +83,12 @@ export async function deleteClient(viewer: Viewer, id: string): Promise<boolean>
   if (!filter) return false
   await connectDatabase()
   const { deletedCount } = await ClientModel.deleteOne(filter)
-  if (deletedCount > 0) await ClientProjectModel.deleteMany({ clientId: id })
+  if (deletedCount > 0) {
+    // The projects go, and each one's tasks with their images and voice notes go with them
+    const projects = (await ClientProjectModel.find({ clientId: id }, { _id: 1 }).lean()) as unknown as { _id: { toString: () => string } }[]
+    await deleteTasksOfProjects(visibleTo(viewer), projects.map((project) => project._id.toString()))
+    await ClientProjectModel.deleteMany({ clientId: id })
+  }
   return deletedCount > 0
 }
 

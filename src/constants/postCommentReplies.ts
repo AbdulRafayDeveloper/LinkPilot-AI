@@ -24,8 +24,11 @@ export function isReplyAuthor(author: string | null): boolean {
   return name === REPLY_AUTHOR_NAME.toLowerCase() || name === "you" || name === "me"
 }
 
-// Plain names on screen; the ids stay stable so saved prompts and selections keep working
+// Plain names on screen; the ids stay stable so saved prompts and selections keep working.
+// Conversational comes first, so it is the default: most replies in a thread are just a short
+// natural answer, and the other styles are for when a reply is meant to do a particular job.
 export const REPLY_STYLES = [
+  { id: "conversational", label: "Conversational", description: "Short natural reply" },
   { id: "authority-builder", label: "Show Expertise", description: "Expert view + data" },
   { id: "curiosity-driver", label: "Ask Their Opinion", description: "Gets them talking" },
   { id: "value-demonstrator", label: "Give Useful Tips", description: "Helpful, no pitch" },

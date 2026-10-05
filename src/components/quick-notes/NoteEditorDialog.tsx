@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal"
 import { RichTextEditor } from "@/components/ui/RichTextEditor"
 import { requestApi } from "@/lib/apiClient"
 import { NOTE_AUTOSAVE_DELAY_MS, NOTE_MAX_LENGTH, NOTE_TITLE_MAX_LENGTH, QUICK_NOTES_ENDPOINT, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
+import { canKeepalive } from "@/constants/textLimits"
 import { NOTE_EDITOR_IMAGES } from "./noteEditorImages"
 import type { QuickNote, QuickNoteInput } from "@/types/quickNotes"
 
@@ -96,11 +97,13 @@ export const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({ note, onSave
   useEffect(() => {
     const flush = () => {
       if (!isDirty() || !isSaveable(formRef.current)) return
+      const body = JSON.stringify(formRef.current)
       void fetch(`${QUICK_NOTES_ENDPOINT}/${note.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formRef.current),
-        keepalive: true,
+        body,
+        // A note too large for a keepalive body goes as an ordinary request (constants/textLimits.ts)
+        keepalive: canKeepalive(body),
       })
     }
     window.addEventListener("pagehide", flush)

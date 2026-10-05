@@ -184,9 +184,13 @@ export default function PromptCreatorClient() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0">
+            {/* The form takes about 65% and the written prompt 35%: what is typed, the targets, the
+                project and the choices all live on the left, while the prompt itself reads fine narrower */}
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)] gap-5 lg:flex-1 lg:min-h-0">
               {/* What the user wants done */}
-              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4">
+              {/* gap-5 between the blocks, so the targets, the project and the choice below the text box
+                  are not crowded together now that the form has the wider side */}
+              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-5 short:gap-4">
                 <div className="flex flex-col gap-2 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label htmlFor="prompt-request" className="text-[10px] font-bold text-outline uppercase tracking-wider">
@@ -214,20 +218,24 @@ export default function PromptCreatorClient() {
                       requestInvalid ? "border-error" : "border-outline-variant focus:border-primary/50"
                     }`}
                   />
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-outline">
+                  {/* The count, who wrote the speech out and Copy share one line, so the model that
+                      wrote it never costs the form a row of its own */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-outline">
                     <span>
                       {request.length.toLocaleString()} / {REQUEST_MAX_LENGTH.toLocaleString()} characters
-                      {requestSource === "voice" && request !== "" && " from your recording"}
+                      {/* "Written out by ..." beside it already says it came from a recording */}
+                      {requestSource === "voice" && request !== "" && transcribedBy.length === 0 && " from your recording"}
                     </span>
+                    {requestSource === "voice" && request !== "" && transcribedBy.length > 0 && (
+                      <span role="status" className="inline-flex items-center gap-1 text-on-surface-variant">
+                        <AudioLines size={12} className="shrink-0 text-primary" aria-hidden="true" />
+                        Written out by <span className="font-semibold text-on-surface">{describeProviders(transcribedBy)}</span>
+                      </span>
+                    )}
+                    {/* It follows the text rather than sitting at the right edge, so the three keep
+                        one line on a narrow laptop column too */}
                     {request !== "" && <CopyButton text={request} label="Copy what you described" />}
                   </div>
-                  {requestSource === "voice" && request !== "" && transcribedBy.length > 0 && (
-                    <p role="status" className="flex items-center gap-1.5 text-[12px] text-on-surface-variant">
-                      <AudioLines size={13} className="shrink-0 text-primary" aria-hidden="true" />
-                      Speech written out by{" "}
-                      <span className="font-semibold text-on-surface">{describeProviders(transcribedBy)}</span>
-                    </p>
-                  )}
                   {voiceError && (
                     <p role="alert" className="rounded-xl border border-error/40 bg-error-container px-3 py-2 text-[12px] text-error">
                       {voiceError}
@@ -256,7 +264,7 @@ export default function PromptCreatorClient() {
 
                 {/* What the prompt is for. The project chosen last is waiting next time, and its
                     instructions go on the end of every prompt written in it */}
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-3">
                   {!projectsOff && (
                     <>
                       <div className="flex flex-wrap items-end gap-2">

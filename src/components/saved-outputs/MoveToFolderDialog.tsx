@@ -3,17 +3,20 @@
 import React, { useMemo, useRef, useState } from "react"
 import { Check, FolderPlus, Loader2, Search } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
-import { FOLDER_NAME_MAX_LENGTH, PROMPT_FOLDER_MESSAGES } from "@/constants/promptFolders"
-import type { PromptFolder } from "@/types/promptFolders"
+import { FOLDER_NAME_MAX_LENGTH, PROMPT_FOLDER_COPY } from "@/constants/promptFolders"
+import { UNFILED_FOLDER_LABEL, type FolderCopy } from "@/constants/folders"
+import type { RecordFolder } from "@/types/folders"
 
 interface MoveToFolderDialogProps {
   // What is being moved, named so the right record is going
   title: string
-  folders: PromptFolder[] | null
+  folders: RecordFolder[] | null
   currentFolderId: string | null
-  onMove: (folder: PromptFolder | null) => Promise<void>
-  onCreate: (name: string) => Promise<PromptFolder>
+  onMove: (folder: RecordFolder | null) => Promise<void>
+  onCreate: (name: string) => Promise<RecordFolder>
   onClose: () => void
+  // What the module files in its folders; prompts when nothing says otherwise
+  copy?: FolderCopy
 }
 
 const rowClass =
@@ -24,7 +27,7 @@ const rowClass =
  * take it out of one, and a name that matches nothing can be made into a folder and used in the
  * same step, so filing something new never means leaving the page first.
  */
-export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({ title, folders, currentFolderId, onMove, onCreate, onClose }) => {
+export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({ title, folders, currentFolderId, onMove, onCreate, onClose, copy = PROMPT_FOLDER_COPY }) => {
   const [query, setQuery] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,7 +44,7 @@ export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({ title, f
       await action()
       onClose()
     } catch (reason: unknown) {
-      setError(reason instanceof Error ? reason.message : PROMPT_FOLDER_MESSAGES.moveFailed)
+      setError(reason instanceof Error ? reason.message : copy.moveFailed)
       setBusy(null)
     }
   }
@@ -79,7 +82,7 @@ export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({ title, f
               disabled={busy !== null || currentFolderId === null}
               className={`${rowClass} ${currentFolderId === null ? "bg-surface-container-high text-on-surface-variant" : "text-on-surface hover:bg-surface-container-low"}`}
             >
-              <span>{PROMPT_FOLDER_MESSAGES.unfiled}</span>
+              <span>{UNFILED_FOLDER_LABEL}</span>
               {currentFolderId === null ? <Check size={14} className="text-primary" aria-label="Where it is now" /> : spinner("none")}
             </button>
           )}
@@ -102,7 +105,7 @@ export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({ title, f
                 >
                   <span className="min-w-0 flex-1 truncate">{folder.name}</span>
                   <span className="flex shrink-0 items-center gap-2 text-[11px] text-outline">
-                    {folder.promptCount.toLocaleString()}
+                    {folder.recordCount.toLocaleString()}
                     {isCurrent ? <Check size={14} className="text-primary" aria-label="Where it is now" /> : spinner(folder.id)}
                   </span>
                 </button>

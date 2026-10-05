@@ -5,6 +5,9 @@ export interface ImportantContent {
   type: string
   // The size the description is written and read at, in pixels (CONTENT_TEXT_SIZES)
   textSize: number
+  // The folder it is filed in, with the name to show for it, or null for an entry in no folder.
+  // A folder deleted while the page was open reads as no folder rather than as a gap
+  folder: { id: string; name: string } | null
   // The account that saved it, named only for an admin (who sees every account's entries)
   owner: string | null
   createdAt: string

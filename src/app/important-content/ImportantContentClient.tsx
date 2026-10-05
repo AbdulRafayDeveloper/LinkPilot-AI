@@ -1,23 +1,33 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import { AlertTriangle, Eye, FileKey2, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { AlertTriangle, Eye, FileKey2, FolderOpen, Folders, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
 import { Pagination } from "@/components/ui/Pagination"
 import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { useRowSelection } from "@/hooks/useRowSelection"
-import { CopyButton } from "@/components/ui/CopyButton"
-import { FilterPanel, SearchFilter, SelectFilter, historyLabelClass } from "@/components/history/HistoryFilters"
+import { FilterPanel, SearchFilter, SearchableSelectFilter, SelectFilter, historyLabelClass } from "@/components/history/HistoryFilters"
 import { ContentDialog } from "@/components/important-content/ContentDialog"
-import { ContentDetailsDialog } from "@/components/important-content/ContentDetailsDialog"
+import { ContentFullView } from "@/components/important-content/ContentFullView"
+import { FoldersDialog } from "@/components/saved-outputs/FoldersDialog"
+import { MoveToFolderDialog } from "@/components/saved-outputs/MoveToFolderDialog"
+import { usePromptFolders } from "@/hooks/usePromptFolders"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { requestApi } from "@/lib/apiClient"
 import { toPlainText } from "@/lib/richText"
 import { HISTORY_DEBOUNCE_MS } from "@/constants/historyFilters"
 import { CONTENT_PREVIEW_MAX_LENGTH, IMPORTANT_CONTENT_ENDPOINT, IMPORTANT_CONTENT_MESSAGES } from "@/constants/importantContent"
+import {
+  CONTENT_FOLDERS_ENDPOINT,
+  CONTENT_FOLDER_COPY,
+  CONTENT_FOLDER_MESSAGES,
+  IN_ANY_FOLDER,
+  UNFILED_FOLDER,
+} from "@/constants/contentFolders"
+import type { RecordFolder } from "@/types/folders"
 import type { ImportantContent, ImportantContentPage } from "@/types/importantContent"
 
 const savedOn = (iso: string) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -32,13 +42,25 @@ const preview = (description: string) => {
   return text.length > CONTENT_PREVIEW_MAX_LENGTH ? `${text.slice(0, CONTENT_PREVIEW_MAX_LENGTH).trimEnd()}...` : text
 }
 
-// Copy takes the saved text; an entry with no description copies its name
-const copyText = (entry: ImportantContent) => entry.description || entry.name
+// Copy takes the saved text; an entry with no description copies its name. Switched off with the
+// row's Copy button at the owner's request, and kept here so putting that button back is one line.
+// const copyText = (entry: ImportantContent) => entry.description || entry.name
 
 const pagerButton =
   "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
 const actionButton =
   "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-outline transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+
+/** Which folder an entry is in, or that it is in none, wherever a row is shown. */
+const FolderTag: React.FC<{ folder: ImportantContent["folder"] }> = ({ folder }) =>
+  folder ? (
+    <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-outline-variant bg-surface-container-lowest px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">
+      <FolderOpen size={11} className="shrink-0" aria-hidden="true" />
+      <span className="truncate">{folder.name}</span>
+    </span>
+  ) : (
+    <span className="text-[11px] text-outline">{CONTENT_FOLDER_MESSAGES.unfiled}</span>
+  )
 
 const TypeBadge: React.FC<{ type: string }> = ({ type }) => (
   <span className="inline-flex max-w-full truncate rounded-full bg-primary-fixed/70 px-2 py-0.5 text-[11px] font-semibold text-on-primary-fixed-variant">{type}</span>
@@ -53,6 +75,8 @@ export default function ImportantContentClient() {
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const [search, setSearch] = useState("")
   const [type, setType] = useState("")
+  // A folder's id, IN_ANY_FOLDER, UNFILED_FOLDER, or "" for every entry
+  const [folder, setFolder] = useState("")
   const [page, setPage] = useState(1)
   const [result, setResult] = useState<ImportantContentPage | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -62,17 +86,25 @@ export default function ImportantContentClient() {
   // The entry opened in full; its description comes with the list, so opening it asks for nothing
   const [viewing, setViewing] = useState<ImportantContent | null>(null)
   const [deleting, setDeleting] = useState<ImportantContent | null>(null)
+  // Filing: the entry being moved, and whether the folder manager is open
+  const [moving, setMoving] = useState<ImportantContent | null>(null)
+  const [isManagingFolders, setIsManagingFolders] = useState(false)
+  const [moveError, setMoveError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   // Deleting several at once: which delete is waiting to be confirmed, and whether it is running
   const [confirmingMany, setConfirmingMany] = useState<"picked" | "all" | null>(null)
   const [isDeletingMany, setIsDeletingMany] = useState(false)
 
+  // One folder list for the filter, the Move dialog and the manager, loaded once per page
+  const folders = usePromptFolders(CONTENT_FOLDERS_ENDPOINT)
+
   // Typing settles before the list is asked for again, and an emptied search box counts at once
   const settledSearch = useDebouncedValue(search.trim(), HISTORY_DEBOUNCE_MS)
   const params = new URLSearchParams({ page: String(page) })
   if (search.trim() && settledSearch) params.set("search", settledSearch)
   if (type) params.set("type", type)
+  if (folder) params.set("folder", folder)
   const query = params.toString()
   const requestKey = `${query}#${attempt}`
   const isLoading = answered !== requestKey
@@ -98,7 +130,7 @@ export default function ImportantContentClient() {
   }, [query, requestKey, page])
 
   const reload = () => setAttempt((count) => count + 1)
-  const hasFilters = Boolean(search || type)
+  const hasFilters = Boolean(search || type || folder)
   const selection = useRowSelection((result?.items ?? []).map((entry) => entry.id))
 
   /**
@@ -134,12 +166,45 @@ export default function ImportantContentClient() {
   const lastShown = Math.min(total, (page - 1) * pageSize + items.length)
   // A type chosen in the filter stays offered even if its last entry was just edited away
   const typeOptions = [...new Set([...(result?.types ?? []), ...(type ? [type] : [])])].map((entry) => ({ id: entry, label: entry }))
+  // "In a folder" carries the number filed, the folder counts added up, like the saved-outputs filter
+  const filedCount = (folders.folders ?? []).reduce((count, entry) => count + entry.recordCount, 0)
+  const folderOptions = [
+    { id: IN_ANY_FOLDER, label: `${CONTENT_FOLDER_MESSAGES.inAnyFolder} (${filedCount})`, searchText: CONTENT_FOLDER_MESSAGES.inAnyFolder },
+    { id: UNFILED_FOLDER, label: CONTENT_FOLDER_MESSAGES.unfiled, searchText: CONTENT_FOLDER_MESSAGES.unfiled },
+    ...(folders.folders ?? []).map((entry) => ({ id: entry.id, label: `${entry.name} (${entry.recordCount})`, searchText: entry.name })),
+  ]
 
   // The list is ordered by last change, so a new entry and an edited one both land at the top of page 1
   const saved = () => {
     setDialog(null)
     setPage(1)
     reload()
+  }
+
+  /**
+   * Files one entry in a folder, or takes it out of one. The row shows it at once; a failure says so
+   * and the list is read again, so the tag can never claim a folder the entry is not in. A folder
+   * filter is on the page, so the entry may now belong on another page: the list is reloaded then.
+   */
+  const move = async (entry: ImportantContent, into: RecordFolder | null) => {
+    const from = entry.folder?.id ?? null
+    setMoveError(null)
+    setResult((current) =>
+      current ? { ...current, items: current.items.map((row) => (row.id === entry.id ? { ...row, folder: into ? { id: into.id, name: into.name } : null } : row)) } : current
+    )
+    try {
+      await requestApi<ImportantContent>(`${IMPORTANT_CONTENT_ENDPOINT}/${entry.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderId: into?.id ?? null }),
+      })
+      folders.countMoved(from, into?.id ?? null)
+      if (folder) reload()
+    } catch (reason: unknown) {
+      setMoveError(reason instanceof Error ? reason.message : CONTENT_FOLDER_MESSAGES.moveFailed)
+      reload()
+      throw reason
+    }
   }
 
   const remove = async () => {
@@ -163,7 +228,12 @@ export default function ImportantContentClient() {
         <Eye size={13} aria-hidden="true" />
         View details
       </button>
-      <CopyButton text={copyText(entry)} label={`Copy ${entry.name}`} showLabel />
+      {/* Copy is switched off here at the owner's request; the full view still has its copy button.
+          <CopyButton text={copyText(entry)} label={`Copy ${entry.name}`} showLabel /> */}
+      <button type="button" onClick={() => setMoving(entry)} aria-label={`Move ${entry.name} to a folder`} className={`${actionButton} hover:text-primary`}>
+        <FolderOpen size={13} aria-hidden="true" />
+        Move
+      </button>
       <button type="button" onClick={() => setDialog({ entry })} aria-label={`Edit ${entry.name}`} className={`${actionButton} hover:text-primary`}>
         <Pencil size={13} aria-hidden="true" />
         Edit
@@ -200,22 +270,34 @@ export default function ImportantContentClient() {
                 </h1>
                 <p className="mt-1 text-sm text-on-surface-variant">Logins, links and text worth finding again, sorted by types you choose.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setDialog({ entry: null })}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant sm:shrink-0"
-              >
-                <Plus size={16} aria-hidden="true" />
-                Add New Content
-              </button>
+              <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsManagingFolders(true)}
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                >
+                  <Folders size={16} aria-hidden="true" />
+                  Folders
+                  {folders.folders && folders.folders.length > 0 && <span className="text-[12px] font-medium text-outline">{folders.folders.length}</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDialog({ entry: null })}
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                >
+                  <Plus size={16} aria-hidden="true" />
+                  Add New Content
+                </button>
+              </div>
             </div>
 
             <FilterPanel
-              columnsClassName="lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
+              columnsClassName="lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
               canClear={hasFilters}
               onClear={() => {
                 setSearch("")
                 setType("")
+                setFolder("")
                 setPage(1)
               }}
               summary={result ? `Showing ${firstShown.toLocaleString()} to ${lastShown.toLocaleString()} of ${total.toLocaleString()}` : "Loading your content..."}
@@ -235,6 +317,19 @@ export default function ImportantContentClient() {
                 options={typeOptions}
                 onChange={(value) => {
                   setType(value)
+                  setPage(1)
+                }}
+              />
+              {/* Searched rather than scrolled, because a hundred folders is a long list to open */}
+              <SearchableSelectFilter
+                label="Folder"
+                allLabel={CONTENT_FOLDER_MESSAGES.allFolders}
+                value={folder}
+                options={folderOptions}
+                searchPlaceholder={CONTENT_FOLDER_MESSAGES.searchFolders}
+                emptyLabel={CONTENT_FOLDER_MESSAGES.noFolderMatch}
+                onChange={(value) => {
+                  setFolder(value)
                   setPage(1)
                 }}
               />
@@ -276,9 +371,9 @@ export default function ImportantContentClient() {
               </div>
             ) : (
               <div className={`flex flex-col gap-3 transition-opacity ${isLoading ? "opacity-60" : ""}`} aria-busy={isLoading}>
-                {error && (
+                {(error || moveError || folders.error) && (
                   <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
-                    {error}
+                    {error ?? moveError ?? folders.error}
                   </p>
                 )}
 
@@ -291,7 +386,8 @@ export default function ImportantContentClient() {
                         <th scope="col" className="w-[36px] px-2 py-2.5">
                           <span className="sr-only">Picked</span>
                         </th>
-                        {["Name", "Type", "Description", "Last changed", "Actions"].map((heading) => (
+                        {/* "Last changed" was taken off at the owner's request; the list is still ordered by it */}
+                        {["Name", "Type", "Folder", "Description", "Actions"].map((heading) => (
                           <th key={heading} scope="col" className={`px-3 py-2.5 ${historyLabelClass} ${heading === "Actions" ? "text-right" : ""}`}>
                             {heading}
                           </th>
@@ -317,6 +413,9 @@ export default function ImportantContentClient() {
                           <td className="max-w-[160px] px-3 py-2.5">
                             <TypeBadge type={entry.type} />
                           </td>
+                          <td className="max-w-[150px] px-3 py-2.5">
+                            <FolderTag folder={entry.folder} />
+                          </td>
                           <td className="max-w-[420px] px-3 py-2.5">
                             {entry.description ? (
                               <p className="line-clamp-3 break-words text-[13px] leading-relaxed text-on-surface-variant">{preview(entry.description)}</p>
@@ -324,7 +423,6 @@ export default function ImportantContentClient() {
                               <span className="text-[12px] text-outline">No description</span>
                             )}
                           </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-[12px] text-on-surface-variant">{savedOn(entry.updatedAt)}</td>
                           <td className="px-3 py-2">{actions(entry)}</td>
                         </tr>
                       ))}
@@ -349,6 +447,7 @@ export default function ImportantContentClient() {
                         </div>
                         <TypeBadge type={entry.type} />
                       </div>
+                      <FolderTag folder={entry.folder} />
                       {entry.description && (
                         <p className="line-clamp-4 break-words text-[13px] leading-relaxed text-on-surface-variant">{preview(entry.description)}</p>
                       )}
@@ -378,13 +477,41 @@ export default function ImportantContentClient() {
         />
       )}
       {viewing && (
-        <ContentDetailsDialog
+        <ContentFullView
           entry={viewing}
           onClose={() => setViewing(null)}
           onEdit={() => {
             setViewing(null)
             setDialog({ entry: viewing })
           }}
+        />
+      )}
+
+      {moving && (
+        <MoveToFolderDialog
+          title={moving.name}
+          folders={folders.folders}
+          currentFolderId={moving.folder?.id ?? null}
+          copy={CONTENT_FOLDER_COPY}
+          onMove={(into) => move(moving, into)}
+          onCreate={folders.create}
+          onClose={() => setMoving(null)}
+        />
+      )}
+
+      {isManagingFolders && (
+        <FoldersDialog
+          folders={folders.folders}
+          copy={CONTENT_FOLDER_COPY}
+          onCreate={folders.create}
+          onRename={folders.rename}
+          onDelete={async (id) => {
+            await folders.remove(id)
+            // The entries in it are kept and now show under No folder, so the list is read again
+            if (folder === id) setFolder("")
+            reload()
+          }}
+          onClose={() => setIsManagingFolders(false)}
         />
       )}
 

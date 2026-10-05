@@ -101,7 +101,7 @@ function queryString(filters: FilterState, search: string, page: number): string
 // Long enough to be cut in the table: past the preview length, or more than a few lines
 /** "In a folder", with how many prompts are filed once the folders have loaded. */
 const filedLabel = (folders: PromptFolder[] | null): string => {
-  const filed = (folders ?? []).reduce((total, folder) => total + folder.promptCount, 0)
+  const filed = (folders ?? []).reduce((total, folder) => total + folder.recordCount, 0)
   return folders && folders.length > 0 ? `${PROMPT_FOLDER_MESSAGES.inAnyFolder} (${filed})` : PROMPT_FOLDER_MESSAGES.inAnyFolder
 }
 
@@ -965,7 +965,7 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                     // Typing matches the folder's name, never the count beside it
                     ...(folders.folders ?? []).map((folder) => ({
                       id: folder.id,
-                      label: `${folder.name} (${folder.promptCount})`,
+                      label: `${folder.name} (${folder.recordCount})`,
                       searchText: folder.name,
                     })),
                   ]}

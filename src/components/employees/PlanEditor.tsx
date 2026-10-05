@@ -12,6 +12,7 @@ import { TASK_ATTACHMENT_MESSAGES, TASK_MAX_DEPTH } from "@/constants/taskAttach
 import { CopyTaskText } from "@/components/tasks/CopyTaskText"
 import { toStoredImages } from "@/types/taskAttachment"
 import { EMPLOYEES_ENDPOINT, EMPLOYEE_MESSAGES, PLAN_ITEM_MAX_LENGTH, PLAN_MAX_ITEMS, PLAN_NOTES_MAX_LENGTH, PLAN_SAVE_DELAY_MS } from "@/constants/employees"
+import { canKeepalive } from "@/constants/textLimits"
 import type { Employee, EmployeePlan, EmployeePlanInput, PlanHistoryDay, PlanHistoryPage, PlanItem } from "@/types/employees"
 import { PlanHistory, dayHeading, mergeHistory, replaceHistoryDay, tickTime } from "./PlanHistory"
 import { TaskReason } from "./TaskReason"
@@ -222,11 +223,13 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
       const payload = pendingRef.current
       if (!payload) return
       pendingRef.current = null
+      const body = JSON.stringify(payload.body)
       void fetchWithRetry(planUrl(payload.employeeId), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload.body),
-        keepalive: true,
+        body,
+        // Notes too large for a keepalive body go as an ordinary request (constants/textLimits.ts)
+        keepalive: canKeepalive(body),
       }).catch(() => undefined)
     }
     window.addEventListener("pagehide", flush)

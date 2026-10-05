@@ -74,7 +74,7 @@ export const FolderDropBar: React.FC<FolderDropBarProps> = ({ folders, overId, m
       <ul className="flex flex-wrap items-center gap-1.5">
         <FolderDropTarget id={UNFILED_DROP} name={PROMPT_FOLDER_MESSAGES.unfiled} count={null} isOver={over === null && overId !== null} />
         {(folders ?? []).map((folder) => (
-          <FolderDropTarget key={folder.id} id={folder.id} name={folder.name} count={folder.promptCount} isOver={over === folder.id} />
+          <FolderDropTarget key={folder.id} id={folder.id} name={folder.name} count={folder.recordCount} isOver={over === folder.id} />
         ))}
       </ul>
     </div>

@@ -1,4 +1,4 @@
-import { ABOUT_ME_TAB_ID, ABOUT_ME_TAB_LABEL } from "./outreachTunes"
+import { ABCD_TUNE, ABCD_TUNE_ID, ABOUT_ME_TAB_ID, ABOUT_ME_TAB_LABEL, VOICE_TUNE, VOICE_TUNE_ID } from "./outreachTunes"
 import { RESTATES_THANKS, RESTATES_VIEW, type OpeningLine } from "@/lib/openingLine"
 
 // Kept as re-exports so existing imports from this module keep working
@@ -11,7 +11,9 @@ export { LINKEDIN_MESSAGE_MAX_CHARS } from "./linkedinLimits"
  * InMail keeps the shared outreach tunes.
  */
 export const FIRST_MESSAGE_TUNES = [
-  { id: "curiosity-hook", label: "Curiosity Hook", description: "Recommended · Intrigue, then a question" },
+  // The default: a short personal message that ends on the four replies (constants/outreachTunes.ts)
+  ABCD_TUNE,
+  { id: "curiosity-hook", label: "Curiosity Hook", description: "Intrigue, then a question" },
   { id: "value-first", label: "Value First", description: "Share an insight before any ask" },
   { id: "credibility-play", label: "Credibility Play", description: "Specific observation about their work" },
   { id: "problem-solution", label: "Problem-Solution", description: "Name their challenge, focus on them" },
@@ -21,6 +23,8 @@ export const FIRST_MESSAGE_TUNES = [
   { id: "comment-interaction", label: "Comment Interaction", description: "Thanks for your comment + curiosity hook" },
   // Someone who viewed your profile and accepted your connection request: say you noticed, then a soft offer to help
   { id: "viewed-accepted", label: "Viewed + Accepted", description: "Viewed your profile + a soft offer to help" },
+  // The voice note's own tone, the only one the Voice note format has (constants/outreachTunes.ts)
+  VOICE_TUNE,
 ] as const
 
 export type FirstMessageTuneId = (typeof FIRST_MESSAGE_TUNES)[number]["id"]
@@ -39,13 +43,16 @@ export const OPENING_LINES: Partial<Record<FirstMessageTuneId, OpeningLine>> = {
   },
 }
 
+/** The tones a written message has: every tone but the voice note's, which is a format of its own. */
+export const FIRST_MESSAGE_TEXT_TUNES = FIRST_MESSAGE_TUNES.filter((tune) => tune.id !== VOICE_TUNE_ID)
+
 export const FIRST_MESSAGE_TUNE_IDS = FIRST_MESSAGE_TUNES.map((tune) => tune.id) as [
   FirstMessageTuneId,
   ...FirstMessageTuneId[],
 ]
 
 // The recommended first choice, selected by default
-export const DEFAULT_FIRST_MESSAGE_TUNE: FirstMessageTuneId = "curiosity-hook"
+export const DEFAULT_FIRST_MESSAGE_TUNE: FirstMessageTuneId = ABCD_TUNE_ID
 
 export type FirstMessagePromptId = FirstMessageTuneId | typeof ABOUT_ME_TAB_ID
 

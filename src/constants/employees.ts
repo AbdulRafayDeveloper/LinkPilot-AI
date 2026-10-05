@@ -1,4 +1,5 @@
 import { Contact, type LucideIcon } from "lucide-react"
+import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
 
 /**
  * Employees Management: the people on the team (name, city, role, date of joining, active or not)
@@ -38,7 +39,8 @@ export const EMPLOYEES_LIST_MAX = 500
 export const PLAN_MAX_ITEMS = 50
 // Why a task wasn't finished, written on the employee's link: a sentence or two, not a report
 export const PLAN_REASON_MAX_LENGTH = 500
-export const PLAN_NOTES_MAX_LENGTH = 4000
+// The manager's own notes on the plan, which no model reads, so the shared text box ceiling
+export const PLAN_NOTES_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
 // Changes to a plan are saved once typing settles for this long
 export const PLAN_SAVE_DELAY_MS = 800
 

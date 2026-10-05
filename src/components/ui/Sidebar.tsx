@@ -232,7 +232,7 @@ const SidebarDropdown: React.FC<SidebarDropdownProps> = ({
 }
 
 /**
- * App navigation: the brand, every tool under the four headings in TOOL_GROUPS, and Global AI
+ * App navigation: the brand, every tool under the three headings in TOOL_GROUPS, and Global AI
  * Prompts pinned at the bottom. Each heading opens and closes its own section, any number at once,
  * each kept as the user left it across pages (hooks/useSidebarSections.ts); every section shows
  * while searching and on the collapsed rail. A drawer on small screens; on desktop a full column that

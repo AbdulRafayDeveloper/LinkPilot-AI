@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { CLIENTS_TOOL } from "./clients"
 import { PROJECTS_TOOL } from "./promptProjects"
+import { CLIENT_PROJECTS_TOOL } from "./clientProjectTasks"
 import { CLIENT_MESSAGING_TOOL } from "./clientMessaging"
 import { CLIENT_VOICES_TOOL } from "./clientVoices"
 import { POST_IMAGES_HISTORY_HREF, POST_IMAGES_TOOL } from "./postImages"
@@ -32,14 +33,14 @@ import { PROFILE_SCHEDULER_LINK } from "./profileScheduler"
 import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./savedOutputs"
 
 /**
- * The four areas of the app, in sidebar order (the owner's: Prompts, Workspace, LinkedIn Tools,
- * Client Work). Each one is a heading in the sidebar that opens and closes its tools, so keep
- * them few and meaningful: a tool that needs a heading of its own belongs in one of these.
+ * The three areas of the app, in sidebar order (the owner's: Workspace, LinkedIn Tools, Client
+ * Work). Each one is a heading in the sidebar that opens and closes its tools, so keep them few
+ * and meaningful: a tool that needs a heading of its own belongs in one of these. Prompt Creator
+ * had a "Prompts" heading of its own until the owner asked for it under Workspace, with the rest
+ * of the day's work.
  */
 export const TOOL_GROUPS = [
-  // Prompts written for other AI tools
-  { id: "prompts", label: "Prompts" },
-  // What the day and the work are kept in: tasks, notes and files
+  // The day's own work: the prompts written for other AI tools, the tasks, the notes and the files
   { id: "workspace", label: "Workspace" },
   // Everything written for LinkedIn itself, from the post to the reply
   { id: "linkedin", label: "LinkedIn Tools" },
@@ -96,10 +97,19 @@ function savedOutputPages(id: SavedOutputToolId): ToolLink[] {
 }
 
 /**
- * The 9 LinkedIn tools, in sidebar order: what to post about and the image for it, then
- * outreach, then engaging on posts, then conversations. The first one is where "/" lands.
+ * The 9 LinkedIn tools, in the sidebar order the owner asked for: commenting on other people's
+ * posts first, then outreach, then conversations, with what to post about and its image last.
+ * This order is the sidebar's alone and says nothing about where "/" lands (`HOME_PATH`).
  */
 export const LINKEDIN_TOOLS: LinkedInTool[] = [
+  // A third page beside its two: the profiles to comment on, and the days each is looked at
+  { id: "comment-writer", title: "Comment Writer", description: "Thoughtful LinkedIn comments", icon: MessageSquareText, href: "/comment-writer", group: "linkedin", links: [...savedOutputPages("comment-writer"), PROFILE_SCHEDULER_LINK] },
+  { id: "post-comment-replies", title: "Post Comment Replies", description: "Reply to post comments", icon: Reply, href: "/post-comment-replies", group: "linkedin", links: savedOutputPages("post-comment-replies") },
+  { id: "inmail-composer", title: "InMail Message", description: "InMail with subject line", icon: Mail, href: "/inmail-message", group: "linkedin", links: savedOutputPages("inmail-message") },
+  { id: "follow-up-message", title: "Follow-Up Message", description: "Pitch & non-pitch follow-ups", icon: Repeat, href: "/follow-up-message", group: "linkedin", links: savedOutputPages("follow-up-message") },
+  { id: "first-message", title: "First Message", description: "Personalized first messages", icon: Hand, href: "/first-message", group: "linkedin", links: savedOutputPages("first-message") },
+  { id: "connection-note", title: "Connection Note", description: "Personalized connection requests", icon: UserPlus, href: "/connection-note", group: "linkedin", links: savedOutputPages("connection-note") },
+  { id: "conversation-reply", title: "Conversation Reply", description: "Next reply + deal signals", icon: MessagesSquare, href: "/conversation-reply", group: "linkedin", links: savedOutputPages("conversation-reply") },
   {
     id: "trending-topics",
     title: "Trending Topics",
@@ -121,40 +131,37 @@ export const LINKEDIN_TOOLS: LinkedInTool[] = [
       { title: "View All Images", description: "Every post image made so far", href: POST_IMAGES_HISTORY_HREF, pageTitle: "Generated Post Images" }
     ),
   },
-  { id: "connection-note", title: "Connection Note", description: "Personalized connection requests", icon: UserPlus, href: "/connection-note", group: "linkedin", links: savedOutputPages("connection-note") },
-  { id: "first-message", title: "First Message", description: "Personalized first messages", icon: Hand, href: "/first-message", group: "linkedin", links: savedOutputPages("first-message") },
-  { id: "inmail-composer", title: "InMail Message", description: "InMail with subject line", icon: Mail, href: "/inmail-message", group: "linkedin", links: savedOutputPages("inmail-message") },
-  // A third page beside its two: the profiles to comment on, and the days each is looked at
-  { id: "comment-writer", title: "Comment Writer", description: "Thoughtful LinkedIn comments", icon: MessageSquareText, href: "/comment-writer", group: "linkedin", links: [...savedOutputPages("comment-writer"), PROFILE_SCHEDULER_LINK] },
-  { id: "post-comment-replies", title: "Post Comment Replies", description: "Reply to post comments", icon: Reply, href: "/post-comment-replies", group: "linkedin", links: savedOutputPages("post-comment-replies") },
-  { id: "follow-up-message", title: "Follow-Up Message", description: "Pitch & non-pitch follow-ups", icon: Repeat, href: "/follow-up-message", group: "linkedin", links: savedOutputPages("follow-up-message") },
-  { id: "conversation-reply", title: "Conversation Reply", description: "Next reply + deal signals", icon: MessagesSquare, href: "/conversation-reply", group: "linkedin", links: savedOutputPages("conversation-reply") },
 ]
 
 /**
- * Every tool the app has, in sidebar order: the 9 LinkedIn tools, then the other modules under
- * their own groups. This is the one list the sidebar, the switcher, the sitemap, the manifest
- * and the SEO pages all read, so a tool added here shows up everywhere at once.
+ * Every tool the app has, in sidebar order: Workspace, then the 9 LinkedIn tools, then Client
+ * Work. This is the one list the sidebar, the switcher, the sitemap, the manifest and the SEO
+ * pages all read, so a tool added here shows up everywhere at once. The order inside each group
+ * is the owner's, so keep a new tool where they put it rather than tidying the list.
  */
 export const APP_TOOLS: LinkedInTool[] = [
-  ...LINKEDIN_TOOLS,
-  // The people the work is for come before what is written to them
-  CLIENTS_TOOL,
-  // What prompts are written for, managed here and picked from in Prompt Creator
-  PROJECTS_TOOL,
-  { ...CLIENT_MESSAGING_TOOL, links: savedOutputPages("client-messaging") },
-  { ...MESSAGE_REWRITER_TOOL, links: savedOutputPages("message-rewriter") },
-  CLIENT_VOICES_TOOL,
-  REFERENCE_CONTENT_TOOL,
-  MEETING_PLANNER_TOOL,
-  MEETINGS_TOOL,
+  // Workspace: the prompts written for other AI tools come first, then the day's work
   { ...PROMPT_CREATOR_TOOL, links: savedOutputPages("prompt-creator") },
   DAILY_TASKS_TOOL,
-  QUICK_NOTES_TOOL,
-  IMPORTANT_FILES_TOOL,
   IMPORTANT_CONTENT_TOOL,
+  QUICK_NOTES_TOOL,
   EMPLOYEES_TOOL,
+  IMPORTANT_FILES_TOOL,
   ADMIN_TOOL,
+  ...LINKEDIN_TOOLS,
+  // Client Work: the meetings and what the clients send, then what is written back to them, then
+  // the clients themselves and what their prompts are written for
+  MEETING_PLANNER_TOOL,
+  CLIENT_VOICES_TOOL,
+  { ...MESSAGE_REWRITER_TOOL, links: savedOutputPages("message-rewriter") },
+  MEETINGS_TOOL,
+  { ...CLIENT_MESSAGING_TOOL, links: savedOutputPages("client-messaging") },
+  REFERENCE_CONTENT_TOOL,
+  CLIENTS_TOOL,
+  // Each client's projects with the work under them, right after the clients themselves
+  CLIENT_PROJECTS_TOOL,
+  // What prompts are written for, managed here and picked from in Prompt Creator
+  PROJECTS_TOOL,
 ]
 
 /**

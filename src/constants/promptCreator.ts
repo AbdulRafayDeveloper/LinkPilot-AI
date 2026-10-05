@@ -55,19 +55,19 @@ export const PROMPT_CREATOR_MESSAGES = {
   notFound: "That saved prompt no longer exists.",
 } as const
 
-// The module's sidebar entry, listed after the LinkedIn tools
+// The module's sidebar entry: the first tool under Workspace, where the day's own work is kept
 export const PROMPT_CREATOR_TOOL: {
   id: string
   title: string
   description: string
   icon: LucideIcon
   href: string
-  group: "prompts"
+  group: "workspace"
 } = {
   id: "prompt-creator",
   title: "Prompt Creator",
   description: "Turn a task into an AI prompt",
   icon: Wand2,
   href: "/prompt-creator",
-  group: "prompts",
+  group: "workspace",
 }

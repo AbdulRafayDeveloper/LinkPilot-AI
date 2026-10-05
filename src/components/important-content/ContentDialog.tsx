@@ -18,6 +18,7 @@ import {
   IMPORTANT_CONTENT_ENDPOINT,
   IMPORTANT_CONTENT_MESSAGES,
 } from "@/constants/importantContent"
+import { canKeepalive } from "@/constants/textLimits"
 import type { ImportantContent, ImportantContentInput } from "@/types/importantContent"
 
 const fieldClass =
@@ -148,11 +149,14 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
     if (!entry) return
     const flush = () => {
       if (!isDirty() || !isSaveable(formRef.current)) return
+      const body = JSON.stringify(formRef.current)
       void fetch(`${IMPORTANT_CONTENT_ENDPOINT}/${entry.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formRef.current),
-        keepalive: true,
+        body,
+        // A description too large for a keepalive body is sent as an ordinary request instead, which
+        // the browser may cancel but will not refuse outright (constants/textLimits.ts)
+        keepalive: canKeepalive(body),
       })
     }
     window.addEventListener("pagehide", flush)
