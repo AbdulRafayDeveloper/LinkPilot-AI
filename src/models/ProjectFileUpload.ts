@@ -1,7 +1,6 @@
 import mongoose, { Schema, type Model } from "mongoose"
 import { OWNER_ID } from "./owner"
 import { ASSET_CATEGORY_IDS } from "@/constants/importantFiles"
-import { PROJECT_FILE_UPLOAD_HOURS } from "@/constants/clientProjectTasks"
 
 /**
  * One file being sent up to a client project, while it is still arriving.
@@ -56,9 +55,15 @@ const ProjectFileUploadSchema = new Schema<IProjectFileUpload>(
   },
   { timestamps: true, collection: "project_file_uploads" }
 )
-// An upload nobody finished is forgotten by itself, so a dropped browser leaves no row behind. Its
-// chunks are cleaned up with the project or the account; they are named by this row until then.
-ProjectFileUploadSchema.index({ updatedAt: 1 }, { expireAfterSeconds: PROJECT_FILE_UPLOAD_HOURS * 60 * 60 })
+/**
+ * **There is deliberately no TTL on this.** A row that expired by itself would take with it the only
+ * record of where its chunks are (their keys are built from `assetId`), leaving them in the bucket
+ * with nothing left able to name them. So a row nobody finished is swept **explicitly**, with its
+ * chunks, by `sweepStaleProjectFileUploads` on the next upload to that project and by
+ * `deleteProjectFileUploads` when the project, the client or the account goes. The row itself is a
+ * few hundred bytes, so keeping it until something can clean up after it costs nothing.
+ */
+ProjectFileUploadSchema.index({ projectId: 1, updatedAt: 1 })
 
 export const ProjectFileUploadModel =
   (mongoose.models.ProjectFileUpload as Model<IProjectFileUpload> | undefined) ??

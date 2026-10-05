@@ -5,6 +5,7 @@ import { ProjectFileUploadModel, type IProjectFileUpload } from "@/models/Projec
 import {
   PROJECT_FILE_CHUNK_BYTES,
   PROJECT_FILE_PART_BYTES,
+  PROJECT_FILE_UPLOAD_HOURS,
   PROJECT_TASK_MESSAGES,
   maxBytesFor,
   type ProjectFileCategory,
@@ -112,6 +113,33 @@ export async function projectFileView(file: ProjectFile): Promise<ProjectFileVie
   }
 }
 
+/**
+ * Forgets this project's uploads that nobody finished, with their chunks. Called before a new one
+ * is planned, which is the moment that costs nothing and is bound to come round for any project
+ * still in use.
+ *
+ * It is explicit rather than a TTL on the record **because the record is the only thing that knows
+ * where the chunks are**: let it expire by itself and they stay in the bucket with nothing able to
+ * name them. A failure here is logged and never stops the upload that is being planned.
+ */
+export async function sweepStaleProjectFileUploads(projectId: string): Promise<void> {
+  try {
+    const before = new Date(Date.now() - PROJECT_FILE_UPLOAD_HOURS * 60 * 60 * 1000)
+    const stale = (await ProjectFileUploadModel.find({ projectId, updatedAt: { $lt: before } }).lean()) as unknown as StoredUpload[]
+    if (stale.length === 0) return
+    await ProjectFileUploadModel.deleteMany({ assetId: { $in: stale.map((upload) => upload.assetId) } })
+    if (!isStorageConfigured()) return
+    for (const upload of stale) {
+      await removeChunks(upload)
+      // A row with a finished object but no item naming it was abandoned between the two
+      if (upload.finalKey) await deleteObject(upload.finalKey).catch(() => undefined)
+    }
+    console.log(`🧹 Cleared ${stale.length} unfinished project upload(s) and their chunks`)
+  } catch (error: unknown) {
+    console.warn("⚠️ Couldn't clear unfinished project uploads:", error instanceof Error ? error.message : error)
+  }
+}
+
 interface PlanInput {
   name: string
   contentType: string
@@ -129,6 +157,8 @@ export async function planProjectFile(project: { id: string; ownerId: string | n
   if (input.size <= 0 || input.size > maxBytesFor(category)) throw new UserFacingError(PROJECT_TASK_MESSAGES.fileTooLarge)
 
   await connectDatabase()
+  // The last abandoned upload on this project goes now, chunks and all
+  await sweepStaleProjectFileUploads(project.id)
   const assetId = new mongoose.Types.ObjectId().toString()
   const chunkCount = Math.max(1, Math.ceil(input.size / PROJECT_FILE_CHUNK_BYTES))
   await ProjectFileUploadModel.create({
