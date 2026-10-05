@@ -330,7 +330,7 @@ export default function PublicPlanClient({ token }: { token: string }) {
       {/* The whole width, so a task reads on one line on a laptop instead of wrapping in a narrow column */}
       <main className="flex w-full flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {error && !plan ? (
-          <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-white px-6 py-12 text-center">
+          <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-white px-6 py-12 short:py-4 text-center">
             <AlertCircle size={24} className="text-error" aria-hidden="true" />
             <p className="max-w-sm text-sm text-on-surface-variant">{error}</p>
             <button
@@ -343,7 +343,7 @@ export default function PublicPlanClient({ token }: { token: string }) {
             </button>
           </div>
         ) : !plan ? (
-          <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
+          <div role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
             <Loader2 size={20} className="animate-spin text-primary" aria-hidden="true" />
             Loading your plan...
           </div>

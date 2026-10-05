@@ -86,7 +86,9 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
         </div>
       </div>
 
-      <p className="-mt-1 flex items-center gap-1.5 text-[11px] text-on-surface-variant">
+      {/* What the marks on a meeting mean. On a short laptop window this line gives way to the weeks
+          themselves, and each mark still says the same thing in its chip's own tooltip. */}
+      <p className="-mt-1 flex items-center gap-1.5 text-[11px] text-on-surface-variant short:hidden">
         <span className="inline-flex items-center gap-0.5 rounded bg-primary-fixed px-1 py-0.5 text-[10px] text-on-primary-fixed-variant ring-1 ring-primary/50" aria-hidden="true">
           <Sparkles size={9} className="text-primary" />
           10:00
@@ -117,7 +119,7 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
               onClick={() => onSelectDay(date)}
               aria-pressed={isSelected}
               aria-label={`${date}, ${dayMeetings.length} ${dayMeetings.length === 1 ? "meeting" : "meetings"}`}
-              className={`flex min-h-[86px] flex-col gap-1 rounded-xl border p-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+              className={`flex min-h-[86px] short:min-h-[46px] flex-col gap-1 rounded-xl border p-1.5 short:p-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                 isSelected ? "border-primary bg-primary/5" : "border-outline-variant hover:bg-surface-container-low"
               } ${isOtherMonth ? "opacity-45" : ""}`}
             >

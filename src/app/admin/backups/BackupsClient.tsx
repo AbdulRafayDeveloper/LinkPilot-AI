@@ -319,7 +319,7 @@ export default function BackupsClient() {
             </FilterPanel>
 
             {error && !result ? (
-              <div role="alert" className="flex flex-col items-center gap-3 py-16 text-center">
+              <div role="alert" className="flex flex-col items-center gap-3 py-16 short:py-5 text-center">
                 <AlertTriangle size={20} className="text-error" aria-hidden="true" />
                 <p className="max-w-sm text-sm text-on-surface-variant">{error}</p>
                 <button type="button" onClick={reload} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold">
@@ -328,12 +328,12 @@ export default function BackupsClient() {
                 </button>
               </div>
             ) : !result ? (
-              <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
+              <div role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
                 <Loader2 size={20} className="animate-spin text-primary" aria-hidden="true" />
                 Loading the backups...
               </div>
             ) : items.length === 0 ? (
-              <p className="py-16 text-center text-sm text-on-surface-variant">
+              <p className="py-16 short:py-5 text-center text-sm text-on-surface-variant">
                 {hasFilters ? "No backups match these filters." : `Nothing backed up yet. The first one runs ${BACKUP_SCHEDULE_LABEL.toLowerCase()}, or take one now.`}
               </p>
             ) : (

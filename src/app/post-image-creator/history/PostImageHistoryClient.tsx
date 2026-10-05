@@ -233,7 +233,7 @@ export default function PostImageHistoryClient() {
             )}
 
             {list.error && !list.hasAnswer ? (
-              <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 short:py-5 text-center">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-error-container text-error">
                   <AlertTriangle size={20} aria-hidden="true" />
                 </div>
@@ -248,12 +248,12 @@ export default function PostImageHistoryClient() {
                 </button>
               </div>
             ) : !list.hasAnswer ? (
-              <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
+              <div role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
                 <Loader2 size={20} className="animate-spin text-primary" aria-hidden="true" />
                 Loading your images...
               </div>
             ) : images.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <div className="flex flex-col items-center justify-center gap-3 py-16 short:py-5 text-center">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/5 text-primary">
                   <GalleryHorizontalEnd size={20} aria-hidden="true" />
                 </div>

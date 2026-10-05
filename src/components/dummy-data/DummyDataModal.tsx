@@ -319,7 +319,7 @@ const DummyDataEditor: React.FC<DummyDataModalProps> = ({ kind, onUse, onClose }
               })}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+            <div className="flex flex-col items-center justify-center gap-2 py-16 short:py-5 text-center">
               <p className="text-sm font-semibold text-on-surface">No dummy {config.item}s yet</p>
               <p className="text-xs text-on-surface-variant">Add one to keep a sample ready for testing.</p>
             </div>

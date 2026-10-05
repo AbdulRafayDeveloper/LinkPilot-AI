@@ -321,13 +321,6 @@ export default function MeetingPlannerClient() {
               )}
             </div>
 
-            <TodayMeetings
-              meetings={page?.today ?? []}
-              todayDate={page?.todayDate ?? today}
-              pendingToday={page?.pendingToday ?? 0}
-              savingIds={savingIds}
-              onToggleStatus={toggleStatus}
-            />
 
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
               {month && (
@@ -343,6 +336,16 @@ export default function MeetingPlannerClient() {
                   onSelectDay={setSelectedDate}
                 />
               )}
+              {/* Today's meetings sits beside the calendar rather than above it: on a short laptop
+                  window the page is as tall as the calendar, and this is the column with room. */}
+              <div className="flex flex-col gap-5 short:gap-3 min-w-0">
+              <TodayMeetings
+                meetings={page?.today ?? []}
+                todayDate={page?.todayDate ?? today}
+                pendingToday={page?.pendingToday ?? 0}
+                savingIds={savingIds}
+                onToggleStatus={toggleStatus}
+              />
               <DayMeetingsPanel
                 date={selectedDate}
                 meetings={dayMeetings}
@@ -358,6 +361,7 @@ export default function MeetingPlannerClient() {
                   setDeleting(meeting)
                 }}
               />
+              </div>
             </div>
 
             <p className="flex items-center gap-2 text-[11px] text-outline">

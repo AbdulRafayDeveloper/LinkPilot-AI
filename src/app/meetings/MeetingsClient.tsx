@@ -323,7 +323,7 @@ export default function MeetingsClient() {
 
             {/* The history */}
             {listError && meetings.length === 0 ? (
-              <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+              <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-12 short:py-4 text-center">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-error-container text-error">
                   <AlertTriangle size={20} aria-hidden="true" />
                 </div>
@@ -338,12 +338,12 @@ export default function MeetingsClient() {
                 </button>
               </div>
             ) : isLoading && meetings.length === 0 ? (
-              <div role="status" className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+              <div role="status" className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-12 short:py-4 text-center">
                 <Loader2 size={22} className="animate-spin text-primary" aria-hidden="true" />
                 <p className="text-sm font-semibold text-on-surface">Loading your meetings...</p>
               </div>
             ) : meetings.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-12 short:py-4 text-center">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/5 text-primary">
                   {isFiltering ? <SearchX size={20} aria-hidden="true" /> : <CalendarClock size={20} aria-hidden="true" />}
                 </div>

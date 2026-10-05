@@ -135,12 +135,12 @@ export default function PublicProjectClient({ token }: { token: string }) {
 
       <main className="flex w-full flex-col gap-4 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {error ? (
-          <div role="alert" className="flex flex-col items-center gap-2 rounded-2xl border border-outline-variant bg-white px-4 py-16 text-center">
+          <div role="alert" className="flex flex-col items-center gap-2 rounded-2xl border border-outline-variant bg-white px-4 py-16 short:py-5 text-center">
             <FolderKanban size={22} className="text-outline" aria-hidden="true" />
             <p className="text-sm text-on-surface-variant">{error}</p>
           </div>
         ) : !project ? (
-          <p role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
+          <p role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
             <Loader2 size={18} className="animate-spin text-primary" aria-hidden="true" />
             Loading the project...
           </p>

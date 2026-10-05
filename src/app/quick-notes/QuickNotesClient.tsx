@@ -270,7 +270,7 @@ export default function QuickNotesClient() {
               {/* Save something new */}
               <section
                 aria-label="Save content"
-                className="flex min-h-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
+                className="flex min-h-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 short:p-3 shadow-sm"
               >
                 <h2 className="text-sm font-bold text-on-surface">Save Content</h2>
                 <label htmlFor="quick-note-title" className="text-[10px] font-bold uppercase tracking-wider text-outline">
@@ -292,7 +292,7 @@ export default function QuickNotesClient() {
                 </label>
                 {/* Ctrl/⌘+Enter saves, the way a send field does; the editor's own keys bubble up to here */}
                 <div
-                  className={`flex min-h-[320px] flex-1 flex-col rounded-xl ${saveState.type === "error" ? "ring-2 ring-error/60" : ""} ${isSaving ? "pointer-events-none opacity-60" : ""}`}
+                  className={`flex min-h-[320px] short:min-h-[150px] flex-1 flex-col rounded-xl ${saveState.type === "error" ? "ring-2 ring-error/60" : ""} ${isSaving ? "pointer-events-none opacity-60" : ""}`}
                   onKeyDown={(event) => {
                     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                       event.preventDefault()

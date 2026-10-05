@@ -79,7 +79,7 @@ export default function TrendingTopicsClient() {
 
             {status === "idle" && <TrendingEmptyState onSearch={() => void search()} />}
             {status === "checking" && (
-              <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
+              <div role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
                 <Loader2 size={18} className="animate-spin text-primary" aria-hidden="true" />
                 Loading the saved topics...
               </div>

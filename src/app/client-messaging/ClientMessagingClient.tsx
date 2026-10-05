@@ -163,8 +163,12 @@ export default function ClientMessagingClient() {
 
             {/* Side by side from xl, where the form still has room for its channel cards; stacked below. The row
                 fills the screen but never shrinks under the form, so a short laptop screen scrolls instead of overlapping */}
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 xl:flex-1 short:gap-4">
-              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 short:p-4 short:gap-3">
+            {/* Side by side from xl, where the form is wide enough for its channel cards. A short
+                laptop window gets the two columns early (short: is 1024px and up), because there the
+                channels are already a list rather than cards and stacking would cost the page its
+                whole second half in height. */}
+            <div className="grid grid-cols-1 short:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 xl:flex-1 short:flex-1 short:min-h-0 short:gap-4">
+              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 short:p-3 short:gap-2">
                 {/* Who the message is for, and on a short laptop window the channel beside it */}
                 <div className="flex flex-col gap-4 short:grid short:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] short:items-start short:gap-3">
                 <div className="flex flex-col gap-1.5 shrink-0">

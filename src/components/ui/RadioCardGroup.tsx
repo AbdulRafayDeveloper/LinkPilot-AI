@@ -51,7 +51,9 @@ export function RadioCardGroup<Id extends string>({
           return (
             <label
               key={option.id}
-              title={compactOnShortScreens ? option.description : undefined}
+              // On a short window the card shows its name alone, and a long name is cut to fit, so the
+              // tooltip carries the name as well as the description rather than the description alone.
+              title={compactOnShortScreens ? `${option.label} — ${option.description}` : undefined}
               className={`relative flex items-start gap-2 min-w-0 cursor-pointer rounded-xl border px-3 py-2 ${compactOnShortScreens ? "short:items-center short:py-1.5" : ""} transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
                 isSelected
                   ? "bg-primary-container border-primary-container text-on-primary-container"

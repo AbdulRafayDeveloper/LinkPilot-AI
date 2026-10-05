@@ -199,7 +199,7 @@ export default function ModelPriorityClient() {
             )}
 
             {error ? (
-              <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-white px-6 py-12 text-center">
+              <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-white px-6 py-12 short:py-4 text-center">
                 <p className="text-sm text-error">{error}</p>
                 <button
                   type="button"
@@ -211,7 +211,7 @@ export default function ModelPriorityClient() {
                 </button>
               </div>
             ) : !overview ? (
-              <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
+              <div role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
                 <Loader2 size={18} className="animate-spin text-primary" aria-hidden="true" />
                 Loading the model priorities...
               </div>

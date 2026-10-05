@@ -242,7 +242,7 @@ export default function ProjectsClient() {
                       </div>
                     </section>
                 ) : (
-                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-16 text-center">
+                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-16 short:py-5 text-center">
                     <FolderKanban size={24} className="text-primary" aria-hidden="true" />
                     <p className="text-[15px] font-semibold text-on-surface">{PROMPT_PROJECT_MESSAGES.choose}</p>
                     <p className="max-w-sm text-sm text-on-surface-variant">{PROMPT_PROJECT_MESSAGES.chooseHint}</p>

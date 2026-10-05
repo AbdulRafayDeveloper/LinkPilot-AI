@@ -134,7 +134,7 @@ export const VoiceInputPanel: React.FC<VoiceInputPanelProps> = ({
           if (isProcessing) return
           take(Array.from(event.dataTransfer.files), "drop")
         }}
-        className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed px-4 py-4 text-center transition-colors ${
+        className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed px-4 py-4 short:py-1.5 text-center transition-colors ${
           isDragging ? "border-primary bg-primary/5" : "border-outline-variant bg-surface-container-lowest"
         }`}
       >

@@ -53,6 +53,47 @@ body {
 }
 
 /*
+ * Short laptop windows: the page frame gives its height back.
+ *
+ * Every page is built on the same frame (a `max-w-[1400px]` wrapper inside `main`, a header holding
+ * the h1 and its one-line description, then the page itself), so the frame is compacted here once
+ * rather than with `short:` classes repeated across 31 client files. It is the same window the
+ * `short:` variant means (tailwind.config.ts): wide enough for the desktop layout, not tall enough
+ * for its full spacing. On a 1366x768 laptop at Windows 125% scaling the page gets 540px of height,
+ * and the frame alone was spending 174px of it on padding, gaps, a 2xl title and a description line.
+ *
+ * It only ever takes away spacing. Nothing is hidden but the description under the title, which is
+ * the one thing on a tool page that says nothing the page does not already show.
+ */
+@media (min-width: 1024px) and (max-height: 860px) {
+  /* `:first-child` is here for specificity as much as for aim: a plain `main > div` loses to the
+     wrapper's own `lg:p-8` and `gap-5` classes, which are a class each. */
+  main > div:first-child {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    row-gap: 0.75rem;
+  }
+  /* The page header: the title beside its buttons rather than above them, and smaller */
+  main > div > div:first-child:has(h1) {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  main h1 {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+  main h1 + p {
+    display: none;
+  }
+  /* The header's own buttons (Reset, Update Prompt, New meeting) lose a little padding with it */
+  main > div:first-child:has(h1) button {
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+  }
+}
+
+/*
  * The visual editor (components/ui/VisualEditor): the page a description is written on. Its elements
  * are made by the browser while typing, so they are styled here rather than one by one, sized in em
  * so the entry's own text size (A- and A+) scales all of them, and matching components/ui/RichTextView.

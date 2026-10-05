@@ -65,14 +65,14 @@ export const PromptModalFooter: React.FC<PromptModalFooterProps> = ({
 )
 
 export const PromptLoading: React.FC<{ text?: string }> = ({ text = "Loading the active prompt..." }) => (
-  <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
+  <div role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
     <Loader2 size={18} className="animate-spin text-primary" aria-hidden="true" />
     {text}
   </div>
 )
 
 export const PromptLoadFailed: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
-  <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+  <div className="flex flex-col items-center justify-center gap-3 py-12 short:py-4 text-center">
     <p className="text-sm text-on-surface-variant">The saved prompts couldn&apos;t be loaded.</p>
     <button
       type="button"

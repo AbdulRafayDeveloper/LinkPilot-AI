@@ -163,7 +163,7 @@ export default function MessageRewriterClient() {
                     disabled={isGenerating}
                     aria-invalid={messageInvalid}
                     placeholder="Type it, paste it, or press Speak instead. Any language, and it does not have to be tidy."
-                    className={`w-full flex-1 min-h-[180px] resize-none rounded-xl border bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
+                    className={`w-full flex-1 min-h-[180px] short:min-h-[88px] resize-none rounded-xl border bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
                       messageInvalid ? "border-error" : "border-outline-variant focus:border-primary/50"
                     }`}
                   />

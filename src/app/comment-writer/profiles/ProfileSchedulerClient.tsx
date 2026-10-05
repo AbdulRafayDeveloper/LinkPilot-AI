@@ -373,8 +373,12 @@ export default function ProfileSchedulerClient() {
               <p className="mt-1 text-sm text-on-surface-variant">The people you comment on, why each is on your list, and the days you look at their posts.</p>
             </div>
 
-            <form onSubmit={add} noValidate className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
+            <form onSubmit={add} noValidate className="flex flex-col gap-4 short:gap-2 rounded-2xl border border-outline-variant bg-white p-4 short:p-3 shadow-sm sm:p-5">
               <h2 className="text-[15px] font-bold text-on-surface">Add a person</h2>
+              {/* The eleven fields are the tallest thing on this page. On a short laptop window they
+                  scroll inside the form, so the heading, the Add person button and the list of people
+                  below all stay where they are instead of being pushed off the screen. */}
+              <div className="contents short:block short:max-h-[150px] short:overflow-y-auto short:pr-1">
               <ProfileScheduleFields
                 idPrefix="add-profile"
                 isUrlRequired
@@ -386,6 +390,7 @@ export default function ProfileSchedulerClient() {
                 disabled={isAdding}
                 urlRef={urlRef}
               />
+              </div>
               {addError && (
                 <p role="alert" className="flex gap-2 rounded-xl bg-error-container px-3 py-2.5 text-[13px] text-error">
                   <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
@@ -473,7 +478,7 @@ export default function ProfileSchedulerClient() {
             )}
 
             {error && !result ? (
-              <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 short:py-5 text-center">
                 <AlertTriangle size={20} className="text-error" aria-hidden="true" />
                 <p className="max-w-sm text-sm text-on-surface-variant">{error}</p>
                 <button type="button" onClick={reload} className={pagerButton}>
@@ -482,12 +487,12 @@ export default function ProfileSchedulerClient() {
                 </button>
               </div>
             ) : !result ? (
-              <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
+              <div role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
                 <Loader2 size={20} className="animate-spin text-primary" aria-hidden="true" />
                 Loading your profiles...
               </div>
             ) : items.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <div className="flex flex-col items-center justify-center gap-3 py-16 short:py-5 text-center">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/5 text-primary">
                   <CalendarDays size={20} aria-hidden="true" />
                 </div>
@@ -502,7 +507,7 @@ export default function ProfileSchedulerClient() {
                 )}
 
                 {/* The table from xl, where it fits beside the open sidebar; cards below, two to a row on a tablet */}
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+                <div className="hidden overflow-x-auto short:max-h-[46vh] short:overflow-y-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
                   <table className="w-full min-w-[880px] border-collapse text-left">
                     <caption className="sr-only">Scheduled profiles, page {page} of {totalPages}</caption>
                     <thead className="bg-surface-container-lowest">
@@ -536,7 +541,7 @@ export default function ProfileSchedulerClient() {
                   </table>
                 </div>
 
-                <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
+                <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 short:max-h-[44vh] short:overflow-y-auto short:pr-1 xl:hidden">
                   {items.map((schedule) => (
                     <li key={schedule.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
                       <div className="flex items-start gap-2">

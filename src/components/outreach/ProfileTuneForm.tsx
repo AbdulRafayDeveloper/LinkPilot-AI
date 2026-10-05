@@ -121,6 +121,11 @@ export function ProfileTuneForm<TuneId extends string>({
         onChange={onTuneChange}
         disabled={isGenerating}
         invalid={tuneInvalid}
+        // Nine tones are five rows of two and the tallest thing on the page. On a short laptop window
+        // they go three across and show their name only, with the description as the card's tooltip,
+        // which is what lets First Message and InMail fit a 540px window without scrolling.
+        columnsClassName="grid-cols-1 sm:grid-cols-2 short:grid-cols-3"
+        compactOnShortScreens
       />
 
       {formError && (

@@ -186,11 +186,11 @@ export default function PromptCreatorClient() {
 
             {/* The form takes about 65% and the written prompt 35%: what is typed, the targets, the
                 project and the choices all live on the left, while the prompt itself reads fine narrower */}
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)] gap-5 lg:flex-1 lg:min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)] gap-5 short:gap-3 lg:flex-1 lg:min-h-0">
               {/* What the user wants done */}
               {/* gap-5 between the blocks, so the targets, the project and the choice below the text box
                   are not crowded together now that the form has the wider side */}
-              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-5 short:gap-4">
+              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 short:p-3 flex flex-col gap-5 short:gap-4">
                 <div className="flex flex-col gap-2 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label htmlFor="prompt-request" className="text-[10px] font-bold text-outline uppercase tracking-wider">
@@ -214,7 +214,7 @@ export default function PromptCreatorClient() {
                     disabled={isGenerating}
                     aria-invalid={requestInvalid}
                     placeholder="Describe the task in your own words. Example: add a dark mode toggle to my Next.js dashboard and make sure nothing else breaks."
-                    className={`w-full flex-1 min-h-[180px] resize-none rounded-xl border bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
+                    className={`w-full flex-1 min-h-[180px] short:min-h-[72px] resize-none rounded-xl border bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
                       requestInvalid ? "border-error" : "border-outline-variant focus:border-primary/50"
                     }`}
                   />

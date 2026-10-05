@@ -316,7 +316,7 @@ export default function UsersClient() {
             </FilterPanel>
 
             {list.error && !list.hasAnswer ? (
-              <div role="alert" className="flex flex-col items-center gap-3 py-16 text-center">
+              <div role="alert" className="flex flex-col items-center gap-3 py-16 short:py-5 text-center">
                 <AlertTriangle size={20} className="text-error" aria-hidden="true" />
                 <p className="max-w-sm text-sm text-on-surface-variant">{list.error}</p>
                 <button type="button" onClick={list.retry} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold">
@@ -325,12 +325,12 @@ export default function UsersClient() {
                 </button>
               </div>
             ) : !list.hasAnswer ? (
-              <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
+              <div role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
                 <Loader2 size={20} className="animate-spin text-primary" aria-hidden="true" />
                 Loading accounts...
               </div>
             ) : list.items.length === 0 ? (
-              <p className="py-16 text-center text-sm text-on-surface-variant">No accounts match these filters.</p>
+              <p className="py-16 short:py-5 text-center text-sm text-on-surface-variant">No accounts match these filters.</p>
             ) : (
               <div className={`flex flex-col gap-3 transition-opacity ${list.isLoading ? "opacity-60" : ""}`} aria-busy={list.isLoading}>
                 {/* The table from xl, where it fits beside the open sidebar; cards below, two to a row on a tablet */}

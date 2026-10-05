@@ -59,7 +59,7 @@ const formStore = createToolStore(
 )
 
 // Compact cards so the Generate button is on screen without scrolling on laptop-height windows
-const cardClass = "bg-white border border-outline-variant rounded-2xl shadow-sm p-4 flex flex-col gap-3 short:p-3 short:gap-2"
+const cardClass = "bg-white border border-outline-variant rounded-2xl shadow-sm p-4 flex flex-col gap-3 short:p-2.5 short:gap-1.5"
 const labelClass = "text-[10px] font-bold text-outline uppercase tracking-wider"
 
 export default function PostCommentRepliesClient() {
@@ -191,7 +191,7 @@ export default function PostCommentRepliesClient() {
                     placeholder={COMMENTS_PLACEHOLDER}
                     aria-invalid={formError === missingComment}
                     aria-describedby={formError === missingComment ? `${COMMENTS_HINT_ID} ${FORM_ERROR_ID}` : COMMENTS_HINT_ID}
-                    className="flex-1 w-full min-h-[140px] short:min-h-[80px] resize-none rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary disabled:opacity-70"
+                    className="flex-1 w-full min-h-[140px] short:min-h-[64px] resize-none rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary disabled:opacity-70"
                   />
                   <p id={COMMENTS_HINT_ID} className="text-[11px] text-outline mt-1.5">
                     Paste one comment or a whole thread. Press Ctrl + Enter to generate.
@@ -243,7 +243,7 @@ export default function PostCommentRepliesClient() {
                   value={style}
                   onChange={(nextStyle) => formStore.update({ style: nextStyle })}
                   disabled={isGenerating}
-                  columnsClassName="grid-cols-2 min-[480px]:grid-cols-3"
+                  columnsClassName="grid-cols-2 min-[480px]:grid-cols-3 short:grid-cols-4"
                   wrapLabels
                   compactOnShortScreens
                 />

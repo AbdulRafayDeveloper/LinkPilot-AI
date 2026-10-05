@@ -121,7 +121,7 @@ const CenteredState: React.FC<{ icon: React.ReactNode; text: string; children?: 
   children,
   role,
 }) => (
-  <div role={role} className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+  <div role={role} className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-12 short:py-4 text-center">
     {icon}
     <p className="max-w-sm text-sm leading-relaxed text-on-surface-variant">{text}</p>
     {children}

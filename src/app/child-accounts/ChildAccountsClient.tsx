@@ -136,12 +136,12 @@ export default function ChildAccountsClient() {
             )}
 
             {!page && !error ? (
-              <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
+              <div role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
                 <Loader2 size={20} className="animate-spin text-primary" aria-hidden="true" />
                 Loading your child accounts...
               </div>
             ) : items.length === 0 ? (
-              <p className="py-16 text-center text-sm text-on-surface-variant">{CHILDREN_MESSAGES.noneYet}</p>
+              <p className="py-16 short:py-5 text-center text-sm text-on-surface-variant">{CHILDREN_MESSAGES.noneYet}</p>
             ) : (
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
                 <ul className="flex flex-col gap-2">

@@ -79,7 +79,7 @@ export const SavedTopicModal: React.FC<{ topic: SavedTopic; onClose: () => void 
           )}
         </div>
       ) : !detail ? (
-        <div role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-on-surface-variant">
+        <div role="status" className="flex items-center justify-center gap-2 py-12 short:py-4 text-sm text-on-surface-variant">
           <Loader2 size={20} className="animate-spin text-primary" aria-hidden="true" />
           Opening the topic...
         </div>

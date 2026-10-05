@@ -213,12 +213,12 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
             </Link>
 
             {isLoading && !meeting ? (
-              <div role="status" className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <div role="status" className="flex flex-col items-center justify-center gap-3 py-16 short:py-5 text-center">
                 <Loader2 size={22} className="animate-spin text-primary" aria-hidden="true" />
                 <p className="text-sm font-semibold text-on-surface">Loading the meeting...</p>
               </div>
             ) : loadError || !meeting ? (
-              <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 short:py-5 text-center">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-error-container text-error">
                   <AlertTriangle size={20} aria-hidden="true" />
                 </div>

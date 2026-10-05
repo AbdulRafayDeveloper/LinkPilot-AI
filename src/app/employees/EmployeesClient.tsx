@@ -394,7 +394,7 @@ export default function EmployeesClient() {
                     <PlanLinkConfirmDialog employee={current} link={planLink} />
                   </>
                 ) : (
-                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-16 text-center">
+                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-16 short:py-5 text-center">
                     <CalendarDays size={24} className="text-primary" aria-hidden="true" />
                     <p className="text-[15px] font-semibold text-on-surface">Choose an employee</p>
                     <p className="max-w-sm text-sm text-on-surface-variant">Their details, their daily plan and its history open here.</p>
