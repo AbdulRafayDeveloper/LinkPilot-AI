@@ -70,6 +70,15 @@ export function promptUsesVariable(prompt: string, variable: CommentPromptVariab
 }
 
 export const COMMENT_WRITER_MESSAGES = {
+  // The comment goes on the clipboard by itself; a browser only allows that while the page is in front of the user
+  autoCopy: {
+    copied: { label: "Copied for you", detail: "This comment is already on your clipboard, so you can paste it straight into LinkedIn." },
+    waiting: {
+      label: "Copying",
+      detail: "Your browser only copies while this page is in front of you, so the comment goes on your clipboard the moment you come back to it.",
+    },
+    failed: { label: "Use Copy", detail: "Your browser would not copy this on its own, so use the Copy button." },
+  },
   missingPost: "Please provide a LinkedIn post first.",
   missingTune: "Please select a comment style.",
   generationFailed: "Unable to generate the comment right now. Please try again.",

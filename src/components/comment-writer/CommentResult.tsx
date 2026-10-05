@@ -4,6 +4,8 @@ import React from "react"
 import {
   AlertTriangle,
   CheckCircle2,
+  Clipboard,
+  ClipboardCheck,
   ExternalLink,
   Info,
   Loader2,
@@ -13,7 +15,8 @@ import {
 import { CopyButton } from "@/components/ui/CopyButton"
 import { EditableOutput } from "@/components/ui/EditableOutput"
 import { useEditableText } from "@/lib/outputEdits"
-import { getTuneLabel } from "@/constants/commentWriter"
+import { COMMENT_WRITER_MESSAGES, getTuneLabel } from "@/constants/commentWriter"
+import { useAutoCopy } from "@/lib/autoCopy"
 import type { CommentStageEntry, CommentWriterStatus } from "@/hooks/useCommentGenerator"
 import type { GeneratedComment } from "@/types/commentWriter"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
@@ -54,6 +57,27 @@ const StageList: React.FC<{ stages: CommentStageEntry[] }> = ({ stages }) => (
   </ol>
 )
 
+/**
+ * What the automatic copy did, beside the Copy button. The comment goes on the clipboard by itself
+ * (lib/autoCopy.ts), so the page says so rather than leaving the user to wonder whether to click.
+ */
+const AutoCopyNote: React.FC = () => {
+  const { status } = useAutoCopy()
+  if (status === "idle") return null
+  const note = COMMENT_WRITER_MESSAGES.autoCopy[status]
+  const isCopied = status === "copied"
+  return (
+    <span
+      title={note.detail}
+      aria-live="polite"
+      className={`inline-flex items-center gap-1 text-[11px] font-semibold ${isCopied ? "text-primary" : "text-outline"}`}
+    >
+      {isCopied ? <ClipboardCheck size={13} aria-hidden="true" /> : <Clipboard size={13} aria-hidden="true" />}
+      {note.label}
+    </span>
+  )
+}
+
 const RegenerateButton: React.FC<{ onClick: () => void; label: string }> = ({ onClick, label }) => (
   <button
     type="button"
@@ -82,7 +106,12 @@ export const CommentResult = React.forwardRef<HTMLElement, CommentResultProps>(f
         <h2 id="comment-writer-result-title" className="text-sm font-bold text-on-surface">
           Generated Comment
         </h2>
-        {status === "success" && result && <CopyButton text={comment.value} label="Copy comment" showLabel />}
+        {status === "success" && result && (
+          <div className="flex items-center gap-2 min-w-0">
+            <AutoCopyNote />
+            <CopyButton text={comment.value} label="Copy comment" showLabel />
+          </div>
+        )}
       </div>
 
       {status === "idle" && (

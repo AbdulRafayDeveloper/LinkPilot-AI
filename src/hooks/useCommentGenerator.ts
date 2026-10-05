@@ -4,6 +4,7 @@ import { readSSEStream } from "@/lib/sse"
 import { fetchWithRetry } from "@/lib/apiClient"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { countedOneComment } from "@/hooks/useCommentCount"
+import { autoCopyText, resetAutoCopy } from "@/lib/autoCopy"
 import { COMMENT_WRITER_MESSAGES, type CommentTuneId } from "@/constants/commentWriter"
 import type { PostInputMode } from "@/constants/postInput"
 import type { ApiEnvelope } from "@/types/api"
@@ -62,6 +63,7 @@ async function generate(request: CommentRequest) {
   const current = new AbortController()
   controller = current
   const fail = (message: string) => store.update({ status: "error", error: message })
+  resetAutoCopy()
   store.update({ status: "loading", result: null, stages: [], error: null })
 
   try {
@@ -82,6 +84,8 @@ async function generate(request: CommentRequest) {
         store.update({ status: "success", result: event.result })
         // The comment is written and saved, so the reminder on the page goes up by one
         countedOneComment()
+        // And it goes on the clipboard by itself, ready to paste into LinkedIn
+        autoCopyText(event.result.comment)
       } else if (event.status === "ERROR") {
         isFinished = true
         fail(event.message)
@@ -101,6 +105,7 @@ async function generate(request: CommentRequest) {
 function reset() {
   controller?.abort()
   controller = null
+  resetAutoCopy()
   store.reset()
 }
 
