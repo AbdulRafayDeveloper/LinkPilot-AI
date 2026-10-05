@@ -1,4 +1,4 @@
-import type { ProjectItemAuthor, ProjectItemKind, ProjectTaskStatus } from "@/constants/clientProjectTasks"
+import type { ProjectFileCategory, ProjectItemAuthor, ProjectItemKind, ProjectTaskStatus } from "@/constants/clientProjectTasks"
 import type { TaskImage, TaskImageView } from "./taskAttachment"
 import type { ClientProjectStatus } from "@/constants/clients"
 
@@ -16,11 +16,51 @@ export interface VoiceNoteView extends VoiceNote {
   url: string
 }
 
+/**
+ * One file on an item, as it is stored: what it is, what to call it and where its object lives.
+ * The name is the one the person picked it with, shown on the item and used as the download's file
+ * name; the key is built on the server from `assetId`, never from the name.
+ */
+export interface ProjectFile {
+  assetId: string
+  name: string
+  contentType: string
+  // What the app places it as (image, pdf, word, text, video, audio), for the icon and the player
+  category: ProjectFileCategory
+  size: number
+}
+
+/** The same file as a page receives it, with a short-lived link to open or play it from. */
+export interface ProjectFileView extends ProjectFile {
+  url: string
+}
+
+/**
+ * What the browser is told to do with a file it is sending: the id the chunks go under, how big a
+ * chunk may be and how many there are. A file small enough for one chunk still goes this way, so
+ * the page has one path rather than two.
+ */
+export interface ProjectFileUploadPlan {
+  assetId: string
+  chunkBytes: number
+  chunks: number
+}
+
+/** Where a file has got to while the server joins its chunks, so a page can show progress. */
+export interface ProjectFileProgress {
+  done: boolean
+  // The finished file, once it is joined and ready to be saved on an item
+  file: ProjectFileView | null
+  joinedBytes: number
+  totalBytes: number
+}
+
 /** One item on a client project, as it is stored. */
 export interface ProjectTaskRecord {
   content: string
   description: string
   images: TaskImage[]
+  files: ProjectFile[]
   voiceNote: VoiceNote | null
   status: ProjectTaskStatus
   kind: ProjectItemKind
@@ -34,6 +74,7 @@ export interface ProjectTask {
   content: string
   description: string
   images: TaskImageView[]
+  files: ProjectFileView[]
   voiceNote: VoiceNoteView | null
   status: ProjectTaskStatus
   // Which tab it sits under; an item saved before the tabs existed reads as a change
@@ -53,6 +94,7 @@ export interface ProjectTaskInput {
   content: string
   description?: string
   images?: TaskImage[]
+  files?: ProjectFile[]
   voiceNote?: VoiceNote | null
   status?: ProjectTaskStatus
   kind?: ProjectItemKind

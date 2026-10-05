@@ -9,7 +9,7 @@ import type { DailyTask, DailyTaskDay, DailyTasksPage, NewDailyTask } from "@/ty
 import { storedImagesOf, type TaskImage, type TaskImageView } from "@/types/taskAttachment"
 import { deleteTaskImages, taskImageLists } from "@/services/taskImages"
 import type { Viewer } from "@/types/auth"
-import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * Tasks live in the daily_tasks collection. Each task belongs to the account that wrote it: a user
@@ -413,7 +413,7 @@ export async function deleteTask(viewer: Viewer, id: string): Promise<boolean> {
  */
 export async function deleteTasksBeforeWindow(viewer: Viewer, today: string): Promise<number> {
   await connectDatabase()
-  const filter = { taskDate: { $lt: windowStartFor(today) }, ...ownedBy(viewer) }
+  const filter = { taskDate: { $lt: windowStartFor(today) }, ...ownedForClearing(viewer) }
   const images = await imagesOf(filter)
   const { deletedCount } = await DailyTaskModel.deleteMany(filter)
   await deleteTaskImages(images)

@@ -7,7 +7,7 @@ import { HISTORY_PAGE_SIZE } from "@/constants/historyFilters"
 import { NO_PHOTO_FILTER, type AssetPoseId, type ImageSizeId } from "@/constants/postImages"
 import type { PostImage, PostImageFilters, PostImagesPage } from "@/types/postImages"
 import type { Viewer } from "@/types/auth"
-import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * The images made so far, newest first, in batches. Each one carries the settings it was made
@@ -123,7 +123,7 @@ export async function deletePostImages(
 ): Promise<{ deleted: number; failed: number }> {
   await connectDatabase()
   const matching = allOf([
-    ids ? visibleTo(viewer) : ownedBy(viewer),
+    ids ? visibleTo(viewer) : ownedForClearing(viewer),
     searchCondition(filters.search, ["postContent", "assetName", "displayName"]),
     filters.size ? { sizeId: filters.size } : null,
     photoCondition(filters.photo),

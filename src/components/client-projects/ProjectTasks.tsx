@@ -3,9 +3,10 @@
 import React from "react"
 import { Loader2, Pencil, Trash2 } from "lucide-react"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
-import { PROJECT_TASK_MESSAGES, projectItemKind, type ProjectItemKind } from "@/constants/clientProjectTasks"
+import { PROJECT_DETAILS_OPEN_MAX_CHARS, PROJECT_TASK_MESSAGES, projectItemKind, type ProjectItemKind } from "@/constants/clientProjectTasks"
 import { clock } from "./VoiceNoteField"
-import type { ProjectTask } from "@/types/clientProjectTasks"
+import { FileKindIcon, fileSize } from "./ProjectFilesField"
+import type { ProjectFileView, ProjectTask } from "@/types/clientProjectTasks"
 
 interface ProjectTasksProps {
   tasks: ProjectTask[]
@@ -21,7 +22,11 @@ interface ProjectTasksProps {
    * own and a surface that wants no tag at all passes none.
    */
   clientTag?: string
-  // Open each item's description and images from the start, which is what a shared link does
+  /**
+   * Open each item's description and images from the start, which is what a shared link does. A
+   * description too long to sit in a list (`PROJECT_DETAILS_OPEN_MAX_CHARS`) still starts folded,
+   * so one specification cannot bury every item under it.
+   */
   detailsOpen?: boolean
 }
 
@@ -36,6 +41,47 @@ const VoiceNotePlayer: React.FC<{ task: ProjectTask }> = ({ task }) =>
       <span className="text-[11px] text-outline">{clock(task.voiceNote.seconds)}</span>
     </div>
   ) : null
+
+/**
+ * The files on one item: a video and an audio file play where they are, and everything else is a
+ * row that opens or downloads by its own name. The same markup on the page and behind a shared
+ * link, since both may have put them there.
+ */
+const ItemFiles: React.FC<{ files: ProjectFileView[] }> = ({ files }) =>
+  files.length === 0 ? null : (
+    <ul className="flex flex-col gap-1.5">
+      {files.map((file) =>
+        file.category === "video" ? (
+          <li key={file.assetId} className="flex flex-col gap-1">
+            <video src={file.url} controls preload="none" className="max-h-[320px] w-full rounded-xl bg-black" aria-label={file.name} />
+            <span className="text-[11px] text-outline">
+              {file.name} · {fileSize(file.size)}
+            </span>
+          </li>
+        ) : file.category === "audio" ? (
+          <li key={file.assetId} className="flex flex-wrap items-center gap-2">
+            <audio src={file.url} controls preload="none" className="h-9 min-w-0 max-w-full flex-1" aria-label={file.name} />
+            <span className="text-[11px] text-outline">{file.name}</span>
+          </li>
+        ) : (
+          <li key={file.assetId}>
+            <a
+              href={file.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-2.5 py-1.5 transition-colors hover:border-primary/40 hover:bg-primary/5"
+            >
+              <FileKindIcon category={file.category} className="shrink-0 text-primary" />
+              <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-on-surface" title={file.name}>
+                {file.name}
+              </span>
+              <span className="shrink-0 text-[11px] text-outline">{fileSize(file.size)}</span>
+            </a>
+          </li>
+        )
+      )}
+    </ul>
+  )
 
 /**
  * One tab of a client project: each item's line, whether it is ticked off, its description, its
@@ -95,7 +141,17 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({ tasks, kind, busyId,
 
             {(task.description || task.images.length > 0) && (
               <div className="pl-6">
-                <TaskDetailsView description={task.description} images={task.images} label={task.content} defaultOpen={detailsOpen} />
+                <TaskDetailsView
+                  description={task.description}
+                  images={task.images}
+                  label={task.content}
+                  defaultOpen={detailsOpen && task.description.length <= PROJECT_DETAILS_OPEN_MAX_CHARS}
+                />
+              </div>
+            )}
+            {task.files.length > 0 && (
+              <div className="pl-6">
+                <ItemFiles files={task.files} />
               </div>
             )}
             {task.voiceNote && <div className="pl-6">{<VoiceNotePlayer task={task} />}</div>}

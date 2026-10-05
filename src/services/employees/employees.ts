@@ -17,7 +17,7 @@ import type {
   PublicPlan,
 } from "@/types/employees"
 import type { Viewer } from "@/types/auth"
-import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
 import { storedImagesOf, type TaskImage, type TaskImageView } from "@/types/taskAttachment"
 import { deleteTaskImages, taskImageLists } from "@/services/taskImages"
 import { buildTree, completedLast, flattenTree } from "@/lib/taskTree"
@@ -188,7 +188,7 @@ export async function deleteEmployees(
   await connectDatabase()
   // Ticked rows follow the per-record delete; a whole filter never reaches another account's team
   const matching = allOf([
-    ids ? visibleTo(viewer) : ownedBy(viewer),
+    ids ? visibleTo(viewer) : ownedForClearing(viewer),
     searchCondition(filters.search, ["name", "city", "role"]),
     filters.status ? { status: filters.status } : null,
     ids ? { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } } : null,

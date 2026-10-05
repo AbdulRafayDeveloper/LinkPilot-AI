@@ -59,6 +59,10 @@ export const AUTH_MESSAGES = {
   signupClosed: "New accounts can't be created here. Ask an admin for one.",
   signInFailed: "Couldn't sign you in. Please try again.",
   signupFailed: "Couldn't create your account. Please try again.",
+  // A child account shares the workspace, so "clear everything" there would empty the owner own
+  // records in one press. It keeps every other delete: one record, or the rows it ticked itself
+  childCannotClearAll:
+    "A child account can't empty a whole tool in one go, because these records belong to the account that owns this workspace. Delete the ones you mean, or ask the owner.",
 } as const
 
 export const ROLE_LABELS: Record<UserRole, string> = { user: "User", admin: "Admin" }

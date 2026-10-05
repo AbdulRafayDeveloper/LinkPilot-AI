@@ -7,6 +7,7 @@ import type { Client, ClientInput } from "@/types/clientMessaging"
 import type { Viewer } from "@/types/auth"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { deleteTasksOfProjects } from "@/services/clientProjects/tasks"
+import { deleteProjectFileUploads } from "@/services/clientProjects/files"
 
 /**
  * The clients the user writes to, kept in the clients collection. Each one carries its own
@@ -86,7 +87,9 @@ export async function deleteClient(viewer: Viewer, id: string): Promise<boolean>
   if (deletedCount > 0) {
     // The projects go, and each one's tasks with their images and voice notes go with them
     const projects = (await ClientProjectModel.find({ clientId: id }, { _id: 1 }).lean()) as unknown as { _id: { toString: () => string } }[]
-    await deleteTasksOfProjects(visibleTo(viewer), projects.map((project) => project._id.toString()))
+    const projectIds = projects.map((project) => project._id.toString())
+    await deleteTasksOfProjects(visibleTo(viewer), projectIds)
+    await deleteProjectFileUploads(visibleTo(viewer), projectIds)
     await ClientProjectModel.deleteMany({ clientId: id })
   }
   return deletedCount > 0

@@ -28,7 +28,7 @@ import type {
   SavedOutputsPage,
 } from "@/types/savedOutputs"
 import type { Viewer } from "@/types/auth"
-import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * Reads back what the LinkedIn tools wrote. Every tool already keeps its outputs in its own
@@ -389,7 +389,7 @@ export async function deleteSavedOutputs(
   const blocking = reader.dependencyField && filters.dependencies ? await blockingIds(viewer) : undefined
   // Ticked rows follow the per-record delete (an admin may delete a record they can see); a whole
   // filter follows Clear All and the Daily Tasks cleanup, which never reach another account's records
-  const matching = matchingFilter(viewer, reader, filters, folders, blocking, ids ? visibleTo(viewer) : ownedBy(viewer))
+  const matching = matchingFilter(viewer, reader, filters, folders, blocking, ids ? visibleTo(viewer) : ownedForClearing(viewer))
   const chosen = ids ? { ...matching, _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } } : matching
   // Which records are going is read first, so what waited for them can be freed once they are gone
   const going = reader.dependencyField ? ((await reader.collection().find(chosen, { projection: { _id: 1 } }).toArray()) as unknown as Row[]) : []

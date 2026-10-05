@@ -14,7 +14,7 @@ import {
 } from "@/constants/importantFiles"
 import type { Asset, AssetMetadataInput, AssetsPage, UploadPlan, UploadRequest } from "@/types/importantFiles"
 import type { Viewer } from "@/types/auth"
-import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
 import {
   abortMultipartUpload,
   buildStorageKey,
@@ -324,7 +324,7 @@ export async function deleteAssets(
 ): Promise<{ deleted: number; failed: number }> {
   await connectDatabase()
   const matchingFiles = [
-    ids ? visibleTo(viewer) : ownedBy(viewer),
+    ids ? visibleTo(viewer) : ownedForClearing(viewer),
     ...matching(filters.search),
     ...inCategory(filters.type),
     ...(ids ? [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] : []),

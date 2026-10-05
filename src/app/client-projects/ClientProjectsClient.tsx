@@ -282,7 +282,7 @@ export default function ClientProjectsClient() {
                     <ProjectTabs chosen={tab} onChoose={setTab} counts={tasks ? countsOf(tasks) : chosen.counts} />
 
                     <div id={`project-panel-${tab}`} role="tabpanel" aria-labelledby={`project-tab-${tab}`} className="flex min-w-0 flex-col gap-3">
-                      <TaskComposer task={null} kind={tab} onSave={addTask} />
+                      <TaskComposer task={null} kind={tab} onSave={addTask} fileEndpoint={`${CLIENT_PROJECTS_ENDPOINT}/${chosen.id}/files`} />
 
                       {taskError && (
                         <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
@@ -320,6 +320,7 @@ export default function ClientProjectsClient() {
           <TaskComposer
             task={editing}
             kind={editing.kind}
+            fileEndpoint={`${CLIENT_PROJECTS_ENDPOINT}/${editing.projectId}/files`}
             onCancel={() => setEditing(null)}
             onSave={async (input) => {
               await saveTask(editing, input)

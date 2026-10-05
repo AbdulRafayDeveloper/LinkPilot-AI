@@ -2,7 +2,7 @@ import { cookies, headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { env } from "@/config/env"
 import { connectDatabase } from "@/lib/db"
-import { toUserFacingMessage } from "@/lib/errors"
+import { UserFacingError, toUserFacingMessage } from "@/lib/errors"
 import { SESSION_COOKIE, SESSION_MS, readSession, signSession } from "@/lib/sessionToken"
 import { UserModel } from "@/models/User"
 import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, REQUEST_PATH_HEADER, type UserRole } from "@/constants/auth"
@@ -109,6 +109,26 @@ export const visibleTo = (viewer: Viewer): Record<string, unknown> => (viewer.ro
  */
 export const ownedBy = (viewer: Viewer): Record<string, unknown> =>
   viewer.role === "admin" ? { ownerId: { $in: [viewer.dataOwnerId, null] } } : { ownerId: viewer.dataOwnerId }
+
+/**
+ * The scope for an action that empties a whole tool: Clear All, "delete all N matching", the
+ * Daily Tasks week-old cleanup. The same records as `ownedBy`, **except that a child account is
+ * refused.**
+ *
+ * A child shares its parent's workspace, so `ownedBy` resolves to the parent's records and one press
+ * of Clear All would empty the owner's own notes, meetings or files. Being given a tool is not the
+ * same as being given the power to empty it, so a child keeps every other delete (one record, or the
+ * rows it ticked itself, which are deliberate and one at a time) and loses only the sweep. Every
+ * module's bulk path goes through here, so a new one is covered by being written.
+ *
+ * To let children sweep after all, return `ownedBy(viewer)` unconditionally; nothing else needs to
+ * change. Narrowing it instead, so a child could clear only what it wrote, would need `createdBy`
+ * on the records beside `ownerId`.
+ */
+export function ownedForClearing(viewer: Viewer): Record<string, unknown> {
+  if (viewer.parentId) throw new UserFacingError(AUTH_MESSAGES.childCannotClearAll)
+  return ownedBy(viewer)
+}
 
 /** One record by id, if the viewer may see it. An id that isn't one never matches. */
 export const visibleById = (viewer: Viewer, id: string): Record<string, unknown> | null =>

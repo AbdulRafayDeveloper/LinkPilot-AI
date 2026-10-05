@@ -4,7 +4,7 @@ import { ReferenceItem as ReferenceItemModel, type IReferenceItem } from "@/mode
 import { REFERENCE_PAGE_SIZE } from "@/constants/referenceContent"
 import type { ReferenceItem, ReferenceItemInput, ReferenceItemsPage } from "@/types/referenceContent"
 import type { Viewer } from "@/types/auth"
-import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * Saved reference content lives in the reference_content collection, read newest first in
@@ -119,7 +119,7 @@ export async function deleteItem(viewer: Viewer, id: string): Promise<boolean> {
 export async function deleteItems(viewer: Viewer, search: string, ids?: string[]): Promise<{ deleted: number }> {
   await connectDatabase()
   // Ticked rows follow the per-record delete; a whole search never reaches another account's items
-  const filter = { $and: [ids ? visibleTo(viewer) : ownedBy(viewer), ...matching(search)] }
+  const filter = { $and: [ids ? visibleTo(viewer) : ownedForClearing(viewer), ...matching(search)] }
   const chosen = ids ? { $and: [filter, { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] } : filter
   const { deletedCount } = await ReferenceItemModel.deleteMany(chosen)
   return { deleted: deletedCount ?? 0 }

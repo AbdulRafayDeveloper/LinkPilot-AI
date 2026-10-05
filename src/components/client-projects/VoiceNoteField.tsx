@@ -3,7 +3,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { Loader2, Mic, Play, Square, Trash2 } from "lucide-react"
 import { requestApi } from "@/lib/apiClient"
-import { PROJECT_TASK_MESSAGES, PROJECT_VOICE_ENDPOINT, VOICE_NOTE_MAX_SECONDS } from "@/constants/clientProjectTasks"
+import {
+  PROJECT_TASK_MESSAGES,
+  PROJECT_VOICE_ENDPOINT,
+  VOICE_NOTE_BITS_A_SECOND,
+  VOICE_NOTE_MAX_BYTES,
+  VOICE_NOTE_MAX_SECONDS,
+  VOICE_NOTE_WARN_SECONDS,
+} from "@/constants/clientProjectTasks"
 import { VOICE_MESSAGES } from "@/constants/voiceInput"
 import type { VoiceNoteView } from "@/types/clientProjectTasks"
 
@@ -99,10 +106,24 @@ export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, 
       return
     }
     try {
-      const media = new MediaRecorder(stream)
+      // A speech bitrate, which is what makes a quarter of an hour fit in one request at all; a
+      // browser that refuses the option records at its own rate and the byte ceiling below catches it
+      let media: MediaRecorder
+      try {
+        media = new MediaRecorder(stream, { audioBitsPerSecond: VOICE_NOTE_BITS_A_SECOND })
+      } catch {
+        media = new MediaRecorder(stream)
+      }
       recorder.current = media
       chunks.current = []
-      media.ondataavailable = (event) => event.data.size > 0 && chunks.current.push(event.data)
+      let recorded = 0
+      media.ondataavailable = (event) => {
+        if (event.data.size === 0) return
+        chunks.current.push(event.data)
+        recorded += event.data.size
+        // Whatever the browser chose to record at, it never gathers more than the server would take
+        if (recorded >= VOICE_NOTE_MAX_BYTES) stop()
+      }
       media.onstop = () => {
         stream.getTracks().forEach((track) => track.stop())
         const length = (Date.now() - startedAt.current) / 1000
@@ -115,7 +136,8 @@ export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, 
       }
       startedAt.current = Date.now()
       setSeconds(0)
-      media.start()
+      // A second at a time, so the running total above is known while it records rather than at the end
+      media.start(1000)
       setIsRecording(true)
       timer.current = window.setInterval(() => {
         const running = (Date.now() - startedAt.current) / 1000
@@ -164,7 +186,14 @@ export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, 
         )}
         {isSaving ? "Saving..." : isRecording ? `Stop (${clock(seconds)} / ${clock(VOICE_NOTE_MAX_SECONDS)})` : "Record a voice note"}
       </button>
-      <span className="text-[11px] text-outline">{canRecord ? `Up to ${clock(VOICE_NOTE_MAX_SECONDS)}` : PROJECT_TASK_MESSAGES.voiceStorageUnavailable}</span>
+      {/* A quarter of an hour is long enough that it should not simply stop, so the last minute counts down */}
+      {isRecording && VOICE_NOTE_MAX_SECONDS - seconds <= VOICE_NOTE_WARN_SECONDS ? (
+        <span role="status" className="text-[11px] font-semibold text-error">
+          {Math.max(0, Math.ceil(VOICE_NOTE_MAX_SECONDS - seconds))}s left
+        </span>
+      ) : (
+        <span className="text-[11px] text-outline">{canRecord ? `Up to ${clock(VOICE_NOTE_MAX_SECONDS)}` : PROJECT_TASK_MESSAGES.voiceStorageUnavailable}</span>
+      )}
     </div>
   )
 }

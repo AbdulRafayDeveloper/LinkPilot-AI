@@ -22,6 +22,8 @@ export interface IClientProjectTask {
   content: string
   description: string
   images: { assetId: string; contentType: string }[]
+  // Word, PDF, video, anything the app can place (services/clientProjects/files.ts)
+  files: { assetId: string; name: string; contentType: string; category: string; size: number }[]
   voiceNote: { assetId: string; contentType: string; seconds: number } | null
   status: string
   // Which tab it sits under: change, idea or discussion
@@ -39,6 +41,17 @@ const ImageSchema = new Schema<IClientProjectTask["images"][number]>(
   { _id: false }
 )
 
+const FileSchema = new Schema<IClientProjectTask["files"][number]>(
+  {
+    assetId: { type: String, required: true },
+    name: { type: String, required: true },
+    contentType: { type: String, required: true },
+    category: { type: String, required: true },
+    size: { type: Number, default: 0 },
+  },
+  { _id: false }
+)
+
 const VoiceNoteSchema = new Schema<NonNullable<IClientProjectTask["voiceNote"]>>(
   { assetId: { type: String, required: true }, contentType: { type: String, required: true }, seconds: { type: Number, default: 0 } },
   { _id: false }
@@ -52,6 +65,7 @@ const ClientProjectTaskSchema = new Schema<IClientProjectTask>(
     content: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     images: { type: [ImageSchema], default: [] },
+    files: { type: [FileSchema], default: [] },
     voiceNote: { type: VoiceNoteSchema, default: null },
     status: { type: String, enum: PROJECT_TASK_STATUS_IDS, default: "open" },
     kind: { type: String, enum: PROJECT_ITEM_KIND_IDS, default: DEFAULT_PROJECT_ITEM_KIND },

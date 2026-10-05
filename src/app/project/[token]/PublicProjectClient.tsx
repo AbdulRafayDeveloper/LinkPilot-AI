@@ -171,6 +171,7 @@ export default function PublicProjectClient({ token }: { token: string }) {
                 onSave={addTask}
                 imageEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.images}`}
                 voiceEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.voice}`}
+                fileEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.files}`}
               />
 
               {writeError && (
@@ -201,6 +202,7 @@ export default function PublicProjectClient({ token }: { token: string }) {
             onCancel={() => setEditing(null)}
             imageEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.images}`}
             voiceEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.voice}`}
+            fileEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.files}`}
             onSave={async (input) => {
               await saveTask(editing, input)
               setEditing(null)

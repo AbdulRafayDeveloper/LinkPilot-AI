@@ -1,6 +1,8 @@
 import { FolderKanban, type LucideIcon } from "lucide-react"
-import { TASK_IMAGE_MAX_BYTES, TASK_IMAGE_TYPES, TASK_MAX_IMAGES } from "./taskAttachments"
-import { VOICE_MAX_BYTES, VOICE_MAX_SECONDS } from "./voiceInput"
+import { TASK_IMAGE_MAX_BYTES, TASK_IMAGE_TYPES } from "./taskAttachments"
+import { VOICE_MAX_BYTES } from "./voiceInput"
+import { ACCEPTED_CONTENT_TYPES, ASSET_MAX_BYTES, maxBytesFor, type AssetCategoryId } from "./importantFiles"
+import { MULTIPART_MIN_PART_BYTES, RECORDING_CHUNK_MAX_BYTES } from "./meetingRecording"
 
 /**
  * Client Projects: the work being done for each client, with everything that is said about it.
@@ -28,7 +30,9 @@ export const PROJECT_VOICE_ENDPOINT = "/api/client-projects/voice"
 // and the two uploads a client may make hang off that same token (see PUBLIC_UPLOAD_PATHS)
 export const PUBLIC_PROJECT_PATH = "/project"
 export const PUBLIC_PROJECT_ENDPOINT = "/api/public/projects"
-export const PUBLIC_UPLOAD_PATHS = { images: "images", voice: "voice" } as const
+export const PUBLIC_UPLOAD_PATHS = { images: "images", voice: "voice", files: "files" } as const
+// Where a signed-in page sends a file to be built up, chunk by chunk
+export const PROJECT_FILES_ENDPOINT = "/api/client-projects/files"
 
 /**
  * The three kinds of item a project carries, which are the tabs on both surfaces, in order. The
@@ -91,6 +95,25 @@ export type ProjectItemAuthor = (typeof PROJECT_ITEM_AUTHORS)[number]
 
 // An item is one line of work, the same length an employee's plan task has
 export const PROJECT_TASK_MAX_LENGTH = 900
+/**
+ * How long an item's description may be, **this module's own number** (200,000, at the owner's
+ * request) rather than the shared `TASK_DESCRIPTION_MAX_LENGTH` (6,000) a daily task and an
+ * employee's plan keep.
+ *
+ * They differ because of who reads them: a daily task's description is written and read by a model
+ * (`services/dailyTasks/writeDetails.ts`), so its length is paid for by the token, while **nothing
+ * on a client project is ever sent to a model** — this is a client and an owner writing to each
+ * other. So it follows the "plain text boxes" rule instead and stays well under
+ * `TEXT_BOX_MAX_LENGTH`, with the text going in one request rather than an autosave.
+ */
+export const PROJECT_DESCRIPTION_MAX_LENGTH = 200_000
+/**
+ * A shared link opens each item's details as it lists them, which is right for a line or two of
+ * explanation and wrong for a specification: one 200,000-character description left open would bury
+ * every item under it. So a description longer than this starts folded, behind its own Details
+ * button, exactly as it does on the owner's page.
+ */
+export const PROJECT_DETAILS_OPEN_MAX_CHARS = 2_000
 // How many items one project may carry **per tab**, so a long discussion never crowds out the
 // changes. It is also the ceiling on what anyone holding a shared link can add.
 export const MAX_PROJECT_TASKS = 300
@@ -103,16 +126,58 @@ export const PROJECT_TASK_STATUSES = [
 export type ProjectTaskStatus = (typeof PROJECT_TASK_STATUSES)[number]["id"]
 export const PROJECT_TASK_STATUS_IDS = PROJECT_TASK_STATUSES.map((status) => status.id) as [ProjectTaskStatus, ...ProjectTaskStatus[]]
 
-// The images are the shared task images, so one picker, one set of limits and one storage service
-export { TASK_IMAGE_MAX_BYTES, TASK_IMAGE_TYPES, TASK_MAX_IMAGES }
+// The images are the shared task images, so one picker and one storage service. **The count is this
+// module's own**: an item here holds 10, at the owner's request, while a daily task and an
+// employee's plan keep the shared 6 (`TASK_MAX_IMAGES`), which is what `TaskDetailsFields` still
+// defaults to when nothing passes a number.
+export { TASK_IMAGE_MAX_BYTES, TASK_IMAGE_TYPES }
+export const PROJECT_MAX_IMAGES = 10
+
+/**
+ * Files on an item: a Word document, a PDF, a video, anything the app can place. The **types and
+ * the per-type ceilings are Important Files'** (`ACCEPTED_CONTENT_TYPES`, `maxBytesFor`), so there
+ * is one mapping from a content type to what it is and how big it may be, rather than a second list
+ * here that could drift from it: images and text 25 MB, PDF and Word 100 MB, audio 200 MB, video
+ * 500 MB.
+ *
+ * **A file is sent in 4 MB chunks through the app, and the server joins them**, which is how a
+ * 200 MB video gets uploaded at all: a serverless request body is capped at 4.5 MB, and the
+ * bucket's CORS rule refuses browser uploads straight to storage from the live site (see Important
+ * Files). It is the same two numbers and the same joining a meeting recording uses, reused rather
+ * than restated: 4 MB a chunk, and S3's own 5 MiB minimum for a part of a joined object.
+ */
+export { ACCEPTED_CONTENT_TYPES, ASSET_MAX_BYTES, maxBytesFor }
+export type ProjectFileCategory = AssetCategoryId
+export const PROJECT_FILE_CHUNK_BYTES = RECORDING_CHUNK_MAX_BYTES
+export const PROJECT_FILE_PART_BYTES = MULTIPART_MIN_PART_BYTES
+export const PROJECT_MAX_FILES = 10
+// A file name is shown and is what a download is saved as; the key is built from an id, never this
+export const PROJECT_FILE_NAME_MAX_LENGTH = 200
+// How many chunks one upload may be, which is the ceiling in chunks rather than in bytes
+export const PROJECT_FILE_MAX_CHUNKS = Math.ceil(ASSET_MAX_BYTES / RECORDING_CHUNK_MAX_BYTES)
+// An upload nobody finished is forgotten after this, with its chunks
+export const PROJECT_FILE_UPLOAD_HOURS = 24
 
 /**
  * A voice note is recorded in the browser and stored as it was recorded. The ceiling is the shared
- * one (4 MB, what a serverless function takes as a body), and the clock is the shared six minutes,
- * so a note that would be refused is stopped before it is sent rather than after.
+ * one (4 MB, what a serverless function takes as a body), and a note that would be refused is
+ * stopped before it is sent rather than after.
+ *
+ * **Fifteen minutes, at the owner's request**, which is its own clock rather than the shared six
+ * minutes the transcription recorder uses (`VOICE_MAX_SECONDS`): that one is cut into parts and sent
+ * to a model, while this one is one request that stores the recording itself.
+ *
+ * Fifteen minutes only fits in 4 MB because the recording asks for a **speech bitrate**. Left to
+ * the browser's own default a quarter of an hour would be several megabytes and the host would
+ * refuse the request before the route ran, so the two numbers belong together: 900 seconds at
+ * 24 kbps is about 2.6 MiB, a third under the ceiling, and Opus is built to carry speech at that
+ * rate. `tests/clientProjectTasks.test.mjs` fails if raising one of them outgrows the other.
  */
 export const VOICE_NOTE_MAX_BYTES = VOICE_MAX_BYTES
-export const VOICE_NOTE_MAX_SECONDS = VOICE_MAX_SECONDS
+export const VOICE_NOTE_MAX_SECONDS = 15 * 60
+export const VOICE_NOTE_BITS_A_SECOND = 24_000
+// The last stretch of the clock, shown in red, so a long recording does not end without warning
+export const VOICE_NOTE_WARN_SECONDS = 60
 
 export const PROJECT_TASK_MESSAGES = {
   loadFailed: "Couldn't load the projects. Please try again.",
@@ -120,8 +185,19 @@ export const PROJECT_TASK_MESSAGES = {
   taskNotFound: "That item no longer exists.",
   missingTask: "Write what it is.",
   taskTooLong: `Keep it under ${PROJECT_TASK_MAX_LENGTH} characters.`,
+  descriptionTooLong: `Keep the description under ${PROJECT_DESCRIPTION_MAX_LENGTH.toLocaleString()} characters.`,
   tooManyTasks: `You can keep up to ${MAX_PROJECT_TASKS} items on one tab of a project.`,
-  tooManyImages: `An item can carry up to ${TASK_MAX_IMAGES} images.`,
+  tooManyImages: `An item can carry up to ${PROJECT_MAX_IMAGES} images.`,
+  tooManyFiles: `An item can carry up to ${PROJECT_MAX_FILES} files.`,
+  // The files
+  missingFileName: "That file has no name.",
+  fileUnsupported: "That file type can't be attached. Images, PDF, Word, text, video and audio can.",
+  fileTooLarge: "That file is larger than this type allows.",
+  fileUploadFailed: "Couldn't upload that file. Please try again.",
+  fileChunkFailed: "That upload stopped part way. Try it again.",
+  fileNotFound: "That file is no longer here.",
+  fileStorageUnavailable: "Files can't be attached here yet: file storage isn't set up.",
+  filesUploading: "Wait for the files to finish uploading.",
   badStatus: "Choose whether it is still to do or finished.",
   badKind: "Choose whether it is a change, an idea or part of the discussion.",
   saveFailed: "Couldn't save it. Please try again.",

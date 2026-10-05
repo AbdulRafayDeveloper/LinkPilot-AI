@@ -15,7 +15,7 @@ import { StoredTrendingTopicSchema } from "@/services/trending/schema"
 import { UserFacingError } from "@/lib/errors"
 import type { SavedTopic, SavedTopicDetail, SavedTopicFilters, SavedTopicsPage } from "@/types/trendingHistory"
 import type { Viewer } from "@/types/auth"
-import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * Every topic every Trending Topics search has found.
@@ -264,7 +264,7 @@ export async function deleteSavedTopics(
     }
   } else {
     const currentId = await currentSearchId(viewer)
-    const scoped = { $and: [searchConditions(viewer, filters, currentId), ownedBy(viewer)] }
+    const scoped = { $and: [searchConditions(viewer, filters, currentId), ownedForClearing(viewer)] }
     const rows = await TrendingSearch.aggregate<{ _id: mongoose.Types.ObjectId; topic: { title?: string } }>([
       { $match: scoped },
       { $project: { topic: "$result.topics" } },

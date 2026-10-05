@@ -31,6 +31,17 @@ interface TaskDetailsFieldsProps {
    * uploads through its own token's route. Left out everywhere else, which uses the signed-in one.
    */
   imageEndpoint?: string
+  /**
+   * How many images this place allows. Left out it is the shared `TASK_MAX_IMAGES` (6), which is
+   * what a daily task and an employee's plan keep; Client Projects passes its own 10.
+   */
+  maxImages?: number
+  /**
+   * How long the description may be. Left out it is the shared `TASK_DESCRIPTION_MAX_LENGTH`
+   * (6,000), which a model reads and so is paid for by the token; Client Projects, where nothing
+   * reaches a model, passes its own 200,000.
+   */
+  maxDescription?: number
 }
 
 const labelClass = "mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-outline"
@@ -67,7 +78,7 @@ const Thumbnail: React.FC<{ image: TaskImageView; label: string; onRemove: () =>
 /**
  * The optional detail a task can carry, written the same way wherever a task is created or edited:
  * a formatted description (the shared visual editor: bold, italic, lists, links, with a Markdown view
- * behind it) and up to TASK_MAX_IMAGES images, chosen by browsing, dropping or pasting, each shown as
+ * behind it) and up to `maxImages` images, chosen by browsing, dropping or pasting, each shown as
  * a thumbnail. A "Write with AI" button fills the description from the task's line when offered.
  *
  * It is closed until it is asked for, so a list of tasks reads as a list of lines whether or not they
@@ -86,6 +97,8 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
   alwaysOpen = false,
   onGenerate,
   imageEndpoint,
+  maxImages = TASK_MAX_IMAGES,
+  maxDescription = TASK_DESCRIPTION_MAX_LENGTH,
 }) => {
   const fieldId = useId()
   // Closed even on a task that already carries details, so a plan reads as a list of lines; the
@@ -108,7 +121,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
     onChange(latest.current)
   }
 
-  const room = TASK_MAX_IMAGES - details.images.length - details.uploading
+  const room = maxImages - details.images.length - details.uploading
 
   const addFiles = async (files: File[]) => {
     onError(null)
@@ -196,7 +209,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
                 id={descriptionId}
                 value={details.description}
                 onChange={(description) => update((current) => ({ ...current, description }))}
-                maxLength={TASK_DESCRIPTION_MAX_LENGTH}
+                maxLength={maxDescription}
                 rows={4}
                 placeholder={TASK_ATTACHMENT_MESSAGES.descriptionHint}
                 ariaLabel={TASK_ATTACHMENT_MESSAGES.descriptionLabel}
@@ -204,8 +217,8 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
                 compact
               />
             </div>
-            <p className={`mt-1 text-[11px] ${details.description.length > TASK_DESCRIPTION_MAX_LENGTH ? "font-semibold text-error" : "text-outline"}`}>
-              {details.description.length.toLocaleString()} / {TASK_DESCRIPTION_MAX_LENGTH.toLocaleString()}
+            <p className={`mt-1 text-[11px] ${details.description.length > maxDescription ? "font-semibold text-error" : "text-outline"}`}>
+              {details.description.length.toLocaleString()} / {maxDescription.toLocaleString()}
             </p>
           </div>
 
@@ -233,7 +246,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
             <span className={labelClass}>
               {TASK_ATTACHMENT_MESSAGES.imagesLabel}{" "}
               <span className="normal-case tracking-normal">
-                (optional, {count} of {TASK_MAX_IMAGES})
+                (optional, {count} of {maxImages})
               </span>
             </span>
             {canAttachImage ? (

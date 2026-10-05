@@ -14,6 +14,7 @@ import {
 import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { deleteTaskImages, taskImageView } from "@/services/taskImages"
 import { deleteVoiceNotes, voiceNoteView } from "./voiceNotes"
+import { deleteProjectFiles, projectFileView, storedProjectFile } from "./files"
 import type { ProjectTask, ProjectTaskInput } from "@/types/clientProjectTasks"
 import type { Viewer } from "@/types/auth"
 
@@ -52,8 +53,9 @@ export async function projectOrNull(viewer: Viewer, projectId: string): Promise<
 
 /** One item with its links signed, ready for a page. */
 async function toTask(record: StoredTask): Promise<ProjectTask> {
-  const [images, voiceNote] = await Promise.all([
+  const [images, files, voiceNote] = await Promise.all([
     Promise.all((record.images ?? []).map((image) => taskImageView(image))),
+    Promise.all((record.files ?? []).map((file) => projectFileView(storedProjectFile(file)))),
     voiceNoteView(record.voiceNote),
   ])
   return {
@@ -61,8 +63,9 @@ async function toTask(record: StoredTask): Promise<ProjectTask> {
     projectId: record.projectId,
     content: record.content,
     description: record.description ?? "",
-    // An image whose link couldn't be signed is left out rather than shown broken
+    // An image or a file whose link couldn't be signed is left out rather than shown broken
     images: images.filter((image) => image !== null),
+    files: files.filter((file) => file !== null),
     voiceNote,
     status: record.status === "done" ? "done" : "open",
     // An item saved before the tabs existed has no kind and reads as a change, the first tab
@@ -99,6 +102,13 @@ const cleanInput = (input: ProjectTaskInput) => ({
   content: input.content.replace(/\s+/g, " ").trim(),
   description: input.description?.trim() ?? "",
   images: (input.images ?? []).map((image) => ({ assetId: image.assetId, contentType: image.contentType })),
+  files: (input.files ?? []).map((file) => ({
+    assetId: file.assetId,
+    name: file.name,
+    contentType: file.contentType,
+    category: file.category,
+    size: file.size,
+  })),
   voiceNote: input.voiceNote ? { assetId: input.voiceNote.assetId, contentType: input.voiceNote.contentType, seconds: input.voiceNote.seconds } : null,
   status: input.status === "done" ? "done" : "open",
 })
@@ -159,6 +169,7 @@ export async function changeProjectTask(
   if (input.content !== undefined) changes.content = cleaned.content
   if (input.description !== undefined) changes.description = cleaned.description
   if (input.images !== undefined) changes.images = cleaned.images
+  if (input.files !== undefined) changes.files = cleaned.files
   if (input.voiceNote !== undefined) changes.voiceNote = cleaned.voiceNote
   if (input.status !== undefined) changes.status = cleaned.status
   if (input.content !== undefined && !cleaned.content) throw new UserFacingError(PROJECT_TASK_MESSAGES.missingTask)
@@ -170,6 +181,10 @@ export async function changeProjectTask(
   if (input.images !== undefined) {
     const kept = new Set(cleaned.images.map((image) => image.assetId))
     await deleteTaskImages((current.images ?? []).filter((image) => !kept.has(image.assetId)))
+  }
+  if (input.files !== undefined) {
+    const kept = new Set(cleaned.files.map((file) => file.assetId))
+    await deleteProjectFiles((current.files ?? []).filter((file) => !kept.has(file.assetId)).map(storedProjectFile))
   }
   if (input.voiceNote !== undefined && current.voiceNote && current.voiceNote.assetId !== cleaned.voiceNote?.assetId) {
     await deleteVoiceNotes([current.voiceNote])
@@ -183,6 +198,7 @@ export async function removeProjectTask(filter: Record<string, unknown>, project
   const record = (await ClientProjectTaskModel.findOneAndDelete({ ...filter, projectId }).lean()) as unknown as StoredTask | null
   if (!record) return false
   await deleteTaskImages(record.images ?? [])
+  await deleteProjectFiles((record.files ?? []).map(storedProjectFile))
   await deleteVoiceNotes([record.voiceNote])
   return true
 }
@@ -219,6 +235,7 @@ export async function deleteTasksOfProjects(scope: Record<string, unknown>, proj
   if (records.length === 0) return 0
   const { deletedCount } = await ClientProjectTaskModel.deleteMany({ _id: { $in: records.map((record) => new mongoose.Types.ObjectId(record._id.toString())) } })
   await deleteTaskImages(records.flatMap((record) => record.images ?? []))
+  await deleteProjectFiles(records.flatMap((record) => (record.files ?? []).map(storedProjectFile)))
   await deleteVoiceNotes(records.map((record) => record.voiceNote))
   return deletedCount ?? 0
 }

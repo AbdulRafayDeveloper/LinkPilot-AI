@@ -14,7 +14,7 @@ import {
 } from "@/constants/profileScheduler"
 import type { ProfilePersonFields, ProfileSchedule, ProfileSchedulePage } from "@/types/profileScheduler"
 import type { Viewer } from "@/types/auth"
-import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * Comment Writer's Profile Scheduler: the people an account comments on (name, role, location,
@@ -185,7 +185,7 @@ export async function deleteProfileSchedule(viewer: Viewer, id: string): Promise
  */
 export async function deleteProfileSchedules(viewer: Viewer, filters: Filters, ids?: string[]): Promise<{ deleted: number }> {
   await connectDatabase()
-  const matching = matchingFilter(ids ? visibleTo(viewer) : ownedBy(viewer), filters)
+  const matching = matchingFilter(ids ? visibleTo(viewer) : ownedForClearing(viewer), filters)
   const chosen = ids ? { $and: [matching, { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] } : matching
   const { deletedCount } = await ProfileScheduleModel.deleteMany(chosen)
   return { deleted: deletedCount ?? 0 }

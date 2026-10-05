@@ -4,9 +4,17 @@ import React, { useState } from "react"
 import { Loader2, Plus, X } from "lucide-react"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { VoiceNoteField } from "./VoiceNoteField"
-import { PROJECT_TASK_MAX_LENGTH, PROJECT_TASK_MESSAGES, projectItemKind, type ProjectItemKind } from "@/constants/clientProjectTasks"
+import { ProjectFilesField } from "./ProjectFilesField"
+import {
+  PROJECT_DESCRIPTION_MAX_LENGTH,
+  PROJECT_MAX_IMAGES,
+  PROJECT_TASK_MAX_LENGTH,
+  PROJECT_TASK_MESSAGES,
+  projectItemKind,
+  type ProjectItemKind,
+} from "@/constants/clientProjectTasks"
 import { emptyTaskDetails, toStoredImages, type TaskDetailsDraft } from "@/types/taskAttachment"
-import type { ProjectTask, ProjectTaskInput, VoiceNoteView } from "@/types/clientProjectTasks"
+import type { ProjectFileView, ProjectTask, ProjectTaskInput, VoiceNoteView } from "@/types/clientProjectTasks"
 
 interface TaskComposerProps {
   // The item being changed, or null when one is being added
@@ -17,9 +25,10 @@ interface TaskComposerProps {
   onCancel?: () => void
   disabled?: boolean
   canAttach?: boolean
-  // Where an image and a recording are sent, for a page whose reader has no account (a shared link)
+  // Where an image, a recording and a file are sent, for a page whose reader has no account
   imageEndpoint?: string
   voiceEndpoint?: string
+  fileEndpoint: string
 }
 
 /**
@@ -31,18 +40,31 @@ interface TaskComposerProps {
  * drift from the others. The tab only changes the words and where a new item lands; a client
  * writing from a shared link fills in exactly the same form the owner does.
  */
-export const TaskComposer: React.FC<TaskComposerProps> = ({ task, kind, onSave, onCancel, disabled, canAttach = true, imageEndpoint, voiceEndpoint }) => {
+export const TaskComposer: React.FC<TaskComposerProps> = ({
+  task,
+  kind,
+  onSave,
+  onCancel,
+  disabled,
+  canAttach = true,
+  imageEndpoint,
+  voiceEndpoint,
+  fileEndpoint,
+}) => {
   const [content, setContent] = useState(task?.content ?? "")
   const [details, setDetails] = useState<TaskDetailsDraft>(
     task ? { description: task.description, images: task.images, uploading: 0 } : emptyTaskDetails()
   )
   const [voiceNote, setVoiceNote] = useState<VoiceNoteView | null>(task?.voiceNote ?? null)
+  const [files, setFiles] = useState<ProjectFileView[]>(task?.files ?? [])
+  // Files still going up, so the item is never saved without one of them
+  const [sending, setSending] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   const isEdit = task !== null
   const words = projectItemKind(kind)
-  const canSave = Boolean(content.trim()) && details.uploading === 0 && !isSaving && !disabled
+  const canSave = Boolean(content.trim()) && details.uploading === 0 && sending === 0 && !isSaving && !disabled
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -54,6 +76,13 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({ task, kind, onSave, 
         content,
         description: details.description,
         images: toStoredImages(details.images),
+        files: files.map((file) => ({
+          assetId: file.assetId,
+          name: file.name,
+          contentType: file.contentType,
+          category: file.category,
+          size: file.size,
+        })),
         voiceNote: voiceNote ? { assetId: voiceNote.assetId, contentType: voiceNote.contentType, seconds: voiceNote.seconds } : null,
         kind,
       })
@@ -62,6 +91,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({ task, kind, onSave, 
         setContent("")
         setDetails(emptyTaskDetails())
         setVoiceNote(null)
+        setFiles([])
       }
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.saveFailed)
@@ -96,6 +126,19 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({ task, kind, onSave, 
         canAttachImage={canAttach}
         alwaysOpen={isEdit}
         imageEndpoint={imageEndpoint}
+        maxImages={PROJECT_MAX_IMAGES}
+        maxDescription={PROJECT_DESCRIPTION_MAX_LENGTH}
+      />
+
+      <ProjectFilesField
+        files={files}
+        onAdd={(file) => setFiles((current) => [...current, file])}
+        onRemove={(assetId) => setFiles((current) => current.filter((file) => file.assetId !== assetId))}
+        onError={setError}
+        onUploading={setSending}
+        endpoint={fileEndpoint}
+        disabled={disabled || isSaving}
+        canAttach={canAttach}
       />
 
       <VoiceNoteField
@@ -135,6 +178,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({ task, kind, onSave, 
         </button>
       </div>
       {details.uploading > 0 && <p className="text-right text-[11px] text-outline">Waiting for {details.uploading} image(s) to finish uploading...</p>}
+      {sending > 0 && <p className="text-right text-[11px] text-outline">{PROJECT_TASK_MESSAGES.filesUploading}</p>}
     </form>
   )
 }

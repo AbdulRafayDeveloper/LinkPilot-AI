@@ -5,6 +5,7 @@ import { CLIENT_PROJECT_MESSAGES, MAX_CLIENT_PROJECTS } from "@/constants/client
 import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { getClient } from "@/services/clientMessaging/clients"
 import { deleteTasksOfProjects } from "@/services/clientProjects/tasks"
+import { deleteProjectFileUploads } from "@/services/clientProjects/files"
 import type { ClientProject, ClientProjectInput, ClientProjectsPage } from "@/types/clients"
 import type { Viewer } from "@/types/auth"
 
@@ -95,6 +96,10 @@ export async function deleteClientProject(viewer: Viewer, clientId: string, proj
   const { deletedCount } = await ClientProjectModel.deleteOne({ ...filter, clientId })
   // Its tasks go with it, with their images and voice notes, so nothing is left pointing at a
   // project that no longer exists (Client Projects owns those; this is the only place they leak from)
-  if (deletedCount > 0) await deleteTasksOfProjects(visibleTo(viewer), [projectId])
+  if (deletedCount > 0) {
+    await deleteTasksOfProjects(visibleTo(viewer), [projectId])
+    // A file somebody was still uploading has no item to hang on, so its chunks go too
+    await deleteProjectFileUploads(visibleTo(viewer), [projectId])
+  }
   return deletedCount > 0
 }
