@@ -2,7 +2,7 @@
 
 import React from "react"
 import { Check, Loader2 } from "lucide-react"
-import { TOOL_GROUPS } from "@/constants/linkedinTools"
+import { TOOL_GROUPS, type LinkedInTool } from "@/constants/linkedinTools"
 import { manageableFeatures } from "@/constants/featureAccess"
 
 interface FeatureSwitchboardProps {
@@ -15,6 +15,9 @@ interface FeatureSwitchboardProps {
   disabled?: boolean
   // Some tools set on or off: one tool, or a whole sidebar group at once
   onChange: (toolIds: string[], on: boolean) => void
+  // The tools to lay out, when they are not every tool an admin can turn off: a parent granting a
+  // child only ever offers the tools it has itself (constants/children.ts)
+  tools?: readonly LinkedInTool[]
 }
 
 const Track: React.FC<{ on: boolean; mixed?: boolean }> = ({ on, mixed = false }) => (
@@ -34,8 +37,8 @@ const Track: React.FC<{ on: boolean; mixed?: boolean }> = ({ on, mixed = false }
  * on, and all of them on otherwise, so a half-on group is one click from fully on. It is the same
  * board for every user and for one account, so the two can never lay the tools out differently.
  */
-export const FeatureSwitchboard: React.FC<FeatureSwitchboardProps> = ({ isOff, noteFor, busy, disabled = false, onChange }) => {
-  const tools = manageableFeatures()
+export const FeatureSwitchboard: React.FC<FeatureSwitchboardProps> = ({ isOff, noteFor, busy, disabled = false, onChange, tools: offered }) => {
+  const tools = offered ?? manageableFeatures()
 
   return (
     <div className="flex flex-col gap-4">

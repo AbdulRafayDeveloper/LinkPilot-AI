@@ -22,7 +22,7 @@ import type { Viewer } from "@/types/auth"
  */
 
 const ADMIN_SCOPE = "default"
-const scopeFor = (viewer: Viewer) => (viewer.role === "admin" ? ADMIN_SCOPE : `user:${viewer.id}`)
+const scopeFor = (viewer: Viewer) => (viewer.role === "admin" ? ADMIN_SCOPE : `user:${viewer.dataOwnerId}`)
 // Photos sit beside the generated images, under the app's own folder in the bucket
 const ASSET_PREFIX = "LinkPilot/post-images/assets"
 

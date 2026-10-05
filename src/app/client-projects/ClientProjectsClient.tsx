@@ -6,13 +6,15 @@ import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
 import { FilterPanel, SearchFilter, SelectFilter } from "@/components/history/HistoryFilters"
-import { ProjectTasks } from "@/components/client-projects/ProjectTasks"
+import { ProjectTasks, deleteItemTitle } from "@/components/client-projects/ProjectTasks"
+import { ProjectTabs } from "@/components/client-projects/ProjectTabs"
+import { countsOf } from "@/lib/projectItems"
 import { TaskComposer } from "@/components/client-projects/TaskComposer"
 import { ProjectLinkPanel } from "@/components/client-projects/ProjectLinkPanel"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { filterByWords } from "@/lib/nameSearch"
-import { CLIENT_PROJECTS_ENDPOINT, PROJECT_TASK_MESSAGES } from "@/constants/clientProjectTasks"
+import { CLIENT_PROJECTS_ENDPOINT, DEFAULT_PROJECT_ITEM_KIND, PROJECT_TASK_MESSAGES, type ProjectItemKind } from "@/constants/clientProjectTasks"
 import { CLIENT_PROJECT_STATUSES } from "@/constants/clients"
 import type { ClientProjectsPage, ProjectTask, ProjectTaskInput, ProjectWithTasks } from "@/types/clientProjectTasks"
 
@@ -20,8 +22,11 @@ import type { ClientProjectsPage, ProjectTask, ProjectTaskInput, ProjectWithTask
  * Client Projects: every project of every client in one list, and the tasks under the one chosen.
  *
  * A project itself (its name, what the work is, whether it is running) still belongs to Clients
- * Management; this page reads them and owns what is under them: the tasks, their images, their
- * voice notes and the read-only link the project can be shared by.
+ * Management; this page reads them and owns what is under them: the changes, the ideas and the
+ * discussion, with their images and voice notes, and the link the project is shared by.
+ *
+ * The three tabs are the same strip the shared link shows, and the client writes through that link
+ * on the same items, so an item they add appears here tagged as theirs.
  */
 export default function ClientProjectsClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -36,6 +41,8 @@ export default function ClientProjectsClient() {
   const [loaded, setLoaded] = useState<{ projectId: string; attempt: number; tasks: ProjectTask[] } | null>(null)
   const [taskError, setTaskError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  // Which tab is open. It stays as the user left it while they move between projects
+  const [tab, setTab] = useState<ProjectItemKind>(DEFAULT_PROJECT_ITEM_KIND)
   const [editing, setEditing] = useState<ProjectTask | null>(null)
   const [deleting, setDeleting] = useState<ProjectTask | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -259,7 +266,7 @@ export default function ClientProjectsClient() {
                 </ul>
 
                 {chosen && (
-                  <section aria-label={`Tasks on ${chosen.name}`} className="flex min-w-0 flex-col gap-3">
+                  <section aria-label={`What is on ${chosen.name}`} className="flex min-w-0 flex-col gap-3">
                     <div className="rounded-2xl border border-outline-variant bg-white p-4">
                       <h2 className="break-words text-lg font-bold text-on-surface">{chosen.name}</h2>
                       <p className="mt-0.5 text-[13px] text-on-surface-variant">For {chosen.clientName}</p>
@@ -272,22 +279,34 @@ export default function ClientProjectsClient() {
                       onChanged={(token) => countTasks(chosen.id, (project) => ({ ...project, publicToken: token }))}
                     />
 
-                    <TaskComposer task={null} onSave={addTask} />
+                    <ProjectTabs chosen={tab} onChoose={setTab} counts={tasks ? countsOf(tasks) : chosen.counts} />
 
-                    {taskError && (
-                      <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
-                        {taskError}
-                      </p>
-                    )}
+                    <div id={`project-panel-${tab}`} role="tabpanel" aria-labelledby={`project-tab-${tab}`} className="flex min-w-0 flex-col gap-3">
+                      <TaskComposer task={null} kind={tab} onSave={addTask} />
 
-                    {tasks === null ? (
-                      <p role="status" className="flex items-center gap-2 py-6 text-[13px] text-on-surface-variant">
-                        <Loader2 size={16} className="animate-spin text-primary" aria-hidden="true" />
-                        Loading the tasks...
-                      </p>
-                    ) : (
-                      <ProjectTasks tasks={tasks} busyId={busyId} onTick={tick} onEdit={setEditing} onDelete={setDeleting} />
-                    )}
+                      {taskError && (
+                        <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
+                          {taskError}
+                        </p>
+                      )}
+
+                      {tasks === null ? (
+                        <p role="status" className="flex items-center gap-2 py-6 text-[13px] text-on-surface-variant">
+                          <Loader2 size={16} className="animate-spin text-primary" aria-hidden="true" />
+                          Loading what is on this project...
+                        </p>
+                      ) : (
+                        <ProjectTasks
+                          tasks={tasks.filter((task) => task.kind === tab)}
+                          kind={tab}
+                          busyId={busyId}
+                          onTick={tick}
+                          onEdit={setEditing}
+                          onDelete={setDeleting}
+                          clientTag={PROJECT_TASK_MESSAGES.fromClient}
+                        />
+                      )}
+                    </div>
                   </section>
                 )}
               </div>
@@ -297,9 +316,10 @@ export default function ClientProjectsClient() {
       </div>
 
       {editing && (
-        <Modal title="Edit task" onClose={() => setEditing(null)} size="large">
+        <Modal title="Edit" onClose={() => setEditing(null)} size="large">
           <TaskComposer
             task={editing}
+            kind={editing.kind}
             onCancel={() => setEditing(null)}
             onSave={async (input) => {
               await saveTask(editing, input)
@@ -311,7 +331,7 @@ export default function ClientProjectsClient() {
 
       {deleting && (
         <Modal
-          title="Delete this task?"
+          title={deleteItemTitle(deleting.kind)}
           description={deleting.content}
           onClose={() => setDeleting(null)}
           isCloseDisabled={isDeleting}
@@ -333,7 +353,7 @@ export default function ClientProjectsClient() {
                 className="inline-flex items-center gap-2 rounded-xl bg-error px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {isDeleting && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
-                Delete task
+                Delete
               </button>
             </div>
           }

@@ -110,7 +110,7 @@ export async function createMeeting(viewer: Viewer, input: NewMeetingPlan, recur
   await connectDatabase()
   const base = {
     ...input,
-    ownerId: viewer.id,
+    ownerId: viewer.dataOwnerId,
     status: "pending" as const,
     completedAt: null,
     prepError: null,

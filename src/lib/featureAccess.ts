@@ -73,6 +73,25 @@ export function effectiveDisabledTools(role: string, defaults: readonly string[]
 }
 
 /**
+ * The tools a **child account** may not use. A child is the other way round from an ordinary
+ * account: it starts with nothing and its parent grants it modules one at a time, so `enabledTools`
+ * is read as the grant list rather than as a difference from what everyone gets.
+ *
+ * **A child can never hold a tool its parent does not have**: a grant for a tool that is off for the
+ * parent counts for nothing, now and later, so a tool the parent loses afterwards goes from the child
+ * too without anybody editing the child. The admin area is not in `allTools`, so it is never granted.
+ */
+export function childDisabledTools(
+  allTools: readonly string[],
+  parentDisabled: readonly string[],
+  granted: readonly string[]
+): string[] {
+  const offForParent = new Set(parentDisabled)
+  const allowed = new Set(granted.filter((toolId) => !offForParent.has(toolId)))
+  return allTools.filter((toolId) => !allowed.has(toolId))
+}
+
+/**
  * Where the named tools land in one account's own choices when they are set on or off for it: only
  * the tools set against what everyone gets are kept as its own choice; a tool set to what everyone
  * gets anyway lands in neither list, so it follows everyone again. The caller takes the named tools

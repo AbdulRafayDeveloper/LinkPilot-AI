@@ -128,7 +128,7 @@ export async function createRecordedMeeting(
     error: null,
   }
   const record = await MeetingModel.create({
-    ownerId: viewer.id,
+    ownerId: viewer.dataOwnerId,
     // Until the analysis writes a real title from what was said
     title: named || "Recorded meeting",
     isTitleGenerated: named === "",

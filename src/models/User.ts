@@ -6,6 +6,9 @@ import { USER_ROLES, type UserRole } from "@/constants/auth"
  * `sessionVersion` ends every sign-in the account has, since a session names the version it was made with.
  */
 export interface IUser {
+  // The account this one belongs to, when it is a child account (services/children.ts). A child reads
+  // and writes its parent's records, so the parent's id is what scopes its data; null on a primary account
+  parentId: string | null
   email: string
   name: string
   passwordHash: string
@@ -32,6 +35,7 @@ export interface IUser {
 const UserSchema = new Schema<IUser>(
   {
     // Stored lowercased, so the same address typed with capitals is the same account
+    parentId: { type: String, default: null, index: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, required: true, trim: true },
     passwordHash: { type: String, required: true },

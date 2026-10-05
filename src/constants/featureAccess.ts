@@ -40,6 +40,8 @@ export const FEATURE_API_PATHS: Record<string, string[]> = {
   "important-files": ["/api/important-files"],
   "important-content": ["/api/important-content"],
   employees: ["/api/employees"],
+  // Only a primary account manages these, so it is primary-only rather than a tool anyone is granted
+  "child-accounts": ["/api/children"],
 }
 
 /**
@@ -70,8 +72,15 @@ export const SHARED_API_PATHS = [
 // A safety net on the request body: nobody can send more ids than the app has tools
 export const MAX_FEATURE_IDS = 100
 
-/** The tools an admin can turn off. The admin area is never one of them, so nobody can be locked out of it. */
-export const manageableFeatures = (): LinkedInTool[] => APP_TOOLS.filter((tool) => !tool.adminOnly)
+/**
+ * The tools an admin can turn off, and the only ones a parent can grant a child. The admin area is
+ * never one of them, so nobody can be locked out of it, and neither is a primary-only tool (managing
+ * child accounts), which exists for a primary account alone and is nobody's to give away.
+ */
+export const manageableFeatures = (): LinkedInTool[] => APP_TOOLS.filter((tool) => !tool.adminOnly && !tool.primaryOnly)
+
+/** The tools only a primary account may open, so a child account is refused them wherever it asks. */
+export const primaryOnlyFeatures = (): LinkedInTool[] => APP_TOOLS.filter((tool) => tool.primaryOnly)
 
 export const FEATURE_ACCESS_MESSAGES = {
   // What a user sees if they reach a tool that is off for them

@@ -90,7 +90,7 @@ export async function createEmployee(viewer: Viewer, input: EmployeeInput): Prom
   await connectDatabase()
   // A new employee goes to the top of the team, above anyone already placed there
   const first = await EmployeeModel.findOne(visibleTo(viewer), { position: 1 }).sort({ position: 1 }).lean()
-  const record = await EmployeeModel.create({ ownerId: viewer.id, ...input, position: first ? first.position - 1 : 0 })
+  const record = await EmployeeModel.create({ ownerId: viewer.dataOwnerId, ...input, position: first ? first.position - 1 : 0 })
   return (await withOwners(viewer, [record.toObject() as unknown as StoredEmployee]))[0]
 }
 

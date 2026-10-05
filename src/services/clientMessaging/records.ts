@@ -15,7 +15,7 @@ export async function saveClientMessage(
 ): Promise<GeneratedClientMessage> {
   await connectDatabase()
   const record = await ClientMessageRecord.create({
-    ownerId: viewer.id,
+    ownerId: viewer.dataOwnerId,
     client: { id: client.id, name: client.name, country: client.country },
     channel: result.channel,
     update,

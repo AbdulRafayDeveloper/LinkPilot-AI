@@ -82,7 +82,7 @@ export async function listItems(viewer: Viewer, { search = "", cursor = null, li
 
 export async function createItem(viewer: Viewer, { title, content }: ReferenceItemInput): Promise<ReferenceItem> {
   await connectDatabase()
-  const record = await ReferenceItemModel.create({ ownerId: viewer.id, title: title.trim(), content })
+  const record = await ReferenceItemModel.create({ ownerId: viewer.dataOwnerId, title: title.trim(), content })
   return toItem(record as unknown as StoredItem)
 }
 

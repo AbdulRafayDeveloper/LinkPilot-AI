@@ -49,7 +49,7 @@ export async function createFolder(viewer: Viewer, name: string): Promise<Record
   const scope = visibleTo(viewer)
   if ((await ContentFolderModel.countDocuments(scope)) >= MAX_FOLDERS) throw new UserFacingError(CONTENT_FOLDER_MESSAGES.tooMany)
   if (await ContentFolderModel.exists({ ...scope, name: sameName(name) })) throw new UserFacingError(CONTENT_FOLDER_MESSAGES.duplicate)
-  const record = await ContentFolderModel.create({ ownerId: viewer.id, name })
+  const record = await ContentFolderModel.create({ ownerId: viewer.dataOwnerId, name })
   return toFolder(record.toObject() as unknown as StoredFolder, 0)
 }
 

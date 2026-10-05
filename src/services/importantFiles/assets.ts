@@ -164,7 +164,7 @@ export async function planUpload(viewer: Viewer, { name, description, originalNa
   await connectDatabase()
 
   const record = await AssetFile.create({
-    ownerId: viewer.id,
+    ownerId: viewer.dataOwnerId,
     name: name.trim(),
     description: description.trim(),
     originalName,

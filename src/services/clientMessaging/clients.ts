@@ -55,7 +55,7 @@ export async function getClient(viewer: Viewer, id: string): Promise<Client | nu
 
 export async function createClient(viewer: Viewer, input: ClientInput): Promise<Client> {
   await connectDatabase()
-  const record = await ClientModel.create({ ownerId: viewer.id, ...cleanInput(input) })
+  const record = await ClientModel.create({ ownerId: viewer.dataOwnerId, ...cleanInput(input) })
   return toClient(record as unknown as StoredClient)
 }
 

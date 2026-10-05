@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
       // The new preparation is turned into vectors now, so the first question about it is answered at once.
       // A failure here only means the first question does that work instead, so it never fails the preparation
-      await syncMeetingVectors(saved.id, meetingChunks(saved), auth.viewer.id, req.signal).catch((error: unknown) =>
+      await syncMeetingVectors(saved.id, meetingChunks(saved), auth.viewer.dataOwnerId, req.signal).catch((error: unknown) =>
         console.warn("⚠️ The meeting's vectors were not written yet:", error instanceof Error ? error.message : error)
       )
       return NextResponse.json({ success: true, message: MEETING_PLANNER_MESSAGES.prepReady, data: saved })

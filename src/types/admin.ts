@@ -89,4 +89,6 @@ export interface AccountDeletion {
   files: number
   // Records removed per tool, busiest first, for the confirmation message
   tools: { title: string; count: number }[]
+  // The accounts it had made for other people to work in its workspace, removed with it
+  children: number
 }

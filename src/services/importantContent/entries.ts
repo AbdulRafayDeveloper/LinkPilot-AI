@@ -103,7 +103,7 @@ export async function listEntries(viewer: Viewer, filters: ContentFilters & { pa
 
 export async function createEntry(viewer: Viewer, input: ImportantContentInput): Promise<ImportantContent> {
   await connectDatabase()
-  const record = await ImportantContentModel.create({ ownerId: viewer.id, ...input, textSize: input.textSize ?? DEFAULT_CONTENT_TEXT_SIZE })
+  const record = await ImportantContentModel.create({ ownerId: viewer.dataOwnerId, ...input, textSize: input.textSize ?? DEFAULT_CONTENT_TEXT_SIZE })
   return (await toEntries(viewer, [record.toObject() as unknown as StoredEntry], await folderNames(viewer)))[0]
 }
 

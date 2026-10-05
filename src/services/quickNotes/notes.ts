@@ -70,7 +70,7 @@ export async function listNotes(viewer: Viewer, cursor: string | null, limit = N
  */
 export async function saveNote(viewer: Viewer, { title, content }: QuickNoteFields): Promise<QuickNote> {
   await connectDatabase()
-  const record = await QuickNoteModel.create({ ownerId: viewer.id, title, content })
+  const record = await QuickNoteModel.create({ ownerId: viewer.dataOwnerId, title, content })
   return toNote(record as unknown as StoredNote)
 }
 

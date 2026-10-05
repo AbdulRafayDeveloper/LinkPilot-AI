@@ -32,7 +32,7 @@ export async function readSavedTrendingResult(viewer: Viewer): Promise<TrendingR
 export async function saveTrendingResult(viewer: Viewer, result: TrendingResult): Promise<void> {
   await connectDatabase()
   await TrendingSearch.create({
-    ownerId: viewer.id,
+    ownerId: viewer.dataOwnerId,
     result,
     topicCount: result.topics.length,
     searchProvider: result.research_metadata.search_provider,

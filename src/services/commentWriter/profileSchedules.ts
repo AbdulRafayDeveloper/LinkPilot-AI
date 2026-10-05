@@ -82,7 +82,7 @@ async function assertNotSaved(viewer: Viewer, profileUrl: string | null | undefi
   // Any number of people may be waiting for their link
   if (!profileUrl) return
   const taken = await ProfileScheduleModel.exists({
-    ownerId: viewer.id,
+    ownerId: viewer.dataOwnerId,
     profileUrl,
     ...(exceptId ? { _id: { $ne: new mongoose.Types.ObjectId(exceptId) } } : {}),
   })
@@ -123,7 +123,7 @@ export async function createProfileSchedule(viewer: Viewer, input: ProfilePerson
   await assertNotSaved(viewer, input.profileUrl)
   try {
     const record = await ProfileScheduleModel.create({
-      ownerId: viewer.id,
+      ownerId: viewer.dataOwnerId,
       profileUrl: input.profileUrl ?? null,
       name: input.name ?? "",
       role: input.role ?? "",

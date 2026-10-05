@@ -26,6 +26,11 @@ interface TaskDetailsFieldsProps {
    * there is nothing to write about yet (no task line).
    */
   onGenerate?: () => Promise<string>
+  /**
+   * Where an image is sent, for a page whose reader has no account: a client project's shared link
+   * uploads through its own token's route. Left out everywhere else, which uses the signed-in one.
+   */
+  imageEndpoint?: string
 }
 
 const labelClass = "mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-outline"
@@ -80,6 +85,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
   canAttachImage = true,
   alwaysOpen = false,
   onGenerate,
+  imageEndpoint,
 }) => {
   const fieldId = useId()
   // Closed even on a task that already carries details, so a plan reads as a list of lines; the
@@ -118,7 +124,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
     await Promise.all(
       sending.map(async (file) => {
         try {
-          const image = await uploadTaskImage(file)
+          const image = await uploadTaskImage(file, undefined, imageEndpoint)
           update((current) => ({ ...current, images: [...current.images, image], uploading: Math.max(0, current.uploading - 1) }))
         } catch (error: unknown) {
           update((current) => ({ ...current, uploading: Math.max(0, current.uploading - 1) }))

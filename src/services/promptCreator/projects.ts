@@ -80,7 +80,7 @@ export async function createProject(viewer: Viewer, input: { name: string; instr
   const scope = visibleTo(viewer)
   if ((await PromptProjectModel.countDocuments(scope)) >= MAX_PROJECTS) throw new UserFacingError(PROMPT_PROJECT_MESSAGES.tooMany)
   if (await PromptProjectModel.exists({ ...scope, name: sameName(input.name) })) throw new UserFacingError(PROMPT_PROJECT_MESSAGES.duplicate)
-  const record = await PromptProjectModel.create({ ownerId: viewer.id, name: input.name, instructions: input.instructions })
+  const record = await PromptProjectModel.create({ ownerId: viewer.dataOwnerId, name: input.name, instructions: input.instructions })
   const project = toProject(record.toObject() as unknown as StoredProject, 0)
   // Its folder is made with it, so it shows among the folders straight away
   return { ...project, folderId: await ensureProjectFolder(viewer, project) }

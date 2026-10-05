@@ -34,7 +34,7 @@ export async function storeImage(images: StoredImages, viewer: Viewer, bytes: Bu
   if (bytes.length > maxBytes) throw new UserFacingError(messages.tooLarge)
   const type = detectImageMimeType(bytes)
   if (!type) throw new UserFacingError(messages.unsupported)
-  const ref: StoredImageRef = { ownerId: viewer.id, file: images.fileOf(new mongoose.Types.ObjectId().toString(), type) }
+  const ref: StoredImageRef = { ownerId: viewer.dataOwnerId, file: images.fileOf(new mongoose.Types.ObjectId().toString(), type) }
   const key = images.keyOf(ref)
   if (!key) throw new UserFacingError(messages.uploadFailed)
   await putObject(key, bytes, type)
@@ -55,7 +55,7 @@ export async function imageLink(
   const key = images.keyOf(ref)
   const type = images.typeOf(ref.file)
   if (!key || !type || !isStorageConfigured()) return null
-  if (viewer.id !== ref.ownerId && !(await isShownTo(images.pathOf(ref)))) return null
+  if (viewer.dataOwnerId !== ref.ownerId && !(await isShownTo(images.pathOf(ref)))) return null
   return presignDownload(key, type)
 }
 

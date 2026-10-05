@@ -7,8 +7,9 @@ import { SESSION_COOKIE, SESSION_MS, readSession, signSession } from "@/lib/sess
 import { UserModel } from "@/models/User"
 import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, REQUEST_PATH_HEADER, type UserRole } from "@/constants/auth"
 import { FEATURE_ACCESS_MESSAGES } from "@/constants/featureAccess"
-import { effectiveDisabledTools, isFeatureDisabled, toolIdForApiPath } from "@/lib/featureAccess"
+import { isFeatureDisabled, toolIdForApiPath } from "@/lib/featureAccess"
 import { readFeatureDefaults } from "@/services/featureSettings"
+import { ACCOUNT_FIELDS, viewerOf } from "./accountViewer"
 import type { Viewer } from "@/types/auth"
 
 /**
@@ -26,14 +27,10 @@ export async function getViewer(): Promise<Viewer | null> {
   await connectDatabase()
   // The account and the settings for every user are read side by side, so the tools it may use are
   // worked out fresh on every request and a change an admin makes applies to the very next one
-  const [user, defaults] = await Promise.all([
-    UserModel.findById(session.uid, { email: 1, name: 1, role: 1, sessionVersion: 1, disabledTools: 1, enabledTools: 1 }).lean(),
-    readFeatureDefaults(),
-  ])
+  const [user, defaults] = await Promise.all([UserModel.findById(session.uid, ACCOUNT_FIELDS).lean(), readFeatureDefaults()])
   if (!user || user.sessionVersion !== session.ver) return null
-  // What is off for everyone, with this account's own choices on top; an admin keeps every tool
-  const disabledTools = effectiveDisabledTools(user.role, defaults, user)
-  return { id: String(user._id), email: user.email, name: user.name, role: user.role, disabledTools }
+  // One rule for what an account may see and do, shared with sign-in (services/auth/accountViewer.ts)
+  return await viewerOf(user, defaults)
 }
 
 type Guard = { viewer: Viewer; denied: null } | { viewer: null; denied: NextResponse }
@@ -99,15 +96,19 @@ export async function endSession(): Promise<void> {
 /**
  * What a viewer may read: an admin sees every record, including those saved before accounts
  * existed; a user sees only their own.
+ *
+ * **It is scoped by `dataOwnerId`, not by `id`**, which is the one place a child account becomes its
+ * parent: a child reads the parent's records in every module, and every create stamps the same id,
+ * so what a child makes is the parent's too. Nothing per module had to know about it.
  */
-export const visibleTo = (viewer: Viewer): Record<string, unknown> => (viewer.role === "admin" ? {} : { ownerId: viewer.id })
+export const visibleTo = (viewer: Viewer): Record<string, unknown> => (viewer.role === "admin" ? {} : { ownerId: viewer.dataOwnerId })
 
 /**
  * What a bulk action (Clear All, a cleanup) may touch: the viewer's own records, and for an admin
  * also the records from before accounts existed. An admin can still delete anyone's record one at a time.
  */
 export const ownedBy = (viewer: Viewer): Record<string, unknown> =>
-  viewer.role === "admin" ? { ownerId: { $in: [viewer.id, null] } } : { ownerId: viewer.id }
+  viewer.role === "admin" ? { ownerId: { $in: [viewer.dataOwnerId, null] } } : { ownerId: viewer.dataOwnerId }
 
 /** One record by id, if the viewer may see it. An id that isn't one never matches. */
 export const visibleById = (viewer: Viewer, id: string): Record<string, unknown> | null =>

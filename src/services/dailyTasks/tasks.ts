@@ -192,7 +192,7 @@ export async function createTasks(viewer: Viewer, taskDate: string, tasks: NewDa
   const start = await nextPosition(viewer, parent ? { parentTaskId: parent } : { taskDate: day, ...TOP_LEVEL })
   const records = await DailyTaskModel.insertMany(
     tasks.map((task, index) => ({
-      ownerId: viewer.id,
+      ownerId: viewer.dataOwnerId,
       content: task.content,
       description: task.description,
       image: null,

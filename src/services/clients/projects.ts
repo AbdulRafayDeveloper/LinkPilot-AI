@@ -66,7 +66,7 @@ export async function createClientProject(viewer: Viewer, clientId: string, inpu
   await connectDatabase()
   const held = await ClientProjectModel.countDocuments({ ...visibleTo(viewer), clientId })
   if (held >= MAX_CLIENT_PROJECTS) throw new UserFacingError(CLIENT_PROJECT_MESSAGES.tooMany)
-  const record = await ClientProjectModel.create({ ownerId: viewer.id, clientId, ...cleanInput(input) })
+  const record = await ClientProjectModel.create({ ownerId: viewer.dataOwnerId, clientId, ...cleanInput(input) })
   return toProject(record as unknown as StoredProject)
 }
 

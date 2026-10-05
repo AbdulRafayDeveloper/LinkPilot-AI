@@ -159,7 +159,7 @@ export async function createMeeting(viewer: Viewer, { title, transcript }: Meeti
   await connectDatabase()
   const named = (title ?? "").trim()
   const record = await MeetingModel.create({
-    ownerId: viewer.id,
+    ownerId: viewer.dataOwnerId,
     title: named || "Untitled meeting",
     isTitleGenerated: named === "",
     transcript,

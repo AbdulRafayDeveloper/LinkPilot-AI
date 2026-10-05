@@ -88,6 +88,12 @@ const TOOL_SEO: Record<string, { title: string; description: string; keywords: s
     description: "Keep your team in one place, with each employee's role, city, joining date and status, a daily plan for each of them with the time every task was finished, and a link each employee can tick their tasks off from.",
     keywords: ["employee management", "team planning", "daily weekly monthly plans", "employee list"],
   },
+  "child-accounts": {
+    title: "Child Accounts for Your Workspace",
+    description:
+      "Give someone their own sign-in to your workspace, with only the tools you choose. They see the same prompts and the same records, and anything they save stays yours.",
+    keywords: ["team accounts", "shared workspace", "sub accounts", "grant tool access"],
+  },
   administration: {
     title: "Audit Management",
     description: "Every sign-in, sign-up and refused attempt, newest first, with the device and browser it came from.",

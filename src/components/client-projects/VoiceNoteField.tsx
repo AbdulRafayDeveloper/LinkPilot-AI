@@ -14,6 +14,12 @@ interface VoiceNoteFieldProps {
   disabled?: boolean
   // Off when file storage isn't set up: the button says why instead of failing when it is pressed
   canRecord?: boolean
+  /**
+   * Where the recording is sent, for a page whose reader has no account: a client project's shared
+   * link stores it through its own token's route, which answers in the same shape. Left out
+   * everywhere else, which uses the signed-in one.
+   */
+  endpoint?: string
 }
 
 /** The clock while recording, and the length of a note that is already there. */
@@ -28,7 +34,7 @@ export const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(
  * what is kept is the recording itself. The clock stops it at the shared six-minute limit, so a
  * recording the server would refuse is never made.
  */
-export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, onError, disabled, canRecord = true }) => {
+export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, onError, disabled, canRecord = true, endpoint = PROJECT_VOICE_ENDPOINT }) => {
   const [isRecording, setIsRecording] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [seconds, setSeconds] = useState(0)
@@ -56,7 +62,7 @@ export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, 
       setIsSaving(true)
       try {
         const { data } = await requestApi<VoiceNoteView>(
-          `${PROJECT_VOICE_ENDPOINT}?seconds=${Math.round(length)}`,
+          `${endpoint}?seconds=${Math.round(length)}`,
           { method: "POST", headers: { "Content-Type": blob.type || "audio/webm" }, body: blob },
           // Storing a recording saves no record, so a repeat only leaves a copy nothing points at
           { retry: true }
@@ -69,7 +75,7 @@ export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, 
         setIsSaving(false)
       }
     },
-    [onChange, onError]
+    [onChange, onError, endpoint]
   )
 
   const stop = useCallback(() => {

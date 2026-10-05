@@ -50,7 +50,7 @@ export async function createFolder(viewer: Viewer, name: string): Promise<Prompt
   const scope = visibleTo(viewer)
   if ((await PromptFolderModel.countDocuments(scope)) >= MAX_FOLDERS) throw new UserFacingError(PROMPT_FOLDER_MESSAGES.tooMany)
   if (await PromptFolderModel.exists({ ...scope, name: sameName(name) })) throw new UserFacingError(PROMPT_FOLDER_MESSAGES.duplicate)
-  const record = await PromptFolderModel.create({ ownerId: viewer.id, name })
+  const record = await PromptFolderModel.create({ ownerId: viewer.dataOwnerId, name })
   return toFolder(record.toObject() as unknown as StoredFolder, 0)
 }
 
@@ -100,7 +100,7 @@ export async function folderForProjectName(viewer: Viewer, name: string, linkedI
   const sameNamed = (await PromptFolderModel.findOne({ ...scope, name: sameName(name) }, { _id: 1 }).lean()) as unknown as StoredFolder | null
   if (sameNamed) return sameNamed._id.toString()
   if ((await PromptFolderModel.countDocuments(scope)) >= MAX_FOLDERS) return null
-  const record = await PromptFolderModel.create({ ownerId: viewer.id, name })
+  const record = await PromptFolderModel.create({ ownerId: viewer.dataOwnerId, name })
   return record._id.toString()
 }
 

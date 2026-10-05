@@ -59,7 +59,7 @@ export const DeleteAccountDialog: React.FC<DeleteAccountDialogProps> = ({ user, 
       const message = reason instanceof Error ? reason.message : ADMIN_MESSAGES.deleteFailed
       // Already gone counts as done: the list only needs to catch up
       if (message === ADMIN_MESSAGES.userNotFound) {
-        onDeleted({ name: user.name, email: user.email, records: 0, files: 0, tools: [] })
+        onDeleted({ name: user.name, email: user.email, records: 0, files: 0, tools: [], children: 0 })
         return
       }
       setError(message)

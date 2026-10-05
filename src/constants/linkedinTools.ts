@@ -28,6 +28,7 @@ import { IMPORTANT_CONTENT_TOOL } from "./importantContent"
 import { REFERENCE_CONTENT_TOOL } from "./referenceContent"
 import { EMPLOYEES_TOOL } from "./employees"
 import { ADMIN_TOOL } from "./admin"
+import { CHILD_ACCOUNTS_TOOL } from "./children"
 import { TRENDING_HISTORY_HREF } from "./trending"
 import { PROFILE_SCHEDULER_LINK } from "./profileScheduler"
 import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./savedOutputs"
@@ -73,6 +74,12 @@ export interface LinkedInTool {
   links?: ToolLink[]
   // Shown only to admins (the sidebar, the switcher) and left out of the sitemap and manifest; its routes check the role
   adminOnly?: boolean
+  /**
+   * Only a primary account sees this tool: a child account never does, it is never one of the tools
+   * a parent can grant a child, and an admin cannot turn it off for anyone. Managing child accounts
+   * is the one of these, because a child cannot have children of its own (constants/children.ts).
+   */
+  primaryOnly?: boolean
 }
 
 /** A tool's two pages: where something new is made, and where everything made so far is listed. */
@@ -147,6 +154,8 @@ export const APP_TOOLS: LinkedInTool[] = [
   QUICK_NOTES_TOOL,
   EMPLOYEES_TOOL,
   IMPORTANT_FILES_TOOL,
+  // The accounts that share this workspace, beside the team and before the admin area
+  CHILD_ACCOUNTS_TOOL,
   ADMIN_TOOL,
   ...LINKEDIN_TOOLS,
   // Client Work: the meetings and what the clients send, then what is written back to them, then
@@ -168,6 +177,10 @@ export const APP_TOOLS: LinkedInTool[] = [
  * The tools a signed-in account may see: everything for an admin, everything but the admin area
  * for a user, less any tool an admin has turned off for that account. Hiding a tool is only the
  * courtesy; its pages and its API refuse the account as well.
+ *
+ * A child account needs no rule of its own here: the primary-only tools are already in the list of
+ * tools it may not use (services/auth/accountViewer.ts), so one list decides the sidebar, the
+ * switcher, every page guard and every route.
  */
 export const toolsFor = (isAdmin: boolean, disabledTools: readonly string[] = []) =>
   APP_TOOLS.filter((tool) => (isAdmin || !tool.adminOnly) && !(!isAdmin && disabledTools.includes(tool.id)))

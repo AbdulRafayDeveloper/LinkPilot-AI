@@ -1,11 +1,11 @@
 import { connectDatabase } from "@/lib/db"
-import { effectiveDisabledTools } from "@/lib/featureAccess"
 import { readFeatureDefaults } from "@/services/featureSettings"
 import { UserFacingError } from "@/lib/errors"
 import { decoyPasswordHash, hashPassword, verifyPassword } from "@/lib/passwords"
 import { UserModel } from "@/models/User"
 import { AUTH_MESSAGES, LOGIN_LOCK_MINUTES, MAX_FAILED_LOGINS } from "@/constants/auth"
 import type { LoginInput, SignupInput, Viewer } from "@/types/auth"
+import { viewerOf, type Account } from "./accountViewer"
 import { recordLoginEvent, type ClientInfo } from "./audit"
 
 /**
@@ -15,21 +15,9 @@ import { recordLoginEvent, type ClientInfo } from "./audit"
 
 type SignedIn = { viewer: Viewer; sessionVersion: number }
 
-// The same account the rest of the app sees: what is off for everyone, with its own choices on top
-const toViewer = async (user: {
-  _id: unknown
-  email: string
-  name: string
-  role: Viewer["role"]
-  disabledTools?: string[]
-  enabledTools?: string[]
-}): Promise<Viewer> => ({
-  id: String(user._id),
-  email: user.email,
-  name: user.name,
-  role: user.role,
-  disabledTools: effectiveDisabledTools(user.role, await readFeatureDefaults(), user),
-})
+// The same account the rest of the app sees, by the one shared rule, so signing in and every request
+// after it agree about the tools and about whose records a child account works with
+const toViewer = async (user: Account): Promise<Viewer> => viewerOf(user, await readFeatureDefaults())
 
 /**
  * Checks an email and password. Every failure reads the same, whether the email is unknown or the

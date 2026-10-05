@@ -3,28 +3,32 @@
 import React from "react"
 import { Loader2, Pencil, Trash2 } from "lucide-react"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
-import { PROJECT_TASK_MESSAGES } from "@/constants/clientProjectTasks"
+import { PROJECT_TASK_MESSAGES, projectItemKind, type ProjectItemKind } from "@/constants/clientProjectTasks"
 import { clock } from "./VoiceNoteField"
 import type { ProjectTask } from "@/types/clientProjectTasks"
 
 interface ProjectTasksProps {
   tasks: ProjectTask[]
-  /**
-   * The read-only view a public link opens: the tasks, their details, their images and their voice
-   * notes, with no checkbox and no actions. Everything that changes a task is left out here rather
-   * than disabled, so the link cannot even ask.
-   */
-  readOnly?: boolean
+  // Which tab these are, so the empty line and the tick's label read as that tab's own words
+  kind: ProjectItemKind
   busyId?: string | null
-  onTick?: (task: ProjectTask, done: boolean) => void
-  onEdit?: (task: ProjectTask) => void
-  onDelete?: (task: ProjectTask) => void
+  onTick: (task: ProjectTask, done: boolean) => void
+  onEdit: (task: ProjectTask) => void
+  onDelete: (task: ProjectTask) => void
+  /**
+   * How an item added from the shared link is tagged. The two surfaces word it differently (the
+   * owner reads "From the client"; the client reads nothing about themselves), so each passes its
+   * own and a surface that wants no tag at all passes none.
+   */
+  clientTag?: string
+  // Open each item's description and images from the start, which is what a shared link does
+  detailsOpen?: boolean
 }
 
 const actionButton =
   "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-outline transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
-/** One task's voice note, as a player. The same markup on the page and behind a public link. */
+/** One item's voice note, as a player. The same markup on the page and behind a shared link. */
 const VoiceNotePlayer: React.FC<{ task: ProjectTask }> = ({ task }) =>
   task.voiceNote ? (
     <div className="flex flex-wrap items-center gap-2">
@@ -34,13 +38,18 @@ const VoiceNotePlayer: React.FC<{ task: ProjectTask }> = ({ task }) =>
   ) : null
 
 /**
- * The tasks of one client project: the line, whether it is done, its description, its images and
- * its voice note. The page passes what changes a task; a public link passes nothing, so the same
- * list reads the same for a client who was sent it and cannot be used to change anything.
+ * One tab of a client project: each item's line, whether it is ticked off, its description, its
+ * images and its voice note.
+ *
+ * The owner's page and the shared link render **the same list with the same controls**, because the
+ * client may change what they are looking at: that is the whole point of the link. What differs is
+ * only how an item added from the link is tagged, and whether the details start open.
  */
-export const ProjectTasks: React.FC<ProjectTasksProps> = ({ tasks, readOnly, busyId, onTick, onEdit, onDelete }) => {
+export const ProjectTasks: React.FC<ProjectTasksProps> = ({ tasks, kind, busyId, onTick, onEdit, onDelete, clientTag, detailsOpen }) => {
+  const words = projectItemKind(kind)
+
   if (tasks.length === 0) {
-    return <p className="rounded-xl border border-dashed border-outline-variant px-3 py-6 text-center text-[13px] text-outline">{PROJECT_TASK_MESSAGES.empty}</p>
+    return <p className="rounded-xl border border-dashed border-outline-variant px-3 py-6 text-center text-[13px] text-outline">{words.empty}</p>
   }
 
   return (
@@ -55,44 +64,38 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({ tasks, readOnly, bus
             }`}
           >
             <div className="flex items-start gap-2">
-              {readOnly ? (
-                <span
-                  aria-hidden="true"
-                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
-                    isDone ? "border-success bg-success text-white" : "border-outline-variant"
-                  }`}
-                >
-                  {isDone ? "✓" : ""}
-                </span>
-              ) : (
-                <input
-                  type="checkbox"
-                  checked={isDone}
-                  disabled={busyId === task.id}
-                  onChange={(event) => onTick?.(task, event.target.checked)}
-                  aria-label={`${task.content} is done`}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                />
-              )}
-              <p className={`min-w-0 flex-1 break-words text-[13px] ${isDone ? "text-on-surface-variant line-through" : "text-on-surface"}`}>{task.content}</p>
+              <input
+                type="checkbox"
+                checked={isDone}
+                disabled={busyId === task.id}
+                onChange={(event) => onTick(task, event.target.checked)}
+                aria-label={`${task.content} is ${words.doneLabel}`}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+              />
+              <div className="min-w-0 flex-1">
+                <p className={`break-words text-[13px] ${isDone ? "text-on-surface-variant line-through" : "text-on-surface"}`}>{task.content}</p>
+                {clientTag && task.addedBy === "client" && (
+                  <span className="mt-1 inline-block rounded-full bg-primary-fixed px-2 py-0.5 text-[10px] font-semibold text-on-primary-fixed-variant">
+                    {clientTag}
+                  </span>
+                )}
+              </div>
               {busyId === task.id && <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-primary" aria-hidden="true" />}
-              {!readOnly && (
-                <div className="flex shrink-0 items-center gap-0.5">
-                  <button type="button" onClick={() => onEdit?.(task)} aria-label={`Edit ${task.content}`} className={`${actionButton} hover:text-primary`}>
-                    <Pencil size={13} aria-hidden="true" />
-                    Edit
-                  </button>
-                  <button type="button" onClick={() => onDelete?.(task)} aria-label={`Delete ${task.content}`} className={`${actionButton} hover:text-error`}>
-                    <Trash2 size={13} aria-hidden="true" />
-                    Delete
-                  </button>
-                </div>
-              )}
+              <div className="flex shrink-0 items-center gap-0.5">
+                <button type="button" onClick={() => onEdit(task)} aria-label={`Edit ${task.content}`} className={`${actionButton} hover:text-primary`}>
+                  <Pencil size={13} aria-hidden="true" />
+                  Edit
+                </button>
+                <button type="button" onClick={() => onDelete(task)} aria-label={`Delete ${task.content}`} className={`${actionButton} hover:text-error`}>
+                  <Trash2 size={13} aria-hidden="true" />
+                  Delete
+                </button>
+              </div>
             </div>
 
             {(task.description || task.images.length > 0) && (
               <div className="pl-6">
-                <TaskDetailsView description={task.description} images={task.images} label={task.content} defaultOpen={readOnly} />
+                <TaskDetailsView description={task.description} images={task.images} label={task.content} defaultOpen={detailsOpen} />
               </div>
             )}
             {task.voiceNote && <div className="pl-6">{<VoiceNotePlayer task={task} />}</div>}
@@ -102,3 +105,7 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({ tasks, readOnly, bus
     </ul>
   )
 }
+
+/** What a delete asks before it happens, named by the tab the item is on. */
+export const deleteItemTitle = (kind: ProjectItemKind) => `Delete this ${projectItemKind(kind).one}?`
+export const deleteItemExplains = PROJECT_TASK_MESSAGES.deleteExplains

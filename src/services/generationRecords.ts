@@ -45,7 +45,7 @@ export function recordConnectionNote(
   const lead = leadFromProfile(input.profileData)
   return saveRecord("connection note", () =>
     ConnectionNoteRecord.create({
-      ownerId: viewer.id,
+      ownerId: viewer.dataOwnerId,
       lead: { ...lead, company: input.companyName ?? lead.company },
       tone: result.tone,
       companyName: input.companyName ?? null,
@@ -60,7 +60,7 @@ export function recordConnectionNote(
 export function recordComment(viewer: Viewer, post: PostSource, result: GeneratedComment): Promise<void> {
   return saveRecord("comment", () =>
     CommentRecord.create({
-      ownerId: viewer.id,
+      ownerId: viewer.dataOwnerId,
       tune: result.tune,
       postSource: post.type,
       postText: postText(post, result.extractedPost),
@@ -74,7 +74,7 @@ export function recordComment(viewer: Viewer, post: PostSource, result: Generate
 export function recordPostCommentReply(viewer: Viewer, input: { comments: string; post: PostSource | null }, result: GeneratedReply): Promise<void> {
   return saveRecord("comment reply", () =>
     PostCommentReplyRecord.create({
-      ownerId: viewer.id,
+      ownerId: viewer.dataOwnerId,
       context: result.context,
       style: result.style,
       postSource: input.post?.type ?? "none",
@@ -91,7 +91,7 @@ export function recordPostCommentReply(viewer: Viewer, input: { comments: string
 export function recordFollowUp(viewer: Viewer, input: { conversation: string; profileData: string | null }, result: GeneratedFollowUp): Promise<void> {
   return saveRecord("follow-up message", () =>
     FollowUpMessageRecord.create({
-      ownerId: viewer.id,
+      ownerId: viewer.dataOwnerId,
       lead: leadFromConversation(input.conversation, input.profileData),
       followUpType: result.type,
       conversation: input.conversation,
@@ -106,7 +106,7 @@ export function recordFollowUp(viewer: Viewer, input: { conversation: string; pr
 export function recordFirstMessage(viewer: Viewer, input: { profileData: string }, result: GeneratedFirstMessage): Promise<void> {
   return saveRecord("first message", () =>
     FirstMessageRecord.create({
-      ownerId: viewer.id,
+      ownerId: viewer.dataOwnerId,
       lead: leadFromProfile(input.profileData),
       tune: result.tune,
       profileData: input.profileData,
@@ -120,7 +120,7 @@ export function recordFirstMessage(viewer: Viewer, input: { profileData: string 
 export function recordInMail(viewer: Viewer, input: { profileData: string }, result: GeneratedInMail): Promise<void> {
   return saveRecord("InMail", () =>
     InMailMessageRecord.create({
-      ownerId: viewer.id,
+      ownerId: viewer.dataOwnerId,
       lead: leadFromProfile(input.profileData),
       tune: result.tune,
       profileData: input.profileData,
@@ -138,7 +138,7 @@ export function recordConversationReply(
 ): Promise<void> {
   return saveRecord("conversation reply", () =>
     ConversationReplyRecord.create({
-      ownerId: viewer.id,
+      ownerId: viewer.dataOwnerId,
       lead: leadFromConversation(input.conversation, input.profileData, result.analysis.parties.otherPersonName),
       replyType: result.replyType,
       conversation: input.conversation,
@@ -158,7 +158,7 @@ export function recordRewrittenMessage(
 ): Promise<void> {
   return saveRecord("rewritten message", () =>
     RewrittenMessageRecord.create({
-      ownerId: viewer.id,
+      ownerId: viewer.dataOwnerId,
       source: input.source,
       sourceLanguage: result.sourceLanguage,
       original: input.message,

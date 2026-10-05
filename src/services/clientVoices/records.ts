@@ -78,7 +78,7 @@ export async function saveVoice(viewer: Viewer, input: SaveVoiceInput): Promise<
   const storageKey = `${VOICE_STORAGE_PREFIX}/${id.toString()}-${cleanName(input.name)}`
   const record = await ClientVoiceModel.create({
     _id: id,
-    ownerId: viewer.id,
+    ownerId: viewer.dataOwnerId,
     clientId: input.clientId,
     clientName,
     position: input.position,
@@ -153,7 +153,7 @@ export async function saveTaskGroup(
   const clientName = await requireClientName(viewer, input.clientId)
   await connectDatabase()
   const record = await ClientVoiceTasksModel.create({
-    ownerId: viewer.id,
+    ownerId: viewer.dataOwnerId,
     clientId: input.clientId,
     clientName,
     tasks: input.tasks,
