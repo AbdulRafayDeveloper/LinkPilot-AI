@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { toUserFacingMessage } from "@/lib/errors"
+import { statusFor, toUserFacingMessage } from "@/lib/errors"
 import { SavedTopicsDeleteSchema, SavedTopicsQuerySchema } from "@/lib/validation/trendingHistory"
 import { TRENDING_HISTORY_MESSAGES } from "@/constants/trending"
 import { deleteSavedTopics, listSavedTopics } from "@/services/trending/history"
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     console.error("GET Trending Topics History Exception:", error instanceof Error ? error.message : error)
     return NextResponse.json(
       { success: false, message: toUserFacingMessage(error, TRENDING_HISTORY_MESSAGES.loadFailed) },
-      { status: 500 }
+      { status: statusFor(error, 500) }
     )
   }
 }
@@ -55,6 +55,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, message: `${deleted} ${deleted === 1 ? "topic" : "topics"} deleted.`, data: { deleted } })
   } catch (error: unknown) {
     console.error("DELETE Trending Topics (bulk) Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, TRENDING_HISTORY_MESSAGES.deleteFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, TRENDING_HISTORY_MESSAGES.deleteFailed) }, { status: statusFor(error, 500) })
   }
 }

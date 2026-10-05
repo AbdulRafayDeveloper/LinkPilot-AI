@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { toUserFacingMessage } from "@/lib/errors"
+import { statusFor, toUserFacingMessage } from "@/lib/errors"
 import { savedOutputsDeleteSchema, savedOutputsQuerySchema } from "@/lib/validation/savedOutputs"
 import { SAVED_OUTPUT_MESSAGES, getSavedOutputTool } from "@/constants/savedOutputs"
 import { deleteSavedOutputs, listSavedOutputs } from "@/services/savedOutputs"
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tool
     console.error(`GET Saved Outputs (${tool.id}) Exception:`, error instanceof Error ? error.message : error)
     return NextResponse.json(
       { success: false, message: toUserFacingMessage(error, SAVED_OUTPUT_MESSAGES.loadFailed) },
-      { status: 500 }
+      { status: statusFor(error, 500) }
     )
   }
 }
@@ -67,6 +67,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ t
     return NextResponse.json({ success: true, message: `${deleted} ${noun} deleted.`, data: { deleted } })
   } catch (error: unknown) {
     console.error(`DELETE Saved Outputs (${tool.id}) Exception:`, error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, SAVED_OUTPUT_MESSAGES.deleteFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, SAVED_OUTPUT_MESSAGES.deleteFailed) }, { status: statusFor(error, 500) })
   }
 }

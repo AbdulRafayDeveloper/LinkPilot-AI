@@ -2,7 +2,7 @@ import { cookies, headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { env } from "@/config/env"
 import { connectDatabase } from "@/lib/db"
-import { UserFacingError, toUserFacingMessage } from "@/lib/errors"
+import { NotAllowedError, toUserFacingMessage } from "@/lib/errors"
 import { SESSION_COOKIE, SESSION_MS, readSession, signSession } from "@/lib/sessionToken"
 import { UserModel } from "@/models/User"
 import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, REQUEST_PATH_HEADER, type UserRole } from "@/constants/auth"
@@ -126,7 +126,7 @@ export const ownedBy = (viewer: Viewer): Record<string, unknown> =>
  * on the records beside `ownerId`.
  */
 export function ownedForClearing(viewer: Viewer): Record<string, unknown> {
-  if (viewer.parentId) throw new UserFacingError(AUTH_MESSAGES.childCannotClearAll)
+  if (viewer.parentId) throw new NotAllowedError(AUTH_MESSAGES.childCannotClearAll)
   return ownedBy(viewer)
 }
 

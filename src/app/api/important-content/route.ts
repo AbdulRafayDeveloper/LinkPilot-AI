@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { toUserFacingMessage } from "@/lib/errors"
+import { statusFor, toUserFacingMessage } from "@/lib/errors"
 import { ImportantContentQuerySchema, ImportantContentSchema } from "@/lib/validation/importantContent"
 import { BulkDeleteSchema } from "@/lib/validation/listFilters"
 import { IMPORTANT_CONTENT_MESSAGES } from "@/constants/importantContent"
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, message: "Content retrieved", data: page })
   } catch (error: unknown) {
     console.error("GET Important Content Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_CONTENT_MESSAGES.loadFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_CONTENT_MESSAGES.loadFailed) }, { status: statusFor(error, 500) })
   }
 }
 
@@ -39,7 +39,7 @@ async function handlePost(req: NextRequest) {
     return NextResponse.json({ success: true, message: IMPORTANT_CONTENT_MESSAGES.created, data: entry }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Important Content Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_CONTENT_MESSAGES.saveFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_CONTENT_MESSAGES.saveFailed) }, { status: statusFor(error, 500) })
   }
 }
 
@@ -64,6 +64,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, message: `${deleted} ${deleted === 1 ? "entry" : "entries"} deleted.`, data: { deleted } })
   } catch (error: unknown) {
     console.error("DELETE Important Content (bulk) Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_CONTENT_MESSAGES.deleteFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_CONTENT_MESSAGES.deleteFailed) }, { status: statusFor(error, 500) })
   }
 }

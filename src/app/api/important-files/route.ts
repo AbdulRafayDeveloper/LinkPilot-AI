@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { toUserFacingMessage } from "@/lib/errors"
+import { statusFor, toUserFacingMessage } from "@/lib/errors"
 import {
   ASSET_CATEGORY_IDS,
   ASSET_SEARCH_MAX_LENGTH,
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     console.error("GET Important Files Exception:", error instanceof Error ? error.message : error)
     return NextResponse.json(
       { success: false, message: toUserFacingMessage(error, IMPORTANT_FILES_MESSAGES.loadFailed) },
-      { status: 500 }
+      { status: statusFor(error, 500) }
     )
   }
 }
@@ -67,6 +67,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, message, data: { deleted, failed } })
   } catch (error: unknown) {
     console.error("DELETE Important Files (bulk) Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_FILES_MESSAGES.deleteFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_FILES_MESSAGES.deleteFailed) }, { status: statusFor(error, 500) })
   }
 }

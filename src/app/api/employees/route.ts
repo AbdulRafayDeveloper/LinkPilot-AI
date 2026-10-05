@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { toUserFacingMessage } from "@/lib/errors"
+import { statusFor, toUserFacingMessage } from "@/lib/errors"
 import { EmployeeSchema, EmployeesQuerySchema } from "@/lib/validation/employees"
 import { EMPLOYEE_MESSAGES } from "@/constants/employees"
 import { createEmployee, deleteEmployees, listEmployees } from "@/services/employees/employees"
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, message: "Employees retrieved", data: page })
   } catch (error: unknown) {
     console.error("GET Employees Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, EMPLOYEE_MESSAGES.loadFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, EMPLOYEE_MESSAGES.loadFailed) }, { status: statusFor(error, 500) })
   }
 }
 
@@ -39,7 +39,7 @@ async function handlePost(req: NextRequest) {
     return NextResponse.json({ success: true, message: EMPLOYEE_MESSAGES.created, data: employee }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Employee Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, EMPLOYEE_MESSAGES.saveFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, EMPLOYEE_MESSAGES.saveFailed) }, { status: statusFor(error, 500) })
   }
 }
 
@@ -68,6 +68,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, message: `${deleted} ${deleted === 1 ? "employee" : "employees"} deleted.`, data: { deleted } })
   } catch (error: unknown) {
     console.error("DELETE Employees (bulk) Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, EMPLOYEE_MESSAGES.deleteFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, EMPLOYEE_MESSAGES.deleteFailed) }, { status: statusFor(error, 500) })
   }
 }

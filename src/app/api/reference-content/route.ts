@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { toUserFacingMessage } from "@/lib/errors"
+import { statusFor, toUserFacingMessage } from "@/lib/errors"
 import { ReferenceItemSchema } from "@/lib/validation/referenceItem"
 import { BulkDeleteSchema } from "@/lib/validation/listFilters"
 import { REFERENCE_CONTENT_MESSAGES, REFERENCE_SEARCH_MAX_LENGTH } from "@/constants/referenceContent"
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     console.error("GET Reference Content Exception:", error)
     return NextResponse.json(
       { success: false, message: toUserFacingMessage(error, REFERENCE_CONTENT_MESSAGES.loadFailed) },
-      { status: 500 }
+      { status: statusFor(error, 500) }
     )
   }
 }
@@ -51,7 +51,7 @@ async function handlePost(req: NextRequest) {
     console.error("POST Reference Content Exception:", error)
     return NextResponse.json(
       { success: false, message: toUserFacingMessage(error, REFERENCE_CONTENT_MESSAGES.saveFailed) },
-      { status: 500 }
+      { status: statusFor(error, 500) }
     )
   }
 }
@@ -76,6 +76,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, message: `${deleted} ${deleted === 1 ? "item" : "items"} deleted.`, data: { deleted } })
   } catch (error: unknown) {
     console.error("DELETE Reference Content (bulk) Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, REFERENCE_CONTENT_MESSAGES.deleteFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, REFERENCE_CONTENT_MESSAGES.deleteFailed) }, { status: statusFor(error, 500) })
   }
 }

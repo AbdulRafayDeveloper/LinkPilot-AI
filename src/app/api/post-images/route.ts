@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { toUserFacingMessage } from "@/lib/errors"
+import { statusFor, toUserFacingMessage } from "@/lib/errors"
 import { PostImagesQuerySchema } from "@/lib/validation/postImages"
 import { POST_IMAGES_MESSAGES } from "@/constants/postImages"
 import { deletePostImages, listPostImages } from "@/services/postImages/history"
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     console.error("GET Post Images Exception:", error instanceof Error ? error.message : error)
     return NextResponse.json(
       { success: false, message: toUserFacingMessage(error, POST_IMAGES_MESSAGES.loadFailed) },
-      { status: 500 }
+      { status: statusFor(error, 500) }
     )
   }
 }
@@ -60,6 +60,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, message, data: { deleted, failed } })
   } catch (error: unknown) {
     console.error("DELETE Post Images (bulk) Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, POST_IMAGES_MESSAGES.deleteFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, POST_IMAGES_MESSAGES.deleteFailed) }, { status: statusFor(error, 500) })
   }
 }

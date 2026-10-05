@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { toUserFacingMessage } from "@/lib/errors"
+import { statusFor, toUserFacingMessage } from "@/lib/errors"
 import { MeetingSchema } from "@/lib/validation/meeting"
 import { MEETING_MESSAGES, MEETING_SEARCH_MAX_LENGTH, MEETING_STATUS_IDS } from "@/constants/meetings"
 import { createMeeting, deleteMeetings, listMeetings } from "@/services/meetings/meetings"
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, message: "Meetings retrieved", data: page })
   } catch (error: unknown) {
     console.error("GET Meetings Exception:", error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, MEETING_MESSAGES.loadFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, MEETING_MESSAGES.loadFailed) }, { status: statusFor(error, 500) })
   }
 }
 
@@ -54,7 +54,7 @@ async function handlePost(req: NextRequest) {
     return NextResponse.json({ success: true, message: MEETING_MESSAGES.saved, data: meeting }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Meeting Exception:", error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, MEETING_MESSAGES.saveFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, MEETING_MESSAGES.saveFailed) }, { status: statusFor(error, 500) })
   }
 }
 
@@ -81,6 +81,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, message: `${deleted} ${deleted === 1 ? "meeting" : "meetings"} deleted.`, data: { deleted } })
   } catch (error: unknown) {
     console.error("DELETE Meetings (bulk) Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, MEETING_MESSAGES.deleteFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, MEETING_MESSAGES.deleteFailed) }, { status: statusFor(error, 500) })
   }
 }

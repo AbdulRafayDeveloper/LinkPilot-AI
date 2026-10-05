@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { toUserFacingMessage } from "@/lib/errors"
+import { statusFor, toUserFacingMessage } from "@/lib/errors"
 import { QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
 import { clearNotes, deleteNotes, listNotes, saveNote } from "@/services/quickNotes/notes"
 import { BulkDeleteSchema } from "@/lib/validation/listFilters"
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     console.error("GET Quick Notes Exception:", error)
     return NextResponse.json(
       { success: false, message: toUserFacingMessage(error, QUICK_NOTES_MESSAGES.loadFailed) },
-      { status: 500 }
+      { status: statusFor(error, 500) }
     )
   }
 }
@@ -51,7 +51,7 @@ async function handlePost(req: NextRequest) {
     console.error("POST Quick Note Exception:", error)
     return NextResponse.json(
       { success: false, message: toUserFacingMessage(error, QUICK_NOTES_MESSAGES.saveFailed) },
-      { status: 500 }
+      { status: statusFor(error, 500) }
     )
   }
 }
@@ -81,7 +81,7 @@ export async function DELETE(req: NextRequest) {
     console.error("DELETE Quick Notes Exception:", error)
     return NextResponse.json(
       { success: false, message: toUserFacingMessage(error, QUICK_NOTES_MESSAGES.clearFailed) },
-      { status: 500 }
+      { status: statusFor(error, 500) }
     )
   }
 }

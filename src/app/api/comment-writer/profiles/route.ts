@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { UserFacingError, toUserFacingMessage } from "@/lib/errors"
+import { UserFacingError, statusFor, toUserFacingMessage } from "@/lib/errors"
 import { ProfileScheduleQuerySchema, ProfileScheduleSchema } from "@/lib/validation/profileSchedules"
 import { BulkDeleteSchema } from "@/lib/validation/listFilters"
 import { PROFILE_SCHEDULER_MESSAGES } from "@/constants/profileScheduler"
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, message: "Profiles retrieved", data: page })
   } catch (error: unknown) {
     console.error("GET Profile Schedules Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, PROFILE_SCHEDULER_MESSAGES.loadFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, PROFILE_SCHEDULER_MESSAGES.loadFailed) }, { status: statusFor(error, 500) })
   }
 }
 
@@ -45,7 +45,7 @@ async function handlePost(req: NextRequest) {
       return NextResponse.json({ success: false, message: error.message }, { status: 409 })
     }
     console.error("POST Profile Schedule Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, PROFILE_SCHEDULER_MESSAGES.saveFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, PROFILE_SCHEDULER_MESSAGES.saveFailed) }, { status: statusFor(error, 500) })
   }
 }
 
@@ -70,6 +70,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, message: `${deleted} ${deleted === 1 ? "profile" : "profiles"} deleted.`, data: { deleted } })
   } catch (error: unknown) {
     console.error("DELETE Profile Schedules (bulk) Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, PROFILE_SCHEDULER_MESSAGES.deleteFailed) }, { status: 500 })
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, PROFILE_SCHEDULER_MESSAGES.deleteFailed) }, { status: statusFor(error, 500) })
   }
 }
