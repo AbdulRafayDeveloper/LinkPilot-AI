@@ -333,6 +333,12 @@ export const PROJECT_TASK_MESSAGES = {
   deleteExplains: "It goes with its images, its files and its voice note. This can't be undone.",
   noProjects: "No client projects yet. Add a project to a client in Clients Management, and it shows here.",
   noResults: "No project matches the search or the filters.",
+  // The list is every project at a glance; one project's own page is where the work on it is done
+  manage: "Manage",
+  manageOne: (name: string) => `Open ${name}`,
+  backToProjects: "All projects",
+  nothingOnIt: "Nothing on it yet",
+  shared: "Shared",
   // Where an item came from, shown as a tag on the item itself
   fromClient: "From the client",
   fromOwner: "From the project owner",

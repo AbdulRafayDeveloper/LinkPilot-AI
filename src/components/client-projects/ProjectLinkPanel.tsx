@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { ExternalLink, Link2, Loader2, RefreshCw, ShieldCheck, X } from "lucide-react"
+import { ExternalLink, Link2, Loader2, RefreshCw, X } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { requestApi } from "@/lib/apiClient"
 import { CLIENT_PROJECTS_ENDPOINT, PROJECT_TASK_MESSAGES, PUBLIC_PROJECT_PATH } from "@/constants/clientProjectTasks"
@@ -14,10 +14,16 @@ interface ProjectLinkPanelProps {
 }
 
 /**
- * The read-only link one project can be shared by. The server holds only a version, never the link
- * itself, so **New link** stops every earlier one at once and **Turn off** stops them all. The
- * address is built here from the page's own origin, so it is right on localhost and on the live
- * site without the server knowing either.
+ * The link one project is shared by, as **one row**: what it is, and the three or four things to do
+ * about it. The server holds only a version, never the link itself, so **New link** stops every
+ * earlier one at once and **Turn off** stops them all. The address is built here from the page's own
+ * origin, so it is right on localhost and on the live site without the server knowing either.
+ *
+ * **The address itself is not shown, and neither is what the link allows** (at the owner's request:
+ * the panel used to be the tallest thing on the page, above the work it is a footnote to). Copy puts
+ * it on the clipboard and Open opens it, which is all either is ever used for. The two tabs a client
+ * never sees (`PROJECT_TASK_MESSAGES.privateTabs`) are still refused in three places on the server;
+ * they are simply not restated here.
  */
 export const ProjectLinkPanel: React.FC<ProjectLinkPanelProps> = ({ projectId, token, onChanged }) => {
   const [busy, setBusy] = useState<string | null>(null)
@@ -47,7 +53,7 @@ export const ProjectLinkPanel: React.FC<ProjectLinkPanelProps> = ({ projectId, t
     "inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
 
   return (
-    <section aria-label="The link for this project" className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3">
+    <section aria-label="The link for this project" className="flex flex-col gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-outline">
           <Link2 size={14} aria-hidden="true" />
@@ -77,13 +83,6 @@ export const ProjectLinkPanel: React.FC<ProjectLinkPanelProps> = ({ projectId, t
         )}
       </div>
 
-      {url && <p className="break-all rounded-xl bg-white px-3 py-2 text-[12px] text-on-surface-variant">{url}</p>}
-      <p className="text-[11px] text-outline">{PROJECT_TASK_MESSAGES.linkExplains}</p>
-      {/* Said beside the link itself, rather than only enforced: the two tabs a client never sees */}
-      <p className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-lowest px-2 py-1 text-[11px] font-semibold text-on-surface-variant">
-        <ShieldCheck size={13} className="shrink-0 text-primary" aria-hidden="true" />
-        {PROJECT_TASK_MESSAGES.privateTabs}
-      </p>
       {error && (
         <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
           {error}
