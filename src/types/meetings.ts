@@ -111,7 +111,7 @@ export interface PlanPickOccurrence {
   linkedCount: number
 }
 
-/** A page of the picker: its rows, and where in the list they are. */
+/** A page of the picker: its rows, where in the list they are, and the months to filter by. */
 export interface PlanPickPage<T> {
   rows: T[]
   page: number
@@ -162,6 +162,8 @@ export interface MeetingSummary {
  */
 export interface Meeting extends MeetingSummary {
   transcript: string
+  // Who was in it, as the user named them; empty when they have not said (see lib/meetingPeople.ts)
+  people: string[]
   analysis: MeetingAnalysis | null
   // True when the transcript was edited after the analysis was made
   isAnalysisStale: boolean
@@ -204,6 +206,8 @@ export interface MeetingsPage {
 export interface MeetingInput {
   title?: string
   transcript: string
+  // Who was in the meeting; left out, whoever was there before stays
+  people?: string[]
 }
 
 export interface MeetingRunState extends WithAiSource {

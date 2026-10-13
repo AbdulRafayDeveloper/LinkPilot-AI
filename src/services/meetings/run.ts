@@ -40,11 +40,12 @@ async function readChunks(
   chunks: { index: number; text: string; context: string }[],
   totalChunks: number,
   signal: AbortSignal,
+  people: string[],
   onResult: (index: number, result: ChunkResult) => Promise<void>
 ): Promise<void> {
   for (let at = 0; at < chunks.length; at += CHUNK_CONCURRENCY) {
     const batch = chunks.slice(at, at + CHUNK_CONCURRENCY)
-    const results = await Promise.all(batch.map((chunk) => analyzeChunk(chunk, totalChunks, signal)))
+    const results = await Promise.all(batch.map((chunk) => analyzeChunk(chunk, totalChunks, signal, people)))
     for (const [offset, result] of results.entries()) await onResult(batch[offset].index, result)
   }
 }
@@ -66,6 +67,9 @@ export async function runAnalysis(id: string, { signal }: RunOptions): Promise<M
   }
   const chunks = splitTranscript(meeting.transcript)
   const totalChunks = chunks.length
+  // Who the user said was in it: the model reads every part knowing the names, and the report is
+  // written in them rather than in whatever the transcription heard (lib/meetingPeople.ts)
+  const people = (meeting.people ?? []).map((name) => name.trim()).filter(Boolean)
 
   // Already analyzed, and the transcript has not changed since
   if (meeting.status === "completed" && meeting.analyzedHash === transcriptHash) {
@@ -87,7 +91,7 @@ export async function runAnalysis(id: string, { signal }: RunOptions): Promise<M
       )
       const batch = pending.slice(0, CHUNKS_PER_REQUEST)
       let analyzed = done.length
-      await readChunks(batch, totalChunks, signal, async (index, result) => {
+      await readChunks(batch, totalChunks, signal, people, async (index, result) => {
         // The unique index on (meeting, transcript, part) means a repeated run cannot store twice
         await MeetingChunk.updateOne(
           { meetingId, transcriptHash, index },
@@ -115,6 +119,7 @@ export async function runAnalysis(id: string, { signal }: RunOptions): Promise<M
     const { analysis, title } = await synthesizeMeeting(done, {
       userTitle: meeting.isTitleGenerated ? null : meeting.title,
       signal,
+      people,
       onFold: (remaining) => console.info(`Meeting ${id}: folding notes into ${remaining} groups`),
     })
 

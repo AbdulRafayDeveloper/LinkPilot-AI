@@ -27,6 +27,13 @@ export interface IMeeting {
   // Who wrote the analysis: the last provider that answered and every provider that did, over all its calls
   analysisProvider: string | null
   analysisProviders: string[]
+  /**
+   * Who was in the meeting, in the user's own words. A recording carries no speaker labels, so the
+   * transcription only ever shows a name being spoken, spelled differently each time it is heard;
+   * this is the one thing that can be exact about it. Empty on every meeting saved before this,
+   * and on any the user has not told.
+   */
+  people: string[]
   // The notes built from the analysis, which the user can edit (lib/meetingNotes.ts); "" until the first analysis
   notes: string
   // When the user last changed the notes by hand; while set, a new analysis leaves them alone
@@ -70,6 +77,7 @@ const MeetingSchema = new Schema<IMeeting>(
     analyzedAt: { type: Date, default: null },
     analysisProvider: { type: String, default: null },
     analysisProviders: { type: [String], default: [] },
+    people: { type: [String], default: [] },
     notes: { type: String, default: "" },
     notesEditedAt: { type: Date, default: null },
     // Mixed on purpose: chunks are confirmed one key at a time with a $set on their own path

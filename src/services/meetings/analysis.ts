@@ -4,7 +4,8 @@ import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
 import { SITE_AUTHOR } from "@/config/site"
-import { MEETING_MESSAGES, MEETING_TITLE_MAX_LENGTH, MEETING_ANSWER_MAX_TOKENS } from "@/constants/meetings"
+import { MEETING_MESSAGES, MEETING_TITLE_MAX_LENGTH, MEETING_ANSWER_MAX_TOKENS, TOPICS_MAX } from "@/constants/meetings"
+import { foldParticipants, mergeTopics, participantsFromPeople, withKnownOwners, workDecisions } from "@/lib/meetingPeople"
 import type { TranscriptChunk } from "@/lib/transcriptChunks"
 import type { MeetingAnalysis } from "@/types/meetings"
 import { aggregateChunkResults } from "./aggregate"
@@ -88,7 +89,13 @@ const trimTitle = (title: string) => title.replace(/["'`*#]/g, "").replace(/\s+/
  * Reads one chunk of the transcript. The chunk is untrusted text inside its own tags, and the tail
  * of the chunk before it comes along as context the model may read but must not extract again.
  */
-export async function analyzeChunk(chunk: TranscriptChunk, totalChunks: number, signal: AbortSignal): Promise<ChunkResult> {
+export async function analyzeChunk(
+  chunk: TranscriptChunk,
+  totalChunks: number,
+  signal: AbortSignal,
+  // Who the user says was in the meeting, so the part is read knowing the names rather than guessing
+  people: string[] = []
+): Promise<ChunkResult> {
   const [system, instructions] = await Promise.all([loadPrompt("meeting-system"), loadPrompt("meeting-chunk")])
   const user = composePromptMessage(
     instructions,
@@ -101,6 +108,13 @@ export async function analyzeChunk(chunk: TranscriptChunk, totalChunks: number, 
         emptyText: "This is the start of the meeting.",
       },
       { variable: "transcript_part", tag: "transcript_part", label: "The part of the meeting to read", content: chunk.text },
+      {
+        variable: "people",
+        tag: "people_in_the_meeting",
+        label: "Who was in this meeting, as the user themselves named them",
+        content: people.length > 0 ? people.join("\n") : null,
+        emptyText: "Nobody has said who was in this meeting, so go only by what the transcript shows.",
+      },
     ],
     { part_number: String(chunk.index + 1), total_parts: String(totalChunks), my_name: SITE_AUTHOR }
   )
@@ -207,7 +221,7 @@ async function reduceToFitting(
  */
 export async function synthesizeMeeting(
   results: { index: number; result: ChunkResult }[],
-  options: { userTitle: string | null; signal: AbortSignal; onFold?: (remaining: number) => void }
+  options: { userTitle: string | null; signal: AbortSignal; onFold?: (remaining: number) => void; people?: string[] }
 ): Promise<{ analysis: MeetingAnalysis; title: string }> {
   const facts = aggregateChunkResults(results)
   const substance = hasMeetingSubstance(facts)
@@ -254,10 +268,23 @@ export async function synthesizeMeeting(
     validate: (output) => (!substance || output.minutes.trim() ? null : "empty minutes of meeting"),
   })
 
-  // The subjects the model put in order, then any it left out, so none is lost
-  const ordered = data.topics.map((topic) => topic.trim()).filter(Boolean)
-  const seen = new Set(ordered.map((topic) => topic.toLowerCase()))
-  const topics = [...ordered, ...facts.topics.filter((topic) => !seen.has(topic.toLowerCase()))]
+  /**
+   * The subjects the model put in order, then any the parts had that it left out. They are merged
+   * on **what they are about**, not on being spelled the same: the model writes "SSO handling" and
+   * a part wrote "single sign-on (SSO) handling", and listing both twice over turned one real
+   * meeting's half-dozen subjects into twenty-two.
+   */
+  const topics = mergeTopics([...data.topics, ...facts.topics], TOPICS_MAX)
+
+  /**
+   * Who was in the meeting. **The user's own list wins**, because a recording has no speaker labels
+   * and nothing read out of the transcript can be more certain than the person who was there; with
+   * no list, the spellings the transcription heard are folded into one entry each (see
+   * lib/meetingPeople.ts). Every owner is then read in those same names, so a task never says
+   * "notify Rafa" about the person reading it, or belongs to "Unnamed speaker 1".
+   */
+  const people = options.people ?? []
+  const participants = people.length > 0 ? participantsFromPeople(people) : foldParticipants(facts.participants, SITE_AUTHOR)
 
   return {
     title: trimTitle(options.userTitle || data.title) || "Untitled meeting",
@@ -271,14 +298,16 @@ export async function synthesizeMeeting(
        */
       purpose: data.purpose?.trim() || facts.purpose || null,
       topics,
-      participants: facts.participants,
+      participants,
       // The count follows the people actually listed, so the two can never disagree
-      participantCount: facts.participants.length,
-      myTasks: facts.myTasks,
+      participantCount: participants.length,
+      myTasks: withKnownOwners(facts.myTasks, participants, SITE_AUTHOR, people.length > 0),
       clientRequests: facts.clientRequests,
-      myDecisions: facts.myDecisions,
-      decisions: facts.decisions,
-      actionItems: facts.actionItems,
+      // Arranging the call reads exactly like an agreement, so it is taken out here rather than
+      // left to a rule the model follows on one run and not the next
+      myDecisions: workDecisions(facts.myDecisions),
+      decisions: workDecisions(facts.decisions),
+      actionItems: withKnownOwners(facts.actionItems, participants, SITE_AUTHOR, people.length > 0),
       // With nothing to summarise the model rightly writes nothing, so the notes say so plainly
       minutes: data.minutes.trim() || MEETING_MESSAGES.nothingDiscussed,
       unknowns: facts.unknowns,

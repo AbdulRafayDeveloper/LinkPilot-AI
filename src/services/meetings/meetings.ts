@@ -72,6 +72,7 @@ function toMeeting(record: StoredMeeting): Meeting {
     isAnalysisStale: Boolean(record.analyzedHash) && record.analyzedHash !== record.transcriptHash,
     analyzedAt: record.analyzedAt ? record.analyzedAt.toISOString() : null,
     analysisSource: { provider: (record.analysisProvider as AiSource["provider"]) ?? null, providers: (record.analysisProviders ?? []) as AiSource["providers"] },
+    people: record.people ?? [],
     notes: record.notes ?? "",
     notesEditedAt: record.notesEditedAt ? new Date(record.notesEditedAt).toISOString() : null,
     recording: record.recording ? toRecordingSummary(record.recording as StoredRecording) : null,
@@ -170,7 +171,7 @@ export async function getMeeting(viewer: Viewer, id: string): Promise<Meeting | 
  * Saves a meeting before anything is analyzed, so the transcript is safe from the first moment.
  * A meeting with no name of its own gets a working one until the analysis writes a real title.
  */
-export async function createMeeting(viewer: Viewer, { title, transcript }: MeetingInput): Promise<Meeting> {
+export async function createMeeting(viewer: Viewer, { title, transcript, people }: MeetingInput): Promise<Meeting> {
   await connectDatabase()
   const named = (title ?? "").trim()
   const record = await MeetingModel.create({
@@ -183,6 +184,7 @@ export async function createMeeting(viewer: Viewer, { title, transcript }: Meeti
     status: "saved",
     totalChunks: countChunks(transcript),
     analyzedChunks: 0,
+    people: people ?? [],
   })
   return toMeeting(record as unknown as StoredMeeting)
 }
@@ -192,7 +194,7 @@ export async function createMeeting(viewer: Viewer, { title, transcript }: Meeti
  * of date: the notes read from the old transcript go, the meeting is marked as needing another
  * run, and the page says plainly that what it shows came from the earlier transcript.
  */
-export async function updateMeeting(viewer: Viewer, id: string, { title, transcript }: MeetingInput): Promise<Meeting | null> {
+export async function updateMeeting(viewer: Viewer, id: string, { title, transcript, people }: MeetingInput): Promise<Meeting | null> {
   const filter = visibleById(viewer, id)
   if (!filter) return null
   await connectDatabase()
@@ -205,6 +207,13 @@ export async function updateMeeting(viewer: Viewer, id: string, { title, transcr
     changes.title = named
     changes.isTitleGenerated = false
   }
+
+  /**
+   * Who was in the meeting is the user's own answer, so it is taken as given. It does **not** make
+   * the analysis stale: a report already written keeps its own names until it is run again, which
+   * is what the Re-analyse button is for, and saying who was there is not a change to what was said.
+   */
+  if (people !== undefined) changes.people = people
 
   if (transcript !== meeting.transcript) {
     changes.transcript = transcript

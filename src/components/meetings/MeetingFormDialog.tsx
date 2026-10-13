@@ -27,6 +27,8 @@ const fieldClass =
 export const MeetingFormDialog: React.FC<MeetingFormDialogProps> = ({ meeting, isSaving, error, onSave, onClose }) => {
   const [title, setTitle] = useState(meeting && !meeting.isTitleGenerated ? meeting.title : "")
   const [transcript, setTranscript] = useState(meeting?.transcript ?? "")
+  // Who was in the meeting, typed as one line of names; a recording cannot know this by itself
+  const [people, setPeople] = useState((meeting?.people ?? []).join(", "))
   const [problem, setProblem] = useState<string | null>(null)
   const transcriptRef = useRef<HTMLTextAreaElement>(null)
   const isEdit = meeting !== null
@@ -40,7 +42,11 @@ export const MeetingFormDialog: React.FC<MeetingFormDialogProps> = ({ meeting, i
       return
     }
     setProblem(null)
-    onSave({ title: title.trim() || undefined, transcript })
+    onSave({
+      title: title.trim() || undefined,
+      transcript,
+      people: people.split(",").map((name) => name.trim()).filter(Boolean),
+    })
   }
 
   return (
@@ -101,6 +107,25 @@ export const MeetingFormDialog: React.FC<MeetingFormDialogProps> = ({ meeting, i
             placeholder="e.g. Upload planning call with Clinicly"
             className={`${fieldClass} py-2.5`}
           />
+        </div>
+
+        {/* A recording has no speaker labels, so the analysis can only go by names it hears said,
+            and speech recognition spells one name several ways. Naming the people makes the
+            report exact: they become the participants, and a task is never given to someone who
+            was not there (lib/meetingPeople.ts). */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="meeting-people" className={labelClass}>
+            Who was in it (optional)
+          </label>
+          <input
+            id="meeting-people"
+            value={people}
+            onChange={(event) => setPeople(event.target.value)}
+            disabled={isSaving}
+            placeholder="Abdul Rafay, Muhammad Touseef, Cristiana, Lucas"
+            className={`${fieldClass} py-2.5`}
+          />
+          <p className="text-[11px] text-outline">{MEETING_MESSAGES.peopleHint} Separate the names with commas.</p>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-1.5">
