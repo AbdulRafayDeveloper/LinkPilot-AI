@@ -1,9 +1,10 @@
 import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
+import { ProviderBusyError } from "@/services/ai"
 import { Meeting as MeetingModel } from "@/models/Meeting"
 import { MeetingChunk } from "@/models/MeetingChunk"
 import { splitTranscript } from "@/lib/transcriptChunks"
-import { CHUNKS_PER_REQUEST, CHUNK_CONCURRENCY } from "@/constants/meetings"
+import { CHUNKS_PER_REQUEST, CHUNK_CONCURRENCY, BUSY_WAIT_MS, MEETING_MESSAGES } from "@/constants/meetings"
 import type { MeetingRunState } from "@/types/meetings"
 import { analyzeChunk, ChunkResultSchema, synthesizeMeeting, type ChunkResult } from "./analysis"
 import type { AiSource } from "@/types/ai"
@@ -136,6 +137,26 @@ export async function runAnalysis(id: string, { signal }: RunOptions): Promise<M
     return { status: "completed", statusMessage: null, progress: { analyzedChunks: totalChunks, totalChunks }, hasMore: false }
   } catch (error: unknown) {
     if (signal.aborted) throw error
+    /**
+     * Every provider was busy for the minute, which is not a failure: the parts already read are
+     * kept, the meeting stays where it was, and this answers "there is more to do" so the page's
+     * own loop comes back and finishes it. It waits a moment first, so that loop paces itself
+     * instead of asking again the instant it is told to wait.
+     */
+    if (error instanceof ProviderBusyError) {
+      const analyzed = await MeetingChunk.countDocuments({ meetingId, transcriptHash })
+      await MeetingModel.updateOne(
+        { _id: meetingId },
+        { status: "analyzing", statusMessage: MEETING_MESSAGES.modelBusy, analyzedChunks: analyzed, totalChunks }
+      )
+      await new Promise((resume) => setTimeout(resume, BUSY_WAIT_MS))
+      return {
+        status: "analyzing",
+        statusMessage: MEETING_MESSAGES.modelBusy,
+        progress: { analyzedChunks: analyzed, totalChunks },
+        hasMore: true,
+      }
+    }
     // The transcript and every chunk already read stay exactly as they are
     const message = error instanceof Error ? error.message : String(error)
     console.error("Meeting analysis failed:", JSON.stringify({ id, message: message.slice(0, 200) }))

@@ -73,6 +73,52 @@ export interface MeetingPlanRef {
 }
 
 /** One record linked to a planned meeting, as the calendar's popup lists it. */
+/**
+ * One row of the picker: a meeting on the calendar, or a whole repeating series as **one** row.
+ *
+ * A weekly call is stored as one meeting per week, which filled the picker with the same name over
+ * and over, so the rows are grouped by series: `count` says how many dates it holds and the dates
+ * themselves are read only when that row is opened. A one-off meeting is a group of one, and
+ * `meetingId` is what gets linked without opening anything.
+ */
+export interface PlanPickGroup {
+  // The series id, or the meeting's own id when it does not repeat
+  key: string
+  seriesId: string | null
+  name: string
+  personName: string | null
+  // "Every week", or null for a meeting that does not repeat
+  pattern: string | null
+  // How many dates this row holds, after the filters
+  count: number
+  firstDate: string
+  lastDate: string
+  // The date nearest today, which is what the row says and what a one-off row links to
+  meetingId: string
+  meetingDate: string
+  meetingTime: string
+  status: string
+  // How many records already point at that nearest date
+  linkedCount: number
+}
+
+/** One date of a repeating meeting, inside the row that was opened. */
+export interface PlanPickOccurrence {
+  id: string
+  meetingDate: string
+  meetingTime: string
+  status: string
+  linkedCount: number
+}
+
+/** A page of the picker: its rows, and where in the list they are. */
+export interface PlanPickPage<T> {
+  rows: T[]
+  page: number
+  pages: number
+  total: number
+}
+
 export interface LinkedMeeting {
   id: string
   title: string

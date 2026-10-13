@@ -117,12 +117,61 @@ export const MEETING_PLAN_LINK_MESSAGES = {
   openNotes: "Open",
   // The most a single call can link at once, which is what one page of the list holds
   tooMany: "Link up to 50 meetings at a time.",
+  // Finding the meeting among everything on the calendar, past and upcoming
+  searchHint: "Search by the meeting's name or the person",
+  everyOne: "Showing every meeting on the calendar, nearest to today first.",
+  repeats: (pattern: string, count: number) => `${pattern} · ${count} ${count === 1 ? "meeting" : "meetings"}`,
+  openSeries: "Open the dates of this meeting",
+  backToList: "Back to all meetings",
+  between: (first: string, last: string) => (first === last ? first : `${first} to ${last}`),
+  page: (page: number, pages: number) => `Page ${page} of ${pages}`,
+  previousPage: "Back",
+  nextPage: "Next",
+  chosenIs: "Linking to",
+  nothingHere: "No meeting matches these filters.",
 } as const
+
+/**
+ * **Which meetings the picker offers.** The record being linked is usually of a meeting that has
+ * just been held, but a meeting written up before it happens is ordinary too (an agenda, a
+ * recording of the one before it), so **both past and upcoming are offered** and this narrows them.
+ */
+export const PLAN_PICK_WHEN = [
+  { id: "all", label: "Past and upcoming" },
+  { id: "past", label: "Past only" },
+  { id: "upcoming", label: "Upcoming only" },
+] as const
+export type PlanPickWhen = (typeof PLAN_PICK_WHEN)[number]["id"]
+export const PLAN_PICK_WHEN_IDS = PLAN_PICK_WHEN.map((entry) => entry.id) as [PlanPickWhen, ...PlanPickWhen[]]
+
+/**
+ * A repeating meeting is one meeting per day it happens, so a weekly call filled the picker with
+ * the same name over and over. **The list is grouped by series**, one row per name, and this says
+ * which kinds of meeting to show at all: the repeating ones (a weekly call), the one-off ones, or
+ * both.
+ */
+export const PLAN_PICK_REPEAT = [
+  { id: "all", label: "Repeating and one-off" },
+  { id: "repeating", label: "Repeating only" },
+  { id: "single", label: "One-off only" },
+] as const
+export type PlanPickRepeat = (typeof PLAN_PICK_REPEAT)[number]["id"]
+export const PLAN_PICK_REPEAT_IDS = PLAN_PICK_REPEAT.map((entry) => entry.id) as [PlanPickRepeat, ...PlanPickRepeat[]]
+
+/** How many rows a page of the picker holds, whether they are meetings or the dates of one series. */
+export const PLAN_PICK_PAGE_SIZE = 10
+/** Where the picker reads from: the planner's own data, grouped for choosing rather than for a calendar. */
+export const PLAN_PICK_ENDPOINT = "/api/meeting-planner/pick"
 
 // How many records one call may link, which is a page of the meetings list
 export const MAX_LINKED_AT_ONCE = 50
 
+// How long a step waits when every model is busy for the minute, so the page's loop paces itself
+export const BUSY_WAIT_MS = 5_000
+
 export const MEETING_MESSAGES = {
+  // Said while every model is rate limited for the minute: the work carries on by itself
+  modelBusy: "The models are busy for a moment. This carries on by itself, and nothing already read is lost.",
   missingTranscript: "Paste the meeting notes or transcript first.",
   transcriptTooLong: `A transcript must be under ${(TRANSCRIPT_MAX_LENGTH / 1_000_000).toFixed(0)} million characters.`,
   titleTooLong: `The meeting name must be under ${MEETING_TITLE_MAX_LENGTH} characters.`,

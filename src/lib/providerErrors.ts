@@ -114,6 +114,15 @@ export function isKeyLimitError(error: unknown): boolean {
   return status === 413 && TOKEN_RATE_LIMIT.test(messageOf(error))
 }
 
+/**
+ * Whether the provider said this is the **day's** limit rather than the minute's. A per-minute
+ * ceiling clears by itself in a moment, so the work can simply carry on; a daily one does not, and
+ * the user has to be told rather than left watching a page that will never finish.
+ */
+export function isDailyLimit(error: unknown): boolean {
+  return PER_DAY_LIMIT.test(messageOf(error))
+}
+
 /** How long a key that failed that way is tried last: a rejected key for a while, a rate limit for as long as asked. */
 export function keyRestMs(error: unknown, retryAfterMs: number | null): number {
   const status = providerStatus(error)

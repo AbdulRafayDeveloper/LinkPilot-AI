@@ -7,8 +7,8 @@ import type { BaseMessage } from "@langchain/core/messages"
 import type { InteropZodType } from "@langchain/core/utils/types"
 import { env, GROQ_API_KEYS, GROQ_KEY_VARIABLES } from "@/config/env"
 import { UserFacingError } from "@/lib/errors"
-import { describeProviderFailure, isKeyLimitError, keyRestMs, redactSecrets, type ProviderNames } from "@/lib/providerErrors"
-import { withKeyRotation } from "@/lib/keyRotation"
+import { describeProviderFailure, isDailyLimit, isKeyLimitError, keyRestMs, redactSecrets, type ProviderNames } from "@/lib/providerErrors"
+import { startKeyFor, withKeyRotation } from "@/lib/keyRotation"
 import { currentModelOrder } from "@/lib/modelOrder"
 import { withRetry } from "@/lib/retry"
 import { isTransientError, retryAfterOf } from "@/lib/transientErrors"
@@ -116,12 +116,34 @@ function requireModel(model: string | undefined, variable: string): string {
  * asked again on every call. Only when every key has failed does the error reach the caller, and the
  * next provider takes over.
  */
+/**
+ * How many Groq calls this process has in flight. Calls that overlap start on different keys
+ * (`startKeyFor`), so parallel work spreads across the accounts instead of spending one key's
+ * per-minute allowance several times over. With one call at a time it is 0, and the call starts on
+ * the active key exactly as before.
+ */
+let groqCallsInFlight = 0
+
 export async function withGroqKey<T>(call: (apiKey: string, keyNumber: number) => Promise<T>, signal?: AbortSignal): Promise<T> {
   if (GROQ_API_KEYS.length === 0) {
     throw new UserFacingError(`Groq is not configured. Set ${GROQ_KEY_VARIABLES} where the app runs.`)
   }
   const { start, resting } = await groqKeyPlan()
   const numberOf = (index: number) => GROQ_API_KEYS[index].number
+  const from = startKeyFor(start, groqCallsInFlight, GROQ_API_KEYS.length)
+  groqCallsInFlight += 1
+  try {
+    return await runWithGroqKeys(call, { from, resting, numberOf, signal })
+  } finally {
+    groqCallsInFlight -= 1
+  }
+}
+
+/** The rotation itself, once the starting key is settled. */
+function runWithGroqKeys<T>(
+  call: (apiKey: string, keyNumber: number) => Promise<T>,
+  { from, resting, numberOf, signal }: { from: number; resting: Map<number, number>; numberOf: (index: number) => number; signal?: AbortSignal }
+): Promise<T> {
   return withKeyRotation(
     GROQ_API_KEYS.map((key) => key.value),
     (apiKey, index) => call(apiKey, numberOf(index)),
@@ -129,7 +151,7 @@ export async function withGroqKey<T>(call: (apiKey: string, keyNumber: number) =
       isKeyError: isKeyLimitError,
       restMs: (error) => keyRestMs(error, retryAfterOf(error)),
       resting,
-      start,
+      start: from,
       signal,
       onRest: noteGroqKeyResting,
       onAnswer: noteGroqKeyAnswered,
@@ -454,6 +476,14 @@ export function missingConfiguration(providers: readonly ModelProvider[] = curre
  * returns output that fails validation, so a successful request never calls two providers. The
  * timeout covers every attempt on one provider.
  */
+/**
+ * Every provider was rate limited **this minute**: the work can simply be tried again in a moment,
+ * so a caller that runs in steps (a meeting's analysis, a recording being written out) carries on
+ * rather than marking the whole job failed. A daily limit is **not** this: that one is a wait of
+ * hours and is reported as a failure, which is what the user needs to hear.
+ */
+export class ProviderBusyError extends UserFacingError {}
+
 export async function generateStructuredWithFallback<T extends Record<string, unknown>>(
   options: StructuredGenerationOptions<T>
 ): Promise<StructuredGeneration<T>> {
@@ -469,6 +499,8 @@ export async function generateStructuredWithFallback<T extends Record<string, un
   let lastError: unknown
   // Why each provider gave up, so a failure can say what to go and change
   const failures: string[] = []
+  // The failures themselves, to tell "busy for a minute" from "broken until someone fixes it"
+  const raw: unknown[] = []
   for (const [index, provider] of providers.entries()) {
     const timeout = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_GENERATION_TIMEOUT_MS)
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
@@ -480,6 +512,7 @@ export async function generateStructuredWithFallback<T extends Record<string, un
     } catch (error: unknown) {
       if (options.signal?.aborted) throw error
       lastError = error
+      raw.push(error)
       // An output that failed the tool's own check is not a provider problem
       const unusable = error instanceof Error && error.message.startsWith("UnusableOutputException:")
       failures.push(
@@ -496,6 +529,13 @@ export async function generateStructuredWithFallback<T extends Record<string, un
     const skipped = missingConfiguration(order, input)
     const reason = [...failures, ...skipped.map((note) => `${note} It was not tried.`)].join(" ")
     console.error("❌ Every AI provider failed:", reason)
+    /**
+     * Every one of them was rate limited and none of them for the day: that is a minute to wait,
+     * not something to fix, so it is thrown as its own kind and a stepped caller carries on.
+     */
+    if (raw.length > 0 && raw.every((error) => isKeyLimitError(error) && !isDailyLimit(error))) {
+      throw new ProviderBusyError(reason)
+    }
     throw new UserFacingError(reason)
   }
   throw lastError

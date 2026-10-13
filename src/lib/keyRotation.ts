@@ -26,6 +26,25 @@ export interface KeyRotationOptions {
 }
 
 /**
+ * Which key a call starts on when **several calls are running at once**.
+ *
+ * One call at a time starts on the active key, which is the documented behaviour: the key that
+ * answered last is the one to use. Calls that overlap are the problem this solves. They used to all
+ * start on that same key, so three calls in parallel spent one key's per-minute allowance three
+ * times over, rested it, moved to the next key together, and burned every key in seconds — which is
+ * exactly how a meeting's analysis (three parts at a time) could fail outright while each key was
+ * perfectly healthy on its own.
+ *
+ * Each call in flight is therefore given the next key along as its starting point. The keys come
+ * from different accounts, each with its own allowance, so three parallel calls use three accounts
+ * instead of hammering one. Everything else is unchanged: a call still walks the whole list from
+ * wherever it starts, so no key is ever skipped.
+ */
+export const startKeyFor = (active: number, inFlight: number, count: number): number =>
+  count > 0 ? (Math.max(0, active) + Math.max(0, inFlight)) % count : 0
+
+
+/**
  * The order to try the keys in: round the list from `start` (after the last key comes the first), the
  * ones not resting first, then the resting ones, soonest back first.
  */
