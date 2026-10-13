@@ -10,8 +10,7 @@ import { FollowUpPromptsModal } from "@/components/follow-up-message/FollowUpPro
 import { LeadSignalsTable } from "@/components/lead-signals/LeadSignalsTable"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { ResetButton } from "@/components/ui/ResetButton"
-import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
-import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
+import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import {
@@ -54,7 +53,6 @@ const textareaClass =
 
 export default function FollowUpMessageClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   const [isPromptsOpen, setIsPromptsOpen] = useState(false)
   const { conversation, profileData, followUpType } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
@@ -87,6 +85,10 @@ export default function FollowUpMessageClient() {
     reset()
     setFormError(null)
   }
+
+  // Sample data comes from the Dummy Data module (Administration), which opens this tool with
+  // an item already chosen; the tool itself no longer carries a button for it
+  useDummyHandoff("follow-up-conversations", loadDummyConversation)
 
   // Clears the conversation, profile and result; the chosen follow-up type stays
   const resetTool = () => {
@@ -122,7 +124,6 @@ export default function FollowUpMessageClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
                 <button
                   type="button"
                   onClick={() => setIsPromptsOpen(true)}
@@ -238,9 +239,6 @@ export default function FollowUpMessageClient() {
       </div>
 
       {isPromptsOpen && <FollowUpPromptsModal initialTab={followUpType} onClose={() => setIsPromptsOpen(false)} />}
-      {isDummyDataOpen && (
-        <DummyDataModal kind="follow-up-conversations" onUse={loadDummyConversation} onClose={() => setIsDummyDataOpen(false)} />
-      )}
     </div>
   )
 }

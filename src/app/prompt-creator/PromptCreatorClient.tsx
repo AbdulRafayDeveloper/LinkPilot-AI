@@ -8,8 +8,7 @@ import { ResultCard } from "@/components/ui/ResultCard"
 import { ResetButton } from "@/components/ui/ResetButton"
 import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
 import { CopyButton } from "@/components/ui/CopyButton"
-import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
-import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
+import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { CreatedPromptPanel, type CreatedPromptChanges } from "@/components/prompt-creator/CreatedPromptPanel"
 import { EnglishDescriptionPanel } from "@/components/prompt-creator/EnglishDescriptionPanel"
 import { PromptCreatorPromptsModal } from "@/components/prompt-creator/PromptCreatorPromptsModal"
@@ -82,7 +81,6 @@ const generation = createGenerationRequest<GeneratePayload, CreatedPrompt>(
 
 export default function PromptCreatorClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   const [promptsTab, setPromptsTab] = useState<PromptTargetId | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [voiceError, setVoiceError] = useState<string | null>(null)
@@ -197,6 +195,10 @@ export default function PromptCreatorClient() {
     setVoiceNotice(null)
   }
 
+  // Sample data comes from the Dummy Data module (Administration), which opens this tool with
+  // an item already chosen; the tool itself no longer carries a button for it
+  useDummyHandoff("prompt-requests", loadDummyRequest)
+
   // Clears the description and the prompt; the chosen target and project stay for the next one
   const resetTool = () => {
     formStore.update({ request: "", requestSource: "text", transcribedBy: [], english: "", englishLanguage: "", englishFor: "" })
@@ -235,7 +237,6 @@ export default function PromptCreatorClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
                 <button
                   type="button"
                   onClick={() => setPromptsTab(target ?? DEFAULT_PROMPT_TARGET)}
@@ -459,9 +460,6 @@ export default function PromptCreatorClient() {
       </div>
 
       {promptsTab && <PromptCreatorPromptsModal initialTarget={promptsTab} onClose={() => setPromptsTab(null)} />}
-      {isDummyDataOpen && (
-        <DummyDataModal kind="prompt-requests" onUse={loadDummyRequest} onClose={() => setIsDummyDataOpen(false)} />
-      )}
     </div>
   )
 }

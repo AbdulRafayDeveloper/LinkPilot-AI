@@ -1,11 +1,13 @@
-import { DatabaseBackup, ListOrdered, ScrollText, ShieldCheck, UsersRound, type LucideIcon } from "lucide-react"
+import { DatabaseBackup, FlaskConical, ListOrdered, ScrollText, ShieldCheck, UsersRound, type LucideIcon } from "lucide-react"
 import { BACKUPS_HREF } from "./backups"
+import { DUMMY_DATA_HREF } from "./dummyData"
 
 /**
  * The admin area: Audit Management (every sign-in, sign-up, sign-out and refused attempt, newest
  * first), User Management (every account, its sign-ins and what it has made in each tool), AI Model
  * Priority (the order each module tries the AI providers in, for admins; constants/modelPriority.ts)
- * and Database Backup (the weekly backup of the whole database, and every run of it; constants/backups.ts).
+ * Database Backup (the weekly backup of the whole database, and every run of it; constants/backups.ts)
+ * and Dummy Data for Testing (the sample data every tool is tried with; constants/dummyData.ts).
  * Only an admin sees it in the sidebar, and every route and page behind it checks the role.
  */
 
@@ -71,5 +73,7 @@ export const ADMIN_TOOL: {
     { title: "User Management", description: "Every account and its activity", icon: UsersRound, href: USERS_HREF, pageTitle: "User Management" },
     { title: "AI Model Priority", description: "The order each module tries the AI models in", icon: ListOrdered, href: MODEL_PRIORITY_HREF, pageTitle: "AI Model Priority" },
     { title: "Database Backup", description: "Weekly backups, and one on demand", icon: DatabaseBackup, href: BACKUPS_HREF, pageTitle: "Database Backup" },
+    // Every tool's sample data, in one place rather than a button on each tool
+    { title: "Dummy Data for Testing", description: "Sample data for every tool", icon: FlaskConical, href: DUMMY_DATA_HREF, pageTitle: "Dummy Data for Testing" },
   ],
 }

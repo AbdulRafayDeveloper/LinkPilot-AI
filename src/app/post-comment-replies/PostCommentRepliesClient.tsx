@@ -9,8 +9,7 @@ import { PostInput } from "@/components/post-input/PostInput"
 import { ReplyResult } from "@/components/post-comment-replies/ReplyResult"
 import { ReplyPromptsModal } from "@/components/post-comment-replies/ReplyPromptsModal"
 import { ResetButton } from "@/components/ui/ResetButton"
-import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
-import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
+import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { usePostCommentReplyGenerator } from "@/hooks/usePostCommentReplyGenerator"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
@@ -64,7 +63,6 @@ const labelClass = "text-[10px] font-bold text-outline uppercase tracking-wider"
 
 export default function PostCommentRepliesClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   const [isPromptsOpen, setIsPromptsOpen] = useState(false)
   const { context, style, postMode, postText, postImage, comments } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
@@ -95,6 +93,10 @@ export default function PostCommentRepliesClient() {
     reset()
     setFormError(null)
   }
+
+  // Sample data comes from the Dummy Data module (Administration), which opens this tool with
+  // an item already chosen; the tool itself no longer carries a button for it
+  useDummyHandoff("comment-threads", loadDummyThread)
 
   // Clears the post, the comments and the reply; the chosen context and style stay
   const resetTool = () => {
@@ -141,7 +143,6 @@ export default function PostCommentRepliesClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
                 <button
                   type="button"
                   onClick={() => setIsPromptsOpen(true)}
@@ -281,9 +282,6 @@ export default function PostCommentRepliesClient() {
 
       {isPromptsOpen && (
         <ReplyPromptsModal initialContext={context} initialStyle={style} onClose={() => setIsPromptsOpen(false)} />
-      )}
-      {isDummyDataOpen && (
-        <DummyDataModal kind="comment-threads" onUse={loadDummyThread} onClose={() => setIsDummyDataOpen(false)} />
       )}
     </div>
   )

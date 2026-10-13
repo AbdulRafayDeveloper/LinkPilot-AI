@@ -19,10 +19,19 @@ export interface DummyDataField {
 }
 
 interface DummyDataKindConfig {
+  // What this kind is called where every kind is listed together; two kinds may share an `item`
+  // ("conversation" is both a follow-up and a reply), so the label is written out rather than built
+  label: string
   item: string
   description: string
   namePlaceholder: string
   fields: readonly DummyDataField[]
+  /**
+   * The tools this kind fills, by their own page. **Use** on an item opens one of them with the
+   * item already in its inputs, so a kind several tools share (a profile) offers each of them.
+   * Hrefs rather than tools, so this file stays out of the navigation list's own imports.
+   */
+  uses: readonly string[]
 }
 
 const PROFILE_FIELD: DummyDataField = {
@@ -41,13 +50,16 @@ const PROFILE_FIELD: DummyDataField = {
 export const DUMMY_DATA_KINDS = {
   // Shared by every tool that starts from someone's profile
   profiles: {
+    label: "Profiles",
     item: "profile",
     description:
       "Sample LinkedIn profiles, shared by Connection Note, First Message and InMail. Saved for everyone: edit, add or remove them here, copy one, or use it to fill the profile input.",
     namePlaceholder: "e.g. Jane Doe, SaaS founder",
     fields: [PROFILE_FIELD],
+    uses: ["/connection-note", "/first-message", "/inmail-message"],
   },
   posts: {
+    label: "Posts",
     item: "post",
     description:
       "Sample LinkedIn posts for Comment Writer. Saved for everyone: edit, add or remove them here, copy one, or use it to fill the post input.",
@@ -61,8 +73,10 @@ export const DUMMY_DATA_KINDS = {
         required: true,
       },
     ],
+    uses: ["/comment-writer"],
   },
   "comment-threads": {
+    label: "Comment threads",
     item: "comment thread",
     description:
       "Sample posts with their comments for Post Comment Replies. Saved for everyone: edit, add or remove them here, copy a part, or use one to fill the post and comments inputs.",
@@ -83,8 +97,10 @@ export const DUMMY_DATA_KINDS = {
         required: true,
       },
     ],
+    uses: ["/post-comment-replies"],
   },
   "follow-up-conversations": {
+    label: "Follow-up conversations",
     item: "conversation",
     description:
       "Sample LinkedIn conversations that need a follow-up (you wrote last and haven't heard back). Saved for everyone: edit, add or remove them here, copy a part, or use one to fill the conversation and profile inputs.",
@@ -105,8 +121,10 @@ export const DUMMY_DATA_KINDS = {
         required: false,
       },
     ],
+    uses: ["/follow-up-message"],
   },
   "reply-conversations": {
+    label: "Conversation replies",
     item: "conversation",
     description:
       "Sample LinkedIn conversations waiting for your reply (they wrote last). Saved for everyone: edit, add or remove them here, copy a part, or use one to fill the conversation and profile inputs.",
@@ -127,8 +145,10 @@ export const DUMMY_DATA_KINDS = {
         required: false,
       },
     ],
+    uses: ["/conversation-reply"],
   },
   "prompt-requests": {
+    label: "Prompt requests",
     item: "task description",
     description:
       "Sample task descriptions for Prompt Creator. Saved for everyone: edit, add or remove them here, copy one, or use it to fill the description.",
@@ -142,8 +162,10 @@ export const DUMMY_DATA_KINDS = {
         required: true,
       },
     ],
+    uses: ["/prompt-creator"],
   },
   "messages-to-rewrite": {
+    label: "Messages to rewrite",
     item: "message",
     description:
       "Sample messages for Message Rewriter, in any language. Saved for everyone: edit, add or remove them here, copy one, or use it to fill the message.",
@@ -157,6 +179,7 @@ export const DUMMY_DATA_KINDS = {
         required: true,
       },
     ],
+    uses: ["/message-rewriter"],
   },
 } as const satisfies Record<string, DummyDataKindConfig>
 
@@ -184,3 +207,17 @@ export function dummyDataMessages(kind: DummyDataKind) {
     notFound: `That dummy ${item} no longer exists.`,
   }
 }
+
+/** Where all the sample data lives now: one page under Administration, admins only. */
+export const DUMMY_DATA_HREF = "/admin/dummy-data"
+
+export const DUMMY_DATA_MESSAGES = {
+  loadFailed: "Couldn't load the sample data. Please try again.",
+  empty: "No sample data saved yet.",
+  noResults: "No sample data matches that search.",
+  // Said on the tool once Use has filled its inputs, so nobody mistakes sample data for their own
+  loaded: (name: string) => `Sample data loaded: ${name}. Reset clears it.`,
+  // Shown under the page's heading, since this is the one place sample data is kept now
+  intro:
+    "Every piece of sample data in one place. Open one to read it, then Use it to open its tool with the inputs already filled. Only admins can see or change any of this.",
+} as const

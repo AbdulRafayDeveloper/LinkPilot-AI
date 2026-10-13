@@ -9,8 +9,7 @@ import { CopyButton } from "@/components/ui/CopyButton"
 import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
 import { appendSpokenText } from "@/lib/spokenText"
 import { VOICE_MESSAGES } from "@/constants/voiceInput"
-import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
-import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
+import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { MessageRewriterPromptModal } from "@/components/message-rewriter/MessageRewriterPromptModal"
 import { RewrittenMessageResult } from "@/components/message-rewriter/RewrittenMessageResult"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -42,7 +41,6 @@ const generation = createGenerationRequest<RewritePayload, RewrittenMessage>(
 
 export default function MessageRewriterClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   const [isPromptOpen, setIsPromptOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [voiceError, setVoiceError] = useState<string | null>(null)
@@ -87,6 +85,10 @@ export default function MessageRewriterClient() {
     setVoiceNotice(null)
   }
 
+  // Sample data comes from the Dummy Data module (Administration), which opens this tool with
+  // an item already chosen; the tool itself no longer carries a button for it
+  useDummyHandoff("messages-to-rewrite", loadDummyMessage)
+
   // Clears the message and the rewrite, ready for the next one
   const resetTool = () => {
     formStore.update({ message: "", source: "text" })
@@ -126,7 +128,6 @@ export default function MessageRewriterClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
                 <button
                   type="button"
                   onClick={() => setIsPromptOpen(true)}
@@ -209,13 +210,6 @@ export default function MessageRewriterClient() {
         </main>
       </div>
 
-      {isDummyDataOpen && (
-        <DummyDataModal
-          kind="messages-to-rewrite"
-          onUse={loadDummyMessage}
-          onClose={() => setIsDummyDataOpen(false)}
-        />
-      )}
       {isPromptOpen && <MessageRewriterPromptModal onClose={() => setIsPromptOpen(false)} />}
     </div>
   )

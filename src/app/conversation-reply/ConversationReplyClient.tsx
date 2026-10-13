@@ -11,8 +11,7 @@ import { LeadSignalsTable } from "@/components/lead-signals/LeadSignalsTable"
 import { ConversationReplyPromptsModal } from "@/components/conversation-reply/ConversationReplyPromptsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { ResetButton } from "@/components/ui/ResetButton"
-import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
-import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
+import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import {
@@ -61,7 +60,6 @@ const textareaClass =
 
 export default function ConversationReplyClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   // The tab the prompts modal opens on; null means the modal is closed
   const [promptsTab, setPromptsTab] = useState<ConversationReplyPromptId | null>(null)
   const { conversation, profileData, replyType } = useToolStore(formStore)
@@ -91,6 +89,10 @@ export default function ConversationReplyClient() {
     reset()
     setFormError(null)
   }
+
+  // Sample data comes from the Dummy Data module (Administration), which opens this tool with
+  // an item already chosen; the tool itself no longer carries a button for it
+  useDummyHandoff("reply-conversations", loadDummyConversation)
 
   // Clears the conversation, profile and result; the chosen reply tone stays
   const resetTool = () => {
@@ -126,7 +128,6 @@ export default function ConversationReplyClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
                 <button
                   type="button"
                   onClick={() => setPromptsTab(replyType)}
@@ -291,9 +292,6 @@ export default function ConversationReplyClient() {
       </div>
 
       {promptsTab && <ConversationReplyPromptsModal initialTab={promptsTab} onClose={() => setPromptsTab(null)} />}
-      {isDummyDataOpen && (
-        <DummyDataModal kind="reply-conversations" onUse={loadDummyConversation} onClose={() => setIsDummyDataOpen(false)} />
-      )}
     </div>
   )
 }

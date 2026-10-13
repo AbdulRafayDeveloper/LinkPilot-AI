@@ -9,8 +9,7 @@ import { TuneSelector } from "@/components/comment-writer/TuneSelector"
 import { CommentResult } from "@/components/comment-writer/CommentResult"
 import { TunePromptsModal } from "@/components/comment-writer/TunePromptsModal"
 import { ResetButton } from "@/components/ui/ResetButton"
-import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
-import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
+import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { ProfilePostsBanner } from "@/components/comment-writer/ProfilePostsBanner"
 import { CommentCountBadge } from "@/components/comment-writer/CommentCountBadge"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -33,7 +32,6 @@ const formStore = createToolStore(
 export default function CommentWriterClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isPromptsOpen, setIsPromptsOpen] = useState(false)
-  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   const { mode, postText, image, tune } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -61,6 +59,10 @@ export default function CommentWriterClient() {
     reset()
     setFormError(null)
   }
+
+  // Sample data comes from the Dummy Data module (Administration), which opens this tool with
+  // an item already chosen; the tool itself no longer carries a button for it
+  useDummyHandoff("posts", loadDummyPost)
 
   // Clears the post (text and screenshot) and the comment; the chosen tune stays
   const resetTool = () => {
@@ -109,7 +111,6 @@ export default function CommentWriterClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
                 <button
                   type="button"
                   onClick={() => setIsPromptsOpen(true)}
@@ -201,7 +202,6 @@ export default function CommentWriterClient() {
       </div>
 
       {isPromptsOpen && <TunePromptsModal initialTune={tune} onClose={() => setIsPromptsOpen(false)} />}
-      {isDummyDataOpen && <DummyDataModal kind="posts" onUse={loadDummyPost} onClose={() => setIsDummyDataOpen(false)} />}
     </div>
   )
 }

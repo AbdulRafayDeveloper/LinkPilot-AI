@@ -10,8 +10,7 @@ import { AboutMeNotice, AnalysisDetails } from "@/components/outreach/OutreachRe
 import { FirstMessagePromptsModal } from "@/components/first-message/FirstMessagePromptsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { ResetButton } from "@/components/ui/ResetButton"
-import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
-import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
+import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import {
@@ -56,7 +55,6 @@ const generation = createGenerationRequest<GeneratePayload, GeneratedFirstMessag
 
 export default function FirstMessageClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isDummyDataOpen, setIsDummyDataOpen] = useState(false)
   // The tab the prompts modal opens on; null means the modal is closed
   const [promptsTab, setPromptsTab] = useState<FirstMessagePromptId | null>(null)
   const { profileData, tune, format } = useToolStore(formStore)
@@ -92,6 +90,10 @@ export default function FirstMessageClient() {
     setFormError(null)
   }
 
+  // Sample data comes from the Dummy Data module (Administration), which opens this tool with
+  // an item already chosen; the tool itself no longer carries a button for it
+  useDummyHandoff("profiles", loadDummyProfile)
+
   // Clears the profile and the result; the chosen tone stays for the next profile
   const resetTool = () => {
     formStore.update({ profileData: "" })
@@ -126,7 +128,6 @@ export default function FirstMessageClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <DummyDataButton onClick={() => setIsDummyDataOpen(true)} />
                 <button
                   type="button"
                   onClick={() => setPromptsTab(chosenTune ?? DEFAULT_FIRST_MESSAGE_TUNE)}
@@ -206,9 +207,6 @@ export default function FirstMessageClient() {
       </div>
 
       {promptsTab && <FirstMessagePromptsModal initialTab={promptsTab} onClose={() => setPromptsTab(null)} />}
-      {isDummyDataOpen && (
-        <DummyDataModal kind="profiles" onUse={loadDummyProfile} onClose={() => setIsDummyDataOpen(false)} />
-      )}
     </div>
   )
 }

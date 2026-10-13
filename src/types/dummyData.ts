@@ -1,3 +1,5 @@
+import type { DummyDataKind } from "@/constants/dummyData"
+
 /**
  * One Dummy Data item (a sample profile, post, comment thread, conversation, ...) kept in
  * the dummy_data collection, for filling a tool's inputs.
@@ -9,4 +11,10 @@ export interface DummyItem {
   fields: Record<string, string>
   // ISO timestamp; items are listed oldest first
   createdAt: string
+}
+
+/** One kind of sample data with everything saved under it, for the page that lists them all. */
+export interface DummyDataGroup {
+  kind: DummyDataKind
+  items: DummyItem[]
 }
