@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useState } from "react"
-import { AlertTriangle, FolderKanban, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { AlertTriangle, FolderKanban, Loader2, Pencil, Plus, RefreshCw, Trash2, Wand2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { ClientProjectDialog } from "@/components/clients/ClientProjectDialog"
 import { requestApi } from "@/lib/apiClient"
@@ -168,6 +168,17 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-[14px] font-semibold text-on-surface [overflow-wrap:anywhere]">{project.name}</p>
                     <StatusBadge status={project.status} />
+                    {/* A project whose prompts carry standing instructions says so, since what is
+                        written here ends up on every Prompt Creator prompt for this project */}
+                    {project.promptInstructions && (
+                      <span
+                        title={project.promptInstructions.slice(0, 300)}
+                        className="inline-flex items-center gap-1 rounded-full bg-primary-fixed px-2 py-0.5 text-[10px] font-bold text-on-primary-fixed-variant"
+                      >
+                        <Wand2 size={10} aria-hidden="true" />
+                        {CLIENT_PROJECT_MESSAGES.hasInstructions}
+                      </span>
+                    )}
                   </div>
                   {project.description && (
                     <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-on-surface-variant [overflow-wrap:anywhere]">

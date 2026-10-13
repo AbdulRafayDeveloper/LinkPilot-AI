@@ -24,6 +24,8 @@ import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import {
+  NO_PROJECT,
+  PROMPT_PROJECT_MESSAGES,
   DEFAULT_PROMPT_TARGET,
   PROMPT_CREATOR_ENDPOINT,
   PROMPT_CREATOR_MESSAGES,
@@ -31,7 +33,7 @@ import {
   REQUEST_MAX_LENGTH,
   type PromptTargetId,
 } from "@/constants/promptCreator"
-import { NO_PROJECT, PROJECTS_TOOL, PROMPT_PROJECT_MESSAGES } from "@/constants/promptProjects"
+import { CLIENTS_TOOL } from "@/constants/clients"
 import type { CreatedPrompt, RequestSource } from "@/types/promptCreator"
 
 interface GeneratePayload {
@@ -76,7 +78,11 @@ export default function PromptCreatorClient() {
   // then the picker goes, nothing is sent, and the list is not even asked for (the server ignores a
   // project id from such an account too, so a stale one left in the browser can't bring it back)
   const viewer = useCurrentUser()
-  const projectsOff = isFeatureDisabled(viewer.user, PROJECTS_TOOL.id)
+  /**
+   * A project is a client's project now, so Clients Management is what decides whether this account
+   * has projects at all: with that tool off, there is nothing to pick and the picker is not shown.
+   */
+  const projectsOff = isFeatureDisabled(viewer.user, CLIENTS_TOOL.id)
   const projects = usePromptProjects({ enabled: viewer.status === "ready" && !projectsOff })
   // A project deleted in another tab must not be sent with the next prompt
   const selectedProject = projects.projects?.find((project) => project.id === projectId) ?? null
@@ -278,23 +284,31 @@ export default function PromptCreatorClient() {
                             className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
                           >
                             <option value={NO_PROJECT}>{PROMPT_PROJECT_MESSAGES.none}</option>
+                            {/* The client is named too: two clients may each have a "Website" project,
+                                and a completed one is still worth writing a prompt for */}
                             {(projects.projects ?? []).map((project) => (
                               <option key={project.id} value={project.id}>
-                                {project.name}
+                                {project.clientName ? `${project.name} — ${project.clientName}` : project.name}
+                                {project.status === "completed" ? " (completed)" : ""}
                               </option>
                             ))}
                           </select>
                         </label>
+                        {/* Projects are made under their client, so this goes to Clients Management */}
                         <Link
-                          href={PROJECTS_TOOL.href}
+                          href={CLIENTS_TOOL.href}
+                          title={PROMPT_PROJECT_MESSAGES.manageHint}
                           className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2.5 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                         >
                           <FolderKanban size={14} aria-hidden="true" />
-                          Manage
+                          {PROMPT_PROJECT_MESSAGES.manage}
                         </Link>
                       </div>
                       {selectedProject && !isTemporary && (
                         <p className="text-[12px] leading-relaxed text-on-surface-variant">{PROMPT_PROJECT_MESSAGES.filedInFolder}</p>
+                      )}
+                      {projects.projects?.length === 0 && (
+                        <p className="text-[12px] leading-relaxed text-on-surface-variant">{PROMPT_PROJECT_MESSAGES.empty}</p>
                       )}
                       {selectedProject?.instructions && (
                         <p className="text-[12px] leading-relaxed text-on-surface-variant">

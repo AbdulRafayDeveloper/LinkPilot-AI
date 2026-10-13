@@ -42,6 +42,30 @@ export const CREATED_PROMPT_MAX_LENGTH = 20000
 
 export const PROMPT_CREATOR_ENDPOINT = "/api/prompt-creator"
 
+/**
+ * The projects a prompt can be written for. **They are the clients' own projects** (Clients
+ * Management, `client_projects`): this route only reads them for the picker, and a project is made,
+ * renamed and deleted with its client. There used to be a separate Projects module with its own
+ * list; the owner asked for one place, so this is a read of theirs.
+ */
+export const PROMPT_PROJECTS_ENDPOINT = "/api/prompt-creator/projects"
+
+// What the picker calls writing a prompt for no project at all
+export const NO_PROJECT = "none"
+
+// The standing instructions live on the project, so a project's own limit is theirs
+export const PROMPT_PROJECT_MESSAGES = {
+  none: "No project",
+  loadFailed: "Couldn't load your projects. Please try again.",
+  notFound: "That project no longer exists.",
+  // Under the picker, so it is clear before writing where the prompt will be kept
+  filedInFolder: "Saved prompts go straight into this project's folder.",
+  // Where projects are made and changed now that Prompt Creator only picks one
+  manage: "Manage",
+  manageHint: "Projects are added under their client in Clients Management.",
+  empty: "No projects yet. Add one under its client in Clients Management.",
+} as const
+
 
 export const PROMPT_CREATOR_MESSAGES = {
   missingRequest: "Describe the task you want a prompt for, by typing or by speaking.",

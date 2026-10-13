@@ -12,7 +12,6 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { CLIENTS_TOOL } from "./clients"
-import { PROJECTS_TOOL } from "./promptProjects"
 import { CLIENT_PROJECTS_TOOL } from "./clientProjectTasks"
 import { CLIENT_MESSAGING_TOOL } from "./clientMessaging"
 import { CLIENT_VOICES_TOOL } from "./clientVoices"
@@ -170,7 +169,6 @@ export const APP_TOOLS: LinkedInTool[] = [
   // Each client's projects with the work under them, right after the clients themselves
   CLIENT_PROJECTS_TOOL,
   // What prompts are written for, managed here and picked from in Prompt Creator
-  PROJECTS_TOOL,
 ]
 
 /**

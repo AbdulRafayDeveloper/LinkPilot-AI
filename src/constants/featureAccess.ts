@@ -34,7 +34,6 @@ export const FEATURE_API_PATHS: Record<string, string[]> = {
   meetings: ["/api/meetings"],
   "prompt-creator": ["/api/prompt-creator"],
   // Nested under Prompt Creator's folder, but the Projects page's own; the longest path wins
-  projects: ["/api/prompt-creator/projects"],
   "daily-tasks": ["/api/daily-tasks"],
   "quick-notes": ["/api/quick-notes"],
   "important-files": ["/api/important-files"],

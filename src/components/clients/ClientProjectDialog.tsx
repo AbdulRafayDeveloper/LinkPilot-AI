@@ -7,6 +7,7 @@ import { requestApi } from "@/lib/apiClient"
 import {
   CLIENTS_ENDPOINT,
   CLIENT_PROJECT_DESCRIPTION_MAX_LENGTH,
+  CLIENT_PROJECT_INSTRUCTIONS_MAX_LENGTH,
   CLIENT_PROJECT_MESSAGES,
   CLIENT_PROJECT_NAME_MAX_LENGTH,
   CLIENT_PROJECT_STATUSES,
@@ -32,18 +33,28 @@ interface ClientProjectDialogProps {
 /**
  * Add and Edit share one dialog, the same way the client's own does. A project needs a name; what
  * the work is can be written now or left for later.
+ *
+ * The last field is the project's **prompt instructions**, which Prompt Creator adds to the end of
+ * every prompt written for this project. It lives here because this is where a project is made:
+ * there used to be a second Projects module with its own list and its own instructions box, and the
+ * owner asked for one place. Leaving it empty leaves every prompt exactly as it is written.
  */
 export const ClientProjectDialog: React.FC<ClientProjectDialogProps> = ({ clientId, clientName, project, onClose, onSaved }) => {
-  const [form, setForm] = useState<ClientProjectInput>(
+  const [form, setForm] = useState<Required<ClientProjectInput>>(
     project
-      ? { name: project.name, description: project.description, status: project.status }
-      : { name: "", description: "", status: DEFAULT_CLIENT_PROJECT_STATUS }
+      ? {
+          name: project.name,
+          description: project.description,
+          status: project.status,
+          promptInstructions: project.promptInstructions ?? "",
+        }
+      : { name: "", description: "", status: DEFAULT_CLIENT_PROJECT_STATUS, promptInstructions: "" }
   )
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
 
-  const update = <K extends keyof ClientProjectInput>(key: K, value: ClientProjectInput[K]) =>
+  const update = <K extends keyof Required<ClientProjectInput>>(key: K, value: Required<ClientProjectInput>[K]) =>
     setForm((current) => ({ ...current, [key]: value }))
 
   const submit = async (event: React.FormEvent) => {
@@ -73,7 +84,7 @@ export const ClientProjectDialog: React.FC<ClientProjectDialogProps> = ({ client
       onClose={onClose}
       isCloseDisabled={isSaving}
       initialFocusRef={nameRef}
-      size="compact"
+      size="default"
       footer={
         <div className="flex justify-end gap-2">
           <button
@@ -159,6 +170,24 @@ export const ClientProjectDialog: React.FC<ClientProjectDialogProps> = ({ client
             })}
           </div>
         </fieldset>
+
+        <label className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className={labelClass}>{CLIENT_PROJECT_MESSAGES.instructionsLabel}</span>
+            <span className="text-[11px] text-outline">
+              {form.promptInstructions.length.toLocaleString()} / {CLIENT_PROJECT_INSTRUCTIONS_MAX_LENGTH.toLocaleString()}
+            </span>
+          </div>
+          <textarea
+            value={form.promptInstructions}
+            maxLength={CLIENT_PROJECT_INSTRUCTIONS_MAX_LENGTH}
+            onChange={(event) => update("promptInstructions", event.target.value)}
+            className={`${fieldClass} min-h-[96px] py-3 leading-relaxed`}
+            placeholder={CLIENT_PROJECT_MESSAGES.instructionsPlaceholder}
+            disabled={isSaving}
+          />
+          <span className="text-[12px] leading-relaxed text-on-surface-variant">{CLIENT_PROJECT_MESSAGES.instructionsHint}</span>
+        </label>
 
         {error && (
           <p role="alert" className="flex gap-2 rounded-xl bg-error-container px-3 py-2.5 text-[13px] text-error">

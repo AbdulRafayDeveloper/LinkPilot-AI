@@ -8,8 +8,12 @@ import { OWNER_ID } from "./owner"
  * it is still running. The client it belongs to is held here, on the project, so deleting a project
  * never touches the client and a client's projects are one indexed read.
  *
- * Nothing to do with `prompt_projects` (models/PromptProject.ts), which is what a created prompt was
- * written for.
+ * **It is also what a created prompt was written for** (`projectId` on `created_prompts`): the
+ * separate `prompt_projects` collection and its `/projects` page are gone, at the owner's request,
+ * so a project is made once, under its client. Two fields serve that: `promptInstructions`, which
+ * every prompt written for the project ends with, and `folderId`, the Prompt Creator folder those
+ * prompts are filed in. Both are optional, so every project saved before this reads as one with no
+ * instructions and no folder yet, and gets a folder the next time a prompt is written for it.
  */
 export interface IClientProject {
   // The account it belongs to (models/owner.ts)
@@ -26,6 +30,10 @@ export interface IClientProject {
    */
   publicLinkVersion: number
   publicLinkActive: boolean
+  // The standing instructions every Prompt Creator prompt written for this project ends with
+  promptInstructions: string
+  // The Prompt Creator folder its prompts are filed in, which carries the project's name
+  folderId: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -40,6 +48,8 @@ const ClientProjectSchema = new Schema<IClientProject>(
     // Both optional in effect: a project saved before links reads as version 0 with no link on
     publicLinkVersion: { type: Number, default: 0 },
     publicLinkActive: { type: Boolean, default: false },
+    promptInstructions: { type: String, default: "" },
+    folderId: { type: String, default: null },
   },
   { timestamps: true, collection: "client_projects" }
 )

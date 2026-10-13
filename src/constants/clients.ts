@@ -7,9 +7,12 @@ import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
  * to (the `clients` collection, `constants/clientMessaging.ts` holds its field limits and the
  * messages its validation uses), so nothing already saved changes shape.
  *
- * Under each client are its projects: the pieces of work being done for them. A project is not a
- * Prompt Creator project (`constants/promptProjects.ts`), which is what a prompt was written for;
- * these two never share a record, a route or a collection.
+ * Under each client are its projects: the pieces of work being done for them. **A client's project
+ * is also what a Prompt Creator prompt is written for**, at the owner's request: there used to be a
+ * second list of projects of its own (`/projects`, the `prompt_projects` collection), which is gone.
+ * A project carries the standing instructions every prompt written in it ends with
+ * (`promptInstructions`) and the Prompt Creator folder those prompts are filed in (`folderId`), and
+ * Prompt Creator only picks from this list, so there is one place a project is made and named.
  */
 
 export const CLIENTS_ENDPOINT = "/api/clients"
@@ -21,6 +24,17 @@ export const CLIENT_PROJECT_NAME_MAX_LENGTH = 80
 export const CLIENT_PROJECT_DESCRIPTION_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
 // Enough for the work one client has on; a longer list is a sign of tasks, not projects
 export const MAX_CLIENT_PROJECTS = 200
+
+/**
+ * The standing instructions added to the end of every Prompt Creator prompt written in this project
+ * (`appendInstructions`), so a rule that holds for all of a project's work ("we use Next.js 16",
+ * "answer in British English") is written once instead of every time. Optional: a project without
+ * them leaves every prompt exactly as it was written.
+ *
+ * A model reads them as part of the prompt, so this is **not** one of the plain text boxes: it keeps
+ * the same 4,000 the deleted Projects module used.
+ */
+export const CLIENT_PROJECT_INSTRUCTIONS_MAX_LENGTH = 4000
 
 export const CLIENT_PROJECT_STATUSES = [
   { id: "active", label: "Active", description: "Still being worked on" },
@@ -66,7 +80,15 @@ export const CLIENT_PROJECT_MESSAGES = {
   missingStatus: "Choose whether the project is active or completed.",
   tooMany: `You can keep up to ${MAX_CLIENT_PROJECTS} projects for one client.`,
   empty: "No projects for this client yet.",
-  deleteExplains: "This can't be undone. The client and their messages stay as they are.",
+  deleteExplains:
+    "This can't be undone. The client and their messages stay as they are, and so do any prompts written for this project and the folder they are filed in.",
+  // The prompt instructions, which live on the project and are used by Prompt Creator
+  instructionsLabel: "Instructions for every prompt in it (optional)",
+  instructionsHint: "Added to the end of every Prompt Creator prompt written for this project.",
+  instructionsTooLong: `Keep the instructions under ${CLIENT_PROJECT_INSTRUCTIONS_MAX_LENGTH.toLocaleString()} characters.`,
+  instructionsPlaceholder: "e.g. We use Next.js 16 and Tailwind. Answer in British English. Never change the database schema.",
+  // On a project that has them, so the list says which projects carry instructions
+  hasInstructions: "Prompt instructions",
 } as const
 
 // The module's sidebar entry, listed first under Client Work: the people the work is for

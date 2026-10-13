@@ -15,7 +15,7 @@ export interface ICreatedPrompt {
   requestSource: "text" | "voice"
   // The folder it is filed in (models/PromptFolder.ts), null for a prompt in no folder
   folderId: string | null
-  // The project it was written for (models/PromptProject.ts), null for one written outside any
+  // The client project it was written for (models/ClientProject.ts), null for one written outside any
   projectId: string | null
   provider: string
   // When the user last changed the name or the prompt by hand

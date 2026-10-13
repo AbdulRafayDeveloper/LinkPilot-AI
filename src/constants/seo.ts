@@ -147,12 +147,6 @@ const TOOL_SEO: Record<string, { title: string; description: string; keywords: s
       "Every client project in one place, with the tasks under it, their images and voice notes, and a read-only link to share the project.",
     keywords: ["client projects", "project tasks", "share project link", "client work tracker"],
   },
-  projects: {
-    title: "Projects for Your Prompts",
-    description:
-      "Keep the projects your prompts are written for, each with standing instructions added to the end of every prompt created in it.",
-    keywords: ["prompt projects", "project instructions", "manage projects", "prompt organizer"],
-  },
   clients: {
     title: "Clients and Projects Manager",
     description:
