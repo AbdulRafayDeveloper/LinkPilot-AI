@@ -108,8 +108,16 @@ interface ActionItemLike {
 export function aggregateChunkResults(results: { index: number; result: ChunkResult }[]): AggregatedFacts {
   const ordered = [...results].sort((a, b) => a.index - b.index).map((entry) => entry.result)
   return {
-    // The first part that says what the meeting is for settles it
-    purpose: ordered.map((result) => result.purpose?.trim()).find(Boolean) ?? null,
+    /**
+     * What the parts say the meeting is for. The **fullest** answer wins, not the first: a recording
+     * usually opens with greetings or with whatever the transcription made of them, so part one
+     * often reports something like "Start of the meeting" while a later part says what the meeting
+     * was actually about.
+     */
+    purpose: ordered
+      .map((result) => result.purpose?.trim())
+      .filter((purpose): purpose is string => Boolean(purpose))
+      .sort((a, b) => b.length - a.length)[0] ?? null,
     participants: mergeParticipants(ordered),
     topics: mergeText(ordered.flatMap((result) => result.topics)),
     decisions: mergeDecisions(ordered.flatMap((result) => result.decisions)),

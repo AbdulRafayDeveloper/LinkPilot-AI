@@ -262,8 +262,14 @@ export async function synthesizeMeeting(
   return {
     title: trimTitle(options.userTitle || data.title) || "Untitled meeting",
     analysis: {
-      // What a part of the meeting actually stated wins over what the model wrote about it
-      purpose: facts.purpose || data.purpose?.trim() || null,
+      /**
+       * Why the meeting happened, as the model read **the whole of it**; what one part said is the
+       * fallback. It used to be the other way round, which meant the first part always settled it:
+       * a recording that opens with greetings gave "Start of the meeting" as the purpose of an hour
+       * about billing and staging. Every other field still takes the parts first, because those are
+       * things that were said rather than things to judge.
+       */
+      purpose: data.purpose?.trim() || facts.purpose || null,
       topics,
       participants: facts.participants,
       // The count follows the people actually listed, so the two can never disagree
