@@ -11,6 +11,7 @@ import {
   MessagesSquare,
   Repeat,
   Reply,
+  ShieldCheck,
   UserPlus,
   type LucideIcon,
 } from "lucide-react"
@@ -36,15 +37,20 @@ import { PROFILE_SCHEDULER_LINK } from "./profileScheduler"
 import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./savedOutputs"
 
 /**
- * The three areas of the app, in sidebar order (the owner's: Workspace, LinkedIn Tools, Client
- * Work). Each one is an icon on the sidebar's rail, and the panel beside it lists that area's
- * tools alone, so keep them few and meaningful: a tool that needs a heading of its own belongs in
- * one of these. Prompt Creator had a "Prompts" heading of its own until the owner asked for it
- * under Workspace, with the rest of the day's work.
+ * The four areas of the app, in sidebar order (the owner's: Workspace, LinkedIn Tools, Client
+ * Work, Administration). Each one is an icon on the sidebar's rail, and the panel beside it lists
+ * that area's tools alone, so keep them few and meaningful: a tool that needs a heading of its own
+ * belongs in one of these. Prompt Creator had a "Prompts" heading of its own until the owner asked
+ * for it under Workspace, with the rest of the day's work.
  *
  * Each one carries its own icon, because the rail is icons alone: the tooltip and the panel's
  * heading are where the label is read, and `hint` is the line under the heading that says what the
  * area is for.
+ *
+ * **Administration is an area of its own, and only an admin ever sees it**: its one tool is
+ * `adminOnly`, so for a user the area holds nothing and the rail never draws it (the sidebar lists
+ * only the areas whose tools that account really has). It was a tool under Workspace until the
+ * owner asked for it on the rail, where its five pages are a click away from any tool.
  */
 export const TOOL_GROUPS = [
   // The day's own work: the prompts written for other AI tools, the tasks, the notes and the files
@@ -54,6 +60,8 @@ export const TOOL_GROUPS = [
   // The people the work is for: what you send them, what they send back, the text you reuse with
   // them, and the meetings
   { id: "clients", label: "Client Work", icon: Handshake, hint: "The people the work is for: their projects, messages and meetings" },
+  // Admins only: the sign-ins, the accounts, the AI models, the backups and the sample data
+  { id: "admin", label: "Administration", icon: ShieldCheck, hint: "Sign-ins, accounts, AI models, backups and sample data" },
 ] as const
 
 export type ToolGroupId = (typeof TOOL_GROUPS)[number]["id"]
@@ -148,7 +156,7 @@ export const LINKEDIN_TOOLS: LinkedInTool[] = [
 
 /**
  * Every tool the app has, in sidebar order: Workspace, then the 9 LinkedIn tools, then Client
- * Work. This is the one list the sidebar, the switcher, the sitemap, the manifest and the SEO
+ * Work, then Administration. This is the one list the sidebar, the switcher, the sitemap, the manifest and the SEO
  * pages all read, so a tool added here shows up everywhere at once. The order inside each group
  * is the owner's, so keep a new tool where they put it rather than tidying the list.
  */
@@ -162,7 +170,6 @@ export const APP_TOOLS: LinkedInTool[] = [
   IMPORTANT_FILES_TOOL,
   // The accounts that share this workspace, beside the team and before the admin area
   CHILD_ACCOUNTS_TOOL,
-  ADMIN_TOOL,
   ...LINKEDIN_TOOLS,
   // Client Work: the meetings and what the clients send, then what is written back to them, then
   // the clients themselves and what their prompts are written for
@@ -176,6 +183,8 @@ export const APP_TOOLS: LinkedInTool[] = [
   // Each client's projects with the work under them, right after the clients themselves
   CLIENT_PROJECTS_TOOL,
   // What prompts are written for, managed here and picked from in Prompt Creator
+  // Administration: its own area on the rail, and only an admin is ever shown it
+  ADMIN_TOOL,
 ]
 
 /**

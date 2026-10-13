@@ -57,7 +57,7 @@ export const ADMIN_TOOL: {
   description: string
   icon: LucideIcon
   href: string
-  group: "workspace"
+  group: "admin"
   adminOnly: true
   links: { title: string; description: string; icon: LucideIcon; href: string; pageTitle: string }[]
 } = {
@@ -66,7 +66,7 @@ export const ADMIN_TOOL: {
   description: "Sign-ins, accounts, activity and AI models",
   icon: ShieldCheck,
   href: AUDIT_HREF,
-  group: "workspace",
+  group: "admin",
   adminOnly: true,
   links: [
     { title: "Audit Management", description: "Every sign-in, newest first", icon: ScrollText, href: AUDIT_HREF, pageTitle: "Audit Management" },

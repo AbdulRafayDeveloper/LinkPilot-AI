@@ -233,9 +233,9 @@ const SidebarDropdown: React.FC<SidebarDropdownProps> = ({
 }
 
 /**
- * App navigation: a **rail of the three areas** (TOOL_GROUPS: Workspace, LinkedIn Tools, Client
- * Work) and a white panel beside it listing the tools of the one chosen, so a list of nineteen
- * tools reads as three short ones.
+ * App navigation: a **rail of the areas** (TOOL_GROUPS: Workspace, LinkedIn Tools, Client Work and,
+ * for an admin, Administration) and a white panel beside it listing the tools of the one chosen, so
+ * a list of nineteen tools reads as three or four short ones.
  *
  * - **The rail is a tab strip**: one icon per area, the chosen one filled in the brand violet, each
  *   with its name as a tooltip and as what a screen reader reads. An area whose tools this account
@@ -373,6 +373,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
     )
   }
 
+  /**
+   * The rows of one area. An area that is a **single tool with its own pages** lists those pages
+   * (Administration: Audit Management, User Management and the rest), because a dropdown there
+   * would only repeat the name the panel's heading already carries. While searching it stays a
+   * dropdown, so a page found in another area still says which tool it belongs to.
+   */
+  const renderArea = (areaTools: LinkedInTool[]) => {
+    const [only] = areaTools
+    if (!isSearching && areaTools.length === 1 && only.links) return only.links.map(renderLink)
+    return areaTools.map(renderTool)
+  }
+
   const panelId = "sidebar-tools"
 
   return (
@@ -468,7 +480,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
           {/* Collapsed on desktop: the chosen area's tools as icons, where the panel would be */}
           {isCollapsed && (
             <nav aria-label={area ? `${area.group.label} tools` : "Tools"} className="custom-scrollbar hidden min-h-0 w-full flex-1 overflow-y-auto border-t border-outline-variant/80 px-2 py-2 lg:block">
-              <ul>{(area?.tools ?? []).map(renderTool)}</ul>
+              <ul>{renderArea(area?.tools ?? [])}</ul>
             </nav>
           )}
 
@@ -562,7 +574,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
                 {isSearching && (
                   <p className="mb-0.5 px-2 text-[10px] font-bold uppercase leading-4 tracking-[0.11em] text-outline">{group.label}</p>
                 )}
-                <ul>{areaTools.map(renderTool)}</ul>
+                <ul>{renderArea(areaTools)}</ul>
               </section>
             ))}
           </nav>
