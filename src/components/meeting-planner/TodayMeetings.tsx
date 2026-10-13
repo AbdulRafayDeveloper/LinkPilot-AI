@@ -2,7 +2,7 @@
 
 import React from "react"
 import Link from "next/link"
-import { CalendarCheck, ChevronRight, NotebookPen, Sun } from "lucide-react"
+import { CalendarCheck, ChevronRight, NotebookPen, Pencil, Sun } from "lucide-react"
 import { MEETING_PLANNER_MESSAGES, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
@@ -19,6 +19,8 @@ interface TodayMeetingsProps {
   onChangeStatus: (meeting: MeetingPlan, status: MeetingPlanStatusId) => void
   // Opening the meeting's notes, written before it or after it
   onNotes: (meeting: MeetingPlan) => void
+  // Editing it where it is read, so today's attend link can be added at the last minute
+  onEditDetails: (meeting: MeetingPlan) => void
 }
 
 /**
@@ -32,6 +34,7 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
   savingIds,
   onChangeStatus,
   onNotes,
+  onEditDetails,
 }) => (
   <section
     aria-label="Today's meetings"
@@ -98,6 +101,15 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                     {meeting.hasNotes && (
                       <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
                     )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onEditDetails(meeting)}
+                    aria-label={`Edit ${meeting.name}`}
+                    title="Edit this meeting: its name, the person, the attend link"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-outline transition-colors hover:bg-primary/5 hover:text-primary"
+                  >
+                    <Pencil size={14} aria-hidden="true" />
                   </button>
                   <MeetingStatusButton meeting={meeting} isSaving={savingIds.has(meeting.id)} onChange={onChangeStatus} />
                 </span>

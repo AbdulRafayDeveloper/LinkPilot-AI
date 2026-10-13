@@ -10,7 +10,9 @@ import { DayMeetingsPanel } from "@/components/meeting-planner/DayMeetingsPanel"
 import {
   MeetingFormModal,
   emptyMeetingForm,
+  formValuesOf,
   recurrenceOf,
+  updateScopeOf,
   type MeetingFormValues,
 } from "@/components/meeting-planner/MeetingFormModal"
 import { MoveMeetingModal } from "@/components/meeting-planner/MoveMeetingModal"
@@ -49,6 +51,15 @@ export default function MeetingPlannerClient() {
   const [notice, setNotice] = useState<string | null>(null)
   const [preparingName, setPreparingName] = useState<string | null>(null)
   const [isPromptsOpen, setIsPromptsOpen] = useState(false)
+  /**
+   * The meeting being edited from the calendar, read in full first: a list carries no preparation
+   * inputs, and the form needs them, so it opens on what the meeting really holds. This is how the
+   * attend link is added without leaving the page, which is what the owner asked for.
+   */
+  const [editing, setEditing] = useState<MeetingPlanDetail | null>(null)
+  const [isOpeningEdit, setIsOpeningEdit] = useState<string | null>(null)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
   // One meeting being moved, or being deleted (alone or with its series), from the day list
   const [moving, setMoving] = useState<MeetingPlan | null>(null)
   const [isMoving, setIsMoving] = useState(false)
@@ -208,6 +219,58 @@ export default function MeetingPlannerClient() {
       setLoadError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.loadFailed)
     } finally {
       setIsLoadingNotes(false)
+    }
+  }
+
+  /** Opens the edit form on everything the meeting holds, read first so nothing is lost by editing. */
+  const openEdit = async (meeting: MeetingPlan) => {
+    if (isOpeningEdit) return
+    setIsOpeningEdit(meeting.id)
+    setEditError(null)
+    try {
+      const { data } = await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${meeting.id}`)
+      setEditing(data)
+    } catch (error: unknown) {
+      setNotice(null)
+      setLoadError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.loadFailed)
+    } finally {
+      setIsOpeningEdit(null)
+    }
+  }
+
+  /**
+   * Saves the edit. The scope is the form's own tick box: on a repeating meeting it offers to put
+   * the change, the attend link included, on every later meeting of the series.
+   */
+  const saveEdit = async (values: MeetingFormValues) => {
+    if (!editing || isSavingEdit) return
+    setIsSavingEdit(true)
+    setEditError(null)
+    try {
+      await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${editing.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: values.name,
+          meetingDate: values.meetingDate,
+          meetingTime: values.meetingTime,
+          personName: values.personName || null,
+          profileLink: values.profileLink || null,
+          joinUrl: values.joinUrl || null,
+          prepEnabled: values.prepEnabled,
+          profileInfo: values.profileInfo || null,
+          conversationHistory: values.conversationHistory || null,
+          additionalInfo: values.additionalInfo || null,
+          scope: updateScopeOf(values),
+        }),
+      })
+      setEditing(null)
+      setNotice(values.applyToSeries ? MEETING_PLANNER_MESSAGES.seriesLinkApplied : MEETING_PLANNER_MESSAGES.updated)
+      reload()
+    } catch (error: unknown) {
+      setEditError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.updateFailed)
+    } finally {
+      setIsSavingEdit(false)
     }
   }
 
@@ -381,6 +444,7 @@ export default function MeetingPlannerClient() {
                 savingIds={savingIds}
                 onChangeStatus={changeStatus}
                 onNotes={(meeting) => void openNotes(meeting)}
+                onEditDetails={(meeting) => void openEdit(meeting)}
               />
               <DayMeetingsPanel
                 date={selectedDate}
@@ -394,6 +458,7 @@ export default function MeetingPlannerClient() {
                   setMoveError(null)
                   setMoving(meeting)
                 }}
+                onEditDetails={(meeting) => void openEdit(meeting)}
                 onDelete={(meeting) => {
                   setDeleteError(null)
                   setDeleting(meeting)
@@ -422,6 +487,22 @@ export default function MeetingPlannerClient() {
             if (isSaving) return
             setIsFormOpen(false)
             setFormError(null)
+          }}
+        />
+      )}
+      {editing && (
+        <MeetingFormModal
+          key={editing.id}
+          title="Edit meeting"
+          initial={formValuesOf(editing)}
+          existing={editing}
+          isSaving={isSavingEdit}
+          error={editError}
+          onSubmit={saveEdit}
+          onClose={() => {
+            if (isSavingEdit) return
+            setEditing(null)
+            setEditError(null)
           }}
         />
       )}

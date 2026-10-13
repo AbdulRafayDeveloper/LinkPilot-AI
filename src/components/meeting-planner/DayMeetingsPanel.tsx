@@ -2,7 +2,7 @@
 
 import React from "react"
 import Link from "next/link"
-import { CalendarPlus, ChevronRight, FileText, NotebookPen, Pencil, Trash2 } from "lucide-react"
+import { CalendarPlus, ChevronRight, Clock, FileText, NotebookPen, Pencil, Trash2 } from "lucide-react"
 import { MEETING_PLANNER_MESSAGES, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
 import { MEETING_PLAN_LINK_MESSAGES } from "@/constants/meetings"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
@@ -20,6 +20,8 @@ interface DayMeetingsPanelProps {
   onAddMeeting: (date: string) => void
   // Moving this one meeting to another day or time, and deleting it (or its whole series)
   onEdit: (meeting: MeetingPlan) => void
+  // Editing everything else about it, including the attend link, without leaving the calendar
+  onEditDetails: (meeting: MeetingPlan) => void
   onDelete: (meeting: MeetingPlan) => void
   // Opening the meeting's notes, written before it or after it
   onNotes: (meeting: MeetingPlan) => void
@@ -46,6 +48,7 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
   onChangeStatus,
   onAddMeeting,
   onEdit,
+  onEditDetails,
   onDelete,
   onNotes,
   onLinked,
@@ -134,6 +137,20 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                     <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
                   )}
                 </button>
+                {/* Everything about the meeting, the attend link included, without opening it first:
+                    the owner asked to be able to add that link while editing from here */}
+                <button
+                  type="button"
+                  onClick={() => onEditDetails(meeting)}
+                  disabled={savingIds.has(meeting.id)}
+                  aria-label={`Edit ${meeting.name}`}
+                  title="Edit this meeting: its name, the person, the attend link"
+                  className={`${iconButton} hover:bg-primary/5 hover:text-primary`}
+                >
+                  <Pencil size={14} aria-hidden="true" />
+                </button>
+                {/* The day and the time have their own button, as the meeting's own page does,
+                    because for a repeating meeting they move the series rather than one week */}
                 <button
                   type="button"
                   onClick={() => onEdit(meeting)}
@@ -142,7 +159,7 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                   title={meeting.seriesId ? "Change the day or time of this meeting only" : "Change the day or time"}
                   className={`${iconButton} hover:bg-primary/5 hover:text-primary`}
                 >
-                  <Pencil size={14} aria-hidden="true" />
+                  <Clock size={14} aria-hidden="true" />
                 </button>
                 <button
                   type="button"
