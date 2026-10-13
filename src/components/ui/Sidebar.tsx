@@ -5,11 +5,12 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { ChevronDown, Loader2, Search, X } from "lucide-react"
 import { BrandLogo } from "./BrandLogo"
-import { TOOL_GROUPS, type LinkedInTool, type ToolLink } from "@/constants/linkedinTools"
+import { TOOL_GROUPS, type LinkedInTool, type ToolGroupId, type ToolLink } from "@/constants/linkedinTools"
 import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 import { markToolSeen, useToolActivity, type ActivityState } from "@/lib/toolActivity"
+import { groupOfPath, shownGroup } from "@/lib/sidebarGroups"
 import { useSidebarDropdowns } from "@/hooks/useSidebarDropdowns"
-import { useSidebarSections } from "@/hooks/useSidebarSections"
+import { useSidebarGroup } from "@/hooks/useSidebarGroup"
 import { useVisibleTools } from "@/hooks/useCurrentUser"
 
 interface SidebarProps {
@@ -33,11 +34,11 @@ const ACTIVITY_TEXT: Record<ActivityState, string> = {
   failed: "Didn't finish",
 }
 
-// Collapsed applies on desktop only (lg:); the mobile drawer always shows the full list
+// Collapsed applies on desktop only (lg:); the mobile drawer always shows the panel
 const whenCollapsed = (isCollapsed: boolean, classes: string) => (isCollapsed ? classes : "")
 const isDesktop = () => window.matchMedia("(min-width: 1024px)").matches
 
-// The collapsed rail's tooltip for one row, on hover and on keyboard focus alike
+// The rail's tooltip for one row, on hover and on keyboard focus alike
 const railHintHandlers = (isCollapsed: boolean, title: string, detail: string, onHint: (hint: RailHint | null) => void) => {
   const show = (event: React.SyntheticEvent<HTMLElement>) => {
     if (!isCollapsed || !isDesktop()) return
@@ -47,9 +48,9 @@ const railHintHandlers = (isCollapsed: boolean, title: string, detail: string, o
   return { onMouseEnter: show, onFocus: show, onMouseLeave: () => onHint(null), onBlur: () => onHint(null) }
 }
 
-// Rows are kept tight so every tool, an open dropdown included, fits a 900px screen without scrolling
+// Rows are kept tight so a whole area, an open dropdown included, fits a 900px screen without scrolling
 const rowClass = (isCollapsed: boolean, isActive: boolean, compact = false) =>
-  `group flex w-full items-center gap-2.5 rounded-lg px-2 ${compact ? "py-px" : "py-[2px]"} text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${whenCollapsed(
+  `group flex w-full items-center gap-2.5 rounded-lg px-2 ${compact ? "py-px" : "py-[3px]"} text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${whenCollapsed(
     isCollapsed,
     "lg:justify-center lg:px-0"
   )} ${isActive ? "bg-primary-fixed/45" : "hover:bg-surface-container-low"}`
@@ -232,18 +233,30 @@ const SidebarDropdown: React.FC<SidebarDropdownProps> = ({
 }
 
 /**
- * App navigation: the brand, every tool under the three headings in TOOL_GROUPS, and Global AI
- * Prompts pinned at the bottom. Each heading opens and closes its own section, any number at once,
- * each kept as the user left it across pages (hooks/useSidebarSections.ts); every section shows
- * while searching and on the collapsed rail. A drawer on small screens; on desktop a full column that
- * collapses to an icon rail. Every tool shows when it's writing in the background or has a
- * result waiting. A tool with several pages is a dropdown that stays as the user left it.
+ * App navigation: a **rail of the three areas** (TOOL_GROUPS: Workspace, LinkedIn Tools, Client
+ * Work) and a white panel beside it listing the tools of the one chosen, so a list of nineteen
+ * tools reads as three short ones.
+ *
+ * - **The rail is a tab strip**: one icon per area, the chosen one filled in the brand violet, each
+ *   with its name as a tooltip and as what a screen reader reads. An area whose tools this account
+ *   cannot see is not offered at all, so the rail is role-aware without knowing what a role is
+ *   (`useVisibleTools`, which already drops the admin area for a user).
+ * - **Which area is shown** follows `lib/sidebarGroups.ts`: the one just clicked while still on the
+ *   page it was clicked on, otherwise the area of the page on screen, so arriving anywhere shows the
+ *   list that page is in. The choice is kept per browser (`hooks/useSidebarGroup.ts`).
+ * - **A search reaches every area**, not only the one on screen, with each match under its area's
+ *   name, so nothing is ever unfindable behind the rail; Enter opens the first match.
+ * - A drawer below `lg`, where the rail and the panel sit side by side; on desktop the panel can be
+ *   collapsed (Ctrl/⌘+B), which leaves the rail with the chosen area's tools as icons.
+ * - Every tool still shows when it is writing in the background or has a result waiting, and an
+ *   area whose tools are out of sight carries that mark on its own icon. A tool with several pages
+ *   is still a dropdown that stays as the user left it.
  */
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed = false }) => {
   const pathname = usePathname()
   const activity = useToolActivity()
   const dropdowns = useSidebarDropdowns()
-  const sections = useSidebarSections()
+  const { picked, pick } = useSidebarGroup()
   // The admin area appears only once the account is known to be an admin, never flashing for a user
   const tools = useVisibleTools()
   const [hint, setHint] = useState<RailHint | null>(null)
@@ -296,14 +309,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
     return links && links.length > 0 ? [{ ...tool, links }] : []
   })
   const showGlobalPrompts = !isSearching || matchesSearch(GLOBAL_PROMPTS_LINK.title, query)
-  // The sections in heading order, each with its tools, so the list and Enter's first match agree
-  const groups = TOOL_GROUPS.map((group) => ({ group, tools: visibleTools.filter((tool) => tool.group === group.id) })).filter((entry) => entry.tools.length > 0)
-  const firstTool = groups[0]?.tools[0]
-  const firstMatch = firstTool?.links?.[0]?.href ?? firstTool?.href ?? (showGlobalPrompts ? GLOBAL_PROMPTS_LINK.href : undefined)
-  // Every page a tool has (its dropdown's pages, or itself), for what a closed section carries
-  const pagesOf = (tool: LinkedInTool) => (tool.links ? tool.links.map((link) => link.href) : [tool.href])
 
+  // The areas this account has, in the owner's order, with the tools of each
+  const areas = TOOL_GROUPS.map((group) => ({ group, tools: tools.filter((tool) => tool.group === group.id) })).filter(
+    (area) => area.tools.length > 0
+  )
+  const available = areas.map((area) => area.group.id)
+  const pageGroup = groupOfPath(tools, pathname)
+  const current = shownGroup(picked, pathname, pageGroup, available)
+  const area = areas.find((entry) => entry.group.id === current) ?? areas[0]
+
+  /**
+   * What the panel lists: the chosen area's tools, or, while searching, every match in every area
+   * under its own name, so the rail never hides something that was looked for.
+   */
+  const shownAreas = isSearching
+    ? areas.map((entry) => ({ group: entry.group, tools: visibleTools.filter((tool) => tool.group === entry.group.id) })).filter((entry) => entry.tools.length > 0)
+    : area
+      ? [{ group: area.group, tools: visibleTools.filter((tool) => tool.group === area.group.id) }]
+      : []
+  const firstTool = shownAreas[0]?.tools[0]
+  const firstMatch = firstTool?.links?.[0]?.href ?? firstTool?.href ?? (showGlobalPrompts ? GLOBAL_PROMPTS_LINK.href : undefined)
   const matchCount = visibleTools.length + (isSearching && showGlobalPrompts ? 1 : 0)
+  // Every page a tool has (its dropdown's pages, or itself), for what an area's icon carries
+  const pagesOf = (tool: LinkedInTool) => (tool.links ? tool.links.map((link) => link.href) : [tool.href])
 
   // Opening a tool means its finished result has been seen
   useEffect(() => {
@@ -342,6 +371,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
     )
   }
 
+  const panelId = "sidebar-tools"
+
   return (
     <>
       {/* Mobile Sidebar Overlay Backdrop */}
@@ -354,132 +385,172 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-[45] flex h-screen w-[280px] flex-shrink-0 flex-col border-r border-outline-variant/80 bg-surface-container-lowest transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-[45] flex h-screen w-[296px] flex-shrink-0 border-r border-outline-variant/80 bg-white transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
           isOpen ? "translate-x-0 shadow-xl lg:shadow-none" : "-translate-x-full"
-        } ${isCollapsed ? "lg:w-[76px]" : "lg:w-[280px]"}`}
+        } ${isCollapsed ? "lg:w-[72px]" : "lg:w-[320px] xl:w-[352px]"}`}
       >
-        {/* Brand: as tall as the header, so both bottom borders line up */}
+        {/* The rail: the three areas, and with the panel collapsed the chosen area's tools too */}
         <div
-          className={`flex h-16 shrink-0 items-center justify-between gap-2 border-b border-outline-variant/80 px-4 ${whenCollapsed(
+          className={`flex w-[60px] shrink-0 flex-col items-center border-r border-outline-variant/80 bg-surface-container-low ${whenCollapsed(
             isCollapsed,
-            "lg:justify-center lg:px-0"
+            "lg:w-[72px]"
           )}`}
         >
-          <BrandLogo wordmarkClassName={whenCollapsed(isCollapsed, "lg:sr-only")} priority />
-          <button
-            onClick={onClose}
-            className="lg:hidden rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-high"
-            aria-label="Close Sidebar"
+          <div className="flex h-16 shrink-0 items-center justify-center border-b border-outline-variant/80">
+            <BrandLogo wordmarkClassName="sr-only" priority />
+          </div>
+
+          <div
+            role="tablist"
+            aria-orientation="vertical"
+            aria-label="Areas of the app"
+            className="flex w-full flex-col items-center gap-1.5 px-2 py-3"
           >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Search: outside the scrolling list, so it stays put however far the tools are scrolled.
-            The icon rail has no room for it; Ctrl/⌘+K opens the tool switcher there */}
-        <div role="search" className={`shrink-0 px-3 pb-1 pt-2 ${whenCollapsed(isCollapsed, "lg:hidden")}`}>
-          <label htmlFor={searchId} className="sr-only">
-            Search tools
-          </label>
-          <div className="relative">
-            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-outline" aria-hidden="true" />
-            <input
-              id={searchId}
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape" && query) {
-                  event.preventDefault()
-                  setQuery("")
-                } else if (event.key === "Enter" && isSearching && firstMatch) {
-                  event.preventDefault()
-                  setQuery("")
-                  onClose()
-                  router.push(firstMatch)
-                }
-              }}
-              placeholder="Search tools"
-              autoComplete="off"
-              spellCheck={false}
-              aria-controls="sidebar-tools"
-              className="h-8 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-8 pr-7 text-[13px] text-on-surface placeholder:text-outline transition-colors focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 [&::-webkit-search-cancel-button]:hidden"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                aria-label="Clear search"
-                className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-outline hover:bg-surface-container-high hover:text-on-surface"
-              >
-                <X size={13} aria-hidden="true" />
-              </button>
-            )}
+            {areas.map(({ group, tools: areaTools }) => {
+              const isChosen = group.id === area?.group.id
+              const Icon = group.icon
+              // An area that is not on screen carries what its tools would have shown
+              const hiddenActivity = isChosen
+                ? undefined
+                : areaTools
+                    .flatMap(pagesOf)
+                    .map((href) => (href === pathname ? undefined : activityOf(href)))
+                    .find((state) => state !== undefined)
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isChosen}
+                  aria-controls={panelId}
+                  title={`${group.label}: ${group.hint}`}
+                  onClick={() => {
+                    setQuery("")
+                    pick(group.id as ToolGroupId, pathname)
+                  }}
+                  className={`relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                    isChosen
+                      ? "bg-primary text-on-primary shadow-sm"
+                      : "bg-white text-on-surface-variant hover:bg-surface-container-high hover:text-primary"
+                  }`}
+                >
+                  <Icon size={19} aria-hidden="true" />
+                  <span className="sr-only">{group.label}</span>
+                  {hiddenActivity && <ActivityMark state={hiddenActivity} className="absolute -right-0.5 -top-0.5" />}
+                </button>
+              )
+            })}
           </div>
-          <span className="sr-only" aria-live="polite">
-            {isSearching ? `${matchCount} ${matchCount === 1 ? "tool" : "tools"} found` : ""}
-          </span>
-        </div>
 
-        <nav
-          ref={navRef}
-          id="sidebar-tools"
-          aria-label="Main"
-          onScroll={handleNavScroll}
-          className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-1.5"
-        >
-          {isSearching && matchCount === 0 && (
-            <p className={`px-2 py-3 text-[12px] text-outline ${whenCollapsed(isCollapsed, "lg:hidden")}`}>No tool matches &ldquo;{query.trim()}&rdquo;.</p>
+          {/* Collapsed on desktop: the chosen area's tools as icons, where the panel would be */}
+          {isCollapsed && (
+            <nav aria-label={area ? `${area.group.label} tools` : "Tools"} className="custom-scrollbar hidden min-h-0 w-full flex-1 overflow-y-auto border-t border-outline-variant/80 px-2 py-2 lg:block">
+              <ul>{(area?.tools ?? []).map(renderTool)}</ul>
+            </nav>
           )}
-          {groups.map(({ group, tools: groupTools }, index) => {
-            const hasActivePage = groupTools.some((tool) => pagesOf(tool).includes(pathname))
-            // Each section is open or closed on its own; a search shows every section with a match
-            const isOpen = sections.isOpen(group.id, hasActivePage)
-            const isShown = isSearching || isOpen
-            // Closed, the heading carries what its hidden tools would have shown, like a closed dropdown
-            const hiddenActivity = isShown
-              ? undefined
-              : groupTools
-                  .flatMap(pagesOf)
-                  .map((href) => (href === pathname ? undefined : activityOf(href)))
-                  .find((state) => state !== undefined)
-            const listId = `nav-group-${group.id}-tools`
-            return (
-              <section key={group.id} aria-labelledby={`nav-group-${group.id}`} className={index > 0 ? "mt-1" : ""}>
-                {/* Collapsed, a thin line separates the groups instead of their names */}
-                {index > 0 && <div className={`mx-2 mb-3 hidden h-px bg-outline-variant/70 ${whenCollapsed(isCollapsed, "lg:block")}`} aria-hidden="true" />}
-                <h2 id={`nav-group-${group.id}`} className={`relative mb-0.5 ${whenCollapsed(isCollapsed, "lg:sr-only")}`}>
-                  {hasActivePage && !isShown && <ActiveBar />}
-                  <button
-                    type="button"
-                    onClick={() => sections.toggle(group.id, isOpen)}
-                    aria-expanded={isShown}
-                    aria-controls={listId}
-                    title={isShown ? `Hide ${group.label}` : `Show ${group.label}`}
-                    className={`flex w-full items-center gap-2 rounded-lg bg-surface-container-low px-2 py-1 text-left text-[10px] font-bold uppercase leading-4 tracking-[0.11em] transition-colors duration-150 hover:bg-surface-container hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-                      hasActivePage && !isShown ? "text-primary" : isShown ? "text-on-surface" : "text-on-surface-variant"
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{group.label}</span>
-                    {hiddenActivity && <ActivityMark state={hiddenActivity} />}
-                    <ChevronDown size={13} aria-hidden="true" className={`shrink-0 text-outline transition-transform duration-150 ${isShown ? "rotate-180" : ""}`} />
-                  </button>
-                </h2>
-                {/* A closed section's tools stay out of view and out of the reading order; the rail always shows its icons */}
-                <ul id={listId} className={isShown ? "" : `hidden ${whenCollapsed(isCollapsed, "lg:block")}`}>
-                  {groupTools.map(renderTool)}
-                </ul>
-              </section>
-            )
-          })}
-        </nav>
 
-        {/* Global AI Prompts: shared settings for every tool, not a LinkedIn tool */}
-        {showGlobalPrompts && (
-          <div className="shrink-0 border-t border-outline-variant/80 px-3 py-2">
-            <ul>{renderLink(GLOBAL_PROMPTS_LINK)}</ul>
+          {isCollapsed && (
+            <div className="mt-auto hidden w-full border-t border-outline-variant/80 px-2 py-2 lg:block">
+              <ul>{renderLink(GLOBAL_PROMPTS_LINK)}</ul>
+            </div>
+          )}
+        </div>
+
+        {/* The panel: the area's own tools, on white */}
+        <div className={`flex min-w-0 flex-1 flex-col bg-white ${whenCollapsed(isCollapsed, "lg:hidden")}`}>
+          {/* As tall as the header, so both bottom borders line up */}
+          <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-outline-variant/80 px-4">
+            {/* The rail already carries the mark, so the panel shows the name alone rather than both */}
+            <BrandLogo markClassName="hidden" />
+            <button
+              onClick={onClose}
+              className="lg:hidden rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-high"
+              aria-label="Close Sidebar"
+            >
+              <X size={20} />
+            </button>
           </div>
-        )}
+
+          {/* Which area is on screen, so the rail's icon is never the only thing that says it */}
+          {area && !isSearching && (
+            <div className="shrink-0 px-4 pt-3">
+              <h2 className="text-[11px] font-bold uppercase leading-4 tracking-[0.11em] text-primary">{area.group.label}</h2>
+              <p className="mt-0.5 text-[11px] leading-4 text-outline">{area.group.hint}</p>
+            </div>
+          )}
+
+          {/* Search: outside the scrolling list, so it stays put however far the tools are scrolled */}
+          <div role="search" className="shrink-0 px-3 pb-1 pt-2">
+            <label htmlFor={searchId} className="sr-only">
+              Search tools
+            </label>
+            <div className="relative">
+              <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-outline" aria-hidden="true" />
+              <input
+                id={searchId}
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && query) {
+                    event.preventDefault()
+                    setQuery("")
+                  } else if (event.key === "Enter" && isSearching && firstMatch) {
+                    event.preventDefault()
+                    setQuery("")
+                    onClose()
+                    router.push(firstMatch)
+                  }
+                }}
+                placeholder="Search every tool"
+                autoComplete="off"
+                spellCheck={false}
+                aria-controls={panelId}
+                className="h-9 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-8 pr-7 text-[13px] text-on-surface placeholder:text-outline transition-colors focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 [&::-webkit-search-cancel-button]:hidden"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-outline hover:bg-surface-container-high hover:text-on-surface"
+                >
+                  <X size={13} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+            <span className="sr-only" aria-live="polite">
+              {isSearching ? `${matchCount} ${matchCount === 1 ? "tool" : "tools"} found` : ""}
+            </span>
+          </div>
+
+          <nav
+            ref={navRef}
+            id={panelId}
+            role="tabpanel"
+            aria-label={area ? `${area.group.label} tools` : "Tools"}
+            onScroll={handleNavScroll}
+            className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-1.5"
+          >
+            {isSearching && matchCount === 0 && <p className="px-2 py-3 text-[12px] text-outline">No tool matches &ldquo;{query.trim()}&rdquo;.</p>}
+            {shownAreas.map(({ group, tools: areaTools }, index) => (
+              <section key={group.id} aria-label={group.label} className={index > 0 ? "mt-2" : ""}>
+                {/* While searching the matches come from every area, so each one says where it is */}
+                {isSearching && (
+                  <p className="mb-0.5 px-2 text-[10px] font-bold uppercase leading-4 tracking-[0.11em] text-outline">{group.label}</p>
+                )}
+                <ul>{areaTools.map(renderTool)}</ul>
+              </section>
+            ))}
+          </nav>
+
+          {/* Global AI Prompts: shared settings for every tool, not a LinkedIn tool */}
+          {showGlobalPrompts && (
+            <div className="shrink-0 border-t border-outline-variant/80 px-3 py-2">
+              <ul>{renderLink(GLOBAL_PROMPTS_LINK)}</ul>
+            </div>
+          )}
+        </div>
       </aside>
 
       {/* The collapsed rail's tooltip, outside the scrolling list so it's never clipped */}

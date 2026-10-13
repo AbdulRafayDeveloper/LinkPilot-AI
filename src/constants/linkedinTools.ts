@@ -1,6 +1,9 @@
 import {
   Flame,
   Hand,
+  Handshake,
+  LayoutGrid,
+  Megaphone,
   History,
   SquarePlus,
   Mail,
@@ -34,19 +37,23 @@ import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./
 
 /**
  * The three areas of the app, in sidebar order (the owner's: Workspace, LinkedIn Tools, Client
- * Work). Each one is a heading in the sidebar that opens and closes its tools, so keep them few
- * and meaningful: a tool that needs a heading of its own belongs in one of these. Prompt Creator
- * had a "Prompts" heading of its own until the owner asked for it under Workspace, with the rest
- * of the day's work.
+ * Work). Each one is an icon on the sidebar's rail, and the panel beside it lists that area's
+ * tools alone, so keep them few and meaningful: a tool that needs a heading of its own belongs in
+ * one of these. Prompt Creator had a "Prompts" heading of its own until the owner asked for it
+ * under Workspace, with the rest of the day's work.
+ *
+ * Each one carries its own icon, because the rail is icons alone: the tooltip and the panel's
+ * heading are where the label is read, and `hint` is the line under the heading that says what the
+ * area is for.
  */
 export const TOOL_GROUPS = [
   // The day's own work: the prompts written for other AI tools, the tasks, the notes and the files
-  { id: "workspace", label: "Workspace" },
+  { id: "workspace", label: "Workspace", icon: LayoutGrid, hint: "Your own day: prompts, tasks, notes and files" },
   // Everything written for LinkedIn itself, from the post to the reply
-  { id: "linkedin", label: "LinkedIn Tools" },
+  { id: "linkedin", label: "LinkedIn Tools", icon: Megaphone, hint: "Everything written for LinkedIn, from the post to the reply" },
   // The people the work is for: what you send them, what they send back, the text you reuse with
   // them, and the meetings
-  { id: "clients", label: "Client Work" },
+  { id: "clients", label: "Client Work", icon: Handshake, hint: "The people the work is for: their projects, messages and meetings" },
 ] as const
 
 export type ToolGroupId = (typeof TOOL_GROUPS)[number]["id"]
