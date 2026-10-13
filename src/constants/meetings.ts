@@ -5,6 +5,11 @@ import { CalendarClock, type LucideIcon } from "lucide-react"
  * so it is stored first and analyzed afterwards, in chunks, across as many requests as it takes.
  */
 export const MEETING_TITLE_MAX_LENGTH = 160
+// Who was in the meeting, in the user's own words: a room full is plenty, and a name is one line
+export const PEOPLE_MAX = 30
+export const PERSON_NAME_MAX_LENGTH = 80
+// At most this many subjects in the report; a meeting has a handful, not a list of every remark
+export const TOPICS_MAX = 10
 // A 5 hour meeting transcribed at speaking speed is roughly 400,000 characters; this leaves room
 export const TRANSCRIPT_MAX_LENGTH = 2_000_000
 // One chunk of transcript per analysis call, in characters (roughly 3,000 tokens)
@@ -187,6 +192,11 @@ export const MEETING_MESSAGES = {
   missingTranscript: "Paste the meeting notes or transcript first.",
   transcriptTooLong: `A transcript must be under ${(TRANSCRIPT_MAX_LENGTH / 1_000_000).toFixed(0)} million characters.`,
   titleTooLong: `The meeting name must be under ${MEETING_TITLE_MAX_LENGTH} characters.`,
+  personTooLong: `Each name must be under ${PERSON_NAME_MAX_LENGTH} characters.`,
+  tooManyPeople: `A meeting can list up to ${PEOPLE_MAX} people.`,
+  // Said under the field, since a recording cannot know who spoke
+  peopleHint:
+    "A recording has no speaker labels, so the analysis can only go by names it hears said. Naming the people here makes the report exact.",
   saved: "Meeting saved. Analysis has started.",
   /**
    * What the minutes say when the recording or the transcript held no meeting at all: someone
