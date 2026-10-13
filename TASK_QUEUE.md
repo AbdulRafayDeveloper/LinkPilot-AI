@@ -5,11 +5,32 @@
 | Task | What it is | Status |
 |---|---|---|
 | 0 | Commit and deploy every session's pending work, then test it live | **COMPLETED** 13 Oct 2026 (see the run notes) |
-| 1 | Sidebar: rename Client Projects to Projects Management | **COMPLETED** (code only, as asked) |
-| 2 | Client Projects: create a .txt document in place, and a folder hierarchy for documents and links | **COMPLETED** (code only; not run in a browser) |
-| 3 | Meeting Planner: link meeting notes and recordings to calendar events, both ways | **COMPLETED** (code only; not run in a browser) |
+| 1 | Sidebar: rename Client Projects to Projects Management | **COMPLETED, live and tested** |
+| 2 | Client Projects: create a .txt document in place, and a folder hierarchy for documents and links | **COMPLETED, live and tested** |
+| 3 | Meeting Planner: link meeting notes and recordings to calendar events, both ways | **COMPLETED, live and tested** |
 
-Tasks 1 to 3 are code only, at the owner's instruction: no build, no commit, no push.
+Tasks 1 to 3 were written code-only first, as the owner asked, then built, pushed and tested live on their word.
+
+### Shipped and tested live (13 Oct 2026)
+
+Tasks 1 to 3 were written without a build at the owner's request, then built, committed, pushed and
+tested on the live site once they asked for it:
+
+- `653ae83` the rename, the folders and the written document · `bc93387` the meeting link ·
+  `9859e8e` the documentation · `3318454` and `7512b88` the three things the live check found.
+- **The push needed the GitHub account pinning first.** Git Credential Manager had two accounts
+  stored and was waiting on a "Select an account" window that never opens headlessly, which is what
+  had every push hanging (one had been stuck for 46 minutes). Fixed for good with
+  `git config --global credential.https://github.com.username AbdulRafayDeveloper`; pushes go
+  through without a prompt now.
+- **Live: 43 API checks and 15 browser checks, all passing** — the folder tree (nested, named,
+  renamed, moved, the sibling-name clash, five deep and the sixth refused, a folder refused inside
+  its own branch), the written .txt document, moving an item, deleting a folder and finding its
+  contents one level up, and both halves of the meeting link including the popup on the calendar.
+- **Three things the live check found, all mine, all fixed and shipped:** a document of nothing but
+  spaces was kept (three spaces are three characters); moving an item into another project's folder
+  answered 500 rather than 400, because the item's own route only knew about `UserFacingError`; and
+  the calendar chip carried the mark but not its tooltip, because that one patch never applied.
 
 ### Task 3 (13 Oct 2026) — done, code only
 
