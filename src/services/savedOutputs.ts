@@ -183,7 +183,8 @@ const READERS: Record<SavedOutputToolId, OutputReader> = {
     contextField: "requestSource",
     searchFields: ["name", "prompt", "request"],
     source: { field: "request", label: "Description" },
-    texts: (row) => written("Prompt", row.prompt),
+    // The description in English is shown and copied beside the prompt, for a prompt that has one
+    texts: (row) => [...written("Prompt", row.prompt), ...written("Description in English", row.englishRequest)],
     heading: (row) => ({ title: text(row.name) || "Untitled prompt", subtitle: null, tags: row.editedAt ? ["Edited by hand"] : [] }),
   },
   "message-rewriter": {

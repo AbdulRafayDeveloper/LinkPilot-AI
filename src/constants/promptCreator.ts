@@ -40,6 +40,9 @@ export const CREATED_NAME_MAX_LENGTH = 80
 // The finished prompt
 export const CREATED_PROMPT_MAX_LENGTH = 20000
 
+// Where the description is read back in clear, simple English (it saves nothing of its own)
+export const PROMPT_CREATOR_ENGLISH_PATH = "/english"
+
 export const PROMPT_CREATOR_ENDPOINT = "/api/prompt-creator"
 
 /**
@@ -72,6 +75,14 @@ export const PROMPT_CREATOR_MESSAGES = {
   requestTooLong: `Your description must be under ${REQUEST_MAX_LENGTH.toLocaleString()} characters.`,
   missingTarget: "Choose what the prompt is for.",
   generationFailed: "Couldn't create the prompt. Please try again.",
+  // Reading the description back in English, which is asked for rather than automatic
+  englishFailed: "Couldn't read that back in English. Please try again.",
+  englishHeading: "What you wrote, in English",
+  englishEmpty: "Write or speak the description first, then it can be read back in English.",
+  englishButton: "Read it in English",
+  englishWorking: "Reading it in English...",
+  englishUse: "Create the prompt from this English",
+  englishStale: "You have changed the description since this was read, so read it again to see the English of what is in the box now.",
   missingName: "Give the prompt a name.",
   nameTooLong: `The name must be under ${CREATED_NAME_MAX_LENGTH} characters.`,
   emptyPrompt: "The prompt can't be empty.",

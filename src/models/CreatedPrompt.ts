@@ -13,6 +13,12 @@ export interface ICreatedPrompt {
   target: string
   request: string
   requestSource: "text" | "voice"
+  /**
+   * The description read back in clear, simple English, when the user asked for it before creating
+   * the prompt. Empty for every prompt written without it, which is how all of them read before
+   * this and how an English description reads when nothing had to be converted.
+   */
+  englishRequest: string
   // The folder it is filed in (models/PromptFolder.ts), null for a prompt in no folder
   folderId: string | null
   // The client project it was written for (models/ClientProject.ts), null for one written outside any
@@ -37,6 +43,7 @@ const CreatedPromptSchema = new Schema<ICreatedPrompt>(
     target: { type: String, required: true, index: true },
     request: { type: String, required: true },
     requestSource: { type: String, enum: ["text", "voice"], required: true },
+    englishRequest: { type: String, default: "" },
     folderId: { type: String, default: null, index: true },
     projectId: { type: String, default: null, index: true },
     provider: { type: String, default: null },

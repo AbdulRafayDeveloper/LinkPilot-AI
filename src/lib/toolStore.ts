@@ -51,6 +51,17 @@ interface ToolStoreOptions<S extends object> {
   // Result stores: the tool's page and its status, so the sidebar and header can show
   // a generation running or finished in the background (lib/toolActivity.ts)
   activity?: { href: string; statusOf: (state: S) => string }
+  /**
+   * The fields that are a **choice rather than a piece of work**: a chosen target, project or
+   * tone. What the user typed and what a tool wrote are theirs for the session and are forgotten
+   * after TOOL_STATE_RETENTION_HOURS, but a choice is a standing preference, so these are kept in
+   * their own localStorage key with no expiry and come back after a browser restart, a week later,
+   * or in a brand-new tab, the way the sidebar remembers being collapsed.
+   *
+   * The tab's own state still wins while it has one, so two tabs never swap choices mid-session,
+   * and Reset keeps them rather than putting the defaults back.
+   */
+  remember?: readonly (keyof S)[]
 }
 
 interface StoredState {
@@ -79,6 +90,9 @@ function isStoredState(value: unknown): value is StoredState {
  */
 export function createToolStore<S extends object>(name: string, initial: S, options: ToolStoreOptions<S>): ToolStore<S> {
   const storageKey = `${STORAGE_PREFIX}${name}`
+  // Its own key, so the choices outlive the state they were made in rather than expiring with it
+  const choiceKey = `${STORAGE_PREFIX}choice:${name}`
+  const remembered = options.remember ?? []
   const toStored = options.toStored ?? ((state: S) => state)
   const listeners = new Set<() => void>()
   let state = initial
@@ -99,6 +113,39 @@ export function createToolStore<S extends object>(name: string, initial: S, opti
       return Object.fromEntries(Object.entries(parsed.state).filter(([key]) => key in initial)) as Partial<S>
     } catch {
       return null
+    }
+  }
+
+  /** The choices kept for good, or null when there are none or they were saved by an older version. */
+  const readChoices = (): Partial<S> | null => {
+    if (remembered.length === 0) return null
+    const storage = storageOf("localStorage")
+    if (!storage) return null
+    try {
+      const raw = storage.getItem(choiceKey)
+      if (!raw) return null
+      const parsed: unknown = JSON.parse(raw)
+      if (!isStoredState(parsed) || parsed.version !== options.version) {
+        storage.removeItem(choiceKey)
+        return null
+      }
+      // Only the fields still asked to be remembered, and only ones the tool still has
+      return Object.fromEntries(
+        Object.entries(parsed.state).filter(([key]) => key in initial && remembered.includes(key as keyof S))
+      ) as Partial<S>
+    } catch {
+      return null
+    }
+  }
+
+  const writeChoices = (current: S) => {
+    if (remembered.length === 0) return
+    const chosen = Object.fromEntries(remembered.map((key) => [key, current[key]]))
+    try {
+      storageOf("localStorage")?.setItem(choiceKey, JSON.stringify({ version: options.version, savedAt: Date.now(), state: chosen }))
+    } catch (error: unknown) {
+      // Private mode or full storage: the choice still holds for this session, just not the next one
+      console.warn(`Couldn't remember the ${name} choices:`, error)
     }
   }
 
@@ -127,9 +174,12 @@ export function createToolStore<S extends object>(name: string, initial: S, opti
         // This tab's own state first; a brand-new tab starts from the latest one and keeps it as its own
         const ownState = readStored("sessionStorage")
         const stored = ownState ?? readStored("localStorage")
-        if (stored) {
-          state = { ...initial, ...stored }
-          if (!ownState) writeStored(stored, ["sessionStorage"])
+        // The choices come first and the state on top, so a tab that is already working keeps the
+        // choices it is working with, and a new one starts from the last choice made anywhere
+        const choices = readChoices()
+        if (stored || choices) {
+          state = { ...initial, ...choices, ...stored }
+          if (!ownState) writeStored(toStored(state), ["sessionStorage"])
         }
       }
       return state
@@ -144,12 +194,15 @@ export function createToolStore<S extends object>(name: string, initial: S, opti
     update(patch) {
       state = { ...state, ...(typeof patch === "function" ? patch(state) : patch) }
       writeStored(toStored(state), ALL_STORAGES)
+      writeChoices(state)
       notify()
     },
     reset() {
-      state = initial
+      // Reset clears the work, never the choices: the tool comes back empty on the target, the
+      // project and the tone the user had picked, which is what every tool's Reset button means
+      state = { ...initial, ...(readChoices() ?? {}) }
       // The tab remembers that it was cleared, so a reload never brings back another tab's state
-      writeStored(toStored(initial), ["sessionStorage"])
+      writeStored(toStored(state), ["sessionStorage"])
       try {
         storageOf("localStorage")?.removeItem(storageKey)
       } catch {

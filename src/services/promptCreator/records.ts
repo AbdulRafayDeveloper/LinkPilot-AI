@@ -19,6 +19,7 @@ function toCreatedPrompt(record: StoredCreatedPrompt, dependencies: PromptDepend
     target: record.target as PromptTargetId,
     request: record.request,
     requestSource: record.requestSource,
+    englishRequest: record.englishRequest ?? "",
     folderId: record.folderId ?? null,
     projectId: record.projectId ?? null,
     appliedAt: record.appliedAt ? new Date(record.appliedAt).toISOString() : null,
@@ -37,7 +38,7 @@ function toCreatedPrompt(record: StoredCreatedPrompt, dependencies: PromptDepend
 export async function saveCreatedPrompt(
   viewer: Viewer,
   created: GeneratedPrompt,
-  request: { text: string; source: RequestSource },
+  request: { text: string; source: RequestSource; english?: string },
   projectId: string | null,
   // The folder it is filed in from the start: its project's folder, or none
   folderId: string | null = null
@@ -50,6 +51,7 @@ export async function saveCreatedPrompt(
     target: created.target,
     request: request.text,
     requestSource: request.source,
+    englishRequest: request.english ?? "",
     projectId,
     folderId,
     provider: created.provider,

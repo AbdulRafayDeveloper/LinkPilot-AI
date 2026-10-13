@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useRef, useState } from "react"
-import { AudioLines, FilePenLine, FolderKanban, Sparkles, Wand2 } from "lucide-react"
+import { AudioLines, FilePenLine, FolderKanban, Languages, Sparkles, Wand2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ResultCard } from "@/components/ui/ResultCard"
@@ -11,6 +11,7 @@ import { CopyButton } from "@/components/ui/CopyButton"
 import { DummyDataButton } from "@/components/dummy-data/DummyDataButton"
 import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
 import { CreatedPromptPanel, type CreatedPromptChanges } from "@/components/prompt-creator/CreatedPromptPanel"
+import { EnglishDescriptionPanel } from "@/components/prompt-creator/EnglishDescriptionPanel"
 import { PromptCreatorPromptsModal } from "@/components/prompt-creator/PromptCreatorPromptsModal"
 import Link from "next/link"
 import { usePromptProjects } from "@/hooks/usePromptProjects"
@@ -23,18 +24,20 @@ import { describeProviders } from "@/constants/aiProviders"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
+import { requestApi } from "@/lib/apiClient"
 import {
   NO_PROJECT,
   PROMPT_PROJECT_MESSAGES,
   DEFAULT_PROMPT_TARGET,
   PROMPT_CREATOR_ENDPOINT,
+  PROMPT_CREATOR_ENGLISH_PATH,
   PROMPT_CREATOR_MESSAGES,
   PROMPT_TARGETS,
   REQUEST_MAX_LENGTH,
   type PromptTargetId,
 } from "@/constants/promptCreator"
 import { CLIENTS_TOOL } from "@/constants/clients"
-import type { CreatedPrompt, RequestSource } from "@/types/promptCreator"
+import type { CreatedPrompt, RequestSource, SimpleEnglish } from "@/types/promptCreator"
 
 interface GeneratePayload {
   request: string
@@ -44,6 +47,10 @@ interface GeneratePayload {
   projectId: string | null
   // A prompt to work with now and not keep: nothing is saved, whatever project it is for
   temporary: boolean
+  // The description in clear English, when it has been read back; kept with the prompt
+  englishRequest: string
+  // Write the prompt from that English rather than from what is in the box
+  fromEnglish: boolean
 }
 
 // What was typed or spoken, who wrote the speech out, and the finished prompt all outlive the page
@@ -57,8 +64,15 @@ const formStore = createToolStore(
     // The project last written for, so the next prompt starts in the same one
     projectId: null as string | null,
     isTemporary: false,
+    // What the description says in clear English, once it has been read back, with the language it
+    // was read from and the exact text it was read from (so the page can say when it is out of date)
+    english: "",
+    englishLanguage: "",
+    englishFor: "",
   },
-  { version: 5 }
+  // The target, the project and whether a prompt is kept are choices rather than work, so they
+  // outlive the session the way the sidebar remembers being collapsed
+  { version: 6, remember: ["target", "projectId", "isTemporary"] }
 )
 const generation = createGenerationRequest<GeneratePayload, CreatedPrompt>(
   "prompt-creator",
@@ -73,7 +87,8 @@ export default function PromptCreatorClient() {
   const [formError, setFormError] = useState<string | null>(null)
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null)
-  const { request, target, requestSource, transcribedBy, projectId, isTemporary } = useToolStore(formStore)
+  const { request, target, requestSource, transcribedBy, projectId, isTemporary, english, englishLanguage, englishFor } = useToolStore(formStore)
+  const [isReadingEnglish, setIsReadingEnglish] = useState(false)
   // Projects are their own tool, which an admin can turn off for an account while leaving this one on:
   // then the picker goes, nothing is sent, and the list is not even asked for (the server ignores a
   // project id from such an account too, so a stale one left in the browser can't bring it back)
@@ -91,11 +106,44 @@ export default function PromptCreatorClient() {
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const { status, result, error, generate, reset } = useGenerationRequest(generation)
   const isGenerating = status === "loading"
-  const canReset = request !== "" || status !== "idle"
+  const isBusy = isGenerating || isReadingEnglish
+  const canReset = request !== "" || english !== "" || status !== "idle"
+  // The English is kept with the prompt only while it is the reading of what is in the box: once
+  // the description is edited the two no longer say the same thing
+  const englishMatches = english !== "" && englishFor === request.trim()
 
   const changeRequest = (value: string) => {
     formStore.update({ request: value, requestSource: "text" })
     if (formError) setFormError(null)
+  }
+
+  /**
+   * Reads the description back in clear English, for the user to check and copy. It is one model
+   * call that stores nothing: the English version is saved only with the prompt itself.
+   */
+  const readInEnglish = async () => {
+    if (isBusy) return
+    const description = request.trim()
+    if (!description) {
+      setFormError(PROMPT_CREATOR_MESSAGES.englishEmpty)
+      requestInputRef.current?.focus()
+      return
+    }
+    setFormError(null)
+    setIsReadingEnglish(true)
+    try {
+      // Nothing is saved by this call, so a dropped request is safe to send again
+      const { data } = await requestApi<SimpleEnglish>(
+        `${PROMPT_CREATOR_ENDPOINT}${PROMPT_CREATOR_ENGLISH_PATH}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request: description }) },
+        { retry: true }
+      )
+      formStore.update({ english: data.english, englishLanguage: data.sourceLanguage, englishFor: description })
+    } catch (error: unknown) {
+      setFormError(error instanceof Error ? error.message : PROMPT_CREATOR_MESSAGES.englishFailed)
+    } finally {
+      setIsReadingEnglish(false)
+    }
   }
 
   // What was spoken is added to whatever is already there, so several takes build one description;
@@ -110,8 +158,8 @@ export default function PromptCreatorClient() {
     setFormError(null)
   }, [])
 
-  const submit = () => {
-    if (isGenerating) return
+  const submit = (fromEnglish = false) => {
+    if (isBusy) return
     if (!request.trim()) {
       setFormError(PROMPT_CREATOR_MESSAGES.missingRequest)
       requestInputRef.current?.focus()
@@ -122,7 +170,16 @@ export default function PromptCreatorClient() {
       return
     }
     setFormError(null)
-    generate({ request, target, requestSource, projectId: currentProjectId, temporary: isTemporary })
+    generate({
+      request,
+      target,
+      requestSource,
+      projectId: currentProjectId,
+      temporary: isTemporary,
+      englishRequest: englishMatches ? english : "",
+      // Written from the English only when the user asked for that, and only while it is current
+      fromEnglish: fromEnglish && englishMatches,
+    })
     // A prompt that is kept counts towards its project; a temporary one is never stored
     if (!isTemporary) projects.countCreated(currentProjectId)
   }
@@ -133,7 +190,7 @@ export default function PromptCreatorClient() {
   }, [])
 
   const loadDummyRequest = ({ request: dummyRequest }: Record<string, string>) => {
-    formStore.update({ request: dummyRequest ?? "", requestSource: "text", transcribedBy: [] })
+    formStore.update({ request: dummyRequest ?? "", requestSource: "text", transcribedBy: [], english: "", englishLanguage: "", englishFor: "" })
     reset()
     setFormError(null)
     setVoiceError(null)
@@ -142,7 +199,7 @@ export default function PromptCreatorClient() {
 
   // Clears the description and the prompt; the chosen target and project stay for the next one
   const resetTool = () => {
-    formStore.update({ request: "", requestSource: "text", transcribedBy: [] })
+    formStore.update({ request: "", requestSource: "text", transcribedBy: [], english: "", englishLanguage: "", englishFor: "" })
     setFormError(null)
     setVoiceError(null)
     setVoiceNotice(null)
@@ -205,7 +262,7 @@ export default function PromptCreatorClient() {
                     <VoiceRecorder
                       onTranscript={addTranscript}
                       onError={setVoiceError}
-                      disabled={isGenerating}
+                      disabled={isBusy}
                       what="what you want done"
                       transcribeFor="prompt-creator"
                       showSource={false}
@@ -217,7 +274,7 @@ export default function PromptCreatorClient() {
                     value={request}
                     onChange={(event) => changeRequest(event.target.value)}
                     maxLength={REQUEST_MAX_LENGTH}
-                    disabled={isGenerating}
+                    disabled={isBusy}
                     aria-invalid={requestInvalid}
                     placeholder="Describe the task in your own words. Example: add a dark mode toggle to my Next.js dashboard and make sure nothing else breaks."
                     className={`w-full flex-1 min-h-[180px] short:min-h-[72px] resize-none rounded-xl border bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
@@ -251,6 +308,15 @@ export default function PromptCreatorClient() {
                     <p role="status" className="rounded-xl bg-secondary-container px-3 py-2 text-[12px] text-on-secondary-container">
                       {voiceNotice}
                     </p>
+                  )}
+                  {english !== "" && (
+                    <EnglishDescriptionPanel
+                      english={english}
+                      sourceLanguage={englishLanguage}
+                      stale={!englishMatches}
+                      onUse={() => submit(true)}
+                      disabled={isBusy || !englishMatches}
+                    />
                   )}
                 </div>
 
@@ -349,22 +415,35 @@ export default function PromptCreatorClient() {
                   </p>
                 )}
 
-                <button
-                  type="button"
-                  onClick={submit}
-                  disabled={isGenerating}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Sparkles size={16} aria-hidden="true" />
-                  {isGenerating ? "Writing your prompt..." : "Create Prompt"}
-                </button>
+                {/* The prompt is written from what is in the box; the second button only reads that
+                    description back in English, and the panel above then offers to write from it */}
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => submit()}
+                    disabled={isBusy}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Sparkles size={16} aria-hidden="true" />
+                    {isGenerating ? "Writing your prompt..." : "Create Prompt"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={readInEnglish}
+                    disabled={isBusy}
+                    className="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Languages size={16} aria-hidden="true" />
+                    {isReadingEnglish ? PROMPT_CREATOR_MESSAGES.englishWorking : PROMPT_CREATOR_MESSAGES.englishButton}
+                  </button>
+                </div>
               </section>
 
               <ResultCard
                 title="Your Prompt"
                 status={status}
                 error={error}
-                onRetry={submit}
+                onRetry={() => submit()}
                 idleIcon={Wand2}
                 idleText="Describe the task, pick what the prompt is for, and get a complete prompt you can paste straight into it."
                 loadingText="Writing your prompt..."

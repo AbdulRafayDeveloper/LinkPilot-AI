@@ -31,6 +31,8 @@ export interface CreatedPrompt {
   // What the user described, so the saved prompt can be traced back to the request
   request: string
   requestSource: RequestSource
+  // The description in clear English, when one was made before the prompt was created; "" otherwise
+  englishRequest: string
   // The folder it is filed in, null for a prompt in no folder
   folderId: string | null
   // The project it was written for, null for one written outside any
@@ -45,4 +47,11 @@ export interface CreatedPrompt {
   providers?: AiProviderId[]
   createdAt: string
   updatedAt: string
+}
+
+/** What the description says in clear, simple English (POST /api/prompt-creator/english). */
+export interface SimpleEnglish {
+  english: string
+  // The language it was read from, named in English ("Roman Urdu"); "Unknown" when the model didn't say
+  sourceLanguage: string
 }

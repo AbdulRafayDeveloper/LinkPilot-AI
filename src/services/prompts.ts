@@ -41,6 +41,9 @@ export type PromptName =
   | `global-${GlobalPromptId}`
   | "humanizer-system"
   | "prompt-creator-system"
+  // Reading a description back in clear English (services/promptCreator/english.ts)
+  | "prompt-creator-english"
+  | "prompt-creator-english-system"
   | `prompt-creator-${PromptTargetId}`
   | "client-message-system"
   | "client-message"
