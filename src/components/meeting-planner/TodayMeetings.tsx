@@ -57,11 +57,13 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
         {MEETING_PLANNER_MESSAGES.emptyToday}
       </p>
     ) : (
-      <ul className="grid gap-2 sm:grid-cols-2">
+      /* One meeting a row: this card sits in the page's narrow right column, where two columns left
+         the name about 70px and truncated it to nothing */
+      <ul className="flex flex-col gap-2">
         {meetings.map((meeting) => (
           <li key={meeting.id}>
             <div
-              className={`flex items-center gap-2 rounded-xl border p-3 ${
+              className={`flex flex-col gap-1.5 rounded-xl border p-3 ${
                 meeting.status === "completed"
                   ? "border-success/40 bg-success-container/40"
                   : meeting.status === "cancelled"
@@ -69,12 +71,36 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                     : "border-outline-variant bg-surface-container-lowest"
               }`}
             >
-              <span className="shrink-0 rounded-lg bg-primary-fixed px-2 py-1 text-[12px] font-bold tabular-nums text-on-primary-fixed-variant">
-                {formatTime(meeting.meetingTime)}
-              </span>
+              {/* The time, the tags and what can be done, all of which keep their own width: the
+                  name below then has the whole row, rather than the ~70px it was truncated to */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="shrink-0 rounded-lg bg-primary-fixed px-2 py-1 text-[12px] font-bold tabular-nums text-on-primary-fixed-variant">
+                  {formatTime(meeting.meetingTime)}
+                </span>
+                <PrepBadge meeting={meeting} />
+                <SeriesBadge meeting={meeting} />
+                <span className="ml-auto flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onNotes(meeting)}
+                    aria-label={`${meeting.hasNotes ? "Read or write" : "Write"} notes for ${meeting.name}`}
+                    title={meeting.hasNotes ? "Notes on this meeting" : "Write notes for this meeting"}
+                    className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-primary/5 hover:text-primary ${
+                      meeting.hasNotes ? "text-primary" : "text-outline"
+                    }`}
+                  >
+                    <NotebookPen size={14} aria-hidden="true" />
+                    {meeting.hasNotes && (
+                      <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                    )}
+                  </button>
+                  <MeetingStatusButton meeting={meeting} isSaving={savingIds.has(meeting.id)} onChange={onChangeStatus} />
+                </span>
+              </div>
+
               <Link
                 href={`/meeting-planner/${meeting.id}`}
-                className="group min-w-0 flex-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="group block min-w-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
                 <span className="flex min-w-0 items-center gap-1 text-[13px] font-semibold text-on-surface group-hover:text-primary">
                   {/* A cancelled meeting is struck through as well as chipped, so it never rests on colour */}
@@ -84,29 +110,7 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                   <ChevronRight size={13} className="shrink-0 text-outline" aria-hidden="true" />
                 </span>
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
-                <PrepBadge meeting={meeting} className="mt-1" />
-                <SeriesBadge meeting={meeting} className="mt-1" />
               </Link>
-              <button
-                type="button"
-                onClick={() => onNotes(meeting)}
-                aria-label={`${meeting.hasNotes ? "Read or write" : "Write"} notes for ${meeting.name}`}
-                title={meeting.hasNotes ? "Notes on this meeting" : "Write notes for this meeting"}
-                className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-primary/5 hover:text-primary ${
-                  meeting.hasNotes ? "text-primary" : "text-outline"
-                }`}
-              >
-                <NotebookPen size={14} aria-hidden="true" />
-                {meeting.hasNotes && (
-                  <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-                )}
-              </button>
-              <MeetingStatusButton
-                meeting={meeting}
-                isSaving={savingIds.has(meeting.id)}
-                onChange={onChangeStatus}
-                size="compact"
-              />
             </div>
           </li>
         ))}

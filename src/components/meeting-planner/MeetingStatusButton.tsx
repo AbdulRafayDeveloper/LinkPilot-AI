@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useEffect, useRef, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { Ban, Check, CheckCircle2, Circle, Loader2 } from "lucide-react"
 import { MEETING_PLAN_STATUSES, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
 import type { MeetingPlan } from "@/types/meetingPlanner"
@@ -9,9 +10,13 @@ interface MeetingStatusButtonProps {
   meeting: MeetingPlan
   isSaving: boolean
   onChange: (meeting: MeetingPlan, status: MeetingPlanStatusId) => void
-  // Compact sits inside a list row; full is used where there is room for the word
-  size?: "compact" | "full"
 }
+
+// What the menu takes up, so it can be placed before it is rendered; it is clamped to the window.
+// The height is the three options measured (161px, Cancelled's description wrapping to two lines)
+// with a little over, since it is only used to decide whether the menu opens below the chip or above it
+const MENU_WIDTH = 192
+const MENU_HEIGHT = 170
 
 /**
  * How each status reads wherever a meeting is shown. Completed is the app's green, cancelled its
@@ -44,44 +49,65 @@ export const statusLabel = (status: MeetingPlanStatusId): string =>
  * meeting can now also be cancelled, and three states have no sensible single click, so the chip
  * says where the meeting stands and the menu is how it is changed.
  */
-export const MeetingStatusButton: React.FC<MeetingStatusButtonProps> = ({
-  meeting,
-  isSaving,
-  onChange,
-  size = "full",
-}) => {
-  const [isOpen, setIsOpen] = useState(false)
+export const MeetingStatusButton: React.FC<MeetingStatusButtonProps> = ({ meeting, isSaving, onChange }) => {
+  // Where the menu sits on screen, or null while it is closed; it is placed from the chip's own
+  // position rather than under it in the markup, so a scrolling list can never clip it
+  const [menuAt, setMenuAt] = useState<{ top: number; left: number } | null>(null)
   const wrapper = useRef<HTMLDivElement>(null)
+  const chip = useRef<HTMLButtonElement>(null)
+  const isOpen = menuAt !== null
   const look = STATUS_LOOK[meeting.status] ?? STATUS_LOOK.pending
   const label = statusLabel(meeting.status)
 
-  // A click anywhere else, or Escape, closes the menu, like every other small menu here
+  const close = useCallback(() => setMenuAt(null), [])
+
+  const open = () => {
+    const rect = chip.current?.getBoundingClientRect()
+    if (!rect) return
+    // Below the chip, or above it when the window has no room, then clamped inside the window on
+    // every edge, so it is whole wherever the chip itself happens to be
+    const roomBelow = window.innerHeight - rect.bottom - 8
+    const preferred = roomBelow >= MENU_HEIGHT ? rect.bottom + 4 : rect.top - MENU_HEIGHT - 4
+    setMenuAt({
+      top: Math.max(8, Math.min(preferred, window.innerHeight - MENU_HEIGHT - 8)),
+      left: Math.max(8, Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8)),
+    })
+  }
+
+  // A click anywhere else, Escape, or the page moving under it closes the menu: it is positioned
+  // once, so scrolling would otherwise leave it floating away from its chip
   useEffect(() => {
     if (!isOpen) return
     const onPointerDown = (event: PointerEvent) => {
-      if (!wrapper.current?.contains(event.target as Node)) setIsOpen(false)
+      const target = event.target as Node
+      if (!wrapper.current?.contains(target) && !(target instanceof Element && target.closest("[data-meeting-status-menu]"))) close()
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsOpen(false)
+      if (event.key === "Escape") close()
     }
     document.addEventListener("pointerdown", onPointerDown)
     document.addEventListener("keydown", onKeyDown)
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("resize", close)
     return () => {
       document.removeEventListener("pointerdown", onPointerDown)
       document.removeEventListener("keydown", onKeyDown)
+      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("resize", close)
     }
-  }, [isOpen])
+  }, [isOpen, close])
 
   const choose = (status: MeetingPlanStatusId) => {
-    setIsOpen(false)
+    close()
     if (status !== meeting.status) onChange(meeting, status)
   }
 
   return (
     <div ref={wrapper} className="relative shrink-0">
       <button
+        ref={chip}
         type="button"
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={() => (isOpen ? close() : open())}
         disabled={isSaving}
         aria-haspopup="menu"
         aria-expanded={isOpen}
@@ -94,15 +120,18 @@ export const MeetingStatusButton: React.FC<MeetingStatusButtonProps> = ({
         ) : (
           <look.Icon size={13} aria-hidden="true" />
         )}
-        {size === "full" && label}
+        {label}
       </button>
 
-      {isOpen && (
-        <div
-          role="menu"
-          aria-label="Meeting status"
-          className="absolute right-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-xl border border-outline-variant bg-white py-1 shadow-lg"
-        >
+      {menuAt &&
+        createPortal(
+          <div
+            role="menu"
+            aria-label="Meeting status"
+            data-meeting-status-menu=""
+            style={{ top: menuAt.top, left: menuAt.left, width: MENU_WIDTH }}
+            className="fixed z-[70] overflow-hidden rounded-xl border border-outline-variant bg-white py-1 shadow-lg"
+          >
           {MEETING_PLAN_STATUSES.map((status) => {
             const option = STATUS_LOOK[status.id]
             const isCurrent = status.id === meeting.status
@@ -125,8 +154,9 @@ export const MeetingStatusButton: React.FC<MeetingStatusButtonProps> = ({
               </button>
             )
           })}
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }

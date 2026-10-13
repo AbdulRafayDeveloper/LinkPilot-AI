@@ -70,17 +70,20 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                   : "border-outline-variant bg-surface-container-lowest"
             }`}
           >
-            <div className="flex items-start justify-between gap-2">
+            {/* The name on its own line above the controls: this panel sits in the page's narrow
+                right column, where a status chip and three buttons beside the name left it about
+                150px and cut it off mid-word */}
+            <div className="flex flex-col gap-1.5">
               <Link
                 href={`/meeting-planner/${meeting.id}`}
-                className="group min-w-0 flex-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="group block min-w-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
                 <span className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[13px] font-bold tabular-nums text-primary">{formatTime(meeting.meetingTime)}</span>
                   <PrepBadge meeting={meeting} />
                   <SeriesBadge meeting={meeting} />
                 </span>
-                <span className="mt-0.5 flex items-center gap-1 text-[13px] font-semibold text-on-surface group-hover:text-primary">
+                <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[13px] font-semibold text-on-surface group-hover:text-primary">
                   {/* A cancelled meeting is struck through, so the list says so without its chip being read */}
                   <span className={`truncate ${meeting.status === "cancelled" ? "line-through decoration-error/60" : ""}`}>
                     {meeting.name}
@@ -89,7 +92,7 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                 </span>
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
               </Link>
-              <div className="flex shrink-0 items-center gap-0.5">
+              <div className="flex flex-wrap items-center justify-end gap-0.5">
                 <MeetingStatusButton meeting={meeting} isSaving={savingIds.has(meeting.id)} onChange={onChangeStatus} />
                 <button
                   type="button"

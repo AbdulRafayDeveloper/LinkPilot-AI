@@ -88,7 +88,7 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
 
       {/* What the marks on a meeting mean. On a short laptop window this line gives way to the weeks
           themselves, and each mark still says the same thing in its chip's own tooltip. */}
-      <p className="-mt-1 flex items-center gap-1.5 text-[11px] text-on-surface-variant short:hidden">
+      <p className="-mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-on-surface-variant short:hidden">
         <span className="inline-flex items-center gap-0.5 rounded bg-primary-fixed px-1 py-0.5 text-[10px] text-on-primary-fixed-variant ring-1 ring-primary/50" aria-hidden="true">
           <Sparkles size={9} className="text-primary" />
           10:00
@@ -130,7 +130,22 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
               >
                 {dayOfMonth(date)}
               </span>
-              <span className="flex min-w-0 flex-col gap-0.5">
+              {/* On a phone a cell is about 40px wide, where a chip showed an icon and an ellipsis and
+                  said nothing at all, so the day is marked with a dot per meeting instead; the day
+                  itself is what is tapped, and the panel beside the calendar names them in full */}
+              <span className="flex flex-wrap items-center gap-1 sm:hidden" aria-hidden="true">
+                {shown.map((meeting) => (
+                  <span
+                    key={meeting.id}
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      meeting.status === "completed" ? "bg-success" : meeting.status === "cancelled" ? "bg-error/60" : "bg-primary"
+                    }`}
+                  />
+                ))}
+                {hidden > 0 && <span className="text-[10px] font-bold leading-none text-primary">+{hidden}</span>}
+              </span>
+
+              <span className="hidden min-w-0 flex-col gap-0.5 sm:flex">
                 {shown.map((meeting) => {
                   const hasPrep = prepStateOf(meeting) === "ready"
                   return (
