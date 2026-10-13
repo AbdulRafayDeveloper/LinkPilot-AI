@@ -1,11 +1,14 @@
 "use client"
 
 import React, { useCallback, useEffect, useState } from "react"
-import { AlertTriangle, FolderKanban, Loader2, Pencil, Plus, RefreshCw, Trash2, Wand2 } from "lucide-react"
+import Link from "next/link"
+import { AlertTriangle, ArrowRight, FolderKanban, Loader2, Pencil, Plus, RefreshCw, Trash2, Wand2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { ClientProjectDialog } from "@/components/clients/ClientProjectDialog"
+import { useVisibleTools } from "@/hooks/useCurrentUser"
 import { requestApi } from "@/lib/apiClient"
 import { CLIENTS_ENDPOINT, CLIENT_PROJECT_MESSAGES } from "@/constants/clients"
+import { CLIENT_PROJECTS_TOOL, PROJECT_TASK_MESSAGES } from "@/constants/clientProjectTasks"
 import type { Client } from "@/types/clientMessaging"
 import type { ClientProject, ClientProjectsPage } from "@/types/clients"
 
@@ -32,6 +35,11 @@ interface ClientProjectsPanelProps {
  * The projects being done for one client, under their details: the list with its counts, and adding,
  * editing and removing one. Mounted under the client's id, so choosing another client starts it
  * fresh rather than showing the previous client's projects while the new ones load.
+ *
+ * **A project is made and named here, and worked on in Projects Management**, so each row carries
+ * **Manage**, the same button that list has, straight to that project's own page. It is left out for
+ * an account that does not have that tool, which is never the protection: the page and its API
+ * refuse it anyway (see Which tools the accounts may use).
  */
 export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client }) => {
   const [page, setPage] = useState<ClientProjectsPage | null>(null)
@@ -42,6 +50,8 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
   const [deleting, setDeleting] = useState<ClientProject | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // Whether this account has Projects Management at all, which decides whether Manage is offered
+  const canManage = useVisibleTools().some((tool) => tool.id === CLIENT_PROJECTS_TOOL.id)
 
   const endpoint = `${CLIENTS_ENDPOINT}/${client.id}/projects`
 
@@ -187,7 +197,17 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
                   )}
                   <p className="mt-1 text-[11px] text-outline">Added {savedOn(project.createdAt)}</p>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  {canManage && (
+                    <Link
+                      href={`${CLIENT_PROJECTS_TOOL.href}/${project.id}`}
+                      aria-label={PROJECT_TASK_MESSAGES.manageOne(project.name)}
+                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    >
+                      {PROJECT_TASK_MESSAGES.manage}
+                      <ArrowRight size={13} aria-hidden="true" />
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => setDialog({ project })}
