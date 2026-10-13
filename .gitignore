@@ -60,3 +60,6 @@ next-env.d.ts
 
 # Lists of LinkedIn profiles and sheets for scripts/import-profile-people.mjs: people's profiles, kept off the public repository
 /scripts/profile-lists/
+
+# The owner's own task queue: a working file on this machine, never pushed and never in a diff
+/TASK_QUEUE.md
