@@ -8,8 +8,32 @@ import { POST_IMAGE_MAX_BYTES, POST_IMAGE_TYPES } from "./postInput"
  * (`services/taskImages.ts`) and the one block of fields (`components/tasks/TaskDetailsFields`).
  */
 
-// A description is a note under the task, not a document; the task's own line stays the title
+/**
+ * How long a description may be **where the shared fields are used as they come**: an employee's
+ * plan, whose tasks all live in one array inside one document, so one long description would be
+ * paid for by the whole plan.
+ *
+ * Daily Tasks passes its own, far larger limit (`DAILY_TASK_DESCRIPTION_MAX_LENGTH`, a million
+ * characters: a task is its own document and nothing but the user reads the whole of one), and
+ * Client Projects passes `PROJECT_DESCRIPTION_MAX_LENGTH`, both through `maxDescription`.
+ */
 export const TASK_DESCRIPTION_MAX_LENGTH = 6000
+
+/**
+ * When an opened description gets its own scroll inside a task's row. A description is a plain text
+ * box now, so one task's details could otherwise be taller than the whole day's list; past this
+ * many characters the text keeps its own height and scrolls, which hides nothing and leaves a short
+ * description looking exactly as it did.
+ */
+export const TASK_DETAILS_SCROLL_CHARS = 2000
+
+/**
+ * How much of a description is ever handed to a model (Write with AI, `writeTaskDetails`), and how
+ * long what it writes back may be. A context window is paid for by the token, so this stays small
+ * whatever the box itself holds: a description longer than this is clipped for the model and kept
+ * whole for the user.
+ */
+export const AI_DESCRIPTION_MAX_CHARS = 6000
 
 /**
  * The image limits are deliberately the post screenshot limits. The picker is the shared
@@ -33,7 +57,9 @@ export const TASK_MAX_IMAGES = 6
 export const TASK_MAX_DEPTH = 3
 
 export const TASK_ATTACHMENT_MESSAGES = {
-  descriptionTooLong: `A description must be under ${TASK_DESCRIPTION_MAX_LENGTH.toLocaleString()} characters.`,
+  // The limit differs by where the fields are used, so the message takes it rather than naming one
+  descriptionTooLong: (max: number = TASK_DESCRIPTION_MAX_LENGTH) =>
+    `A description must be under ${max.toLocaleString()} characters.`,
   unsupportedImage: "Upload a PNG, JPG or WEBP image.",
   imageTooLarge: `Images must be ${TASK_IMAGE_MAX_BYTES / (1024 * 1024)} MB or smaller.`,
   uploadFailed: "Couldn't upload that image. Please try again.",

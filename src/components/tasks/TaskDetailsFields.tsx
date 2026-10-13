@@ -38,8 +38,10 @@ interface TaskDetailsFieldsProps {
   maxImages?: number
   /**
    * How long the description may be. Left out it is the shared `TASK_DESCRIPTION_MAX_LENGTH`
-   * (6,000), which a model reads and so is paid for by the token; Client Projects, where nothing
-   * reaches a model, passes its own 200,000.
+   * (6,000), which is what an employee's plan keeps, since a plan's tasks all live in one array
+   * inside one document. Daily Tasks passes `DAILY_TASK_DESCRIPTION_MAX_LENGTH` (a million: a task
+   * is its own document) and Client Projects its own 200,000. Whatever the box holds, only
+   * `AI_DESCRIPTION_MAX_CHARS` of it is ever handed to a model.
    */
   maxDescription?: number
 }

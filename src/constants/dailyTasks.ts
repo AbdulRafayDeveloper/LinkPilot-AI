@@ -1,4 +1,5 @@
 import { ListTodo, type LucideIcon } from "lucide-react"
+import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
 
 /**
  * Daily Tasks: a short checklist per day. A task is only its text and the day it belongs to,
@@ -7,6 +8,18 @@ import { ListTodo, type LucideIcon } from "lucide-react"
  */
 // One task is a line, not a document, but a line can be a long one (it was 300)
 export const TASK_MAX_LENGTH = 900
+
+/**
+ * **A daily task's description is one of the plain text boxes** (`TEXT_BOX_MAX_LENGTH`, a million
+ * characters), at the owner's request: a task's details are notes they write and read themselves,
+ * and nothing but the user ever reads the whole of one. Each daily task is its own document, so a
+ * long description costs that task's record alone.
+ *
+ * The shared `TASK_DESCRIPTION_MAX_LENGTH` (6,000) stays where it is for an **employee's plan**,
+ * whose tasks all live in one array inside one document, and is still all a model is ever handed
+ * (`AI_DESCRIPTION_MAX_CHARS`), since a context window is paid for by the token.
+ */
+export const DAILY_TASK_DESCRIPTION_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
 // Rows the composer offers at once; a bulk paste is cut to this many
 export const MAX_TASKS_PER_SUBMIT = 25
 // Rows the composer starts with
@@ -28,6 +41,7 @@ export const DAILY_TASKS_ENDPOINT = "/api/daily-tasks"
 export const DAILY_TASKS_MESSAGES = {
   missingContent: "Write at least one task.",
   contentTooLong: `A task must be under ${TASK_MAX_LENGTH} characters.`,
+  descriptionTooLong: `A description must be under ${DAILY_TASK_DESCRIPTION_MAX_LENGTH.toLocaleString()} characters.`,
   tooManyTasks: `You can add ${MAX_TASKS_PER_SUBMIT} tasks at a time.`,
   invalidDate: "Pick a valid task date.",
   futureDate: "Tasks can be added for today or an earlier day.",

@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from "react"
 import { CalendarDays, ListPlus, Loader2, Plus, X } from "lucide-react"
-import { INITIAL_TASK_ROWS, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
+import { DAILY_TASK_DESCRIPTION_MAX_LENGTH, INITIAL_TASK_ROWS, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { emptyTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
 import { writeTaskDetails } from "@/lib/taskDetailsAi"
@@ -204,6 +204,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
                 onGenerate={row.content.trim() ? async () => (await writeTaskDetails("daily-tasks", { title: row.content, description: row.details.description })).details : undefined}
                 onError={setDetailsError}
                 disabled={isSaving}
+                maxDescription={DAILY_TASK_DESCRIPTION_MAX_LENGTH}
               />
             </div>
           </li>

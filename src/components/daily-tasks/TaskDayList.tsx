@@ -40,7 +40,7 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react"
-import { DAILY_TASKS_MESSAGES, TASK_MAX_LENGTH, VISIBLE_DAYS } from "@/constants/dailyTasks"
+import { DAILY_TASKS_MESSAGES, DAILY_TASK_DESCRIPTION_MAX_LENGTH, TASK_MAX_LENGTH, VISIBLE_DAYS } from "@/constants/dailyTasks"
 import { TASK_ATTACHMENT_MESSAGES, TASK_MAX_DEPTH } from "@/constants/taskAttachments"
 import { dayLabel } from "@/lib/taskDates"
 import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks"
@@ -610,6 +610,7 @@ const AddToDayRow: React.FC<{ date: string; onAddTask: AddTaskHandler }> = ({ da
         onChange={setDetails}
         onError={setDetailsError}
         disabled={isSaving}
+        maxDescription={DAILY_TASK_DESCRIPTION_MAX_LENGTH}
       />
       {detailsError && (
         <p role="alert" className="text-[11px] text-error">

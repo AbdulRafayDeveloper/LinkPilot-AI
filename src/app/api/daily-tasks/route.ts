@@ -4,7 +4,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { DAILY_TASKS_MESSAGES, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
 import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
 import { IsoDate, TodaySchema } from "@/lib/validation/dailyTasks"
-import { TaskDetailsSchema } from "@/lib/validation/taskAttachment"
+import { DailyTaskDetailsSchema } from "@/lib/validation/taskAttachment"
 import type { NewDailyTask } from "@/types/dailyTasks"
 import { createTasks, deleteTasks, deleteTasksBeforeWindow, listTasks } from "@/services/dailyTasks/tasks"
 import { BulkDeleteSchema } from "@/lib/validation/listFilters"
@@ -30,7 +30,7 @@ export const CreateSchema = z
           z.string().max(TASK_MAX_LENGTH, DAILY_TASKS_MESSAGES.contentTooLong),
           z
             .object({ content: z.string().max(TASK_MAX_LENGTH, DAILY_TASKS_MESSAGES.contentTooLong) })
-            .and(TaskDetailsSchema),
+            .and(DailyTaskDetailsSchema),
         ])
       )
       .min(1, DAILY_TASKS_MESSAGES.missingContent)

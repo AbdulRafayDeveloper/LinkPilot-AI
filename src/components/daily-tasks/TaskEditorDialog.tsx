@@ -8,8 +8,13 @@ import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { CopyTaskText } from "@/components/tasks/CopyTaskText"
 import { requestApi } from "@/lib/apiClient"
 import { writeTaskDetails } from "@/lib/taskDetailsAi"
-import { DAILY_TASKS_ENDPOINT, DAILY_TASKS_MESSAGES, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
-import { TASK_ATTACHMENT_MESSAGES, TASK_DESCRIPTION_MAX_LENGTH, TASK_MAX_DEPTH } from "@/constants/taskAttachments"
+import {
+  DAILY_TASKS_ENDPOINT,
+  DAILY_TASKS_MESSAGES,
+  DAILY_TASK_DESCRIPTION_MAX_LENGTH,
+  TASK_MAX_LENGTH,
+} from "@/constants/dailyTasks"
+import { TASK_ATTACHMENT_MESSAGES, TASK_MAX_DEPTH } from "@/constants/taskAttachments"
 import type { DailyTask } from "@/types/dailyTasks"
 import { toStoredImages, type TaskDetailsDraft } from "@/types/taskAttachment"
 import type { AiSource } from "@/types/ai"
@@ -49,7 +54,7 @@ const bodyOf = (draft: Draft) =>
   JSON.stringify({ content: draft.content.trim(), description: draft.details.description.trim(), images: toStoredImages(draft.details.images) })
 
 const isSaveable = (draft: Draft) =>
-  Boolean(draft.content.trim()) && draft.details.uploading === 0 && draft.details.description.length <= TASK_DESCRIPTION_MAX_LENGTH
+  Boolean(draft.content.trim()) && draft.details.uploading === 0 && draft.details.description.length <= DAILY_TASK_DESCRIPTION_MAX_LENGTH
 
 const clock = () => new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
 
@@ -301,6 +306,7 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
             disabled={isClosing}
             onGenerate={generate}
             alwaysOpen
+            maxDescription={DAILY_TASK_DESCRIPTION_MAX_LENGTH}
           />
           {source && (
             <p className="mt-1 text-[11px] text-outline">

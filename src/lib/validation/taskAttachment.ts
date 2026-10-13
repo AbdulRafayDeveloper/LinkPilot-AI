@@ -7,7 +7,7 @@ import {
   TASK_MAX_DEPTH,
   TASK_MAX_IMAGES,
 } from "@/constants/taskAttachments"
-import { DAILY_TASKS_MESSAGES, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
+import { DAILY_TASKS_MESSAGES, DAILY_TASK_DESCRIPTION_MAX_LENGTH, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
 
 /**
  * The optional detail a task is saved with. The description is formatted text (the Markdown subset
@@ -27,31 +27,51 @@ export const TaskImageSchema = z.object({
   contentType: z.string().trim().refine((type) => TASK_IMAGE_TYPES.includes(type), TASK_ATTACHMENT_MESSAGES.unsupportedImage),
 })
 
-export const TaskDescriptionSchema = z
-  .string()
-  .max(TASK_DESCRIPTION_MAX_LENGTH, TASK_ATTACHMENT_MESSAGES.descriptionTooLong)
-  .optional()
-  .default("")
-  .transform((value) => value.trim())
+/**
+ * A description, as long as the place it is written allows. **How long differs by place, on
+ * purpose**: Daily Tasks holds a million characters (a task is its own document and nothing but the
+ * user reads the whole of one), while an employee's plan keeps the shared 6,000, since a plan's
+ * tasks all live in one array inside one document.
+ */
+export const taskDescriptionSchema = (max: number) =>
+  z
+    .string()
+    .max(max, TASK_ATTACHMENT_MESSAGES.descriptionTooLong(max))
+    .optional()
+    .default("")
+    .transform((value) => value.trim())
+
+export const TaskDescriptionSchema = taskDescriptionSchema(TASK_DESCRIPTION_MAX_LENGTH)
 
 export const TaskImagesSchema = z.array(TaskImageSchema).max(TASK_MAX_IMAGES, TASK_ATTACHMENT_MESSAGES.tooManyImages)
 
-/** The optional fields, as every create and save accepts them. */
-export const TaskDetailsSchema = z.object({
-  description: TaskDescriptionSchema,
-  image: TaskImageSchema.nullish().transform((value) => value ?? null),
-  // Several images; when sent, these are the task's images and `image` is only the first version's field
-  images: TaskImagesSchema.optional(),
-})
+/** The optional fields, as every create and save accepts them, with the caller's own limit. */
+export const taskDetailsSchema = (max: number) =>
+  z.object({
+    description: taskDescriptionSchema(max),
+    image: TaskImageSchema.nullish().transform((value) => value ?? null),
+    // Several images; when sent, these are the task's images and `image` is only the first version's field
+    images: TaskImagesSchema.optional(),
+  })
+
+/** The shared limit, which is what an employee's plan uses. */
+export const TaskDetailsSchema = taskDetailsSchema(TASK_DESCRIPTION_MAX_LENGTH)
+
+/** Daily Tasks, whose description is a plain text box. */
+export const DailyTaskDetailsSchema = taskDetailsSchema(DAILY_TASK_DESCRIPTION_MAX_LENGTH)
 
 /**
- * The detail of a task already written, as its edit saves it. Unlike a new task, **both** fields
- * are required: an edit always sends the whole of it, so a request that left them out could
- * otherwise clear a task's description and image without anyone meaning to.
+ * The detail of a **daily task** already written, as its editor saves it (`content` and
+ * `generateAI` are that editor's own fields). Unlike a new task, **both** detail fields are
+ * required: an edit always sends the whole of it, so a request that left them out could otherwise
+ * clear a task's description and image without anyone meaning to.
  */
 export const TaskDetailsEditSchema = z
   .object({
-    description: z.string().max(TASK_DESCRIPTION_MAX_LENGTH, TASK_ATTACHMENT_MESSAGES.descriptionTooLong).transform((value) => value.trim()),
+    description: z
+      .string()
+      .max(DAILY_TASK_DESCRIPTION_MAX_LENGTH, TASK_ATTACHMENT_MESSAGES.descriptionTooLong(DAILY_TASK_DESCRIPTION_MAX_LENGTH))
+      .transform((value) => value.trim()),
     // The first version's one image, or the list of them: one of the two is always sent
     image: TaskImageSchema.nullable().optional(),
     images: TaskImagesSchema.optional(),
@@ -90,5 +110,14 @@ export const WriteDetailsSchema = z.object({
     .transform((value) => value.trim())
     .pipe(z.string().min(1, TASK_ATTACHMENT_MESSAGES.generateNeedsTitle).max(TASK_MAX_LENGTH, DAILY_TASKS_MESSAGES.contentTooLong)),
   parents: z.array(z.string().trim().max(TASK_MAX_LENGTH)).max(TASK_MAX_DEPTH - 1).optional().default([]),
-  description: z.string().max(TASK_DESCRIPTION_MAX_LENGTH, TASK_ATTACHMENT_MESSAGES.descriptionTooLong).optional().default(""),
+  /**
+   * What is already written, which the new text builds on. The whole box is accepted, however long
+   * it has grown, because refusing it would be refusing to write about a task the user can see;
+   * only the first `AI_DESCRIPTION_MAX_CHARS` of it reach the model (`writeTaskDetails`).
+   */
+  description: z
+    .string()
+    .max(DAILY_TASK_DESCRIPTION_MAX_LENGTH, TASK_ATTACHMENT_MESSAGES.descriptionTooLong(DAILY_TASK_DESCRIPTION_MAX_LENGTH))
+    .optional()
+    .default(""),
 })

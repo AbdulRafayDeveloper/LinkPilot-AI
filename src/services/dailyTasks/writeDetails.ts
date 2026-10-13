@@ -9,7 +9,7 @@ import { WriteDetailsSchema } from "@/lib/validation/taskAttachment"
 import { requireViewer } from "@/services/auth/viewer"
 import { runAiRequest, withSource } from "@/services/modelPriority"
 import { findPlaceholders } from "@/lib/generatedText"
-import { TASK_ATTACHMENT_MESSAGES, TASK_DESCRIPTION_MAX_LENGTH } from "@/constants/taskAttachments"
+import { AI_DESCRIPTION_MAX_CHARS, TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
 
 /**
  * Writes the details of a task with AI: from its own line, the tasks it sits under and anything
@@ -23,8 +23,12 @@ import { TASK_ATTACHMENT_MESSAGES, TASK_DESCRIPTION_MAX_LENGTH } from "@/constan
  * anything typed.
  */
 
-// Well under the field's limit, so what comes back always fits and leaves room to add to it
-const TARGET_CHARS = Math.floor(TASK_DESCRIPTION_MAX_LENGTH * 0.6)
+/**
+ * Well under what a model may be handed, so what comes back always fits and leaves room to add to
+ * it. It is `AI_DESCRIPTION_MAX_CHARS`, not the box's own limit: a daily task's description holds a
+ * million characters, and asking for details that long would cost a fortune and help nobody.
+ */
+const TARGET_CHARS = Math.floor(AI_DESCRIPTION_MAX_CHARS * 0.6)
 const WRITING_TEMPERATURE = 0.3
 
 const DetailsSchema = z.object({
@@ -36,14 +40,17 @@ export interface WriteDetailsInput {
   title: string
   // The tasks above it, the top one first, so a subtask is written about in its context
   parents: string[]
-  // Whatever is already written, which the new text builds on rather than contradicts
+  /**
+   * Whatever is already written, which the new text builds on rather than contradicts. The box may
+   * hold a million characters, so only its beginning is handed over (see below).
+   */
   description: string
   signal?: AbortSignal
 }
 
 function problemWith(details: string): string | null {
   if (!details.trim()) return "It is empty. Write the details."
-  if (details.length > TASK_DESCRIPTION_MAX_LENGTH) return `It is ${details.length} characters. Keep it under ${TARGET_CHARS}.`
+  if (details.length > AI_DESCRIPTION_MAX_CHARS) return `It is ${details.length} characters. Keep it under ${TARGET_CHARS}.`
   const placeholders = findPlaceholders(details)
   if (placeholders.length > 0) return `It has placeholders to fill in (${placeholders.join(", ")}). Write it without any.`
   return null
@@ -54,7 +61,18 @@ export async function writeTaskDetails({ title, parents, description, signal }: 
   const user = composePromptMessage("", [
     { variable: "task", tag: "task", label: "The task", content: title },
     { variable: "parents", tag: "parent_tasks", label: "The tasks it sits under, the top one first", content: parents.join("\n"), emptyText: "None: it is a task of its own." },
-    { variable: "written", tag: "written_so_far", label: "What is already written about it", content: description, emptyText: "Nothing yet." },
+    {
+      variable: "written",
+      tag: "written_so_far",
+      label: "What is already written about it",
+      /**
+       * Clipped, never refused. A daily task's description is a plain text box now, and a model's
+       * context window is paid for by the token, so a long one is handed over from the start, where
+       * what the task is about is written, and the rest stays with the user.
+       */
+      content: description.slice(0, AI_DESCRIPTION_MAX_CHARS),
+      emptyText: "Nothing yet.",
+    },
   ])
   const { data } = await generateStructuredWithFallback({
     schema: DetailsSchema,

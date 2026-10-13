@@ -3,6 +3,7 @@
 import React, { useState } from "react"
 import { ChevronDown, ChevronRight, ImageOff, X } from "lucide-react"
 import { RichTextView } from "@/components/ui/RichTextView"
+import { TASK_DETAILS_SCROLL_CHARS } from "@/constants/taskAttachments"
 import type { TaskImageView } from "@/types/taskAttachment"
 
 interface TaskDetailsViewProps {
@@ -88,7 +89,18 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({ description, i
         {isShown ? "Hide details" : `Details (${what})`}
       </button>
 
-      {isShown && description && <RichTextView text={description} fontSize={13} className="[overflow-wrap:anywhere]" />}
+      {isShown && description && (
+        // A long description scrolls inside the row rather than making it taller than the day's list
+        <div
+          className={
+            description.length > TASK_DETAILS_SCROLL_CHARS
+              ? "custom-scrollbar max-h-96 overflow-y-auto rounded-lg border border-outline-variant bg-surface-container-lowest p-2"
+              : undefined
+          }
+        >
+          <RichTextView text={description} fontSize={13} className="[overflow-wrap:anywhere]" />
+        </div>
+      )}
 
       {isShown && images.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label={`Images on ${label}`}>
