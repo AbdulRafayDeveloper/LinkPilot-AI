@@ -95,7 +95,9 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
         </span>
         A spark on a meeting means its preparation is written;
         <Repeat size={11} className="text-on-secondary-fixed-variant" aria-hidden="true" />
-        means it repeats.
+        means it repeats;
+        <FileText size={11} className="text-primary" aria-hidden="true" />
+        means its notes or recording are kept with it.
       </p>
 
       <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wider text-outline">
@@ -151,7 +153,7 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
                   return (
                     <span
                       key={meeting.id}
-                      title={`${formatTime(meeting.meetingTime)} ${meeting.name}${meeting.status === "cancelled" ? " · cancelled" : meeting.status === "completed" ? " · completed" : ""}${hasPrep ? " · preparation ready" : ""}${meeting.seriesId ? " · repeats" : ""}`}
+                      title={`${formatTime(meeting.meetingTime)} ${meeting.name}${meeting.status === "cancelled" ? " · cancelled" : meeting.status === "completed" ? " · completed" : ""}${hasPrep ? " · preparation ready" : ""}${meeting.seriesId ? " · repeats" : ""}${(meeting.linkedCount ?? 0) > 0 ? ` · ${meeting.linkedCount} written up` : ""}`}
                       className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${
                         meeting.status === "completed"
                           ? "bg-success-container text-on-success-container"
