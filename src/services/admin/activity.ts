@@ -22,6 +22,7 @@ import { QuickNote } from "@/models/QuickNote"
 import { ReferenceItem } from "@/models/ReferenceItem"
 import { ImportantContentModel } from "@/models/ImportantContent"
 import { ContentFolderModel } from "@/models/ContentFolder"
+import { PromptFolderModel } from "@/models/PromptFolder"
 import { ClientProjectTaskModel } from "@/models/ClientProjectTask"
 import { ProfileScheduleModel } from "@/models/ProfileSchedule"
 import { TrendingSearch } from "@/models/TrendingSearch"
@@ -72,6 +73,9 @@ export const SOURCES: ActivitySource[] = [
   { href: "/important-files", collection: () => AssetFile.collection, match: { status: "ready" } },
   { href: "/important-content", collection: () => ImportantContentModel.collection },
   { href: "/important-content", label: "folders", collection: () => ContentFolderModel.collection },
+  // Prompt Creator's folders, which a client project also makes one of; counted and deleted with
+  // the account, the way Important Content's are. Without this an account's folders outlived it
+  { href: "/prompt-creator", label: "folders", collection: () => PromptFolderModel.collection },
   { href: "/employees", label: "employees", collection: () => EmployeeModel.collection },
   { href: "/employees", label: "plans", collection: () => EmployeePlanModel.collection },
 ]

@@ -27,6 +27,7 @@ const OWNED_COLLECTIONS = [
   "client_messages",
   "rewritten_messages",
   "created_prompts",
+  "prompt_folders",
   "clients",
   "trending_searches",
   "daily_tasks",
