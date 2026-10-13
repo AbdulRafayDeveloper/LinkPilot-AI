@@ -443,10 +443,19 @@ export async function runRecordingStep(id: string, signal: AbortSignal): Promise
 export async function recordingLinks(viewer: Viewer, id: string): Promise<MeetingRecordingLinks | null> {
   const found = await recordingFor(viewer, id)
   if (!found) return null
-  const { recording, meeting } = found
+  return linksForRecording(id, found.meeting.title, found.recording)
+}
+
+/**
+ * The same signed links, built from a recording already in hand rather than read for a viewer.
+ *
+ * It is split out for the share link, which has no account to scope a read by: the token resolves
+ * the meeting itself, and the links are then made from exactly what that meeting recorded.
+ */
+export async function linksForRecording(id: string, title: string, recording: StoredRecording): Promise<MeetingRecordingLinks> {
   const screen = recording.tracks.screen
   const camera = recording.tracks.camera
-  const fileName = `${meeting.title.replace(/[^\w .-]+/g, "").trim() || "meeting"}.${screen?.mimeType === "video/mp4" ? "mp4" : "webm"}`
+  const fileName = `${title.replace(/[^\w .-]+/g, "").trim() || "meeting"}.${screen?.mimeType === "video/mp4" ? "mp4" : "webm"}`
   return {
     screen: screen?.finalKey
       ? {

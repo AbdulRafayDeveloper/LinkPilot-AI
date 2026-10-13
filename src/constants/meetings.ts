@@ -61,11 +61,46 @@ export const MEETING_PROMPT_IDS = MEETING_PROMPT_TABS.map((tab) => tab.id) as [M
 
 export const MEETINGS_ENDPOINT = "/api/meetings"
 
+/**
+ * The share link one meeting can be sent by (lib/meetingLink.ts): the page whoever receives it
+ * opens, and the routes it reads the meeting through. Both are let past the sign-in gate in
+ * `src/proxy.ts`, since the signed token in the address is the whole of the caller's authority.
+ */
+export const PUBLIC_MEETING_PATH = "/meeting"
+export const PUBLIC_MEETING_ENDPOINT = "/api/public/meetings"
+
+export const MEETING_LINK_MESSAGES = {
+  failed: "Couldn't change the link. Please try again.",
+  made: "Link made.",
+  replaced: "New link made. The old one stopped working.",
+  off: "Link turned off.",
+  explains:
+    "Whoever has this link can watch the recording and read the summary without signing in. They cannot change anything. New link stops the old one; Turn off stops them all.",
+} as const
+
+export const PUBLIC_MEETING_MESSAGES = {
+  // Every refusal about the link reads the same, so a guessed token learns nothing
+  invalid: "That link doesn't open anything.",
+  // On the shared page, so whoever opens it knows there is nothing for them to change
+  readOnly: "Shared with you to watch and read",
+  // A recorded meeting whose video hasn't been joined yet, or one that was pasted rather than recorded
+  noVideo: "There is no video on this meeting.",
+  // A meeting shared before its analysis finished: the video is there and the summary follows later
+  notAnalysed: "This meeting hasn't been summarised yet.",
+} as const
+
 export const MEETING_MESSAGES = {
   missingTranscript: "Paste the meeting notes or transcript first.",
   transcriptTooLong: `A transcript must be under ${(TRANSCRIPT_MAX_LENGTH / 1_000_000).toFixed(0)} million characters.`,
   titleTooLong: `The meeting name must be under ${MEETING_TITLE_MAX_LENGTH} characters.`,
   saved: "Meeting saved. Analysis has started.",
+  /**
+   * What the minutes say when the recording or the transcript held no meeting at all: someone
+   * testing the microphone, a few seconds of a video, a call that never started. The analysis
+   * **finishes** and says this, rather than failing, because there being nothing to summarise is an
+   * answer about the recording and not a fault in the model that read it.
+   */
+  nothingDiscussed: "Nothing was discussed in this recording. No topics, decisions or tasks came out of it.",
   updated: "Changes saved.",
   deleted: "Meeting deleted.",
   notFound: "That meeting no longer exists.",

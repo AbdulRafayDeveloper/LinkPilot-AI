@@ -92,6 +92,26 @@ export interface Meeting extends MeetingSummary {
   notesEditedAt: string | null
   // Set for a meeting recorded in the app, null for a pasted one
   recording: MeetingRecordingSummary | null
+  // The token of the share link that is on, or null when there is none (lib/meetingLink.ts)
+  publicToken: string | null
+}
+
+/**
+ * What a meeting's share link opens, for someone who is not signed in: the recording to watch and
+ * what the analysis made of it. **Read only**, and deliberately less than the owner sees: no
+ * transcript, no chat, no notes to edit, and nothing that says whose account the meeting is.
+ */
+export interface PublicMeeting {
+  title: string
+  // When it was recorded or saved, and how long the recording runs
+  createdAt: string
+  durationMs: number | null
+  hasVideo: boolean
+  // The summary to send on, "" until there is an analysis
+  minutes: string
+  // The notes built from the analysis and edited by the owner, "" when there are none
+  notes: string
+  analysis: MeetingAnalysis | null
 }
 
 export interface MeetingsPage {

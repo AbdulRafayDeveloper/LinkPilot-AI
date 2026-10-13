@@ -33,6 +33,10 @@ export interface IMeeting {
   notesEditedAt: Date | null
   // A meeting recorded in the app (types/meetingRecording.ts StoredRecording); null for a pasted one
   recording: unknown
+  // The share link (lib/meetingLink.ts): raising the version stops every link already sent, and
+  // the flag turns them all off without losing which version comes next
+  publicLinkVersion: number
+  publicLinkActive: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -60,6 +64,9 @@ const MeetingSchema = new Schema<IMeeting>(
     notesEditedAt: { type: Date, default: null },
     // Mixed on purpose: chunks are confirmed one key at a time with a $set on their own path
     recording: { type: Schema.Types.Mixed, default: null },
+    // 0 and false on a meeting saved before links existed, so it simply has no link until one is made
+    publicLinkVersion: { type: Number, required: true, default: 0 },
+    publicLinkActive: { type: Boolean, required: true, default: false },
   },
   { timestamps: true, collection: "meetings" }
 )

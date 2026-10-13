@@ -12,6 +12,7 @@ import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer
 import type { AiSource } from "@/types/ai"
 import type { StoredRecording } from "@/types/meetingRecording"
 import { removeRecordingFiles, toRecordingSummary } from "@/services/meetings/recording"
+import { publicMeetingToken } from "@/services/meetings/publicLink"
 
 /**
  * Meetings in the database. The history list never reads a transcript: a card needs a title, a
@@ -70,6 +71,7 @@ function toMeeting(record: StoredMeeting): Meeting {
     notes: record.notes ?? "",
     notesEditedAt: record.notesEditedAt ? new Date(record.notesEditedAt).toISOString() : null,
     recording: record.recording ? toRecordingSummary(record.recording as StoredRecording) : null,
+    publicToken: publicMeetingToken(record, record._id.toString()),
   }
 }
 

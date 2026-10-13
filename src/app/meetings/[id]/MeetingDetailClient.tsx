@@ -14,6 +14,7 @@ import { MeetingFormDialog } from "@/components/meetings/MeetingFormDialog"
 import { DeleteMeetingDialog } from "@/components/meetings/DeleteMeetingDialog"
 import { RecordingPanel } from "@/components/meetings/RecordingPanel"
 import { MeetingNotesPanel } from "@/components/meetings/MeetingNotesPanel"
+import { MeetingLinkPanel } from "@/components/meetings/MeetingLinkPanel"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useMeetingRun } from "@/hooks/useMeetingRun"
 import { requestApi } from "@/lib/apiClient"
@@ -267,6 +268,14 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                     {MEETING_MESSAGES.staleAnalysis} Press Re-analyse to rebuild it from the transcript as it is now.
                   </p>
                 )}
+
+                {/* The read-only link this meeting can be sent by: the recording and the summary,
+                    for someone with no account here */}
+                <MeetingLinkPanel
+                  meetingId={meeting.id}
+                  token={meeting.publicToken}
+                  onChanged={(publicToken) => setMeeting((current) => (current ? { ...current, publicToken } : current))}
+                />
 
                 {/* The notes written from the analysis, which are the user's to edit */}
                 {meeting.notes && <MeetingNotesPanel meeting={meeting} onSaved={setMeeting} />}

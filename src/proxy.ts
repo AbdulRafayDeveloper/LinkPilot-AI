@@ -4,6 +4,7 @@ import { SESSION_COOKIE, readSession } from "@/lib/sessionToken"
 import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, HOME_PATH, LOGIN_PATH, REQUEST_PATH_HEADER, SIGNUP_PATH } from "@/constants/auth"
 import { PUBLIC_PLAN_ENDPOINT, PUBLIC_PLAN_PATH } from "@/constants/employees"
 import { PUBLIC_PROJECT_ENDPOINT, PUBLIC_PROJECT_PATH } from "@/constants/clientProjectTasks"
+import { PUBLIC_MEETING_ENDPOINT, PUBLIC_MEETING_PATH } from "@/constants/meetings"
 import { CRON_BACKUP_PATH } from "@/constants/backups"
 
 /**
@@ -17,8 +18,8 @@ import { CRON_BACKUP_PATH } from "@/constants/backups"
 const PUBLIC_PAGES = new Set([LOGIN_PATH, SIGNUP_PATH])
 const PUBLIC_API = new Set(["/api/auth/login", "/api/auth/signup", "/api/auth/logout"])
 // A link whose signed token in the address is the key, checked by the route it opens: an employee's
-// own daily plan, and a client project shared read only
-const PUBLIC_LINK_PREFIXES = [PUBLIC_PLAN_PATH, PUBLIC_PLAN_ENDPOINT, PUBLIC_PROJECT_PATH, PUBLIC_PROJECT_ENDPOINT]
+// own daily plan, a client project the client writes on, and a meeting shared read only to watch
+const PUBLIC_LINK_PREFIXES = [PUBLIC_PLAN_PATH, PUBLIC_PLAN_ENDPOINT, PUBLIC_PROJECT_PATH, PUBLIC_PROJECT_ENDPOINT, PUBLIC_MEETING_PATH, PUBLIC_MEETING_ENDPOINT]
 const isPlanLink = (pathname: string) => PUBLIC_LINK_PREFIXES.some((prefix) => pathname.startsWith(`${prefix}/`))
 // The weekly database backup: nobody is signed in for it, so the route checks CRON_SECRET itself
 const isScheduledJob = (pathname: string) => pathname === CRON_BACKUP_PATH

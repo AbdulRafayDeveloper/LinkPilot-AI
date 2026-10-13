@@ -4,10 +4,11 @@ import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
 import { SITE_AUTHOR } from "@/config/site"
-import { MEETING_TITLE_MAX_LENGTH } from "@/constants/meetings"
+import { MEETING_MESSAGES, MEETING_TITLE_MAX_LENGTH } from "@/constants/meetings"
 import type { TranscriptChunk } from "@/lib/transcriptChunks"
 import type { MeetingAnalysis } from "@/types/meetings"
 import { aggregateChunkResults } from "./aggregate"
+import { hasMeetingSubstance } from "@/lib/meetingFacts"
 
 /**
  * The two AI stages of a meeting. Reading one chunk is the map step, and putting the chunk
@@ -205,6 +206,7 @@ export async function synthesizeMeeting(
   options: { userTitle: string | null; signal: AbortSignal; onFold?: (remaining: number) => void }
 ): Promise<{ analysis: MeetingAnalysis; title: string }> {
   const facts = aggregateChunkResults(results)
+  const substance = hasMeetingSubstance(facts)
   // The model reads the merged facts, which are far smaller than every raw note and already free
   // of repeats. Only a meeting so long that even those do not fit is folded first, and only for
   // the model: what is stored always keeps every merged fact.
@@ -236,7 +238,14 @@ export async function synthesizeMeeting(
     temperature: ANALYSIS_TEMPERATURE,
     timeoutMs: SYNTHESIS_TIMEOUT_MS,
     signal: options.signal,
-    validate: (output) => (output.minutes.trim() ? null : "empty minutes of meeting"),
+    /**
+     * Empty minutes are a failure **only when there was something to summarise**. A recording that
+     * holds no meeting (a microphone test, a few seconds of a video) gives the model nothing to
+     * write, and rejecting that answer used to send the whole analysis through every provider and
+     * end as "Groq wrote something the app could not use", which blamed the model for the
+     * recording being empty and named env vars that had nothing to do with it.
+     */
+    validate: (output) => (!substance || output.minutes.trim() ? null : "empty minutes of meeting"),
   })
 
   // The subjects the model put in order, then any it left out, so none is lost
@@ -258,7 +267,8 @@ export async function synthesizeMeeting(
       myDecisions: facts.myDecisions,
       decisions: facts.decisions,
       actionItems: facts.actionItems,
-      minutes: data.minutes.trim(),
+      // With nothing to summarise the model rightly writes nothing, so the notes say so plainly
+      minutes: data.minutes.trim() || MEETING_MESSAGES.nothingDiscussed,
       unknowns: facts.unknowns,
     },
   }

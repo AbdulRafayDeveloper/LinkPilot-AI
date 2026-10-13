@@ -2,8 +2,9 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, Download, Loader2, RefreshCw, Video } from "lucide-react"
+import { AlertTriangle, Loader2, RefreshCw, Video } from "lucide-react"
 import { requestApi } from "@/lib/apiClient"
+import { RecordingVideo } from "@/components/meetings/RecordingVideo"
 import { useRecordingRun } from "@/hooks/useRecordingRun"
 import { useMeetingRecorder } from "@/hooks/useMeetingRecorder"
 import { RECORDING_MESSAGES, recordingEndpoint } from "@/constants/meetingRecording"
@@ -47,8 +48,6 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
   const [linksError, setLinksError] = useState<string | null>(null)
   const [finishError, setFinishError] = useState<string | null>(null)
   const [isFinishing, setIsFinishing] = useState(false)
-  const screenRef = useRef<HTMLVideoElement>(null)
-  const cameraRef = useRef<HTMLVideoElement>(null)
   const startedRef = useRef(false)
 
   const { run, isRunning, error: runError } = useRecordingRun(
@@ -83,20 +82,6 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
       })
     return () => controller.abort()
   }, [meetingId, recording.stage])
-
-  // The camera follows the screen: play, pause and seek together, drift corrected as it plays
-  useEffect(() => {
-    const screen = screenRef.current
-    const camera = cameraRef.current
-    if (!screen || !camera) return
-    const follow = () => {
-      if (Math.abs(camera.currentTime - screen.currentTime) > 0.3) camera.currentTime = screen.currentTime
-      if (screen.paused !== camera.paused) void (screen.paused ? camera.pause() : camera.play().catch(() => undefined))
-    }
-    const events = ["play", "pause", "seeked", "timeupdate"] as const
-    events.forEach((name) => screen.addEventListener(name, follow))
-    return () => events.forEach((name) => screen.removeEventListener(name, follow))
-  }, [links])
 
   const finishPartial = async () => {
     setIsFinishing(true)
@@ -191,29 +176,7 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
 
       {recording.stage === "done" &&
         (links?.screen ? (
-          <div className="flex flex-col gap-2">
-            <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-on-surface">
-              <video ref={screenRef} src={links.screen.url} controls preload="metadata" className="aspect-video w-full" />
-              {links.camera && (
-                <video
-                  ref={cameraRef}
-                  src={links.camera.url}
-                  muted
-                  playsInline
-                  preload="metadata"
-                  aria-label="Camera"
-                  className="pointer-events-none absolute bottom-12 right-3 w-1/4 max-w-[220px] rounded-lg border-2 border-white/70 shadow-lg"
-                />
-              )}
-            </div>
-            <a
-              href={links.screen.downloadUrl}
-              className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-outline-variant px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-            >
-              <Download size={13} aria-hidden="true" />
-              Download the video ({megabytes(links.screen.size)})
-            </a>
-          </div>
+          <RecordingVideo screen={links.screen} camera={links.camera} />
         ) : linksError ? (
           <p className="text-[12px] text-error">{linksError}</p>
         ) : links ? (
