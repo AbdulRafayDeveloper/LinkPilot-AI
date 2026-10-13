@@ -267,6 +267,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
   const isSearching = query.trim().length > 0
   const navRef = useRef<HTMLElement>(null)
   const saveFrame = useRef<number | null>(null)
+  // The rail's own buttons, so the arrow keys can move between them (vertical tabs, WAI-ARIA)
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   // Back to where the list was on the previous page, before it is painted, and once more on the
   // next frame in case the remembered dropdowns opened after the first paint and made it taller
@@ -406,7 +408,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
             aria-label="Areas of the app"
             className="flex w-full flex-col items-center gap-1.5 px-2 py-3"
           >
-            {areas.map(({ group, tools: areaTools }) => {
+            {areas.map(({ group, tools: areaTools }, index) => {
               const isChosen = group.id === area?.group.id
               const Icon = group.icon
               // An area that is not on screen carries what its tools would have shown
@@ -419,11 +421,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
               return (
                 <button
                   key={group.id}
+                  ref={(node) => {
+                    tabRefs.current[index] = node
+                  }}
                   type="button"
                   role="tab"
                   aria-selected={isChosen}
                   aria-controls={panelId}
+                  // One stop for the whole rail: inside it the arrow keys move, as vertical tabs do
+                  tabIndex={isChosen ? 0 : -1}
                   title={`${group.label}: ${group.hint}`}
+                  onKeyDown={(event) => {
+                    const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0
+                    const to =
+                      step !== 0
+                        ? (index + step + areas.length) % areas.length
+                        : event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? areas.length - 1
+                            : -1
+                    if (to < 0) return
+                    event.preventDefault()
+                    setQuery("")
+                    pick(areas[to].group.id as ToolGroupId, pathname)
+                    tabRefs.current[to]?.focus()
+                  }}
                   onClick={() => {
                     setQuery("")
                     pick(group.id as ToolGroupId, pathname)
