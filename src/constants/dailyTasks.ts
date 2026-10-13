@@ -67,7 +67,8 @@ export const DAILY_TASKS_MESSAGES = {
   cleanupFailed: "Couldn't delete the older tasks. Please try again.",
   cleaned: "Older tasks deleted.",
   nothingToClean: "There was nothing older than a week to delete.",
-  empty: "No tasks for the last seven days yet. Add today's tasks on the left.",
+  // "on the left" was the column that wrote the tasks; they are written in the Add task popup now
+  empty: "No tasks for the last seven days yet. Write today's with Add task above.",
   emptyHistory: "No tasks on these days.",
 } as const
 
