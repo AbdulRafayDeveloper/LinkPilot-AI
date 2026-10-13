@@ -3,6 +3,7 @@ import { toUserFacingMessage } from "@/lib/errors"
 import { PROJECT_TASK_MESSAGES } from "@/constants/clientProjectTasks"
 import { getProjectWithTasks } from "@/services/clientProjects/projects"
 import { tasksOfProject } from "@/services/clientProjects/tasks"
+import { listProjectFolders } from "@/services/clientProjects/folders"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
@@ -22,7 +23,9 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     if (!project || !tasks) {
       return NextResponse.json({ success: false, message: PROJECT_TASK_MESSAGES.projectNotFound }, { status: 404 })
     }
-    return NextResponse.json({ success: true, message: "Project retrieved", data: { project, tasks } })
+    // The folders come with the items, so a page draws the whole tree without a second request
+    const folders = await listProjectFolders(id)
+    return NextResponse.json({ success: true, message: "Project retrieved", data: { project, tasks, folders } })
   } catch (error: unknown) {
     console.error("GET Client Project Exception:", error instanceof Error ? error.message : error)
     return NextResponse.json({ success: false, message: toUserFacingMessage(error, PROJECT_TASK_MESSAGES.loadFailed) }, { status: 500 })

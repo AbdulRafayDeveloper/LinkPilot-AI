@@ -66,6 +66,7 @@ export interface ProjectFileProgress {
 /** One item on a client project, as it is stored. */
 export interface ProjectTaskRecord {
   content: string
+  folderId?: string | null
   description: string
   // A link item's web address; "" on every other kind
   url: string
@@ -93,6 +94,8 @@ export interface ProjectTask {
   kind: ProjectItemKind
   // Whether the project's owner added it or someone writing from the shared link did
   addedBy: ProjectItemAuthor
+  // The folder it is filed in, on the tabs that have folders; null at the top of the tree
+  folderId: string | null
   position: number
   createdAt: string
   updatedAt: string
@@ -102,6 +105,36 @@ export interface ProjectTask {
  * What an item is saved with. Everything but the line is optional, so a one-line item costs
  * nothing, and the kind left out means a change (the first tab).
  */
+/**
+ * A folder the documents or links of one project are filed in. The tree is nested, so a folder
+ * names the one it sits in (`parentId`, null at the top), and `depth` is how far down it is, worked
+ * out on the server so a page never has to walk the list to draw the tree.
+ */
+export interface ProjectFolder {
+  id: string
+  projectId: string
+  kind: ProjectItemKind
+  name: string
+  parentId: string | null
+  depth: number
+  // How many items of that tab are filed directly in it, and in it and everything inside it
+  itemCount: number
+  totalItemCount: number
+}
+
+export interface ProjectFolderInput {
+  kind: ProjectItemKind
+  name: string
+  parentId?: string | null
+}
+
+/** What writing a document in the app takes: its name and what it says. */
+export interface ProjectDocumentInput {
+  name: string
+  text: string
+  folderId?: string | null
+}
+
 export interface ProjectTaskInput {
   content: string
   description?: string
@@ -111,6 +144,8 @@ export interface ProjectTaskInput {
   voiceNote?: VoiceNote | null
   status?: ProjectTaskStatus
   kind?: ProjectItemKind
+  // Where to file it, or null for the top. Left out, an item is not moved
+  folderId?: string | null
 }
 
 /** How one tab of a project stands: how many items it holds and how many are ticked off. */

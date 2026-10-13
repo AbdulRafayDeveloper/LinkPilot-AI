@@ -309,6 +309,33 @@ export async function finishProjectFile(projectId: string, assetId: string, dead
  * Removes the stored files of items that have gone. A file is an attachment, so the records go
  * first and a storage failure is logged rather than failing the delete the user asked for.
  */
+/**
+ * A document written in the app rather than uploaded: the text is stored as one `.txt` object and
+ * answered as a file ready to go on an item.
+ *
+ * It needs none of the chunking above, because the text arrives whole in one request (a document is
+ * `PROJECT_DOCUMENT_TEXT_MAX_LENGTH` characters at most, which fits a request body), and it uses
+ * the same key shape and the same id the uploaded path uses, so nothing downstream can tell the two
+ * apart: previewing, downloading and deleting a written document are the uploaded file's own code.
+ */
+export async function writeProjectDocument(
+  project: { id: string; ownerId: string | null },
+  input: { name: string; text: string }
+): Promise<ProjectFile> {
+  if (!isStorageConfigured()) throw new UserFacingError(PROJECT_TASK_MESSAGES.fileStorageUnavailable)
+  const name = input.name.trim().toLowerCase().endsWith(".txt") ? input.name.trim() : `${input.name.trim()}.txt`
+  const bytes = Buffer.from(input.text, "utf8")
+  const contentType = "text/plain"
+  const category = categoryForContentType(contentType)
+  if (!category) throw new UserFacingError(PROJECT_TASK_MESSAGES.fileUnsupported)
+  if (bytes.byteLength <= 0 || bytes.byteLength > maxBytesFor(category)) throw new UserFacingError(PROJECT_TASK_MESSAGES.fileTooLarge)
+
+  await connectDatabase()
+  const assetId = new mongoose.Types.ObjectId().toString()
+  await putObject(finalKeyFor(assetId, name), bytes, contentType)
+  return { assetId, name, contentType, category, size: bytes.byteLength }
+}
+
 export async function deleteProjectFiles(files: readonly (ProjectFile | null | undefined)[]): Promise<void> {
   if (!isStorageConfigured()) return
   for (const file of files) {

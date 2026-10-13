@@ -7,6 +7,7 @@ import type { Client, ClientInput } from "@/types/clientMessaging"
 import type { Viewer } from "@/types/auth"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { deleteTasksOfProjects } from "@/services/clientProjects/tasks"
+import { deleteFoldersOfProjects } from "@/services/clientProjects/folders"
 import { deleteProjectFileUploads } from "@/services/clientProjects/files"
 
 /**
@@ -89,6 +90,8 @@ export async function deleteClient(viewer: Viewer, id: string): Promise<boolean>
     const projects = (await ClientProjectModel.find({ clientId: id }, { _id: 1 }).lean()) as unknown as { _id: { toString: () => string } }[]
     const projectIds = projects.map((project) => project._id.toString())
     await deleteTasksOfProjects(visibleTo(viewer), projectIds)
+    // The folders those documents were filed in file nothing now
+    await deleteFoldersOfProjects(projectIds)
     await deleteProjectFileUploads(visibleTo(viewer), projectIds)
     await ClientProjectModel.deleteMany({ clientId: id })
   }

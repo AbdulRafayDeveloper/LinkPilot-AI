@@ -1,5 +1,6 @@
 import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
+import { folderForItem } from "@/services/clientProjects/folders"
 import { UserFacingError } from "@/lib/errors"
 import { ClientProjectModel, type IClientProject } from "@/models/ClientProject"
 import { ClientProjectTaskModel, type IClientProjectTask } from "@/models/ClientProjectTask"
@@ -12,6 +13,7 @@ import {
   projectItemKind,
   type ProjectItemAuthor,
   type ProjectItemKind,
+  hasFolders,
 } from "@/constants/clientProjectTasks"
 import { itemName, itemProblem, projectItemUrl } from "@/lib/projectItems"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
@@ -90,6 +92,8 @@ async function toTask(record: StoredTask): Promise<ProjectTask> {
     // An item saved before the tabs existed has no kind and reads as a change, the first tab
     kind: projectItemKind(record.kind).id,
     addedBy: record.addedBy === "client" ? "client" : "owner",
+    // Null at the top of the tree, and on every item saved before folders existed
+    folderId: record.folderId ?? null,
     position: record.position ?? 0,
     createdAt: new Date(record.createdAt).toISOString(),
     updatedAt: new Date(record.updatedAt).toISOString(),
@@ -160,12 +164,19 @@ export async function createProjectTask({ project, projectId, ownerId, addedBy, 
   const count = await ClientProjectTaskModel.countDocuments(inTab)
   if (count >= MAX_PROJECT_TASKS) throw new UserFacingError(PROJECT_TASK_MESSAGES.tooManyTasks)
   const last = (await ClientProjectTaskModel.findOne(inTab).sort({ position: -1 }).select({ position: 1 }).lean()) as { position?: number } | null
+  /**
+   * Where it is filed, on the tabs that have folders. The folder is checked against this project
+   * and this tab (`folderForItem`), so an item can never be filed into another project's tree, and
+   * anything the browser sends for a tab without folders is ignored rather than stored.
+   */
+  const folderId = hasFolders(kind) ? await folderForItem(projectId, kind, input.folderId) : null
   const record = await ClientProjectTaskModel.create({
     ownerId,
     clientId: project.clientId,
     projectId,
     ...cleanInput(input, kind),
     kind,
+    folderId,
     addedBy,
     position: (last?.position ?? count - 1) + 1,
   })
@@ -213,6 +224,14 @@ export async function changeProjectTask(
   if (input.files !== undefined) changes.files = cleaned.files
   if (input.voiceNote !== undefined) changes.voiceNote = cleaned.voiceNote
   if (input.status !== undefined) changes.status = cleaned.status
+  /**
+   * Moving it between folders is one field like any other, checked against this project and this
+   * tab, so a move can never file an item into another project's tree. A tab without folders takes
+   * the top of the tree, which is where its items already are.
+   */
+  if (input.folderId !== undefined) {
+    changes.folderId = hasFolders(kind) ? await folderForItem(projectId, kind, input.folderId) : null
+  }
 
   const record = (await ClientProjectTaskModel.findOneAndUpdate({ ...filter, projectId }, { $set: changes }, { returnDocument: "after", runValidators: true }).lean()) as unknown as StoredTask | null
   if (!record) return null

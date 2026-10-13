@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { Download, Eye, Link2, Loader2, Pencil, Trash2 } from "lucide-react"
+import { Download, Eye, FolderInput, Link2, Loader2, Pencil, Trash2 } from "lucide-react"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 import {
   PROJECT_DETAILS_OPEN_MAX_CHARS,
@@ -24,6 +24,11 @@ interface ProjectTasksProps {
   onTick: (task: ProjectTask, done: boolean) => void
   onEdit: (task: ProjectTask) => void
   onDelete: (task: ProjectTask) => void
+  /**
+   * Moving the item to another folder. Only the tabs that have folders pass it, so the action is
+   * on a document and a link and nowhere else.
+   */
+  onMove?: (task: ProjectTask) => void
   /**
    * How an item added from the shared link is tagged. The two surfaces word it differently (the
    * owner reads "From the client"; the client reads nothing about themselves), so each passes its
@@ -153,7 +158,7 @@ const ItemFiles: React.FC<{ files: ProjectFileView[]; onPreview: (file: ProjectF
  * only how an item added from the link is tagged, whether the details start open, and which tabs
  * the link is given at all (never Credentials or Backups).
  */
-export const ProjectTasks: React.FC<ProjectTasksProps> = ({ tasks, kind, busyId, onTick, onEdit, onDelete, clientTag, detailsOpen }) => {
+export const ProjectTasks: React.FC<ProjectTasksProps> = ({ tasks, kind, busyId, onTick, onEdit, onDelete, onMove, clientTag, detailsOpen }) => {
   const words = projectItemKind(kind)
   const shape = words.shape
   // The file being looked at, over the whole popup. One at a time, for the whole list
@@ -212,6 +217,17 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({ tasks, kind, busyId,
                 </div>
                 {busyId === task.id && <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-primary" aria-hidden="true" />}
                 <div className="flex shrink-0 items-center gap-0.5">
+                  {onMove && (
+                    <button
+                      type="button"
+                      onClick={() => onMove(task)}
+                      aria-label={`Move ${task.content} to another folder`}
+                      className={`${actionButton} hover:text-primary`}
+                    >
+                      <FolderInput size={13} aria-hidden="true" />
+                      Move
+                    </button>
+                  )}
                   <button type="button" onClick={() => onEdit(task)} aria-label={`Edit ${task.content}`} className={`${actionButton} hover:text-primary`}>
                     <Pencil size={13} aria-hidden="true" />
                     Edit

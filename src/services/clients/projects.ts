@@ -9,6 +9,7 @@ import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { getClient } from "@/services/clientMessaging/clients"
 import { deleteTasksOfProjects } from "@/services/clientProjects/tasks"
 import { deleteProjectFileUploads } from "@/services/clientProjects/files"
+import { deleteFoldersOfProjects } from "@/services/clientProjects/folders"
 import { folderForProjectName, renameFolder } from "@/services/promptCreator/folders"
 import type { ClientProject, ClientProjectInput, ClientProjectsPage, PromptProject } from "@/types/clients"
 import type { Viewer } from "@/types/auth"
@@ -162,6 +163,8 @@ export async function deleteClientProject(viewer: Viewer, clientId: string, proj
     await deleteTasksOfProjects(visibleTo(viewer), [projectId])
     // A file somebody was still uploading has no item to hang on, so its chunks go too
     await deleteProjectFileUploads(visibleTo(viewer), [projectId])
+    // And the folders its documents were filed in, which file nothing now
+    await deleteFoldersOfProjects([projectId])
     /**
      * The prompts written for it are **kept**, and go back to no project: a prompt is work of its
      * own, and the folder it is filed in stays as it is, so nothing the user wrote disappears with

@@ -3,6 +3,7 @@ import { TASK_IMAGE_MAX_BYTES, TASK_IMAGE_TYPES } from "./taskAttachments"
 import { VOICE_MAX_BYTES } from "./voiceInput"
 import { ACCEPTED_CONTENT_TYPES, ASSET_MAX_BYTES, maxBytesFor, type AssetCategoryId } from "./importantFiles"
 import { MULTIPART_MIN_PART_BYTES, RECORDING_CHUNK_MAX_BYTES } from "./meetingRecording"
+import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
 
 /**
  * Client Projects: the work being done for each client, with everything that is said about it.
@@ -16,7 +17,8 @@ import { MULTIPART_MIN_PART_BYTES, RECORDING_CHUNK_MAX_BYTES } from "./meetingRe
 
 export const CLIENT_PROJECTS_TOOL = {
   id: "client-projects",
-  title: "Client Projects",
+  // Renamed at the owner's request; the id stays, since it is the feature switch and the SEO key
+  title: "Projects Management",
   description: "Every client project with its changes, ideas and discussion, and a link to share",
   href: "/client-projects",
   icon: FolderKanban as LucideIcon,
@@ -362,6 +364,74 @@ export const PROJECT_FILE_MESSAGES = {
   noPreview: "This kind of file can't be shown in a browser. Download it and your computer will open it.",
   // A type the app takes that this browser can't decode (a TIFF image, a .mov or .mkv video)
   cannotShow: "This browser can't show this file. Download it and open it on your computer.",
+} as const
+
+/**
+ * Folders, on the tabs whose items are kept rather than discussed: **Documents and Links**. They
+ * are the app's only nested folders (`models/ClientProjectFolder.ts`), because a document is filed
+ * the way a file is, inside another folder when that is what it belongs in.
+ *
+ * The other tabs are a conversation about the work (changes, ideas, discussion) or are already
+ * ordered by their own rule (backups are numbered, credentials are a short list), so they stay flat.
+ */
+export const FOLDERED_ITEM_KINDS = ["document", "link"] as const
+export type FolderedItemKind = (typeof FOLDERED_ITEM_KINDS)[number]
+export const hasFolders = (kind: string): kind is FolderedItemKind =>
+  (FOLDERED_ITEM_KINDS as readonly string[]).includes(kind)
+
+// How deep the tree goes: a folder, and four more inside it. Deeper is a filing system nobody reads
+export const PROJECT_FOLDER_MAX_DEPTH = 5
+// Per project and tab; a longer list is a sign of tags, not folders
+export const MAX_PROJECT_FOLDERS = 200
+// A folder's name is a label, like every other folder name in the app
+export const PROJECT_FOLDER_NAME_MAX_LENGTH = 60
+// What the top of the tree is called, where an item sits in no folder at all
+export const PROJECT_ROOT_FOLDER_LABEL = "All documents"
+
+/**
+ * Writing a document in the app instead of uploading one: a name and the text, kept as a .txt file
+ * on the item, so a note that belongs with the project's files is filed with them rather than
+ * living somewhere else.
+ */
+export const PROJECT_DOCUMENT_TEXT_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
+export const PROJECT_DOCUMENT_NAME_MAX_LENGTH = 120
+
+export const PROJECT_FOLDER_MESSAGES = {
+  root: PROJECT_ROOT_FOLDER_LABEL,
+  newFolder: "New folder",
+  newSubfolder: "New folder inside this one",
+  rename: "Rename",
+  move: "Move",
+  moveHere: "Move here",
+  missingName: "Name the folder.",
+  nameTooLong: `Keep the folder name under ${PROJECT_FOLDER_NAME_MAX_LENGTH} characters.`,
+  duplicate: "A folder with that name is already here.",
+  tooDeep: `Folders go ${PROJECT_FOLDER_MAX_DEPTH} levels deep at most.`,
+  tooMany: `You can keep up to ${MAX_PROJECT_FOLDERS} folders on one tab.`,
+  notFound: "That folder no longer exists.",
+  // Moving a folder into itself, or into one of its own folders, would cut it off the tree
+  intoItself: "A folder can't be moved inside itself.",
+  createFailed: "Couldn't make the folder. Please try again.",
+  renameFailed: "Couldn't rename the folder. Please try again.",
+  moveFailed: "Couldn't move it. Please try again.",
+  deleteFailed: "Couldn't delete the folder. Please try again.",
+  // Nothing is lost with a folder: what was in it comes up one level
+  deleteExplains: "What is inside comes up one level: the folders and the items are kept.",
+  deleted: "Folder deleted. What was inside came up one level.",
+  empty: "This folder is empty.",
+  noMatch: "Nothing in this folder matches that search.",
+  searchHere: "Search in this folder",
+  // Said under the search box, so it is clear what is being searched
+  searchScope: "Searching this folder and the folders inside it.",
+  // Writing a document in the app
+  write: "Create document",
+  writeHint: "Write a .txt file and keep it with this project.",
+  writeName: "File name",
+  writeText: "What the document says",
+  writeMissingName: "Give the document a name.",
+  writeMissingText: "Write something in the document.",
+  writeFailed: "Couldn't create the document. Please try again.",
+  written: "Document created.",
 } as const
 
 export const PUBLIC_PROJECT_MESSAGES = {

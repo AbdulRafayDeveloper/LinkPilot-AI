@@ -23,6 +23,11 @@ export interface IClientProjectTask {
   description: string
   // A link item's web address, stored with its scheme; "" on every other kind
   url: string
+  /**
+   * The folder it is filed in (models/ClientProjectFolder.ts), on the tabs that have folders.
+   * Null at the top of the tree, and on every item saved before folders existed.
+   */
+  folderId: string | null
   images: { assetId: string; contentType: string }[]
   // Word, PDF, video, anything the app can place (services/clientProjects/files.ts)
   files: { assetId: string; name: string; contentType: string; category: string; size: number }[]
@@ -67,6 +72,7 @@ const ClientProjectTaskSchema = new Schema<IClientProjectTask>(
     content: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     url: { type: String, default: "" },
+    folderId: { type: String, default: null },
     images: { type: [ImageSchema], default: [] },
     files: { type: [FileSchema], default: [] },
     voiceNote: { type: VoiceNoteSchema, default: null },

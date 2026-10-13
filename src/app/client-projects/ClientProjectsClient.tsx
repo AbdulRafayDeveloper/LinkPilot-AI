@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
-import { AlertTriangle, FolderKanban, Loader2, RefreshCw } from "lucide-react"
+import { AlertTriangle, FilePlus2, FolderKanban, Loader2, RefreshCw } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
@@ -11,12 +11,21 @@ import { ProjectTabs } from "@/components/client-projects/ProjectTabs"
 import { countsOf, totalItems, workItems } from "@/lib/projectItems"
 import { TaskComposer } from "@/components/client-projects/TaskComposer"
 import { ProjectLinkPanel } from "@/components/client-projects/ProjectLinkPanel"
+import { ProjectFolderTree, folderBranch, folderPath } from "@/components/client-projects/ProjectFolderTree"
+import { FolderNameDialog, MoveToFolderDialog, WriteDocumentDialog } from "@/components/client-projects/ProjectFolderDialogs"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { filterByWords } from "@/lib/nameSearch"
-import { CLIENT_PROJECTS_ENDPOINT, DEFAULT_PROJECT_ITEM_KIND, PROJECT_TASK_MESSAGES, type ProjectItemKind } from "@/constants/clientProjectTasks"
+import {
+  CLIENT_PROJECTS_ENDPOINT,
+  DEFAULT_PROJECT_ITEM_KIND,
+  PROJECT_FOLDER_MESSAGES,
+  PROJECT_TASK_MESSAGES,
+  hasFolders,
+  type ProjectItemKind,
+} from "@/constants/clientProjectTasks"
 import { CLIENT_PROJECT_STATUSES } from "@/constants/clients"
-import type { ClientProjectsPage, ProjectTask, ProjectTaskInput, ProjectWithTasks } from "@/types/clientProjectTasks"
+import type { ClientProjectsPage, ProjectFolder, ProjectTask, ProjectTaskInput, ProjectWithTasks } from "@/types/clientProjectTasks"
 
 /**
  * Client Projects: every project of every client in one list, and the tasks under the one chosen.
@@ -43,6 +52,23 @@ export default function ClientProjectsClient() {
   const [busyId, setBusyId] = useState<string | null>(null)
   // Which tab is open. It stays as the user left it while they move between projects
   const [tab, setTab] = useState<ProjectItemKind>(DEFAULT_PROJECT_ITEM_KIND)
+  /**
+   * The folders of the project on screen, and which one is open. The Documents and Links tabs are
+   * filed in folders (`hasFolders`); every other tab is a flat list, so neither the tree nor the
+   * folder search is drawn on it.
+   */
+  const [folders, setFolders] = useState<ProjectFolder[]>([])
+  const [folderId, setFolderId] = useState<string | null>(null)
+  const [folderSearch, setFolderSearch] = useState("")
+  const [folderBusyId, setFolderBusyId] = useState<string | null>(null)
+  const [folderError, setFolderError] = useState<string | null>(null)
+  const [isFolderSaving, setIsFolderSaving] = useState(false)
+  // Which folder dialog is open: naming one, moving something, or writing a document
+  const [naming, setNaming] = useState<{ renaming: ProjectFolder | null; parentId: string | null } | null>(null)
+  const [movingTask, setMovingTask] = useState<ProjectTask | null>(null)
+  const [movingFolder, setMovingFolder] = useState<ProjectFolder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<ProjectFolder | null>(null)
+  const [isWriting, setIsWriting] = useState(false)
   const [editing, setEditing] = useState<ProjectTask | null>(null)
   const [deleting, setDeleting] = useState<ProjectTask | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -82,9 +108,12 @@ export default function ClientProjectsClient() {
   useEffect(() => {
     if (!chosenId_) return
     const controller = new AbortController()
-    requestApi<{ project: ProjectWithTasks; tasks: ProjectTask[] }>(`${CLIENT_PROJECTS_ENDPOINT}/${chosenId_}`, { signal: controller.signal })
+    requestApi<{ project: ProjectWithTasks; tasks: ProjectTask[]; folders?: ProjectFolder[] }>(`${CLIENT_PROJECTS_ENDPOINT}/${chosenId_}`, {
+      signal: controller.signal,
+    })
       .then(({ data }) => {
         setLoaded({ projectId: chosenId_, attempt, tasks: data.tasks })
+        setFolders(data.folders ?? [])
         setTaskError(null)
       })
       .catch((reason: unknown) => {
@@ -122,9 +151,11 @@ export default function ClientProjectsClient() {
 
   const addTask = async (input: ProjectTaskInput) => {
     if (!chosen) return
+    // It goes in the folder being looked at, which is where the user expects to find it
+    const body = hasFolders(input.kind ?? tab) ? { ...input, folderId } : input
     const { data } = await requestApi<ProjectTask>(
       `${CLIENT_PROJECTS_ENDPOINT}/${chosen.id}/tasks`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) },
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
       // It creates a record and may carry images and a voice note, so a retry must not add it twice
       { idempotent: true }
     )
@@ -162,6 +193,111 @@ export default function ClientProjectsClient() {
     }
   }
 
+  /** Every folder call answers with the folder, so the tree follows without reading it again. */
+  const reloadFolders = async (projectId: string) => {
+    const { data } = await requestApi<{ folders: ProjectFolder[] }>(`${CLIENT_PROJECTS_ENDPOINT}/${projectId}/folders`)
+    setFolders(data.folders)
+  }
+
+  const makeFolder = async (name: string) => {
+    if (!chosen || !naming) return
+    setIsFolderSaving(true)
+    setFolderError(null)
+    try {
+      if (naming.renaming) {
+        await requestApi<ProjectFolder>(`${CLIENT_PROJECTS_ENDPOINT}/${chosen.id}/folders/${naming.renaming.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        })
+      } else {
+        const { data } = await requestApi<ProjectFolder>(
+          `${CLIENT_PROJECTS_ENDPOINT}/${chosen.id}/folders`,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: tab, name, parentId: naming.parentId }) },
+          // It creates a record, so a retry must not make the folder twice
+          { idempotent: true }
+        )
+        // A folder just made is the one to work in
+        setFolderId(data.id)
+      }
+      await reloadFolders(chosen.id)
+      setNaming(null)
+    } catch (reason: unknown) {
+      setFolderError(reason instanceof Error ? reason.message : PROJECT_FOLDER_MESSAGES.createFailed)
+    } finally {
+      setIsFolderSaving(false)
+    }
+  }
+
+  /** Moves one item, or one folder, into another folder (null for the top of the tree). */
+  const moveInto = async (target: string | null) => {
+    if (!chosen) return
+    const task = movingTask
+    const folder = movingFolder
+    setIsFolderSaving(true)
+    setFolderError(null)
+    try {
+      if (task) {
+        await saveTask(task, { folderId: target })
+        await reloadFolders(chosen.id)
+        setMovingTask(null)
+      } else if (folder) {
+        await requestApi<ProjectFolder>(`${CLIENT_PROJECTS_ENDPOINT}/${chosen.id}/folders/${folder.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ parentId: target }),
+        })
+        await reloadFolders(chosen.id)
+        setMovingFolder(null)
+      }
+    } catch (reason: unknown) {
+      setFolderError(reason instanceof Error ? reason.message : PROJECT_FOLDER_MESSAGES.moveFailed)
+    } finally {
+      setIsFolderSaving(false)
+    }
+  }
+
+  /** Deletes a folder. What was inside comes up one level, so the items are read again. */
+  const removeFolder = async () => {
+    if (!chosen || !deletingFolder) return
+    setFolderBusyId(deletingFolder.id)
+    setFolderError(null)
+    try {
+      await requestApi(`${CLIENT_PROJECTS_ENDPOINT}/${chosen.id}/folders/${deletingFolder.id}`, { method: "DELETE" })
+      // The folder being looked at may be the one that went, so the view goes to where it was
+      if (folderId === deletingFolder.id) setFolderId(deletingFolder.parentId)
+      setDeletingFolder(null)
+      setAttempt((count) => count + 1)
+    } catch (reason: unknown) {
+      setFolderError(reason instanceof Error ? reason.message : PROJECT_FOLDER_MESSAGES.deleteFailed)
+    } finally {
+      setFolderBusyId(null)
+    }
+  }
+
+  /** Writes a .txt document in the app and files it where the user is looking. */
+  const writeDocument = async (name: string, text: string) => {
+    if (!chosen) return
+    setIsFolderSaving(true)
+    setFolderError(null)
+    try {
+      const { data } = await requestApi<ProjectTask>(
+        `${CLIENT_PROJECTS_ENDPOINT}/${chosen.id}/documents`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, text, folderId }) },
+        // It stores a file and creates an item, so a retry must not write the document twice
+        { idempotent: true }
+      )
+      setTasks((current) => [...current, data])
+      bump(chosen.id, data.kind, 1, 0)
+      await reloadFolders(chosen.id)
+      setIsWriting(false)
+    } catch (reason: unknown) {
+      setFolderError(reason instanceof Error ? reason.message : PROJECT_FOLDER_MESSAGES.writeFailed)
+    } finally {
+      setIsFolderSaving(false)
+    }
+  }
+
   const removeTask = async () => {
     if (!deleting || !chosen) return
     setIsDeleting(true)
@@ -195,7 +331,7 @@ export default function ClientProjectsClient() {
             <div className="min-w-0">
               <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
                 <FolderKanban size={24} className="shrink-0 text-primary" aria-hidden="true" />
-                Client Projects
+                Projects Management
               </h1>
               <p className="mt-1 text-sm text-on-surface-variant">
                 Every client project with the work under it. Projects themselves are added to a client in Clients Management.
@@ -302,7 +438,16 @@ export default function ClientProjectsClient() {
                       onChanged={(token) => countTasks(chosen.id, (project) => ({ ...project, publicToken: token }))}
                     />
 
-                    <ProjectTabs chosen={tab} onChoose={setTab} counts={tasks ? countsOf(tasks) : chosen.counts} />
+                    <ProjectTabs
+                      chosen={tab}
+                      onChoose={(next) => {
+                        setTab(next)
+                        // Each tab has its own folders, so changing tab opens that tab at the top
+                        setFolderId(null)
+                        setFolderSearch("")
+                      }}
+                      counts={tasks ? countsOf(tasks) : chosen.counts}
+                    />
 
                     <div id={`project-panel-${tab}`} role="tabpanel" aria-labelledby={`project-tab-${tab}`} className="flex min-w-0 flex-col gap-3">
                       {/* Keyed by the tab, so each one opens its own empty form rather than what
@@ -320,7 +465,8 @@ export default function ClientProjectsClient() {
                           <Loader2 size={16} className="animate-spin text-primary" aria-hidden="true" />
                           Loading what is on this project...
                         </p>
-                      ) : (
+                      ) : !hasFolders(tab) ? (
+                        /* The tabs that are a conversation about the work stay a flat list */
                         <ProjectTasks
                           tasks={tasks.filter((task) => task.kind === tab)}
                           kind={tab}
@@ -330,6 +476,116 @@ export default function ClientProjectsClient() {
                           onDelete={setDeleting}
                           clientTag={PROJECT_TASK_MESSAGES.fromClient}
                         />
+                      ) : (
+                        (() => {
+                          const tabFolders = folders.filter((folder) => folder.kind === tab)
+                          const branch = folderBranch(tabFolders, folderId)
+                          const ofTab = tasks.filter((task) => task.kind === tab)
+                          const inHere = ofTab.filter((task) => branch.has(task.folderId ?? null))
+                          const searched = folderSearch.trim()
+                            ? filterByWords(inHere, folderSearch, (task) => `${task.content} ${task.url} ${task.files.map((file) => file.name).join(" ")}`)
+                            : inHere
+                          const path = folderPath(tabFolders, folderId)
+                          return (
+                            <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
+                              <div className="min-w-0 rounded-2xl border border-outline-variant bg-white p-2">
+                                <ProjectFolderTree
+                                  folders={tabFolders}
+                                  selectedId={folderId}
+                                  rootCount={ofTab.filter((task) => !task.folderId).length}
+                                  busyId={folderBusyId}
+                                  onSelect={(id) => {
+                                    setFolderId(id)
+                                    setFolderSearch("")
+                                  }}
+                                  onCreate={(parentId) => {
+                                    setFolderError(null)
+                                    setNaming({ renaming: null, parentId })
+                                  }}
+                                  onRename={(folder) => {
+                                    setFolderError(null)
+                                    setNaming({ renaming: folder, parentId: folder.parentId })
+                                  }}
+                                  onDelete={(folder) => {
+                                    setFolderError(null)
+                                    setDeletingFolder(folder)
+                                  }}
+                                />
+                              </div>
+
+                              <div className="flex min-w-0 flex-col gap-3">
+                                {/* Where the list is, and the two things to do here: search it, or
+                                    write a document straight into it */}
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <p className="min-w-0 text-[12px] text-on-surface-variant">
+                                    <span className="font-semibold text-on-surface">
+                                      {path.length === 0 ? PROJECT_FOLDER_MESSAGES.root : path.map((folder) => folder.name).join(" / ")}
+                                    </span>
+                                    {path.length > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setMovingFolder(path[path.length - 1])}
+                                        className="ml-2 font-semibold text-primary hover:underline"
+                                      >
+                                        {PROJECT_FOLDER_MESSAGES.move}
+                                      </button>
+                                    )}
+                                  </p>
+                                  {tab === "document" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setFolderError(null)
+                                        setIsWriting(true)
+                                      }}
+                                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                                    >
+                                      <FilePlus2 size={14} aria-hidden="true" />
+                                      {PROJECT_FOLDER_MESSAGES.write}
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <input
+                                    value={folderSearch}
+                                    onChange={(event) => setFolderSearch(event.target.value)}
+                                    placeholder={PROJECT_FOLDER_MESSAGES.searchHere}
+                                    aria-label={PROJECT_FOLDER_MESSAGES.searchHere}
+                                    className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[13px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
+                                  />
+                                  <p className="mt-1 text-[11px] text-outline">{PROJECT_FOLDER_MESSAGES.searchScope}</p>
+                                </div>
+
+                                {folderError && (
+                                  <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
+                                    {folderError}
+                                  </p>
+                                )}
+
+                                {searched.length === 0 ? (
+                                  <p className="rounded-xl border border-dashed border-outline-variant px-3 py-6 text-center text-[13px] text-outline">
+                                    {folderSearch.trim() ? PROJECT_FOLDER_MESSAGES.noMatch : PROJECT_FOLDER_MESSAGES.empty}
+                                  </p>
+                                ) : (
+                                  <ProjectTasks
+                                    tasks={searched}
+                                    kind={tab}
+                                    busyId={busyId}
+                                    onTick={tick}
+                                    onEdit={setEditing}
+                                    onDelete={setDeleting}
+                                    onMove={(task) => {
+                                      setFolderError(null)
+                                      setMovingTask(task)
+                                    }}
+                                    clientTag={PROJECT_TASK_MESSAGES.fromClient}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })()
                       )}
                     </div>
                   </section>
@@ -339,6 +595,92 @@ export default function ClientProjectsClient() {
           </div>
         </main>
       </div>
+
+      {naming && chosen && (
+        <FolderNameDialog
+          folders={folders.filter((folder) => folder.kind === tab)}
+          renaming={naming.renaming}
+          parentId={naming.parentId}
+          isSaving={isFolderSaving}
+          error={folderError}
+          onSubmit={(name) => void makeFolder(name)}
+          onClose={() => {
+            if (isFolderSaving) return
+            setNaming(null)
+            setFolderError(null)
+          }}
+        />
+      )}
+
+      {(movingTask || movingFolder) && chosen && (
+        <MoveToFolderDialog
+          folders={folders.filter((folder) => folder.kind === (movingTask?.kind ?? movingFolder?.kind ?? tab))}
+          what={movingTask ? movingTask.content : (movingFolder?.name ?? "")}
+          movingFolderId={movingFolder?.id ?? null}
+          currentFolderId={movingTask ? movingTask.folderId : (movingFolder?.parentId ?? null)}
+          isSaving={isFolderSaving}
+          error={folderError}
+          onSubmit={(target) => void moveInto(target)}
+          onClose={() => {
+            if (isFolderSaving) return
+            setMovingTask(null)
+            setMovingFolder(null)
+            setFolderError(null)
+          }}
+        />
+      )}
+
+      {isWriting && chosen && (
+        <WriteDocumentDialog
+          folders={folders.filter((folder) => folder.kind === "document")}
+          folderId={folderId}
+          isSaving={isFolderSaving}
+          error={folderError}
+          onSubmit={(name, text) => void writeDocument(name, text)}
+          onClose={() => {
+            if (isFolderSaving) return
+            setIsWriting(false)
+            setFolderError(null)
+          }}
+        />
+      )}
+
+      {deletingFolder && (
+        <Modal
+          title={`Delete the folder ${deletingFolder.name}?`}
+          description={PROJECT_FOLDER_MESSAGES.deleteExplains}
+          onClose={() => setDeletingFolder(null)}
+          isCloseDisabled={folderBusyId === deletingFolder.id}
+          size="compact"
+          footer={
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeletingFolder(null)}
+                disabled={folderBusyId === deletingFolder.id}
+                className="rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-50"
+              >
+                Keep it
+              </button>
+              <button
+                type="button"
+                onClick={() => void removeFolder()}
+                disabled={folderBusyId === deletingFolder.id}
+                className="inline-flex items-center gap-2 rounded-xl bg-error px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-error/90 disabled:opacity-60"
+              >
+                {folderBusyId === deletingFolder.id && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
+                Delete the folder
+              </button>
+            </div>
+          }
+        >
+          <p className="text-[13px] leading-relaxed text-on-surface-variant">
+            {deletingFolder.totalItemCount > 0
+              ? `${deletingFolder.totalItemCount} ${deletingFolder.totalItemCount === 1 ? "item is" : "items are"} filed in it. ${PROJECT_FOLDER_MESSAGES.deleteExplains}`
+              : PROJECT_FOLDER_MESSAGES.deleteExplains}
+          </p>
+        </Modal>
+      )}
 
       {editing && (
         <Modal title="Edit" onClose={() => setEditing(null)} size="large">

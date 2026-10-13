@@ -15,6 +15,11 @@ import {
   PROJECT_TASK_MESSAGES,
   PROJECT_TASK_STATUS_IDS,
   VOICE_NOTE_MAX_SECONDS,
+  FOLDERED_ITEM_KINDS,
+  PROJECT_FOLDER_MESSAGES,
+  PROJECT_FOLDER_NAME_MAX_LENGTH,
+  PROJECT_DOCUMENT_NAME_MAX_LENGTH,
+  PROJECT_DOCUMENT_TEXT_MAX_LENGTH,
 } from "@/constants/clientProjectTasks"
 import { ASSET_CATEGORY_IDS, categoryForContentType } from "@/constants/importantFiles"
 import { PROJECT_DESCRIPTION_MAX_LENGTH, type ProjectItemKind } from "@/constants/clientProjectTasks"
@@ -105,7 +110,17 @@ export const ProjectTaskSchema = newItemSchema(PROJECT_ITEM_KIND_IDS)
  * is `{ status }` alone and never has to carry its text, images and voice note back. `kind` is not
  * among them: which tab an item belongs to is settled when it is added.
  */
-const editFields = { content: content.optional(), description, url, images, files, voiceNote, status }
+const editFields = {
+  content: content.optional(),
+  description,
+  url,
+  images,
+  files,
+  voiceNote,
+  status,
+  // Where it is filed. Left out, the item is not moved; null moves it to the top of the tree
+  folderId: z.union([z.string().regex(/^[0-9a-f]{24}$/), z.null()]).optional(),
+}
 // Named rather than counted, so the shared link's body can carry `taskId` as well and that alone
 // still reads as "nothing to change"
 const EDIT_FIELDS = Object.keys(editFields)
@@ -129,6 +144,51 @@ export const PublicTaskDeleteSchema = z.object({ taskId })
  * mapping and the size against that type's own ceiling, then answers how many chunks to send; the
  * browser never chooses a key, a chunk size or an id.
  */
+const FOLDER_ID = z.string().regex(/^[0-9a-f]{24}$/, PROJECT_FOLDER_MESSAGES.notFound)
+
+/** Where an item is filed: a folder of this project, or null for the top of the tree. */
+export const ProjectFolderIdSchema = z.union([FOLDER_ID, z.null()])
+
+const FolderName = z
+  .string({ error: PROJECT_FOLDER_MESSAGES.missingName })
+  .transform((value) => value.replace(/\s+/g, " ").trim())
+  .pipe(
+    z
+      .string()
+      .min(1, PROJECT_FOLDER_MESSAGES.missingName)
+      .max(PROJECT_FOLDER_NAME_MAX_LENGTH, PROJECT_FOLDER_MESSAGES.nameTooLong)
+  )
+
+/** A new folder: which tab it files, its name, and the folder it sits in (none for the top). */
+export const ProjectFolderSchema = z.object({
+  kind: z.enum(FOLDERED_ITEM_KINDS, { error: PROJECT_FOLDER_MESSAGES.notFound }),
+  name: FolderName,
+  parentId: ProjectFolderIdSchema.optional().transform((value) => value ?? null),
+})
+
+/** A change to a folder: its name, where it sits, or both. One that says nothing is refused. */
+export const ProjectFolderChangeSchema = z
+  .object({ name: FolderName.optional(), parentId: ProjectFolderIdSchema.optional() })
+  .refine((body) => body.name !== undefined || body.parentId !== undefined, PROJECT_FOLDER_MESSAGES.renameFailed)
+
+/** A document written in the app: its name, what it says, and where to file it. */
+export const ProjectDocumentSchema = z.object({
+  name: z
+    .string({ error: PROJECT_FOLDER_MESSAGES.writeMissingName })
+    .transform((value) => value.replace(/\s+/g, " ").trim())
+    .pipe(
+      z
+        .string()
+        .min(1, PROJECT_FOLDER_MESSAGES.writeMissingName)
+        .max(PROJECT_DOCUMENT_NAME_MAX_LENGTH, PROJECT_FOLDER_MESSAGES.nameTooLong)
+    ),
+  text: z
+    .string({ error: PROJECT_FOLDER_MESSAGES.writeMissingText })
+    .min(1, PROJECT_FOLDER_MESSAGES.writeMissingText)
+    .max(PROJECT_DOCUMENT_TEXT_MAX_LENGTH, PROJECT_TASK_MESSAGES.descriptionTooLong),
+  folderId: ProjectFolderIdSchema.optional().transform((value) => value ?? null),
+})
+
 export const ProjectFilePlanSchema = z
   .object({
     name: z.string().trim().min(1, PROJECT_TASK_MESSAGES.missingFileName).max(PROJECT_FILE_NAME_MAX_LENGTH),
