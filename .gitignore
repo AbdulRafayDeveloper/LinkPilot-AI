@@ -54,8 +54,9 @@ next-env.d.ts
 # Tests are the owner's own and stay on this machine: never pushed, never shared with collaborators
 /tests/
 
-# One-off scripts and their output left in the project root while testing
-/*.local.mjs
+# One-off scripts and their output left in the project root while testing. Any extension, since a
+# scratch file written as .cjs or .js slipped past a rule that named .mjs alone and was committed
+/*.local.*
 /*.out
 
 # Lists of LinkedIn profiles and sheets for scripts/import-profile-people.mjs: people's profiles, kept off the public repository
