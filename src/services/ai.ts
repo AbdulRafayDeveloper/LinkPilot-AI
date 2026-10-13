@@ -406,6 +406,13 @@ export interface StructuredGenerationOptions<T extends Record<string, unknown>> 
   onFallback?: (failed: ModelProvider, next: ModelProvider) => void
   // Returns a reason when the output is unusable, which triggers the fallback provider
   validate?: (output: T) => string | null
+  /**
+   * How much room the answer needs, for a schema big enough that the provider's own default cuts it
+   * off mid-JSON (a meeting part). Left out, the provider decides, which is right for every tool
+   * that writes a short piece: Groq counts what is **requested** against the per-minute allowance,
+   * so reserving thousands of tokens a tool will never use would rate limit it for nothing.
+   */
+  maxTokens?: number
 }
 
 export interface StructuredGeneration<T> {
@@ -430,10 +437,16 @@ function parsedOf<T>(answer: RawStructured<T>): T {
 
 async function invokeStructured<T extends Record<string, unknown>>(
   provider: ModelProvider,
-  { schema, name, messages, temperature = DEFAULT_TEMPERATURE, input = "text" }: StructuredGenerationOptions<T>,
+  { schema, name, messages, temperature = DEFAULT_TEMPERATURE, input = "text", maxTokens }: StructuredGenerationOptions<T>,
   signal: AbortSignal
 ): Promise<T> {
-  const modelOptions = { temperature, maxRetries: 0 }
+  /**
+   * How much the model may write, **only where the caller asks for room**. It is left to the
+   * provider's own default everywhere else on purpose: Groq counts what is requested against the
+   * per-minute allowance, so a tool that writes 300 characters must not reserve thousands of tokens
+   * it will never use.
+   */
+  const modelOptions = { temperature, maxRetries: 0, ...(maxTokens ? { maxTokens } : {}) }
   const kind = input === "image" ? "screenshot" : "text"
   const model = modelNameOf(provider, input)
   if (provider === "groq") {

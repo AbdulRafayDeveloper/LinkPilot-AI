@@ -1,8 +1,9 @@
 /**
  * Server side: whether a failed outbound call (AI provider, web research, MongoDB) is worth
  * retrying. Transient means it may well succeed in a moment: rate limits, 5xx answers and
- * dropped connections. Bad requests, bad keys, used-up quotas, timeouts and aborts are not
- * retried; for AI calls the next provider takes over instead, which is faster than waiting.
+ * dropped connections, and the one bad request that is the model's own fault rather than the
+ * request's: JSON that did not fit the schema it was given. Bad keys, used-up quotas, timeouts and
+ * aborts are not retried; for AI calls the next provider takes over instead, which is faster.
  */
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
 const NETWORK_CODES = new Set([
@@ -21,6 +22,14 @@ const NETWORK_MESSAGE = /fetch failed|socket hang up|network error|ECONNRESET|ET
 const DATABASE_NETWORK_ERROR = /^(?:MongoNetworkError|MongoNetworkTimeoutError|MongoServerSelectionError|MongooseServerSelectionError)$/
 // A 429 that means the plan's quota is used up won't clear in seconds
 const QUOTA_EXHAUSTED = /exceeded your current quota|insufficient_quota|billing|per day|\(TPD\)|\(RPD\)/i
+/**
+ * The one 400 worth asking again: the model wrote JSON that did not fit the schema it was given
+ * (Groq answers `json_validate_failed`, "Failed to validate JSON"). Nothing about the request is
+ * wrong, so sending it again usually gets a valid answer; everything else about a 400 is the
+ * request's own fault and is never retried.
+ */
+const MODEL_WROTE_BAD_JSON = /json_validate_failed|failed to validate json/i
+
 // Status codes the SDKs only put in the message, e.g. "[503 Service Unavailable]"
 const STATUS_IN_MESSAGE = /\[(\d{3})\b|\b(\d{3}) (?:Service Unavailable|Bad Gateway|Gateway Timeout|Too Many Requests|Internal Server Error|Request Timeout)\b/i
 
@@ -57,6 +66,7 @@ export function isTransientError(error: unknown): boolean {
   const name = String(asErrorLike(error).name ?? "")
   if (name === "AbortError" || name === "TimeoutError") return false
   if (DATABASE_NETWORK_ERROR.test(name)) return true
+  if (MODEL_WROTE_BAD_JSON.test(messageOf(error))) return true
   const status = statusOf(error)
   if (status !== null) return RETRYABLE_STATUS.has(status) && !(status === 429 && QUOTA_EXHAUSTED.test(messageOf(error)))
   const code = networkCodeOf(error)

@@ -4,7 +4,7 @@ import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
 import { SITE_AUTHOR } from "@/config/site"
-import { MEETING_MESSAGES, MEETING_TITLE_MAX_LENGTH } from "@/constants/meetings"
+import { MEETING_MESSAGES, MEETING_TITLE_MAX_LENGTH, MEETING_ANSWER_MAX_TOKENS } from "@/constants/meetings"
 import type { TranscriptChunk } from "@/lib/transcriptChunks"
 import type { MeetingAnalysis } from "@/types/meetings"
 import { aggregateChunkResults } from "./aggregate"
@@ -113,6 +113,8 @@ export async function analyzeChunk(chunk: TranscriptChunk, totalChunks: number, 
       new HumanMessage(user),
     ],
     temperature: ANALYSIS_TEMPERATURE,
+    // A meeting's schemas are the biggest the app asks for; the provider's own default cut them off
+    maxTokens: MEETING_ANSWER_MAX_TOKENS,
     signal,
   })
   return data
@@ -148,6 +150,8 @@ async function foldResults(
       new HumanMessage(user),
     ],
     temperature: ANALYSIS_TEMPERATURE,
+    // A meeting's schemas are the biggest the app asks for; the provider's own default cut them off
+    maxTokens: MEETING_ANSWER_MAX_TOKENS,
     signal,
   })
   return data
@@ -236,6 +240,8 @@ export async function synthesizeMeeting(
       new HumanMessage(user),
     ],
     temperature: ANALYSIS_TEMPERATURE,
+    // Putting the whole meeting together is the longest answer of all
+    maxTokens: MEETING_ANSWER_MAX_TOKENS,
     timeoutMs: SYNTHESIS_TIMEOUT_MS,
     signal: options.signal,
     /**

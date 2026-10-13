@@ -166,6 +166,14 @@ export const PLAN_PICK_ENDPOINT = "/api/meeting-planner/pick"
 // How many records one call may link, which is a page of the meetings list
 export const MAX_LINKED_AT_ONCE = 50
 
+/**
+ * How much room a meeting's own answers get. Measured rather than guessed: one part of a transcript
+ * answers in about 4,000 tokens with its reasoning, and the provider's own default cut that off
+ * mid-JSON, which it then refused outright. It stays under Groq's free per-minute allowance of
+ * 8,000 tokens together with the prompt, because what is **requested** counts towards it.
+ */
+export const MEETING_ANSWER_MAX_TOKENS = 5000
+
 // How long a step waits when every model is busy for the minute, so the page's loop paces itself
 export const BUSY_WAIT_MS = 5_000
 
