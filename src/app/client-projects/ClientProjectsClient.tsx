@@ -8,7 +8,7 @@ import { Modal } from "@/components/ui/Modal"
 import { FilterPanel, SearchFilter, SelectFilter } from "@/components/history/HistoryFilters"
 import { ProjectTasks, deleteItemTitle } from "@/components/client-projects/ProjectTasks"
 import { ProjectTabs } from "@/components/client-projects/ProjectTabs"
-import { countsOf } from "@/lib/projectItems"
+import { countsOf, totalItems, workItems } from "@/lib/projectItems"
 import { TaskComposer } from "@/components/client-projects/TaskComposer"
 import { ProjectLinkPanel } from "@/components/client-projects/ProjectLinkPanel"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -102,6 +102,24 @@ export default function ClientProjectsClient() {
   const countTasks = (projectId: string, change: (project: ProjectWithTasks) => ProjectWithTasks) =>
     setPage((current) => (current ? { ...current, projects: current.projects.map((project) => (project.id === projectId ? change(project) : project)) } : current))
 
+  /**
+   * One item added, removed or ticked, counted on its own tab as well as on the project. The row in
+   * the list reads its tabs, so a credential or a backup must not land in the "done" of the work.
+   */
+  const bump = (projectId: string, kind: ProjectItemKind, total: number, done: number) =>
+    countTasks(projectId, (project) => ({
+      ...project,
+      taskCount: Math.max(0, project.taskCount + total),
+      doneCount: Math.max(0, project.doneCount + done),
+      counts: {
+        ...project.counts,
+        [kind]: {
+          total: Math.max(0, project.counts[kind].total + total),
+          done: Math.max(0, project.counts[kind].done + done),
+        },
+      },
+    }))
+
   const addTask = async (input: ProjectTaskInput) => {
     if (!chosen) return
     const { data } = await requestApi<ProjectTask>(
@@ -111,7 +129,7 @@ export default function ClientProjectsClient() {
       { idempotent: true }
     )
     setTasks((current) => [...current, data])
-    countTasks(chosen.id, (project) => ({ ...project, taskCount: project.taskCount + 1 }))
+    bump(chosen.id, data.kind, 1, 0)
   }
 
   const saveTask = async (task: ProjectTask, input: Partial<ProjectTaskInput>) => {
@@ -131,13 +149,13 @@ export default function ClientProjectsClient() {
     const status = done ? "done" : "open"
     setBusyId(task.id)
     setTasks((current) => current.map((row) => (row.id === task.id ? { ...row, status } : row)))
-    countTasks(chosen.id, (project) => ({ ...project, doneCount: Math.max(0, project.doneCount + (done ? 1 : -1)) }))
+    bump(chosen.id, task.kind, 0, done ? 1 : -1)
     try {
       await saveTask(task, { status })
       setTaskError(null)
     } catch (reason: unknown) {
       setTasks((current) => current.map((row) => (row.id === task.id ? { ...row, status: task.status } : row)))
-      countTasks(chosen.id, (project) => ({ ...project, doneCount: Math.max(0, project.doneCount + (done ? -1 : 1)) }))
+      bump(chosen.id, task.kind, 0, done ? -1 : 1)
       setTaskError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.saveFailed)
     } finally {
       setBusyId(null)
@@ -150,11 +168,7 @@ export default function ClientProjectsClient() {
     try {
       await requestApi(`${CLIENT_PROJECTS_ENDPOINT}/${chosen.id}/tasks/${deleting.id}`, { method: "DELETE" })
       setTasks((current) => current.filter((row) => row.id !== deleting.id))
-      countTasks(chosen.id, (project) => ({
-        ...project,
-        taskCount: Math.max(0, project.taskCount - 1),
-        doneCount: Math.max(0, project.doneCount - (deleting.status === "done" ? 1 : 0)),
-      }))
+      bump(chosen.id, deleting.kind, -1, deleting.status === "done" ? -1 : 0)
       setDeleting(null)
       setTaskError(null)
     } catch (reason: unknown) {
@@ -234,6 +248,10 @@ export default function ClientProjectsClient() {
                 <ul className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto rounded-2xl border border-outline-variant bg-white p-2 xl:max-h-[calc(100vh-280px)]">
                   {projects.map((project) => {
                     const isChosen = chosen?.id === project.id
+                    // Only what can be ticked off is "done": a credential, a link, a document or a
+                    // backup is kept rather than finished, so it is counted as what the project holds
+                    const work = workItems(project.counts)
+                    const held = totalItems(project.counts)
                     return (
                       <li key={project.id}>
                         <button
@@ -256,7 +274,12 @@ export default function ClientProjectsClient() {
                           </span>
                           <span className="truncate text-[12px] text-on-surface-variant">{project.clientName}</span>
                           <span className="text-[11px] text-outline">
-                            {project.taskCount === 0 ? "No tasks yet" : `${project.doneCount} of ${project.taskCount} done`}
+                            {work.total > 0
+                              ? `${work.done} of ${work.total} done`
+                              : held.total > 0
+                                ? `${held.total} ${held.total === 1 ? "item" : "items"}`
+                                : "Nothing on it yet"}
+                            {work.total > 0 && held.total > work.total ? ` · ${held.total - work.total} kept` : ""}
                             {project.publicToken ? " · shared" : ""}
                           </span>
                         </button>
@@ -282,7 +305,9 @@ export default function ClientProjectsClient() {
                     <ProjectTabs chosen={tab} onChoose={setTab} counts={tasks ? countsOf(tasks) : chosen.counts} />
 
                     <div id={`project-panel-${tab}`} role="tabpanel" aria-labelledby={`project-tab-${tab}`} className="flex min-w-0 flex-col gap-3">
-                      <TaskComposer task={null} kind={tab} onSave={addTask} fileEndpoint={`${CLIENT_PROJECTS_ENDPOINT}/${chosen.id}/files`} />
+                      {/* Keyed by the tab, so each one opens its own empty form rather than what
+                          was half written on another */}
+                      <TaskComposer key={tab} task={null} kind={tab} onSave={addTask} fileEndpoint={`${CLIENT_PROJECTS_ENDPOINT}/${chosen.id}/files`} />
 
                       {taskError && (
                         <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">

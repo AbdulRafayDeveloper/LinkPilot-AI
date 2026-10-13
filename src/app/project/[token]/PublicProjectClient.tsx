@@ -11,8 +11,9 @@ import { TaskComposer } from "@/components/client-projects/TaskComposer"
 import { requestApi } from "@/lib/apiClient"
 import { SITE_LOGO_PNG, SITE_NAME } from "@/config/site"
 import {
-  DEFAULT_PROJECT_ITEM_KIND,
+  DEFAULT_PUBLIC_ITEM_KIND,
   PROJECT_TASK_MESSAGES,
+  PUBLIC_ITEM_KINDS,
   PUBLIC_PROJECT_ENDPOINT,
   PUBLIC_PROJECT_MESSAGES,
   PUBLIC_UPLOAD_PATHS,
@@ -24,10 +25,14 @@ import type { ProjectTask, ProjectTaskInput, PublicProject } from "@/types/clien
  * What a project's shared link opens, for a client who is not signed in to anything: the project,
  * who it is for, and its changes, ideas and discussion under the same three tabs the owner sees.
  *
- * **It writes.** The client adds items, edits them, ticks them off and removes them, with images
- * and a voice note, which is what the link is for: the work is theirs to describe. Every call goes
- * to this project's own token, so nothing here can reach another project, and the owner stops all
- * of it by turning the link off.
+ * **It writes.** The client adds items, edits them, ticks them off and removes them, with images,
+ * files and a voice note, which is what the link is for: the work is theirs to describe. Every call
+ * goes to this project's own token, so nothing here can reach another project, and the owner stops
+ * all of it by turning the link off.
+ *
+ * **It shows the public tabs only** (`PUBLIC_ITEM_KINDS`): the project's credentials and its backups
+ * are the owner's own and are never listed, never read and never writable from here. That is held
+ * on the server as well as here, so the page's list of tabs is the convenience rather than the rule.
  *
  * There is still nothing here that says whose account the project is, or what else that client has.
  *
@@ -38,7 +43,8 @@ import type { ProjectTask, ProjectTaskInput, PublicProject } from "@/types/clien
 export default function PublicProjectClient({ token }: { token: string }) {
   const [project, setProject] = useState<PublicProject | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<ProjectItemKind>(DEFAULT_PROJECT_ITEM_KIND)
+  // Only the tabs a link shows, so the one it opens on is the first of those
+  const [tab, setTab] = useState<ProjectItemKind>(DEFAULT_PUBLIC_ITEM_KIND)
   const [writeError, setWriteError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [editing, setEditing] = useState<ProjectTask | null>(null)
@@ -162,10 +168,11 @@ export default function PublicProjectClient({ token }: { token: string }) {
               <p className="mt-3 rounded-xl bg-surface-container-lowest px-3 py-2 text-[12px] text-on-surface-variant">{PUBLIC_PROJECT_MESSAGES.intro}</p>
             </section>
 
-            <ProjectTabs chosen={tab} onChoose={setTab} counts={countsOf(project.tasks)} />
+            <ProjectTabs chosen={tab} onChoose={setTab} counts={countsOf(project.tasks)} kinds={PUBLIC_ITEM_KINDS} />
 
             <section id={`project-panel-${tab}`} role="tabpanel" aria-labelledby={`project-tab-${tab}`} className="flex min-w-0 flex-col gap-3">
               <TaskComposer
+                key={tab}
                 task={null}
                 kind={tab}
                 onSave={addTask}

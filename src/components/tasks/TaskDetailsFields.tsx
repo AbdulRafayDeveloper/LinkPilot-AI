@@ -44,6 +44,22 @@ interface TaskDetailsFieldsProps {
    * `AI_DESCRIPTION_MAX_CHARS` of it is ever handed to a model.
    */
   maxDescription?: number
+  /**
+   * What the written block is called and what it says when it is empty. Left out it is the shared
+   * "Description", which is what a task is written with everywhere; Client Projects' Credentials tab
+   * passes its own, because what is written there is the credentials themselves rather than a note
+   * about them. `textRequired` only drops the "(optional)" beside the label, since what each kind of
+   * item really needs is decided in one place (`itemProblem`) rather than in the fields.
+   */
+  textLabel?: string
+  textHint?: string
+  textRequired?: boolean
+  /**
+   * Whether images may be attached here at all. Off (Client Projects' credentials, links, documents
+   * and backups) the picker is not rendered: it is different from `canAttachImage`, which is on by
+   * default and explains that storage is not set up.
+   */
+  showImages?: boolean
 }
 
 const labelClass = "mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-outline"
@@ -101,11 +117,19 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
   imageEndpoint,
   maxImages = TASK_MAX_IMAGES,
   maxDescription = TASK_DESCRIPTION_MAX_LENGTH,
+  textLabel = TASK_ATTACHMENT_MESSAGES.descriptionLabel,
+  textHint = TASK_ATTACHMENT_MESSAGES.descriptionHint,
+  textRequired = false,
+  showImages = true,
 }) => {
   const fieldId = useId()
   // Closed even on a task that already carries details, so a plan reads as a list of lines; the
-  // button says what is there, and the editor that is only about the details passes `alwaysOpen`
-  const [isOpen, setIsOpen] = useState(() => alwaysOpen)
+  // button says what is there, and the editor that is only about the details passes `alwaysOpen`.
+  // **`alwaysOpen` is read on every render, not only the first**: one composer serves several kinds
+  // of item (a client project's tabs), so it turns true while the fields are already mounted, and
+  // reading it once left the credentials box with neither a text area nor a button to open one.
+  const [isOpenByHand, setIsOpenByHand] = useState(false)
+  const isOpen = alwaysOpen || isOpenByHand
   const [isGenerating, setIsGenerating] = useState(false)
   const [isDropping, setIsDropping] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -170,7 +194,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
       {!alwaysOpen && (
         <button
           type="button"
-          onClick={() => setIsOpen((current) => !current)}
+          onClick={() => setIsOpenByHand((current) => !current)}
           disabled={disabled}
           aria-expanded={isOpen}
           aria-controls={panelId}
@@ -191,7 +215,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
           <div>
             <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
               <label htmlFor={descriptionId} className="text-[10px] font-bold uppercase tracking-wider text-outline">
-                {TASK_ATTACHMENT_MESSAGES.descriptionLabel} <span className="normal-case tracking-normal">(optional)</span>
+                {textLabel} {!textRequired && <span className="normal-case tracking-normal">(optional)</span>}
               </label>
               {onGenerate && (
                 <button
@@ -213,8 +237,8 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
                 onChange={(description) => update((current) => ({ ...current, description }))}
                 maxLength={maxDescription}
                 rows={4}
-                placeholder={TASK_ATTACHMENT_MESSAGES.descriptionHint}
-                ariaLabel={TASK_ATTACHMENT_MESSAGES.descriptionLabel}
+                placeholder={textHint}
+                ariaLabel={textLabel}
                 visual
                 compact
               />
@@ -224,6 +248,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
             </p>
           </div>
 
+          {showImages && (
           <div
             onDragOver={(event) => {
               if (!canAttachImage || disabled) return
@@ -304,6 +329,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
               </p>
             )}
           </div>
+          )}
         </div>
       )}
     </div>

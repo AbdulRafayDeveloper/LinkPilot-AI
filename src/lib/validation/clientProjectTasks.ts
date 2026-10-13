@@ -1,6 +1,9 @@
 import { z } from "zod"
 import {
   ASSET_MAX_BYTES,
+  DEFAULT_PROJECT_ITEM_KIND,
+  PROJECT_URL_MAX_LENGTH,
+  PUBLIC_ITEM_KIND_IDS,
   PROJECT_FILE_CHUNK_BYTES,
   PROJECT_FILE_MAX_CHUNKS,
   PROJECT_FILE_NAME_MAX_LENGTH,
@@ -14,7 +17,8 @@ import {
   VOICE_NOTE_MAX_SECONDS,
 } from "@/constants/clientProjectTasks"
 import { ASSET_CATEGORY_IDS, categoryForContentType } from "@/constants/importantFiles"
-import { PROJECT_DESCRIPTION_MAX_LENGTH } from "@/constants/clientProjectTasks"
+import { PROJECT_DESCRIPTION_MAX_LENGTH, type ProjectItemKind } from "@/constants/clientProjectTasks"
+import { itemName, itemProblem, projectItemUrl } from "@/lib/projectItems"
 
 /** One image as an item names it: the id the server made for it and what it is. */
 const ImageSchema = z.object({
@@ -29,10 +33,18 @@ const VoiceNoteSchema = z.object({
   seconds: z.coerce.number().min(0).max(VOICE_NOTE_MAX_SECONDS).catch(0),
 })
 
+/**
+ * The line an item is named by. It is **not** required here, because a document and a backup may be
+ * added with nothing typed and take their file's own name; what each kind really needs is one rule
+ * (`itemProblem`), asked once below, so the message always says what is missing on that tab.
+ */
 const content = z
   .string({ error: PROJECT_TASK_MESSAGES.missingTask })
   .transform((value) => value.replace(/\s+/g, " ").trim())
-  .pipe(z.string().min(1, PROJECT_TASK_MESSAGES.missingTask).max(PROJECT_TASK_MAX_LENGTH, PROJECT_TASK_MESSAGES.taskTooLong))
+  .pipe(z.string().max(PROJECT_TASK_MAX_LENGTH, PROJECT_TASK_MESSAGES.taskTooLong))
+
+/** A link item's web address. What it must be is `itemProblem`'s to say, so this only caps it. */
+const url = z.string().trim().max(PROJECT_URL_MAX_LENGTH, PROJECT_TASK_MESSAGES.badUrl).optional()
 
 const description = z.string().max(PROJECT_DESCRIPTION_MAX_LENGTH, PROJECT_TASK_MESSAGES.descriptionTooLong).optional()
 const images = z.array(ImageSchema).max(PROJECT_MAX_IMAGES, PROJECT_TASK_MESSAGES.tooManyImages).optional()
@@ -52,21 +64,48 @@ const FileSchema = z.object({
 const files = z.array(FileSchema).max(PROJECT_MAX_FILES, PROJECT_TASK_MESSAGES.tooManyFiles).optional()
 const voiceNote = VoiceNoteSchema.nullable().optional()
 const status = z.enum(PROJECT_TASK_STATUS_IDS, { error: PROJECT_TASK_MESSAGES.badStatus }).optional()
-// Left out, the item is a change: the first tab, and what every item saved before the tabs is
-const kind = z.enum(PROJECT_ITEM_KIND_IDS, { error: PROJECT_TASK_MESSAGES.badKind }).optional()
 
 /** An item's own id, as a path or a body names it. */
 const taskId = z.string().regex(/^[0-9a-f]{24}$/, PROJECT_TASK_MESSAGES.taskNotFound)
 
-/** A new item. Everything but the line is optional, so a one-line item costs nothing to add. */
-export const ProjectTaskSchema = z.object({ content, description, images, files, voiceNote, status, kind })
+const itemFields = { content: content.optional(), description, url, images, files, voiceNote, status }
+
+/**
+ * A new item, on the tabs the surface allows. The owner's page may write any tab; a shared link may
+ * only write a public one, so **its schema takes only those kinds** and a body naming Credentials
+ * or Backups is refused before anything else is read.
+ *
+ * What each tab needs is asked once, through the same `itemProblem` the composer asks, and the
+ * answer is tidied the same way it will be stored: the line taken from the file where a tab allows
+ * that, and the address given its scheme.
+ */
+const newItemSchema = (kinds: readonly [ProjectItemKind, ...ProjectItemKind[]]) =>
+  z
+    .object({ ...itemFields, kind: z.enum(kinds, { error: PROJECT_TASK_MESSAGES.badKind }).optional() })
+    .superRefine((value, ctx) => {
+      const problem = itemProblem(value.kind ?? DEFAULT_PROJECT_ITEM_KIND, {
+        content: value.content ?? "",
+        description: value.description,
+        url: value.url,
+        files: value.files,
+      })
+      if (problem) ctx.addIssue({ code: "custom", message: problem })
+    })
+    .transform((value) => ({
+      ...value,
+      content: itemName(value.kind ?? DEFAULT_PROJECT_ITEM_KIND, value.content ?? "", value.files ?? []),
+      url: projectItemUrl(value.url ?? ""),
+    }))
+
+/** A new item on the owner's page: any tab, and what that tab needs. */
+export const ProjectTaskSchema = newItemSchema(PROJECT_ITEM_KIND_IDS)
 
 /**
  * The fields a change to an item may carry. Only the ones sent are written, so ticking an item off
  * is `{ status }` alone and never has to carry its text, images and voice note back. `kind` is not
  * among them: which tab an item belongs to is settled when it is added.
  */
-const editFields = { content: content.optional(), description, images, files, voiceNote, status }
+const editFields = { content: content.optional(), description, url, images, files, voiceNote, status }
 // Named rather than counted, so the shared link's body can carry `taskId` as well and that alone
 // still reads as "nothing to change"
 const EDIT_FIELDS = Object.keys(editFields)
@@ -77,10 +116,11 @@ export const ProjectTaskEditSchema = z.object(editFields).refine(saysSomething, 
 
 /**
  * The same three bodies again for the shared link, which names the item in the body because the
- * token is what the path carries. They are the same fields and the same limits: whoever holds the
- * link writes exactly what the owner can write, and nothing more.
+ * token is what the path carries. The fields and the limits are the owner's, with **one narrower
+ * rule**: only a public tab may be named, so credentials and backups cannot be written from a link
+ * even by a caller writing the body by hand.
  */
-export const PublicProjectTaskSchema = ProjectTaskSchema
+export const PublicProjectTaskSchema = newItemSchema(PUBLIC_ITEM_KIND_IDS)
 export const PublicTaskEditSchema = z.object({ taskId, ...editFields }).refine(saysSomething, PROJECT_TASK_MESSAGES.saveFailed)
 export const PublicTaskDeleteSchema = z.object({ taskId })
 

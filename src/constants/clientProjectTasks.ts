@@ -35,15 +35,55 @@ export const PUBLIC_UPLOAD_PATHS = { images: "images", voice: "voice", files: "f
 export const PROJECT_FILES_ENDPOINT = "/api/client-projects/files"
 
 /**
- * The three kinds of item a project carries, which are the tabs on both surfaces, in order. The
- * first is the default (`DEFAULT_PROJECT_ITEM_KIND` reads `PROJECT_ITEM_KINDS[0]`), so **Changes**
- * is what the owner's page and a shared link both open on, the same rule Post Comment Replies'
- * styles follow.
+ * What an item of one kind carries, so **one composer and one list serve every tab** rather than a
+ * form per tab. A tab says which pieces it has and both surfaces render it from that, which is why
+ * adding a tab is an entry in `PROJECT_ITEM_KINDS` and nothing else.
+ */
+export interface ProjectItemShape {
+  // The written block under the line: what it is called, the hint inside it, and whether it is needed
+  text: { label: string; hint: string; required: boolean } | null
+  // A web address, which a link has and nothing else does
+  url: boolean
+  // Images and a voice note, which the three kinds of conversation carry
+  talk: boolean
+  // Files: not at all, by choice, or at least one (a document and a backup are a file)
+  files: "none" | "optional" | "required"
+  // A checkbox, which only work that can be finished has
+  tick: boolean
+  // Numbered and dated, newest first: what a list of backups has to be
+  numbered: boolean
+  // The line may be left empty and is taken from the file, which is how a backup is usually saved
+  nameFromFile: boolean
+}
+
+// A change, an idea and a message all carry the same pieces, so they share one shape
+const TALK: ProjectItemShape = {
+  text: { label: "Description", hint: "Anything worth saying about it", required: false },
+  url: false,
+  talk: true,
+  files: "optional",
+  tick: true,
+  numbered: false,
+  nameFromFile: false,
+}
+// A note beside a link, a document or a backup: never needed, always allowed
+const NOTE = { label: "Note", hint: "Anything worth saying about it", required: false }
+
+/**
+ * The kinds of item a project carries, which are the tabs on both surfaces, in order. The first is
+ * the default (`DEFAULT_PROJECT_ITEM_KIND` reads `PROJECT_ITEM_KINDS[0]`), so **Changes** is what
+ * the owner's page and a shared link both open on, the same rule Post Comment Replies' styles
+ * follow.
  *
- * They are one collection with a `kind` on each row, not three collections: an item carries the
- * same line, details, images, voice note and tick whichever tab it sits under, so one list, one
- * composer and one set of routes serve all three. A row saved before the tabs existed has no
- * `kind` and reads as a Change, which is what every task in the first version was.
+ * They are one collection with a `kind` on each row, never a collection per tab: an item carries
+ * the same fields whichever tab it sits under, and `shape` says which of them that tab uses, so one
+ * list, one composer and one set of routes serve all of them. A row saved before the tabs existed
+ * has no `kind` and reads as a Change, which is what every task in the first version was.
+ *
+ * **`isPublic` is the whole of what a shared link may ever show.** Credentials and Backups are the
+ * owner's own, and that is held in three places rather than one: the link's page lists only the
+ * public tabs, the service reads only public kinds, and its routes refuse to write or change
+ * anything else. So a client holding the link can neither see nor reach either of them.
  */
 export const PROJECT_ITEM_KINDS = [
   {
@@ -56,6 +96,8 @@ export const PROJECT_ITEM_KINDS = [
     // What a ticked item means here, which is also what the counter beside the tab says
     doneLabel: "done",
     empty: "No changes on this project yet. Add the first one above.",
+    isPublic: true,
+    shape: TALK,
   },
   {
     id: "idea",
@@ -65,6 +107,8 @@ export const PROJECT_ITEM_KINDS = [
     placeholder: "An idea worth trying on this project",
     doneLabel: "picked up",
     empty: "No ideas yet. Add the first one above.",
+    isPublic: true,
+    shape: TALK,
   },
   {
     id: "discussion",
@@ -74,6 +118,62 @@ export const PROJECT_ITEM_KINDS = [
     placeholder: "Something to ask, answer or agree on",
     doneLabel: "settled",
     empty: "Nothing in the discussion yet. Start it above.",
+    isPublic: true,
+    shape: TALK,
+  },
+  {
+    // The owner's own: a sign-in, a key, a panel. Never on the shared link
+    id: "credentials",
+    label: "Credentials",
+    one: "credential",
+    addLabel: "Add credentials",
+    placeholder: "What these are for (the hosting panel, the database, the mail account)",
+    doneLabel: "done",
+    empty: "No credentials kept on this project yet. Add the first one above.",
+    isPublic: false,
+    shape: {
+      text: { label: "Credentials", hint: "The address, the user name, the password, whatever is needed to sign in", required: true },
+      url: false,
+      talk: false,
+      files: "none",
+      tick: false,
+      numbered: false,
+      nameFromFile: false,
+    },
+  },
+  {
+    id: "link",
+    label: "Links",
+    one: "link",
+    addLabel: "Add a link",
+    placeholder: "What the link is (the live site, the design, the repository)",
+    doneLabel: "done",
+    empty: "No links on this project yet. Add the first one above.",
+    isPublic: true,
+    shape: { text: NOTE, url: true, talk: false, files: "none", tick: false, numbered: false, nameFromFile: false },
+  },
+  {
+    id: "document",
+    label: "Documents",
+    one: "document",
+    addLabel: "Add a document",
+    placeholder: "What the document is (left empty, the file's own name is used)",
+    doneLabel: "done",
+    empty: "No documents on this project yet. Add the first one above.",
+    isPublic: true,
+    shape: { text: NOTE, url: false, talk: false, files: "required", tick: false, numbered: false, nameFromFile: true },
+  },
+  {
+    // A file kept with the day it was taken and its number, so a backup is never lost among the rest
+    id: "backup",
+    label: "Backups",
+    one: "backup",
+    addLabel: "Add a backup",
+    placeholder: "What this backup is (left empty, the file's own name is used)",
+    doneLabel: "done",
+    empty: "No backups kept on this project yet. Upload the first one above.",
+    isPublic: false,
+    shape: { text: NOTE, url: false, talk: false, files: "required", tick: false, numbered: true, nameFromFile: true },
   },
 ] as const
 
@@ -84,6 +184,20 @@ export const DEFAULT_PROJECT_ITEM_KIND: ProjectItemKind = PROJECT_ITEM_KINDS[0].
 /** One kind by its id, falling back to the default so an unknown value never leaves a page blank. */
 export const projectItemKind = (id: string | null | undefined) =>
   PROJECT_ITEM_KINDS.find((kind) => kind.id === id) ?? PROJECT_ITEM_KINDS[0]
+
+/** What an item of that kind carries, which is what both surfaces render it from. */
+export const projectItemShape = (id: string | null | undefined): ProjectItemShape => projectItemKind(id).shape
+
+/**
+ * The tabs a shared link may show, and the only kinds it may read or write: Credentials and Backups
+ * are not among them. A page lists these, `readPublicProject` reads these, and every public write
+ * is held to these, so leaving one out of any single place could not open it on its own.
+ */
+export const PUBLIC_ITEM_KINDS = PROJECT_ITEM_KINDS.filter((kind) => kind.isPublic)
+export const PUBLIC_ITEM_KIND_IDS = PUBLIC_ITEM_KINDS.map((kind) => kind.id) as [ProjectItemKind, ...ProjectItemKind[]]
+export const DEFAULT_PUBLIC_ITEM_KIND: ProjectItemKind = PUBLIC_ITEM_KINDS[0].id
+/** Whether a shared link may ever show an item of that kind. An unknown kind reads as a change. */
+export const isPublicItemKind = (id: string | null | undefined): boolean => projectItemKind(id).isPublic
 
 /**
  * Who put an item there: the account that owns the project, or someone writing from the shared
@@ -153,6 +267,8 @@ export const PROJECT_FILE_PART_BYTES = MULTIPART_MIN_PART_BYTES
 export const PROJECT_MAX_FILES = 10
 // A file name is shown and is what a download is saved as; the key is built from an id, never this
 export const PROJECT_FILE_NAME_MAX_LENGTH = 200
+// A link item's own web address. Long enough for any signed or tracked address anyone would paste
+export const PROJECT_URL_MAX_LENGTH = 2_000
 // How many chunks one upload may be, which is the ceiling in chunks rather than in bytes
 export const PROJECT_FILE_MAX_CHUNKS = Math.ceil(ASSET_MAX_BYTES / RECORDING_CHUNK_MAX_BYTES)
 // An upload nobody finished is forgotten after this, with its chunks
@@ -199,13 +315,20 @@ export const PROJECT_TASK_MESSAGES = {
   fileStorageUnavailable: "Files can't be attached here yet: file storage isn't set up.",
   filesUploading: "Wait for the files to finish uploading.",
   badStatus: "Choose whether it is still to do or finished.",
-  badKind: "Choose whether it is a change, an idea or part of the discussion.",
+  badKind: "Choose which tab it belongs on.",
+  // The link, the document and the backup tabs each need one thing of their own
+  missingUrl: "Give the web address, starting with http:// or https://.",
+  badUrl: "That web address doesn't look right. It must start with http:// or https://.",
+  missingText: (label: string) => `Write the ${label.toLowerCase()} under the name.`,
+  missingFile: "Attach the file first.",
+  // What a shared link may never carry, said where the link is made
+  privateTabs: "Credentials and backups are never shared: they stay on your side of this project.",
   saveFailed: "Couldn't save it. Please try again.",
   deleteFailed: "Couldn't remove it. Please try again.",
   created: "Added.",
   saved: "Saved.",
   deleted: "Removed.",
-  deleteExplains: "It goes with its images and its voice note. This can't be undone.",
+  deleteExplains: "It goes with its images, its files and its voice note. This can't be undone.",
   noProjects: "No client projects yet. Add a project to a client in Clients Management, and it shows here.",
   noResults: "No project matches the search or the filters.",
   // Where an item came from, shown as a tag on the item itself
@@ -221,10 +344,24 @@ export const PROJECT_TASK_MESSAGES = {
   linkInvalid: "That link doesn't open anything.",
   linkFailed: "Couldn't change the link. Please try again.",
   linkExplains:
-    "Anyone with this link can read this project and add, change and remove its changes, ideas and discussion, with images and voice notes, without signing in. Send it to the client; turn it off to stop it.",
+    "Anyone with this link can read this project and add, change and remove its changes, ideas, discussion, links and documents, with images and voice notes, without signing in. Send it to the client; turn it off to stop it.",
   linkReplaced: "New link made. The old one stopped working.",
   linkOff: "Link turned off.",
   linkCopied: "Link copied.",
+} as const
+
+/**
+ * What the file viewer says. It is its own set because both surfaces show it and because what a
+ * browser can and cannot show is a thing to explain plainly rather than to leave as a blank frame.
+ */
+export const PROJECT_FILE_MESSAGES = {
+  preview: "Preview",
+  download: "Download",
+  openInTab: "Open in a new tab",
+  // A type no browser renders: a Word document, or one the app no longer places
+  noPreview: "This kind of file can't be shown in a browser. Download it and your computer will open it.",
+  // A type the app takes that this browser can't decode (a TIFF image, a .mov or .mkv video)
+  cannotShow: "This browser can't show this file. Download it and open it on your computer.",
 } as const
 
 export const PUBLIC_PROJECT_MESSAGES = {
@@ -232,5 +369,5 @@ export const PUBLIC_PROJECT_MESSAGES = {
   invalid: "That link doesn't open anything.",
   // On the shared page, so whoever opens it knows they may write rather than guessing
   canWrite: "You can add and change items here",
-  intro: "Add what you need under any of the three tabs. Everything you add shows up for the project owner straight away.",
+  intro: "Add what you need under any of the tabs. Everything you add shows up for the project owner straight away.",
 } as const

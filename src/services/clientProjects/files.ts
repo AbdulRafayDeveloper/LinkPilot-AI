@@ -90,23 +90,41 @@ export const storedProjectFile = (file: {
 })
 
 /**
- * One file with a short-lived link.
+ * The type a file is **shown** as, or null for one no browser can show, which today is only a Word
+ * document (and anything whose type the app no longer places).
  *
- * **A video and an audio file get a plain link, so they play where they are; everything else is
- * signed as an attachment**, so it downloads by its own name rather than being rendered by the
- * browser. That is deliberate and it is the one thing standing between an accepted type and a
- * script: the list takes `image/svg+xml`, and an SVG is a document that can carry one, so no file
- * outside the two media kinds is ever opened in a tab from the bucket's own origin. The media types
- * cannot carry script, and a disposition would be ignored by `<video>` and `<audio>` anyway.
+ * A text file is shown as `text/plain`, whatever text it is: a browser downloads a `text/csv` and a
+ * `text/markdown` instead of showing them, and the point here is to read it without saving it
+ * first. Everything else keeps its own type, so a PDF opens in the PDF viewer and a video plays.
+ */
+export const previewTypeOf = (file: Pick<ProjectFile, "category" | "contentType">): string | null => {
+  if (file.category === "word") return null
+  return file.category === "text" ? "text/plain; charset=utf-8" : file.contentType
+}
+
+/**
+ * One file with two short-lived links, because they are for two different things.
+ *
+ * `url` is the **download**: always signed as an attachment, so every type saves by its own name
+ * rather than being rendered. `previewUrl` is the file **shown where it is**, and it is null for a
+ * type no browser can show. A media element ignores the disposition, so a video and a sound play
+ * from either one; the page uses the preview link for both.
+ *
+ * **An SVG is shown only as an image, never opened as a page.** The list takes `image/svg+xml` and
+ * an SVG is a document that can carry script, so the preview renders it in an `<img>` (which never
+ * runs it) and the page offers no "open in a tab" for it. That rule lives beside the preview on the
+ * page, in `canOpenInTab`.
  */
 export async function projectFileView(file: ProjectFile): Promise<ProjectFileView | null> {
   if (!file?.assetId || !isStorageConfigured()) return null
-  const plays = file.category === "video" || file.category === "audio"
+  const key = finalKeyFor(file.assetId, file.name)
+  const showAs = previewTypeOf(file)
   try {
-    return {
-      ...file,
-      url: await presignDownload(finalKeyFor(file.assetId, file.name), file.contentType, plays ? undefined : file.name),
-    }
+    const [url, previewUrl] = await Promise.all([
+      presignDownload(key, file.contentType, file.name),
+      showAs ? presignDownload(key, showAs) : Promise.resolve(null),
+    ])
+    return { ...file, url, previewUrl }
   } catch (error: unknown) {
     console.warn("⚠️ Couldn't sign a project file link:", error instanceof Error ? error.message : error)
     return null

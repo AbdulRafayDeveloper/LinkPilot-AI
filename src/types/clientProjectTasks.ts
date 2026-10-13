@@ -30,9 +30,17 @@ export interface ProjectFile {
   size: number
 }
 
-/** The same file as a page receives it, with a short-lived link to open or play it from. */
+/**
+ * The same file as a page receives it, with short-lived links.
+ *
+ * There are two, because they are signed for two different things: `url` is the **download**, which
+ * carries the file's own name and is always an attachment, and `previewUrl` is the file **shown
+ * where it is** (an image, a PDF, a video, a sound, a text file), which is null for a kind no
+ * browser can show, such as a Word document.
+ */
 export interface ProjectFileView extends ProjectFile {
   url: string
+  previewUrl: string | null
 }
 
 /**
@@ -59,6 +67,8 @@ export interface ProjectFileProgress {
 export interface ProjectTaskRecord {
   content: string
   description: string
+  // A link item's web address; "" on every other kind
+  url: string
   images: TaskImage[]
   files: ProjectFile[]
   voiceNote: VoiceNote | null
@@ -73,6 +83,8 @@ export interface ProjectTask {
   projectId: string
   content: string
   description: string
+  // Where a link item points, as it is stored (with https:// in front when none was typed)
+  url: string
   images: TaskImageView[]
   files: ProjectFileView[]
   voiceNote: VoiceNoteView | null
@@ -93,6 +105,7 @@ export interface ProjectTask {
 export interface ProjectTaskInput {
   content: string
   description?: string
+  url?: string
   images?: TaskImage[]
   files?: ProjectFile[]
   voiceNote?: VoiceNote | null

@@ -1,4 +1,4 @@
-import { changeProjectTask, createProjectTask, removeProjectTask, taskById } from "./tasks"
+import { changeProjectTask, createProjectTask, publicTaskById, removeProjectTask } from "./tasks"
 import { projectFromToken } from "./projects"
 import type { ProjectTask, ProjectTaskInput } from "@/types/clientProjectTasks"
 
@@ -13,9 +13,10 @@ import type { ProjectTask, ProjectTaskInput } from "@/types/clientProjectTasks"
  *    checks the signature against that project's own `publicLinkVersion`, so a token reaches the
  *    single project it was signed for. Turning the link off, or replacing it, stops the writes at
  *    the same moment it stops the reads, because they come through the same door.
- * 2. **The item must be on that project.** The filter is the item's id with no account scope (the
- *    client has none) **and** the project id, so an id belonging to another project matches nothing
- *    even if someone has one.
+ * 2. **The item must be on that project, and on a tab the link shows.** The filter is the item's
+ *    id with no account scope (the client has none), the project id, and the public kinds, so an id
+ *    belonging to another project matches nothing even if someone has one, and so does the id of a
+ *    credential or a backup, which the link neither shows nor may touch.
  * 3. **It joins the owner's list.** An item written here is stored against the project's own
  *    `ownerId` and marked `addedBy: "client"`, so the owner sees it in their scoped reads straight
  *    away and both surfaces can say where it came from.
@@ -53,7 +54,7 @@ export async function addPublicProjectTask(token: string, input: ProjectTaskInpu
 
 /** Changes one item of that project through a shared link. Only the fields given are written. */
 export async function updatePublicProjectTask(token: string, taskId: string, input: Partial<ProjectTaskInput>): Promise<PublicWrite<ProjectTask>> {
-  const filter = taskById(taskId)
+  const filter = publicTaskById(taskId)
   if (!filter) return failed("item")
   const project = await projectFromToken(token)
   if (!project) return failed("link")
@@ -63,7 +64,7 @@ export async function updatePublicProjectTask(token: string, taskId: string, inp
 
 /** Removes one item of that project through a shared link, with its images and its voice note. */
 export async function deletePublicProjectTask(token: string, taskId: string): Promise<PublicWrite<true>> {
-  const filter = taskById(taskId)
+  const filter = publicTaskById(taskId)
   if (!filter) return failed("item")
   const project = await projectFromToken(token)
   if (!project) return failed("link")

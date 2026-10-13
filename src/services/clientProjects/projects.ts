@@ -7,7 +7,7 @@ import { projectItemKind, type ProjectItemKind } from "@/constants/clientProject
 import { emptyItemCounts, totalItems } from "@/lib/projectItems"
 import { projectLinkToken, projectLinkMatches, readProjectLinkToken } from "@/lib/projectLink"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
-import { listProjectTasks } from "./tasks"
+import { PUBLIC_KINDS_ONLY, listProjectTasks } from "./tasks"
 import type { ClientProjectsPage, ProjectItemCount, ProjectWithTasks, PublicProject } from "@/types/clientProjectTasks"
 import type { ClientProjectStatus } from "@/constants/clients"
 import type { Viewer } from "@/types/auth"
@@ -168,13 +168,17 @@ export async function projectFromToken(token: string): Promise<StoredProject | n
  *
  * It is read outside any account, so the items are read by the project itself rather than by a
  * viewer's scope: the signed token is the key, and it opens this one project and nothing else.
+ *
+ * **Credentials and backups never come through here.** The read is held to `PUBLIC_KINDS_ONLY`, so
+ * they are not in the answer at all, rather than being filtered out by the page afterwards.
  */
 export async function readPublicProject(token: string): Promise<PublicProject | null> {
   const record = await projectFromToken(token)
   if (!record) return null
   const [client, tasks] = await Promise.all([
     Client.findById(record.clientId, { name: 1 }).lean() as unknown as Promise<{ name: string } | null>,
-    listProjectTasks({}, record._id.toString()),
+    // Only the tabs a link shows: a credential and a backup are never read out of this door
+    listProjectTasks({ ...PUBLIC_KINDS_ONLY }, record._id.toString()),
   ])
   return {
     name: record.name,

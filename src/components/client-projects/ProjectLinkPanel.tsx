@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { ExternalLink, Link2, Loader2, RefreshCw, X } from "lucide-react"
+import { ExternalLink, Link2, Loader2, RefreshCw, ShieldCheck, X } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { requestApi } from "@/lib/apiClient"
 import { CLIENT_PROJECTS_ENDPOINT, PROJECT_TASK_MESSAGES, PUBLIC_PROJECT_PATH } from "@/constants/clientProjectTasks"
@@ -79,6 +79,11 @@ export const ProjectLinkPanel: React.FC<ProjectLinkPanelProps> = ({ projectId, t
 
       {url && <p className="break-all rounded-xl bg-white px-3 py-2 text-[12px] text-on-surface-variant">{url}</p>}
       <p className="text-[11px] text-outline">{PROJECT_TASK_MESSAGES.linkExplains}</p>
+      {/* Said beside the link itself, rather than only enforced: the two tabs a client never sees */}
+      <p className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-lowest px-2 py-1 text-[11px] font-semibold text-on-surface-variant">
+        <ShieldCheck size={13} className="shrink-0 text-primary" aria-hidden="true" />
+        {PROJECT_TASK_MESSAGES.privateTabs}
+      </p>
       {error && (
         <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
           {error}

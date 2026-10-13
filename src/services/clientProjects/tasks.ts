@@ -6,11 +6,14 @@ import { ClientProjectTaskModel, type IClientProjectTask } from "@/models/Client
 import {
   DEFAULT_PROJECT_ITEM_KIND,
   MAX_PROJECT_TASKS,
+  PROJECT_ITEM_KINDS,
   PROJECT_TASK_MESSAGES,
+  PUBLIC_ITEM_KIND_IDS,
   projectItemKind,
   type ProjectItemAuthor,
   type ProjectItemKind,
 } from "@/constants/clientProjectTasks"
+import { itemName, itemProblem, projectItemUrl } from "@/lib/projectItems"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { deleteTaskImages, taskImageView } from "@/services/taskImages"
 import { deleteVoiceNotes, voiceNoteView } from "./voiceNotes"
@@ -43,6 +46,21 @@ const ID_PATTERN = /^[0-9a-f]{24}$/
  */
 export const taskById = (taskId: string): Record<string, unknown> | null => (ID_PATTERN.test(taskId) ? { _id: taskId } : null)
 
+/**
+ * The kinds a shared link may ever reach. `null` is in the list because it matches a row with no
+ * `kind` at all, which is every item saved before the tabs existed and reads as a change.
+ *
+ * It is a **filter rather than a check after the fact**: added to a read it leaves the owner's own
+ * tabs out of the answer, and added to a write's filter it makes an id that names one of them match
+ * nothing, so a client holding the link cannot read, change or delete a credential or a backup even
+ * if they somehow learned its id.
+ */
+export const PUBLIC_KINDS_ONLY = { kind: { $in: [...PUBLIC_ITEM_KIND_IDS, null] } } as const
+
+/** One item by its id, held to the tabs a shared link may reach. */
+export const publicTaskById = (taskId: string): Record<string, unknown> | null =>
+  ID_PATTERN.test(taskId) ? { _id: taskId, ...PUBLIC_KINDS_ONLY } : null
+
 /** The project, or null when it is gone or belongs to another account. */
 export async function projectOrNull(viewer: Viewer, projectId: string): Promise<StoredProject | null> {
   const filter = visibleById(viewer, projectId)
@@ -63,6 +81,7 @@ async function toTask(record: StoredTask): Promise<ProjectTask> {
     projectId: record.projectId,
     content: record.content,
     description: record.description ?? "",
+    url: record.url ?? "",
     // An image or a file whose link couldn't be signed is left out rather than shown broken
     images: images.filter((image) => image !== null),
     files: files.filter((file) => file !== null),
@@ -86,7 +105,8 @@ export async function listProjectTasks(scope: Record<string, unknown>, projectId
   await connectDatabase()
   const records = (await ClientProjectTaskModel.find({ ...scope, projectId })
     .sort({ position: 1, createdAt: 1, _id: 1 })
-    .limit(MAX_PROJECT_TASKS * 3)
+    // The ceiling is per tab, so a project's whole list is at most that many on each of them
+    .limit(MAX_PROJECT_TASKS * PROJECT_ITEM_KINDS.length)
     .lean()) as unknown as StoredTask[]
   return Promise.all(records.map(toTask))
 }
@@ -98,9 +118,11 @@ export async function tasksOfProject(viewer: Viewer, projectId: string): Promise
   return listProjectTasks(visibleTo(viewer), projectId)
 }
 
-const cleanInput = (input: ProjectTaskInput) => ({
-  content: input.content.replace(/\s+/g, " ").trim(),
+const cleanInput = (input: ProjectTaskInput, kind: ProjectItemKind) => ({
+  // A document and a backup may be saved with nothing typed and take their file's own name
+  content: itemName(kind, input.content, input.files ?? []),
   description: input.description?.trim() ?? "",
+  url: projectItemUrl(input.url ?? ""),
   images: (input.images ?? []).map((image) => ({ assetId: image.assetId, contentType: image.contentType })),
   files: (input.files ?? []).map((file) => ({
     assetId: file.assetId,
@@ -130,6 +152,9 @@ interface CreateOptions {
  */
 export async function createProjectTask({ project, projectId, ownerId, addedBy, scope }: CreateOptions, input: ProjectTaskInput): Promise<ProjectTask> {
   const kind: ProjectItemKind = input.kind ?? DEFAULT_PROJECT_ITEM_KIND
+  // What this tab needs, asked again here: the schema asks it of a request, this asks it of the item
+  const problem = itemProblem(kind, input)
+  if (problem) throw new UserFacingError(problem)
   await connectDatabase()
   const inTab = { ...scope, projectId, kind }
   const count = await ClientProjectTaskModel.countDocuments(inTab)
@@ -139,7 +164,7 @@ export async function createProjectTask({ project, projectId, ownerId, addedBy, 
     ownerId,
     clientId: project.clientId,
     projectId,
-    ...cleanInput(input),
+    ...cleanInput(input, kind),
     kind,
     addedBy,
     position: (last?.position ?? count - 1) + 1,
@@ -164,15 +189,30 @@ export async function changeProjectTask(
   const current = (await ClientProjectTaskModel.findOne({ ...filter, projectId }).lean()) as unknown as StoredTask | null
   if (!current) return null
 
-  const cleaned = cleanInput({ content: input.content ?? current.content, ...input })
+  // The item as it would be once this change lands, which is what the tab's own rule is asked about
+  const kind = projectItemKind(current.kind).id
+  const merged: ProjectTaskInput = {
+    content: input.content ?? current.content,
+    description: input.description ?? current.description ?? "",
+    url: input.url ?? current.url ?? "",
+    files: input.files ?? (current.files ?? []).map(storedProjectFile),
+    images: input.images ?? current.images ?? [],
+    voiceNote: input.voiceNote !== undefined ? input.voiceNote : current.voiceNote,
+    status: input.status,
+  }
+  const problem = itemProblem(kind, merged)
+  if (problem) throw new UserFacingError(problem)
+
+  const cleaned = cleanInput(merged, kind)
   const changes: Record<string, unknown> = {}
-  if (input.content !== undefined) changes.content = cleaned.content
+  // The name may change because the file did, so it is written whenever either of them is sent
+  if (input.content !== undefined || input.files !== undefined) changes.content = cleaned.content
   if (input.description !== undefined) changes.description = cleaned.description
+  if (input.url !== undefined) changes.url = cleaned.url
   if (input.images !== undefined) changes.images = cleaned.images
   if (input.files !== undefined) changes.files = cleaned.files
   if (input.voiceNote !== undefined) changes.voiceNote = cleaned.voiceNote
   if (input.status !== undefined) changes.status = cleaned.status
-  if (input.content !== undefined && !cleaned.content) throw new UserFacingError(PROJECT_TASK_MESSAGES.missingTask)
 
   const record = (await ClientProjectTaskModel.findOneAndUpdate({ ...filter, projectId }, { $set: changes }, { returnDocument: "after", runValidators: true }).lean()) as unknown as StoredTask | null
   if (!record) return null

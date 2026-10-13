@@ -9,20 +9,26 @@ interface ProjectTabsProps {
   onChoose: (kind: ProjectItemKind) => void
   // How each tab stands, so the counts are on the tabs themselves rather than only inside them
   counts: Record<ProjectItemKind, ProjectItemCount>
+  /**
+   * Which tabs to show. Left out it is every one of them, which is the owner's page; a shared link
+   * passes `PUBLIC_ITEM_KINDS`, so Credentials and Backups are not offered there at all.
+   */
+  kinds?: readonly (typeof PROJECT_ITEM_KINDS)[number][]
 }
 
 /**
- * The three tabs a project's items sit under: Changes, Ideas and Discussion, in `PROJECT_ITEM_KINDS`
- * order, with Changes first and chosen by default. The same strip serves the owner's page and the
- * shared link, so a client sees the project laid out exactly as its owner does.
+ * The tabs a project's items sit under, in `PROJECT_ITEM_KINDS` order, with Changes first and
+ * chosen by default. The same strip serves the owner's page and the shared link, so a client sees
+ * the project laid out exactly as its owner does, **less the tabs the link never shows**: it is
+ * given `PUBLIC_ITEM_KINDS`, which leaves Credentials and Backups out.
  *
  * It is a real tab strip for a screen reader (`role="tablist"`, each tab owning the panel its items
  * are in), and each tab carries its own count, so how much is on the other two is readable without
  * opening them.
  */
-export const ProjectTabs: React.FC<ProjectTabsProps> = ({ chosen, onChoose, counts }) => (
+export const ProjectTabs: React.FC<ProjectTabsProps> = ({ chosen, onChoose, counts, kinds = PROJECT_ITEM_KINDS }) => (
   <div role="tablist" aria-label="What this project holds" className="flex flex-wrap gap-1 rounded-2xl border border-outline-variant bg-white p-1">
-    {PROJECT_ITEM_KINDS.map((kind) => {
+    {kinds.map((kind) => {
       const isChosen = kind.id === chosen
       const count = counts[kind.id]
       return (
@@ -34,9 +40,9 @@ export const ProjectTabs: React.FC<ProjectTabsProps> = ({ chosen, onChoose, coun
           aria-selected={isChosen}
           aria-controls={`project-panel-${kind.id}`}
           onClick={() => onChoose(kind.id)}
-          // Three equal tabs across a phone, then each one only as wide as its own label, so a
-          // full-width page (the shared link) never stretches three buttons across the screen
-          className={`inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:flex-none sm:px-5 ${
+          // Each tab is as wide as its own label and they wrap onto another line when there is no
+          // room, which is what seven of them need on a phone
+          className={`inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:px-4 ${
             isChosen ? "bg-primary text-white" : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
           }`}
         >

@@ -1,4 +1,12 @@
-import { PROJECT_ITEM_KIND_IDS, PROJECT_ITEM_KINDS, type ProjectItemKind } from "@/constants/clientProjectTasks"
+import {
+  PROJECT_ITEM_KIND_IDS,
+  PROJECT_ITEM_KINDS,
+  PROJECT_TASK_MESSAGES,
+  PROJECT_URL_MAX_LENGTH,
+  projectItemKind,
+  projectItemShape,
+  type ProjectItemKind,
+} from "@/constants/clientProjectTasks"
 import type { ProjectItemCount } from "@/types/clientProjectTasks"
 
 /**
@@ -28,3 +36,85 @@ export const countsOf = (items: readonly { kind: ProjectItemKind; status: string
 /** Every tab added up, which is what a project's row in the list says. */
 export const totalItems = (counts: Record<ProjectItemKind, ProjectItemCount>): ProjectItemCount =>
   Object.values(counts).reduce((sum, count) => ({ total: sum.total + count.total, done: sum.done + count.done }), { total: 0, done: 0 })
+
+
+/**
+ * Every tab that can be ticked off, added up. A project's row says "3 of 7 done", and only work
+ * that can be finished belongs in that: a credential, a link, a document or a backup is kept, not
+ * done, so counting them would read as seven things undone the moment a project is set up.
+ */
+export const workItems = (counts: Record<ProjectItemKind, ProjectItemCount>): ProjectItemCount =>
+  PROJECT_ITEM_KINDS.filter((kind) => kind.shape.tick).reduce(
+    (sum, kind) => ({ total: sum.total + counts[kind.id].total, done: sum.done + counts[kind.id].done }),
+    { total: 0, done: 0 }
+  )
+
+/**
+ * A web address as it is stored: what was typed, with `https://` in front when no scheme was given,
+ * which is what anyone pasting an address expects. An empty one stays empty.
+ */
+export const projectItemUrl = (url: string): string => {
+  const typed = url.trim()
+  if (!typed) return ""
+  return /^[a-z][a-z0-9+.-]*:/i.test(typed) ? typed : `https://${typed}`
+}
+
+/** Whether an address is one this will show as a link: http or https, and nothing else. */
+export const isWebAddress = (url: string): boolean => /^https?:\/\/\S+$/i.test(url) && url.length <= PROJECT_URL_MAX_LENGTH
+
+/**
+ * The name an item is saved under. A document and a backup may be added with nothing typed, in
+ * which case the file's own name is what it is called, so uploading a backup is one click and the
+ * list still reads. Every other kind keeps what was typed.
+ */
+export const itemName = (kind: ProjectItemKind, content: string, files: readonly { name: string }[]): string => {
+  const typed = content.replace(/\s+/g, " ").trim()
+  if (typed || !projectItemShape(kind).nameFromFile) return typed
+  return (files[0]?.name ?? "").trim()
+}
+
+/**
+ * What is still missing from an item of this kind, in the words the page shows, or null when it may
+ * be saved. **One rule for both surfaces and both ends**: the composer asks it before it offers to
+ * save, the schema asks it on a new item, and the service asks it again after an edit is merged in,
+ * so a link can never be left without an address or a document without its file.
+ */
+export function itemProblem(
+  kind: ProjectItemKind,
+  item: { content: string; description?: string; url?: string; files?: readonly { name: string }[] }
+): string | null {
+  const shape = projectItemShape(kind)
+  const files = item.files ?? []
+  // The file comes first where the tab is the file: a backup with neither a file nor a name is
+  // missing its file, which is the thing to say, and the name follows from it anyway
+  if (shape.files === "required" && files.length === 0) return PROJECT_TASK_MESSAGES.missingFile
+  if (!itemName(kind, item.content, files)) return PROJECT_TASK_MESSAGES.missingTask
+  if (shape.text?.required && !(item.description ?? "").trim()) return PROJECT_TASK_MESSAGES.missingText(shape.text.label)
+  if (shape.url) {
+    const url = projectItemUrl(item.url ?? "")
+    if (!url) return PROJECT_TASK_MESSAGES.missingUrl
+    if (!isWebAddress(url)) return PROJECT_TASK_MESSAGES.badUrl
+  }
+  return null
+}
+
+/**
+ * One tab's items as they are shown. A numbered tab (the backups) is **newest first and numbered
+ * from the oldest**, so the newest backup is at the top while #1 stays the first one ever taken;
+ * every other tab is the order the items were put in, which is what their `position` already is.
+ */
+export const shownItems = <T,>(kind: ProjectItemKind, items: readonly T[]): { item: T; number: number }[] => {
+  const numbered = items.map((item, index) => ({ item, number: index + 1 }))
+  return projectItemKind(kind).shape.numbered ? numbered.reverse() : numbered
+}
+
+/**
+ * Whether a file may be **opened as a page of its own**, rather than only shown inside the app.
+ *
+ * An SVG is never one. The app accepts `image/svg+xml` and an SVG is a document that can carry
+ * script, so it is only ever rendered in an `<img>` (which never runs what is inside it) and is
+ * not offered as a tab of its own on the storage host. A file with no preview link is not openable
+ * either, since there is nothing to open.
+ */
+export const canOpenInTab = (file: { previewUrl: string | null; contentType: string }): boolean =>
+  Boolean(file.previewUrl) && file.contentType.split(";")[0].trim().toLowerCase() !== "image/svg+xml"

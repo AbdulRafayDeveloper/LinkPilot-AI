@@ -3,8 +3,8 @@ import { OWNER_ID } from "./owner"
 import { DEFAULT_PROJECT_ITEM_KIND, PROJECT_ITEM_AUTHORS, PROJECT_ITEM_KIND_IDS, PROJECT_TASK_STATUS_IDS } from "@/constants/clientProjectTasks"
 
 /**
- * One item on a client project: a change, an idea or something in the discussion, which is what
- * `kind` says. It carries its line, an optional description (the Markdown subset of
+ * One item on a client project: a change, an idea, something in the discussion, a set of
+ * credentials, a link, a document or a backup, which is what `kind` says. It carries its line, an optional description (the Markdown subset of
  * `lib/richText.ts`), any images and one voice note, all stored in S3 and named here by the id the
  * server made for them. The project and the client are both on the item, so it can be read back to
  * its client without a second lookup, and a project a viewer may not see can never be reached
@@ -21,6 +21,8 @@ export interface IClientProjectTask {
   projectId: string
   content: string
   description: string
+  // A link item's web address, stored with its scheme; "" on every other kind
+  url: string
   images: { assetId: string; contentType: string }[]
   // Word, PDF, video, anything the app can place (services/clientProjects/files.ts)
   files: { assetId: string; name: string; contentType: string; category: string; size: number }[]
@@ -64,6 +66,7 @@ const ClientProjectTaskSchema = new Schema<IClientProjectTask>(
     projectId: { type: String, required: true, index: true },
     content: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
+    url: { type: String, default: "" },
     images: { type: [ImageSchema], default: [] },
     files: { type: [FileSchema], default: [] },
     voiceNote: { type: VoiceNoteSchema, default: null },
