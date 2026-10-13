@@ -13,7 +13,7 @@ import {
   type PlanPickRepeat,
   type PlanPickWhen,
 } from "@/constants/meetings"
-import { dayLabel, formatTime, todayIso } from "@/lib/meetingDates"
+import { dayLabel, formatTime, monthLabel, todayIso } from "@/lib/meetingDates"
 import type { PlanPickGroup, PlanPickOccurrence, PlanPickPage } from "@/types/meetings"
 
 interface LinkToPlanDialogProps {
@@ -94,6 +94,8 @@ export const LinkToPlanDialog: React.FC<LinkToPlanDialogProps> = ({ count, isSav
   const [search, setSearch] = useState("")
   const [when, setWhen] = useState<PlanPickWhen>("all")
   const [repeat, setRepeat] = useState<PlanPickRepeat>("all")
+  // One month of the calendar, or "" for every one of them
+  const [month, setMonth] = useState("")
   const [page, setPage] = useState(1)
   /**
    * Each answer is kept with the request it was read for, so a page still arriving never shows under
@@ -115,7 +117,7 @@ export const LinkToPlanDialog: React.FC<LinkToPlanDialogProps> = ({ count, isSav
     return () => clearTimeout(timer)
   }, [typed])
 
-  const filters = `today=${today}&when=${when}&repeat=${repeat}`
+  const filters = `today=${today}&when=${when}&repeat=${repeat}${month ? `&month=${month}` : ""}`
   const groupsQuery = `${filters}&search=${encodeURIComponent(search)}&page=${page}`
   const datesQuery = openGroup?.seriesId ? `${filters}&series=${openGroup.seriesId}&page=${datePage}` : null
   const shownGroups = groups?.key === groupsQuery ? groups.data : null
@@ -167,6 +169,17 @@ export const LinkToPlanDialog: React.FC<LinkToPlanDialogProps> = ({ count, isSav
     setDatePage(1)
   }
 
+  /**
+   * The months to choose from come with the answer on screen, so inside a repeating meeting they are
+   * that meeting's own months. A month chosen before one was opened is kept in the list even when it
+   * holds nothing there, or the field would show a value it does not offer.
+   */
+  const shown = openGroup ? shownDates : shownGroups
+  const months = useMemo(() => {
+    const offered = shown?.months ?? (month ? [{ month, count: 0 }] : [])
+    return offered.some((entry) => entry.month === month) || !month ? offered : [{ month, count: 0 }, ...offered]
+  }, [shown, month])
+
   const isLoading = openGroup ? shownDates === null : shownGroups === null
   const busy = isSaving || isLoading
 
@@ -216,8 +229,8 @@ export const LinkToPlanDialog: React.FC<LinkToPlanDialogProps> = ({ count, isSav
       }
     >
       <div className="flex flex-col gap-3">
-        {/* The search and the two filters, which stay as they are while a meeting's dates are open */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+        {/* The search and the filters, which stay as they are while a meeting's dates are open */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
           <div className="relative">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-outline" aria-hidden="true" />
             <input
@@ -256,6 +269,22 @@ export const LinkToPlanDialog: React.FC<LinkToPlanDialogProps> = ({ count, isSav
             {PLAN_PICK_REPEAT.map((entry) => (
               <option key={entry.id} value={entry.id}>
                 {entry.label}
+              </option>
+            ))}
+          </select>
+          {/* The months that really hold meetings, newest first; it narrows the dates of one
+              repeating meeting too, which is the same field doing the same job */}
+          <select
+            aria-label={words.monthFilter}
+            value={month}
+            onChange={(event) => narrow(() => setMonth(event.target.value))}
+            disabled={isSaving}
+            className={fieldClass}
+          >
+            <option value="">{words.anyMonth}</option>
+            {months.map((entry) => (
+              <option key={entry.month} value={entry.month}>
+                {words.inMonth(monthLabel(entry.month), entry.count)}
               </option>
             ))}
           </select>
@@ -324,7 +353,7 @@ export const LinkToPlanDialog: React.FC<LinkToPlanDialogProps> = ({ count, isSav
           </>
         ) : (shownGroups?.rows.length ?? 0) === 0 ? (
           <p className="rounded-xl border border-dashed border-outline-variant px-3 py-6 text-center text-[13px] text-outline">
-            {search.trim() ? words.noMatch : when !== "all" || repeat !== "all" ? words.nothingHere : words.noneToLink}
+            {search.trim() ? words.noMatch : when !== "all" || repeat !== "all" || month ? words.nothingHere : words.noneToLink}
           </p>
         ) : (
           <>

@@ -5,6 +5,7 @@ import { visibleTo } from "@/services/auth/viewer"
 import { linkedCounts } from "@/services/meetings/planLink"
 import { PLAN_PICK_PAGE_SIZE, type PlanPickRepeat, type PlanPickWhen } from "@/constants/meetings"
 import { recurrenceLabel } from "@/constants/meetingPlanner"
+import { monthEnd, monthStart } from "@/lib/meetingDates"
 import type { PlanPickGroup, PlanPickOccurrence, PlanPickPage } from "@/types/meetings"
 import type { Viewer } from "@/types/auth"
 
@@ -34,6 +35,8 @@ export interface PickFilters {
   search: string
   when: PlanPickWhen
   repeat: PlanPickRepeat
+  // One month of the calendar (YYYY-MM), or nothing for every month
+  month?: string
   page: number
   // The browser's own day, so "past" and "upcoming" are the user's, not the server's
   today: string
@@ -45,10 +48,21 @@ const escapeText = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
  * What the filters leave, as a plain query: the viewer's own meetings, narrowed by when they are,
  * whether they repeat and what was typed. `visibleTo` is a single field, so `$or` here is safe.
  */
-function narrowing(viewer: Viewer, { search, when, repeat, today }: Omit<PickFilters, "page">): Record<string, unknown> {
+function narrowing(viewer: Viewer, { search, when, repeat, month, today }: Omit<PickFilters, "page">): Record<string, unknown> {
   const filter: Record<string, unknown> = { ...visibleTo(viewer) }
-  if (when === "past") filter.meetingDate = { $lt: today }
-  if (when === "upcoming") filter.meetingDate = { $gte: today }
+  /**
+   * When and which month are **both** conditions on the same field, so they are built together
+   * rather than one overwriting the other: November with "past only" is November up to today.
+   */
+  const date: Record<string, string> = {}
+  if (when === "past") date.$lt = today
+  if (when === "upcoming") date.$gte = today
+  if (month) {
+    const from = monthStart(month)
+    date.$gte = date.$gte && date.$gte > from ? date.$gte : from
+    date.$lte = monthEnd(month)
+  }
+  if (Object.keys(date).length > 0) filter.meetingDate = date
   // A meeting saved before series existed has no field at all, which `$in: [null]` matches too
   if (repeat === "repeating") filter.seriesId = { $type: "string" }
   if (repeat === "single") filter.seriesId = { $in: [null] }
@@ -64,6 +78,20 @@ function narrowing(viewer: Viewer, { search, when, repeat, today }: Omit<PickFil
 const pageOf = (page: number, total: number) => {
   const pages = Math.max(1, Math.ceil(total / PLAN_PICK_PAGE_SIZE))
   return { page: Math.min(Math.max(1, page), pages), pages }
+}
+
+/**
+ * The months the rest of the filters leave something in, newest first, with how many dates each
+ * holds. The month filter itself is left out of the query, so choosing a month never empties the
+ * list of months that can be chosen.
+ */
+async function monthsOf(match: Record<string, unknown>): Promise<{ month: string; count: number }[]> {
+  const rows = await MeetingPlanModel.aggregate<{ _id: string; count: number }>([
+    { $match: match },
+    { $group: { _id: { $substrBytes: ["$meetingDate", 0, 7] }, count: { $sum: 1 } } },
+    { $sort: { _id: -1 } },
+  ])
+  return rows.map((row) => ({ month: row._id, count: row.count }))
 }
 
 /** How many records already point at each of these meetings, in one grouped read for the page. */
@@ -121,8 +149,9 @@ const grouping = (match: Record<string, unknown>, today: string): PipelineStage[
  */
 export async function listPlanGroups(viewer: Viewer, filters: PickFilters): Promise<PlanPickPage<PlanPickGroup>> {
   await connectDatabase()
-  const { search, when, repeat, today } = filters
-  const stages = grouping(narrowing(viewer, { search, when, repeat, today }), today)
+  const { search, when, repeat, month, today } = filters
+  const stages = grouping(narrowing(viewer, { search, when, repeat, month, today }), today)
+  const months = await monthsOf(narrowing(viewer, { search, when, repeat, today }))
 
   const [counted] = await MeetingPlanModel.aggregate<{ n: number }>([...stages, { $count: "n" }])
   const total = counted?.n ?? 0
@@ -152,13 +181,13 @@ export async function listPlanGroups(viewer: Viewer, filters: PickFilters): Prom
     status: row.status,
     linkedCount: 0,
   }))
-  return { rows: await withLinked(viewer, groups, (group) => group.meetingId), page, pages, total }
+  return { rows: await withLinked(viewer, groups, (group) => group.meetingId), page, pages, total, months }
 }
 
 /**
- * The dates of one repeating meeting, newest first, inside the row that was opened. The `when`
- * filter is kept, so a picker narrowed to past meetings opens a series on its past dates only; the
- * search is left out, because every date of a series carries the same name.
+ * The dates of one repeating meeting, newest first, inside the row that was opened. The `when` and
+ * `month` filters are kept, so a picker narrowed to November opens a series on its November dates;
+ * the search is left out, because every date of a series carries the same name.
  */
 export async function listPlanOccurrences(
   viewer: Viewer,
@@ -167,6 +196,8 @@ export async function listPlanOccurrences(
 ): Promise<PlanPickPage<PlanPickOccurrence>> {
   await connectDatabase()
   const match = { ...narrowing(viewer, { ...filters, search: "", repeat: "all" }), seriesId }
+  // The months this meeting itself has, so the filter inside a series offers its own dates only
+  const months = await monthsOf({ ...narrowing(viewer, { ...filters, search: "", repeat: "all", month: undefined }), seriesId })
   const total = await MeetingPlanModel.countDocuments(match)
   const { page, pages } = pageOf(filters.page, total)
   const records = (await MeetingPlanModel.find(match, "meetingDate meetingTime status")
@@ -182,5 +213,5 @@ export async function listPlanOccurrences(
     status: record.status,
     linkedCount: 0,
   }))
-  return { rows: await withLinked(viewer, rows, (row) => row.id), page, pages, total }
+  return { rows: await withLinked(viewer, rows, (row) => row.id), page, pages, total, months }
 }

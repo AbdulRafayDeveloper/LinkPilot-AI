@@ -26,11 +26,11 @@ export async function GET(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || MEETING_PLAN_LINK_MESSAGES.linkFailed }, { status: 400 })
   }
-  const { today, search, when, repeat, page, series } = parsed.data
+  const { today, search, when, repeat, month, page, series } = parsed.data
   try {
     const data = series
-      ? await listPlanOccurrences(auth.viewer, series, { today, when, page })
-      : await listPlanGroups(auth.viewer, { today, search, when, repeat, page })
+      ? await listPlanOccurrences(auth.viewer, series, { today, when, month, page })
+      : await listPlanGroups(auth.viewer, { today, search, when, repeat, month, page })
     return NextResponse.json({ success: true, message: "Planned meetings retrieved", data })
   } catch (error: unknown) {
     console.error("GET Meeting Plan Pick Exception:", error instanceof Error ? error.message : error)

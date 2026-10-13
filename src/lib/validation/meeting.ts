@@ -3,11 +3,19 @@ import {
   MEETING_LINK_MESSAGES,
   MEETING_MESSAGES,
   MEETING_TITLE_MAX_LENGTH,
+  PEOPLE_MAX,
+  PERSON_NAME_MAX_LENGTH,
   PLAN_PICK_REPEAT_IDS,
   PLAN_PICK_WHEN_IDS,
   TRANSCRIPT_MAX_LENGTH,
 } from "@/constants/meetings"
-import { ISO_DATE_PATTERN, MAX_TODAY_DRIFT_DAYS, MEETING_NAME_MAX_LENGTH, MEETING_PLANNER_MESSAGES } from "@/constants/meetingPlanner"
+import {
+  ISO_DATE_PATTERN,
+  ISO_MONTH_PATTERN,
+  MAX_TODAY_DRIFT_DAYS,
+  MEETING_NAME_MAX_LENGTH,
+  MEETING_PLANNER_MESSAGES,
+} from "@/constants/meetingPlanner"
 import { shiftDate } from "@/lib/taskDates"
 
 /**
@@ -21,6 +29,20 @@ export const MeetingSchema = z.object({
     .trim()
     .min(1, MEETING_MESSAGES.missingTranscript)
     .max(TRANSCRIPT_MAX_LENGTH, MEETING_MESSAGES.transcriptTooLong),
+  /**
+   * Who was in the meeting, in the user's own words: tidied, each person once, and never more than
+   * a room holds. Left out, the meeting keeps whoever it already had, so every caller written
+   * before this is unchanged.
+   */
+  people: z
+    .array(z.string().trim().max(PERSON_NAME_MAX_LENGTH, MEETING_MESSAGES.personTooLong))
+    .max(PEOPLE_MAX, MEETING_MESSAGES.tooManyPeople)
+    .optional()
+    .transform((people) =>
+      people === undefined
+        ? undefined
+        : [...new Map(people.map((name) => name.trim()).filter(Boolean).map((name) => [name.toLowerCase(), name])).values()]
+    ),
 })
 
 /** Making, replacing or turning off a meeting's share link. */
@@ -54,6 +76,8 @@ export const PlanPickQuerySchema = z.object({
   when: z.enum(PLAN_PICK_WHEN_IDS).catch("all"),
   repeat: z.enum(PLAN_PICK_REPEAT_IDS).catch("all"),
   page: z.coerce.number().int().min(1).catch(1),
+  // One month of the calendar (YYYY-MM). Anything else reads as every month rather than as an error
+  month: z.string().trim().regex(ISO_MONTH_PATTERN).optional().catch(undefined),
   // A series id is one the app made itself (a UUID or an object id), never a path or a pattern
   series: z.string().trim().regex(/^[\w-]{8,64}$/).optional(),
 })

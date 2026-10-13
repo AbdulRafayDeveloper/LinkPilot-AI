@@ -129,6 +129,10 @@ export const MEETING_PLAN_LINK_MESSAGES = {
   nextPage: "Next",
   chosenIs: "Linking to",
   nothingHere: "No meeting matches these filters.",
+  // The month filter, which narrows the list and the dates of one repeating meeting alike
+  anyMonth: "Any month",
+  monthFilter: "Month",
+  inMonth: (label: string, count: number) => `${label} (${count})`,
 } as const
 
 /**

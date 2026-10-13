@@ -117,6 +117,12 @@ export interface PlanPickPage<T> {
   page: number
   pages: number
   total: number
+  /**
+   * Every month the rest of the filters leave something in, newest first, with how many dates each
+   * one holds. It is worked out **without** the month filter itself, so choosing one never empties
+   * the list of months to choose from, exactly as Important Content's type filter behaves.
+   */
+  months: { month: string; count: number }[]
 }
 
 export interface LinkedMeeting {
