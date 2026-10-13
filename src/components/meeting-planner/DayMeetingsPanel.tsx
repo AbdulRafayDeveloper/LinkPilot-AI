@@ -2,8 +2,9 @@
 
 import React from "react"
 import Link from "next/link"
-import { CalendarPlus, ChevronRight, NotebookPen, Pencil, Trash2 } from "lucide-react"
+import { CalendarPlus, ChevronRight, FileText, NotebookPen, Pencil, Trash2 } from "lucide-react"
 import { MEETING_PLANNER_MESSAGES, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
+import { MEETING_PLAN_LINK_MESSAGES } from "@/constants/meetings"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
 import { MeetingStatusButton } from "./MeetingStatusButton"
@@ -21,6 +22,11 @@ interface DayMeetingsPanelProps {
   onDelete: (meeting: MeetingPlan) => void
   // Opening the meeting's notes, written before it or after it
   onNotes: (meeting: MeetingPlan) => void
+  /**
+   * Opening what this meeting was written up as: the notes and recordings linked to it from Meeting
+   * Notes to Tasks. Only shown on a meeting that has some, so a row stays about the meeting itself.
+   */
+  onLinked: (meeting: MeetingPlan) => void
 }
 
 const iconButton =
@@ -41,6 +47,7 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
   onEdit,
   onDelete,
   onNotes,
+  onLinked,
 }) => (
   <section
     aria-label={`Meetings on ${date}`}
@@ -93,6 +100,21 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
               </Link>
               <div className="flex flex-wrap items-center justify-end gap-0.5">
+                {/* What it was written up as, when there is something: the records of this meeting */}
+                {(meeting.linkedCount ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onLinked(meeting)}
+                    aria-label={`Open the notes and recordings of ${meeting.name}`}
+                    title={MEETING_PLAN_LINK_MESSAGES.notesOn(meeting.linkedCount ?? 0)}
+                    className={`${iconButton} relative text-primary hover:bg-primary/5`}
+                  >
+                    <FileText size={14} aria-hidden="true" />
+                    <span className="absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] font-bold leading-[14px] text-white">
+                      {meeting.linkedCount}
+                    </span>
+                  </button>
+                )}
                 <MeetingStatusButton meeting={meeting} isSaving={savingIds.has(meeting.id)} onChange={onChangeStatus} />
                 <button
                   type="button"

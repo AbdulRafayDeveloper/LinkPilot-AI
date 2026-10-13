@@ -33,6 +33,16 @@ export interface IMeeting {
   notesEditedAt: Date | null
   // A meeting recorded in the app (types/meetingRecording.ts StoredRecording); null for a pasted one
   recording: unknown
+  /**
+   * The planned meeting on the calendar this one is the record of (`meeting_plans`,
+   * models/MeetingPlan.ts), or null for a meeting that is linked to nothing. One record belongs to
+   * at most one planned meeting, and a planned meeting may have several: a call that ran over two
+   * sittings is two recordings of one event.
+   *
+   * It is one nullable field rather than a join table on purpose: every meeting saved before this
+   * reads as linked to nothing, and nothing about either module changes until a link is made.
+   */
+  planId: string | null
   // The share link (lib/meetingLink.ts): raising the version stops every link already sent, and
   // the flag turns them all off without losing which version comes next
   publicLinkVersion: number
@@ -64,6 +74,7 @@ const MeetingSchema = new Schema<IMeeting>(
     notesEditedAt: { type: Date, default: null },
     // Mixed on purpose: chunks are confirmed one key at a time with a $set on their own path
     recording: { type: Schema.Types.Mixed, default: null },
+    planId: { type: String, default: null },
     // 0 and false on a meeting saved before links existed, so it simply has no link until one is made
     publicLinkVersion: { type: Number, required: true, default: 0 },
     publicLinkActive: { type: Boolean, required: true, default: false },
@@ -76,5 +87,7 @@ MeetingSchema.index({ createdAt: -1, _id: -1 })
 MeetingSchema.index({ status: 1, createdAt: -1, _id: -1 })
 // Searching by name, which is the only field the search matches
 MeetingSchema.index({ title: 1 })
+// Every record linked to one planned meeting, for the calendar's popup; unlinked meetings stay out
+MeetingSchema.index({ planId: 1 }, { partialFilterExpression: { planId: { $type: "string" } } })
 
 export const Meeting = (mongoose.models.Meeting as Model<IMeeting> | undefined) ?? mongoose.model<IMeeting>("Meeting", MeetingSchema)

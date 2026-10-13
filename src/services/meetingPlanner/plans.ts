@@ -3,6 +3,7 @@ import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { MeetingPlan as MeetingPlanModel, type IMeetingPlan } from "@/models/MeetingPlan"
 import { daysBetween, monthEnd, monthStart } from "@/lib/meetingDates"
+import { forgetPlan, linkedCounts } from "@/services/meetings/planLink"
 import { shiftDate } from "@/lib/taskDates"
 import { datesAfter, datesForCount } from "@/lib/meetingRecurrence"
 import type {
@@ -83,11 +84,19 @@ export async function listMonth(viewer: Viewer, month: string, today: string): P
       .lean(),
     MeetingPlanModel.find({ meetingDate: today, ...visibleTo(viewer) }, LIST_FIELDS).sort(byDayThenTime).lean(),
   ])
+  const monthMeetings = (monthRecords as unknown as StoredPlan[]).map(toMeeting)
   const todayMeetings = (todayRecords as unknown as StoredPlan[]).map(toMeeting)
+  /**
+   * How many records (notes, recordings) are linked to each one, in one grouped read for the whole
+   * month, so the calendar can say which meetings have been held and written up without a request
+   * per meeting.
+   */
+  const linked = await linkedCounts(viewer, [...new Set([...monthMeetings, ...todayMeetings].map((meeting) => meeting.id))])
+  const withLinked = (meeting: MeetingPlan): MeetingPlan => ({ ...meeting, linkedCount: linked.get(meeting.id) ?? 0 })
   return {
     month,
-    meetings: (monthRecords as unknown as StoredPlan[]).map(toMeeting),
-    today: todayMeetings,
+    meetings: monthMeetings.map(withLinked),
+    today: todayMeetings.map(withLinked),
     todayDate: today,
     pendingToday: todayMeetings.filter((meeting) => meeting.status === "pending").length,
   }
@@ -368,8 +377,12 @@ export async function deleteMeeting(viewer: Viewer, id: string): Promise<boolean
   if (!filter) return false
   await connectDatabase()
   const { deletedCount } = await MeetingPlanModel.deleteOne(filter)
-  // The meeting's vectors and its chat go with it; neither means anything without the meeting
-  if (deletedCount > 0) await Promise.all([deleteMeetingVectors(id), clearMeetingChat(id)])
+  /**
+   * The meeting's vectors and its chat go with it; neither means anything without the meeting. The
+   * records linked to it are **kept** and simply stop pointing at it: their notes and recordings are
+   * work of their own, the same rule deleting a folder follows.
+   */
+  if (deletedCount > 0) await Promise.all([deleteMeetingVectors(id), clearMeetingChat(id), forgetPlan(viewer, [id])])
   return deletedCount > 0
 }
 
@@ -390,6 +403,8 @@ export async function deleteSeries(viewer: Viewer, id: string): Promise<number> 
   const ids = (await MeetingPlanModel.find(seriesFilter, "_id").lean()).map((record) => String(record._id))
   const { deletedCount } = await MeetingPlanModel.deleteMany({ ...seriesFilter, _id: { $in: ids } })
   await Promise.all(ids.flatMap((meetingId) => [deleteMeetingVectors(meetingId), clearMeetingChat(meetingId)]))
+  // Every record of any meeting of the series keeps itself and stops pointing at what has gone
+  await forgetPlan(viewer, ids)
   return deletedCount
 }
 

@@ -3,10 +3,11 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { AlertTriangle, CalendarClock, FilePenLine, Loader2, Plus, RefreshCw, Search, SearchX, Video, X } from "lucide-react"
+import { AlertTriangle, CalendarClock, FilePenLine, Loader2, Plus, RefreshCw, Search, SearchX, Video, X, Link2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { MeetingsTable } from "@/components/meetings/MeetingsTable"
+import { LinkToPlanDialog } from "@/components/meetings/LinkToPlanDialog"
 import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { DeleteMeetingDialog } from "@/components/meetings/DeleteMeetingDialog"
@@ -22,8 +23,7 @@ import {
   RUNNING_STATUSES,
   SEARCH_DEBOUNCE_MS,
   type MeetingPromptId,
-  type MeetingStatusId,
-} from "@/constants/meetings"
+  type MeetingStatusId, MEETINGS_LINK_ENDPOINT, MEETING_PLAN_LINK_MESSAGES } from "@/constants/meetings"
 import type { Meeting, MeetingInput, MeetingSummary, MeetingsPage } from "@/types/meetings"
 
 // While something is being analyzed, the list checks back this often
@@ -188,6 +188,15 @@ export default function MeetingsClient() {
   }
 
   const selection = useRowSelection(meetings.map((meeting) => meeting.id))
+  /**
+   * Linking the ticked records to a meeting on the calendar (Meeting Planner). It is done over the
+   * ticked rows because it is nearly always several records of one meeting: two recordings of a
+   * call that ran over two sittings, or the notes and the recording of the same hour.
+   */
+  const [isLinking, setIsLinking] = useState(false)
+  const [isSavingLink, setIsSavingLink] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const [linkNotice, setLinkNotice] = useState<string | null>(null)
 
   /**
    * Deletes the ticked meetings in one call. Each takes its transcript, what was read from it and
@@ -214,6 +223,33 @@ export default function MeetingsClient() {
   }
 
   const isFiltering = search !== "" || status !== ""
+
+  /**
+   * Links the ticked records to one planned meeting, or takes one record off the meeting it points
+   * at. Both are the same request with a planned meeting or nothing to point at, and the list is
+   * read again afterwards so every row says what it is linked to.
+   */
+  const linkPicked = async (planId: string | null, ids?: string[]) => {
+    const meetingIds = ids ?? [...selection.pickedIds]
+    if (meetingIds.length === 0) return
+    setIsSavingLink(true)
+    setLinkError(null)
+    try {
+      const { message } = await requestApi<{ changed: number }>(MEETINGS_LINK_ENDPOINT, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meetingIds, planId }),
+      })
+      setIsLinking(false)
+      if (!ids) selection.clear()
+      setLinkNotice(message ?? null)
+      reload()
+    } catch (reason: unknown) {
+      setLinkError(reason instanceof Error ? reason.message : MEETING_PLAN_LINK_MESSAGES.linkFailed)
+    } finally {
+      setIsSavingLink(false)
+    }
+  }
 
   return (
     <div className="font-body-md text-body-md min-h-screen bg-background text-on-surface flex overflow-hidden h-screen">
@@ -362,12 +398,41 @@ export default function MeetingsClient() {
                   onClear={selection.clear}
                 />
 
+                {/* Linking the ticked records to a meeting on the calendar, beside the delete bar
+                    rather than inside it: it is the other thing worth doing to a set of records */}
+                {selection.pickedIds.size > 0 && (
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLinkError(null)
+                        setIsLinking(true)
+                      }}
+                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                    >
+                      <Link2 size={14} aria-hidden="true" />
+                      {MEETING_PLAN_LINK_MESSAGES.link}
+                    </button>
+                    {linkError && (
+                      <span role="alert" className="text-[12px] text-error">
+                        {linkError}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {linkNotice && (
+                  <p className="mb-3 text-[12px] font-semibold text-success" aria-live="polite">
+                    {linkNotice}
+                  </p>
+                )}
+
                 <MeetingsTable
                   meetings={meetings}
                   deletingId={isDeleting ? (meetingToDelete?.id ?? null) : null}
                   pickedIds={selection.pickedIds}
                   onPick={selection.pick}
                   onDelete={setMeetingToDelete}
+                  onUnlink={(meeting) => void linkPicked(null, [meeting.id])}
                 />
 
                 <div ref={sentinelRef} className="pt-4 text-center text-[11px] text-outline" aria-live="polite">
@@ -410,6 +475,20 @@ export default function MeetingsClient() {
           }}
         />
       )}
+      {isLinking && (
+        <LinkToPlanDialog
+          count={selection.pickedIds.size}
+          isSaving={isSavingLink}
+          error={linkError}
+          onSubmit={(planId) => void linkPicked(planId)}
+          onClose={() => {
+            if (isSavingLink) return
+            setIsLinking(false)
+            setLinkError(null)
+          }}
+        />
+      )}
+
       {isConfirmingPicked && (
         <ConfirmBulkDelete
           count={selection.pickedIds.size}

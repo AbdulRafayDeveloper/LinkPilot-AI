@@ -2,8 +2,9 @@
 
 import React from "react"
 import Link from "next/link"
-import { ExternalLink, Trash2, Users } from "lucide-react"
+import { CalendarDays, ExternalLink, Trash2, Users } from "lucide-react"
 import { historyLabelClass } from "@/components/history/HistoryFilters"
+import { MEETING_PLAN_LINK_MESSAGES } from "@/constants/meetings"
 import { MeetingStatusBadge } from "./MeetingStatusBadge"
 import type { MeetingSummary } from "@/types/meetings"
 
@@ -15,6 +16,11 @@ interface MeetingsTableProps {
   pickedIds: ReadonlySet<string>
   onPick: (id: string, isRange: boolean) => void
   onDelete: (meeting: MeetingSummary) => void
+  /**
+   * Taking this record off the planned meeting it points at. Only the rows that are linked show it,
+   * and nothing of the record itself changes: a link is one field on it.
+   */
+  onUnlink?: (meeting: MeetingSummary) => void
 }
 
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -82,7 +88,36 @@ const Actions: React.FC<{ meeting: MeetingSummary; deletingId: string | null; on
  * that, one to a row on a phone and two on a tablet. The title is the link either way, so opening a
  * meeting is one click wherever it is read (see the Responsive layout rules in CLAUDE.md).
  */
-export const MeetingsTable: React.FC<MeetingsTableProps> = ({ meetings, deletingId, pickedIds, onPick, onDelete }) => (
+/**
+ * The planned meeting this record is of, when it has been linked to one (Meeting Planner's
+ * calendar), with the one thing to do about it here: take it off. The link itself is made over the
+ * ticked rows, because it is nearly always several records of one meeting.
+ */
+const LinkedPlan: React.FC<{ meeting: MeetingSummary; onUnlink?: (meeting: MeetingSummary) => void }> = ({ meeting, onUnlink }) =>
+  meeting.plan ? (
+    <span className="mt-1 flex flex-wrap items-center gap-1.5">
+      <Link
+        href="/meeting-planner"
+        title={`${meeting.plan.name} on ${meeting.plan.meetingDate} at ${meeting.plan.meetingTime}`}
+        className="inline-flex max-w-full items-center gap-1 rounded-full bg-primary-fixed px-2 py-0.5 text-[10px] font-semibold text-on-primary-fixed-variant transition-colors hover:bg-primary-container"
+      >
+        <CalendarDays size={10} className="shrink-0" aria-hidden="true" />
+        <span className="min-w-0 truncate">{meeting.plan.name}</span>
+      </Link>
+      {onUnlink && (
+        <button
+          type="button"
+          onClick={() => onUnlink(meeting)}
+          aria-label={`Unlink ${meeting.title} from ${meeting.plan.name}`}
+          className="text-[10px] font-semibold text-outline underline transition-colors hover:text-error"
+        >
+          {MEETING_PLAN_LINK_MESSAGES.unlink}
+        </button>
+      )}
+    </span>
+  ) : null
+
+export const MeetingsTable: React.FC<MeetingsTableProps> = ({ meetings, deletingId, pickedIds, onPick, onDelete, onUnlink }) => (
   <>
     <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
       <table className="w-full min-w-[880px] border-collapse text-left [overflow-wrap:anywhere]">
@@ -122,6 +157,7 @@ export const MeetingsTable: React.FC<MeetingsTableProps> = ({ meetings, deleting
                   {meeting.title}
                 </Link>
                 <Purpose meeting={meeting} lines="mt-1 line-clamp-2" />
+                <LinkedPlan meeting={meeting} onUnlink={onUnlink} />
               </td>
               <td className="w-[150px] px-3 py-2.5">
                 <MeetingStatusBadge status={meeting.status} progress={meeting.progress} />
@@ -165,6 +201,7 @@ export const MeetingsTable: React.FC<MeetingsTableProps> = ({ meetings, deleting
             <MeetingStatusBadge status={meeting.status} progress={meeting.progress} />
           </div>
           <Purpose meeting={meeting} lines="line-clamp-3" />
+          <LinkedPlan meeting={meeting} onUnlink={onUnlink} />
           <div className="flex flex-col gap-1 border-t border-outline-variant/70 pt-2">
             <span className="flex flex-wrap items-center gap-x-2 text-[11px] text-outline">
               {when(meeting.createdAt)}

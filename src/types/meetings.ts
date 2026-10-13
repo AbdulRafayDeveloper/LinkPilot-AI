@@ -62,9 +62,38 @@ export interface MeetingProgress {
 /**
  * One meeting in the history list: enough to show a card, without its transcript.
  */
+/**
+ * A planned meeting, as little of it as naming it takes: what a linked record says it belongs to.
+ */
+export interface MeetingPlanRef {
+  id: string
+  name: string
+  meetingDate: string
+  meetingTime: string
+}
+
+/** One record linked to a planned meeting, as the calendar's popup lists it. */
+export interface LinkedMeeting {
+  id: string
+  title: string
+  status: string
+  // Whether it was recorded in the app, so the popup says "recording" rather than "notes"
+  hasRecording: boolean
+  transcriptChars: number
+  createdAt: string
+}
+
 export interface MeetingSummary {
   id: string
   title: string
+  /**
+   * The planned meeting this is the record of, when it has been linked to one: its id and enough
+   * of it to name it in a list. Null for a meeting linked to nothing, which is every meeting until
+   * someone links it.
+   */
+  plan?: { id: string; name: string; meetingDate: string; meetingTime: string } | null
+  // Whether it was recorded in the app, so a list can say "recording" rather than "notes"
+  hasRecording?: boolean
   isTitleGenerated: boolean
   status: MeetingStatusId
   statusMessage: string | null

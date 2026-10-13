@@ -148,6 +148,11 @@ export interface MeetingPlan {
    */
   hasNotes: boolean
   notesUpdatedAt: string | null
+  /**
+   * How many records of this meeting (notes, recordings from Meeting Notes to Tasks) are linked to
+   * it. Only the month read carries it, since counting it is a query of its own.
+   */
+  linkedCount?: number
   createdAt: string
 }
 

@@ -60,6 +60,8 @@ export type MeetingPromptId = (typeof MEETING_PROMPT_TABS)[number]["id"]
 export const MEETING_PROMPT_IDS = MEETING_PROMPT_TABS.map((tab) => tab.id) as [MeetingPromptId, ...MeetingPromptId[]]
 
 export const MEETINGS_ENDPOINT = "/api/meetings"
+// Where several records are linked to one planned meeting, or taken off the one they point at
+export const MEETINGS_LINK_ENDPOINT = "/api/meetings/link"
 
 /**
  * The share link one meeting can be sent by (lib/meetingLink.ts): the page whoever receives it
@@ -88,6 +90,37 @@ export const PUBLIC_MEETING_MESSAGES = {
   // A meeting shared before its analysis finished: the video is there and the summary follows later
   notAnalysed: "This meeting hasn't been summarised yet.",
 } as const
+
+/**
+ * Linking a meeting's notes or recording to the planned meeting it was (`meeting_plans`, the
+ * calendar in Meeting Planner). One record belongs to at most one planned meeting; a planned
+ * meeting may hold several, since a call that ran over two sittings is two records of one event.
+ */
+export const MEETING_PLAN_LINK_MESSAGES = {
+  // On the meetings list, over the ticked rows
+  link: "Link to a planned meeting",
+  linkOne: "Link to a planned meeting",
+  unlink: "Unlink",
+  choose: "Which planned meeting was this?",
+  chooseHint: "The notes and the recording stay here; the meeting on the calendar will point at them.",
+  search: "Search the planned meetings",
+  noneToLink: "No meetings on the calendar yet. Add one in Meeting Planner first.",
+  noMatch: "No planned meeting matches that search.",
+  linked: (count: number) => `${count} ${count === 1 ? "meeting" : "meetings"} linked.`,
+  unlinked: (count: number) => `${count} ${count === 1 ? "meeting" : "meetings"} unlinked.`,
+  linkFailed: "Couldn't link it. Please try again.",
+  unlinkFailed: "Couldn't unlink it. Please try again.",
+  // On the calendar, where a planned meeting says what it has
+  notesOn: (count: number) => `${count} ${count === 1 ? "record" : "records"}`,
+  notesTitle: "Notes and recordings of this meeting",
+  notesEmpty: "Nothing is linked to this meeting yet. Link its notes from Meeting Notes to Tasks.",
+  openNotes: "Open",
+  // The most a single call can link at once, which is what one page of the list holds
+  tooMany: "Link up to 50 meetings at a time.",
+} as const
+
+// How many records one call may link, which is a page of the meetings list
+export const MAX_LINKED_AT_ONCE = 50
 
 export const MEETING_MESSAGES = {
   missingTranscript: "Paste the meeting notes or transcript first.",

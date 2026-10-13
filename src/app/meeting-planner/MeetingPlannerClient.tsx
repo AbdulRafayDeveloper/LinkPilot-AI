@@ -29,6 +29,7 @@ import {
 } from "@/constants/meetingPlanner"
 import type { MeetingPlan, MeetingPlanDetail, MeetingPlannerPage } from "@/types/meetingPlanner"
 import { MeetingNotesModal } from "@/components/meeting-planner/MeetingNotesModal"
+import { LinkedMeetingsDialog } from "@/components/meeting-planner/LinkedMeetingsDialog"
 
 export default function MeetingPlannerClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -57,6 +58,8 @@ export default function MeetingPlannerClient() {
    * read with the meeting when the panel opens and kept here while it is on screen.
    */
   const [notesFor, setNotesFor] = useState<MeetingPlan | null>(null)
+  // The planned meeting whose records (notes, recordings) are being looked at
+  const [linkedFor, setLinkedFor] = useState<MeetingPlan | null>(null)
   const [notesText, setNotesText] = useState("")
   const [isLoadingNotes, setIsLoadingNotes] = useState(false)
   const [deleting, setDeleting] = useState<MeetingPlan | null>(null)
@@ -384,6 +387,7 @@ export default function MeetingPlannerClient() {
                 savingIds={savingIds}
                 onChangeStatus={changeStatus}
                 onNotes={(meeting) => void openNotes(meeting)}
+                onLinked={setLinkedFor}
                 onAddMeeting={openForm}
                 onEdit={(meeting) => {
                   setMoveError(null)
@@ -454,6 +458,7 @@ export default function MeetingPlannerClient() {
           onClose={() => setNotesFor(null)}
         />
       )}
+      {linkedFor && <LinkedMeetingsDialog meeting={linkedFor} onClose={() => setLinkedFor(null)} />}
       {deleting && (
         <DeleteMeetingDialog
           meeting={deleting}

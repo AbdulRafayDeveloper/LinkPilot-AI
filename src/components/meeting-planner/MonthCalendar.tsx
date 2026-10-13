@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useMemo } from "react"
-import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Repeat, Sparkles } from "lucide-react"
+import { CalendarDays, ChevronLeft, ChevronRight, FileText, Loader2, Repeat, Sparkles } from "lucide-react"
 import { DAY_CELL_MAX_MEETINGS } from "@/constants/meetingPlanner"
 import { WEEKDAY_LABELS, calendarDays, dayOfMonth, formatTime, monthLabel, monthOf } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
@@ -171,6 +171,13 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
                         <>
                           <Repeat size={9} className="mr-0.5 inline-block align-[-1px] text-on-secondary-fixed-variant" aria-hidden="true" />
                           <span className="sr-only">Repeats: </span>
+                        </>
+                      )}
+                      {/* It has been written up: its notes or its recording are linked to it */}
+                      {(meeting.linkedCount ?? 0) > 0 && (
+                        <>
+                          <FileText size={9} className="mr-0.5 inline-block align-[-1px] text-primary" aria-hidden="true" />
+                          <span className="sr-only">Has notes or a recording: </span>
                         </>
                       )}
                       <span className="font-bold tabular-nums">{formatTime(meeting.meetingTime)}</span> {meeting.name}

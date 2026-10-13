@@ -5,6 +5,7 @@ import { MeetingChunk } from "@/models/MeetingChunk"
 import { deleteMeetingVectors } from "@/services/meetingPlanner/vectors"
 import { clearMeetingChat } from "@/services/meetingPlanner/chatHistory"
 import { countChunks, hashTranscript } from "@/lib/transcriptChunks"
+import { plansOfMeetings } from "@/services/meetings/planLink"
 import { MEETINGS_PAGE_SIZE, type MeetingStatusId } from "@/constants/meetings"
 import type { Meeting, MeetingAnalysis, MeetingInput, MeetingSummary, MeetingsPage } from "@/types/meetings"
 import type { Viewer } from "@/types/auth"
@@ -30,6 +31,9 @@ const SUMMARY_FIELDS = {
   status: 1,
   statusMessage: 1,
   transcriptChars: 1,
+  // What it is linked to, and whether it was recorded: a list says both without reading the rest
+  planId: 1,
+  recording: 1,
   totalChunks: 1,
   analyzedChunks: 1,
   analyzedHash: 1,
@@ -138,8 +142,17 @@ export async function listMeetings(viewer: Viewer, { search = "", status = null,
   ])
   const stored = records as unknown as StoredMeeting[]
   const batch = stored.slice(0, size)
+  /**
+   * The planned meeting each linked record belongs to, named in one read for the whole batch rather
+   * than one per row. A link to a planned meeting that has gone reads as no link.
+   */
+  const plans = await plansOfMeetings(viewer, batch.map((record) => record.planId))
   return {
-    meetings: batch.map(toSummary),
+    meetings: batch.map((record) => ({
+      ...toSummary(record),
+      plan: record.planId ? (plans.get(record.planId) ?? null) : null,
+      hasRecording: Boolean(record.recording),
+    })),
     nextCursor: stored.length > size && batch.length > 0 ? toCursor(batch[batch.length - 1]) : null,
     total,
   }
