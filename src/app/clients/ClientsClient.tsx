@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { AlertTriangle, Building2, FileText, Globe2, Loader2, MessageSquareText, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { AlertTriangle, Building2, Eye, FileText, Globe2, Loader2, MessageSquareText, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
@@ -48,6 +48,7 @@ export default function ClientsClient() {
   const [search, setSearch] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dialog, setDialog] = useState<{ client: Client | null } | null>(null)
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [deleting, setDeleting] = useState<Client | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -235,7 +236,15 @@ export default function ClientsClient() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsDetailsOpen(true)}
+                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                          >
+                            <Eye size={14} aria-hidden="true" />
+                            {CLIENTS_MESSAGES.details}
+                          </button>
                           <button
                             type="button"
                             onClick={() => setDialog({ client: current })}
@@ -258,41 +267,6 @@ export default function ClientsClient() {
                         </div>
                       </div>
 
-                      <div className="mt-4 flex flex-col gap-4 border-t border-outline-variant/70 pt-4">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <h3 className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-outline">
-                              <FileText size={12} aria-hidden="true" />
-                              Message format
-                            </h3>
-                            <CopyButton text={current.messageFormat} label="Copy message format" showLabel />
-                          </div>
-                          <p className="whitespace-pre-wrap rounded-xl bg-surface-container-lowest px-3 py-2.5 text-[13px] leading-relaxed text-on-surface [overflow-wrap:anywhere]">
-                            {current.messageFormat}
-                          </p>
-                        </div>
-
-                        {filledSamples(current).map((sample, index) => (
-                          <div key={index} className="flex flex-col gap-1.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <h3 className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-outline">
-                                <MessageSquareText size={12} aria-hidden="true" />
-                                Sample message {index + 1}
-                              </h3>
-                              <CopyButton text={sample} label={`Copy sample message ${index + 1}`} showLabel />
-                            </div>
-                            <p className="whitespace-pre-wrap rounded-xl bg-surface-container-lowest px-3 py-2.5 text-[13px] leading-relaxed text-on-surface [overflow-wrap:anywhere]">
-                              {sample}
-                            </p>
-                          </div>
-                        ))}
-                        {filledSamples(current).length < SAMPLE_MESSAGE_COUNT && (
-                          <p className="text-[12px] text-outline">
-                            Every message written for this client follows {filledSamples(current).length} of the{" "}
-                            {SAMPLE_MESSAGE_COUNT} sample messages. Edit them to fill the rest in.
-                          </p>
-                        )}
-                      </div>
                     </section>
 
                     <ClientProjectsPanel key={current.id} client={current} />
@@ -309,6 +283,50 @@ export default function ClientsClient() {
           </div>
         </main>
       </div>
+
+      {isDetailsOpen && current && (
+        <Modal
+          title={CLIENTS_MESSAGES.detailsOf(current.name)}
+          description={CLIENTS_MESSAGES.detailsExplains}
+          onClose={() => setIsDetailsOpen(false)}
+        >
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-outline">
+                  <FileText size={12} aria-hidden="true" />
+                  Message format
+                </h3>
+                <CopyButton text={current.messageFormat} label="Copy message format" showLabel />
+              </div>
+              <p className="whitespace-pre-wrap rounded-xl bg-surface-container-lowest px-3 py-2.5 text-[13px] leading-relaxed text-on-surface [overflow-wrap:anywhere]">
+                {current.messageFormat}
+              </p>
+            </div>
+
+            {filledSamples(current).map((sample, index) => (
+              <div key={index} className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-outline">
+                    <MessageSquareText size={12} aria-hidden="true" />
+                    Sample message {index + 1}
+                  </h3>
+                  <CopyButton text={sample} label={`Copy sample message ${index + 1}`} showLabel />
+                </div>
+                <p className="whitespace-pre-wrap rounded-xl bg-surface-container-lowest px-3 py-2.5 text-[13px] leading-relaxed text-on-surface [overflow-wrap:anywhere]">
+                  {sample}
+                </p>
+              </div>
+            ))}
+            {filledSamples(current).length < SAMPLE_MESSAGE_COUNT && (
+              <p className="text-[12px] text-outline">
+                Every message written for this client follows {filledSamples(current).length} of the{" "}
+                {SAMPLE_MESSAGE_COUNT} sample messages. Edit them to fill the rest in.
+              </p>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {dialog && <ClientDialog client={dialog.client} onClose={() => setDialog(null)} onSaved={saved} />}
 

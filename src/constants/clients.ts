@@ -64,6 +64,11 @@ export const CLIENTS_MESSAGES = {
   noMatch: "No clients match these filters.",
   choose: "Choose a client",
   chooseHint: "Their details and the projects you are doing for them open here.",
+  // The message format and the sample messages are long, and reading them is not what this page is
+  // for, so the card keeps the client themselves and these open in a popup
+  details: "Details",
+  detailsOf: (name: string) => `${name}: message details`,
+  detailsExplains: "The format every message for this client follows, and the sample messages it is written from.",
 } as const
 
 export const CLIENT_PROJECT_MESSAGES = {
