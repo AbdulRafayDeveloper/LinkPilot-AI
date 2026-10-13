@@ -28,7 +28,8 @@ import { DeleteMeetingDialog } from "@/components/meeting-planner/DeleteMeetingD
 import { MeetingPrepView } from "@/components/meeting-planner/MeetingPrepView"
 import { MeetingChatPanel } from "@/components/meeting-planner/MeetingChatPanel"
 import { endConversationEdit, useConversationDraft } from "@/components/meeting-planner/ConversationEditor"
-import { MeetingFormModal, formValuesOf, type MeetingFormValues } from "@/components/meeting-planner/MeetingFormModal"
+import { MeetingFormModal, formValuesOf, updateScopeOf, type MeetingFormValues } from "@/components/meeting-planner/MeetingFormModal"
+import { JoinLink } from "@/components/meeting-planner/JoinLink"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
@@ -229,14 +230,19 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
           meetingTime: values.meetingTime,
           personName: values.personName || null,
           profileLink: values.profileLink || null,
+          joinUrl: values.joinUrl || null,
           prepEnabled: values.prepEnabled,
           profileInfo: values.profileInfo || null,
           conversationHistory: values.conversationHistory || null,
           additionalInfo: values.additionalInfo || null,
+          // "series" only when the form's own tick box asked for it, so an ordinary edit is
+          // exactly the one-meeting change it always was
+          scope: updateScopeOf(values),
         }),
       })
       showMeeting(data)
       setIsEditing(false)
+      if (values.applyToSeries) setNotice(MEETING_PLANNER_MESSAGES.seriesLinkApplied)
     } catch (error: unknown) {
       setEditError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.updateFailed)
     } finally {
@@ -421,6 +427,9 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                       notice && <p className="font-semibold text-success">{notice}</p>
                     )}
                   </div>
+
+                  {/* How the meeting is attended, high on the page: Join as it starts, Copy to send it on */}
+                  <JoinLink url={meeting.joinUrl} name={meeting.name} variant="panel" />
 
                     {/* The notes themselves, read without opening anything, so a meeting says what it
                       is for at a glance. Writing them is the Notes button above. */}

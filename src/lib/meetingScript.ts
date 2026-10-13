@@ -60,6 +60,16 @@ export function normalizeProjectLink(link: string): string {
   return /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`
 }
 
+/** Whether a link is one a browser will really open: http or https, with a host. */
+export function isWebLink(link: string): boolean {
+  try {
+    const url = new URL(link)
+    return /^https?:$/i.test(url.protocol) && Boolean(url.hostname)
+  } catch {
+    return false
+  }
+}
+
 /** Each project's link by its name, lowercased, for the conversation's show steps. */
 export function projectLinksOf(projects: ProjectToShow[]): Record<string, string> {
   return Object.fromEntries(

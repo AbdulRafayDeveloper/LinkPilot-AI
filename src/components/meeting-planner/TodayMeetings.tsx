@@ -6,6 +6,7 @@ import { CalendarCheck, ChevronRight, NotebookPen, Sun } from "lucide-react"
 import { MEETING_PLANNER_MESSAGES, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
+import { JoinLink } from "./JoinLink"
 import { MeetingStatusButton } from "./MeetingStatusButton"
 import { PrepBadge } from "./PrepBadge"
 import { SeriesBadge } from "./SeriesBadge"
@@ -63,12 +64,14 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
         {meetings.map((meeting) => (
           <li key={meeting.id}>
             <div
+              /* Today's meetings are the brand's violet, at the owner's request: they sat in the
+                 same plain grey as the day panel below them and the two cards read as one list */
               className={`flex flex-col gap-1.5 rounded-xl border p-3 ${
                 meeting.status === "completed"
                   ? "border-success/40 bg-success-container/40"
                   : meeting.status === "cancelled"
                     ? "border-error/30 bg-error-container/30"
-                    : "border-outline-variant bg-surface-container-lowest"
+                    : "border-primary/30 bg-primary/5"
               }`}
             >
               {/* The time, the tags and what can be done, all of which keep their own width: the
@@ -80,6 +83,8 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                 <PrepBadge meeting={meeting} />
                 <SeriesBadge meeting={meeting} />
                 <span className="ml-auto flex items-center gap-1">
+                  {/* The attend link where the meeting is read, so the call is one click at the hour */}
+                  <JoinLink url={meeting.joinUrl} name={meeting.name} />
                   <button
                     type="button"
                     onClick={() => onNotes(meeting)}

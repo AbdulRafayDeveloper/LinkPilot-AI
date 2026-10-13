@@ -30,7 +30,7 @@ import { clearMeetingChat } from "@/services/meetingPlanner/chatHistory"
  */
 // What the calendar, today's list and the history rows draw; the long preparation inputs stay out
 const LIST_FIELDS =
-  "name meetingDate meetingTime status completedAt personName profileLink prepEnabled prepStatus prepError preparedAt seriesId recurrencePattern recurrenceUntil notesUpdatedAt createdAt"
+  "name meetingDate meetingTime status completedAt personName profileLink joinUrl prepEnabled prepStatus prepError preparedAt seriesId recurrencePattern recurrenceUntil notesUpdatedAt createdAt"
 
 type StoredPlan = IMeetingPlan & { _id: { toString: () => string } }
 
@@ -43,6 +43,7 @@ const toMeeting = (record: StoredPlan): MeetingPlan => ({
   completedAt: record.completedAt ? record.completedAt.toISOString() : null,
   personName: record.personName ?? null,
   profileLink: record.profileLink ?? null,
+  joinUrl: record.joinUrl ?? null,
   prepEnabled: record.prepEnabled,
   prepStatus: record.prepStatus,
   prepError: record.prepError ?? null,
@@ -108,6 +109,7 @@ export interface NewMeetingPlan {
   meetingTime: string
   personName: string | null
   profileLink: string | null
+  joinUrl: string | null
   prepEnabled: boolean
   profileInfo: string | null
   conversationHistory: string | null
@@ -142,10 +144,14 @@ export async function createMeeting(viewer: Viewer, input: NewMeetingPlan, recur
   }
   const seriesId = new mongoose.Types.ObjectId().toString()
   const dates = datesForCount(input.meetingDate, recurrence.pattern, recurrence.count)
+  // A series is nearly always attended on the same link, so it goes on every meeting unless the
+  // form says otherwise, in which case only the first one carries it
+  const linkEveryMeeting = recurrence.linkEveryMeeting !== false
   const records = await MeetingPlanModel.insertMany(
     dates.map((meetingDate, index) => ({
       ...base,
       meetingDate,
+      joinUrl: linkEveryMeeting || index === 0 ? input.joinUrl : null,
       prepEnabled: index === 0 && input.prepEnabled,
       prepStatus: index === 0 && input.prepEnabled ? "queued" : "off",
       seriesId,
@@ -177,6 +183,7 @@ export interface MeetingPlanChanges {
   meetingTime?: string
   personName?: string | null
   profileLink?: string | null
+  joinUrl?: string | null
   status?: MeetingPlanStatusId
   prepEnabled?: boolean
   profileInfo?: string | null
@@ -260,6 +267,14 @@ export async function updateSeriesSchedule(
   const shared: Record<string, unknown> = { ...changes }
   delete shared.meetingDate
   if (changes.status) shared.completedAt = changes.status === "completed" ? new Date() : null
+  /**
+   * What the series shares is when it meets, who it is with and how it is attended; **preparation
+   * stays each meeting's own**, because it is written for one call from what was pasted for it.
+   * So a full edit sent with scope "series" spreads the name, the time and the attend link, and
+   * leaves every other meeting's own preparation inputs exactly as they are.
+   */
+  const sharedByTheSeries: Record<string, unknown> = { ...shared }
+  for (const own of ["prepEnabled", "profileInfo", "conversationHistory", "additionalInfo"]) delete sharedByTheSeries[own]
 
   const laterFilter = { seriesId: meeting.seriesId, meetingDate: { $gte: meeting.meetingDate }, ...visibleTo(viewer) }
   const later = (await MeetingPlanModel.find(laterFilter, "meetingDate").sort({ meetingDate: 1 }).lean()) as unknown as {
@@ -272,7 +287,11 @@ export async function updateSeriesSchedule(
         updateOne: {
           filter: { _id: record._id },
           update: {
-            $set: { ...shared, meetingDate: shift === 0 ? record.meetingDate : shiftDate(record.meetingDate, shift) },
+            $set: {
+              // This meeting takes the whole change; the rest of the series takes what it shares
+              ...(String(record._id) === String(meeting._id) ? shared : sharedByTheSeries),
+              meetingDate: shift === 0 ? record.meetingDate : shiftDate(record.meetingDate, shift),
+            },
           },
         },
       })),
@@ -347,6 +366,7 @@ export async function extendSeries(
       completedAt: null,
       personName: meeting.personName ?? null,
       profileLink: meeting.profileLink ?? null,
+      joinUrl: meeting.joinUrl ?? null,
       prepEnabled: false,
       prepStatus: "off" as const,
       profileInfo: meeting.profileInfo ?? null,

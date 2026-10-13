@@ -15,6 +15,13 @@ export const PERSON_NAME_MAX_LENGTH = 120
 // A link straight to the person: their LinkedIn, their site, wherever the profile was read from.
 // Long enough for the tracking tails a copied profile address usually carries
 export const PROFILE_LINK_MAX_LENGTH = 500
+/**
+ * The link the meeting is actually attended on (Meet, Zoom, Teams, a dial-in page). It is kept
+ * beside the profile link because they are opened at different moments: the profile before the
+ * call, this one as it starts. A meeting link carries long ids and query strings, so it is given
+ * more room than a profile address.
+ */
+export const JOIN_URL_MAX_LENGTH = 1_000
 // The three optional preparation inputs; a LinkedIn profile and a long chat both fit
 export const PREP_INPUT_MAX_LENGTH = 30_000
 // How far the calendar goes in either direction, so a year of meetings stays reachable
@@ -189,6 +196,10 @@ export const MEETING_PLANNER_MESSAGES = {
   projectNameMissing: "Give the project a name.",
   projectLinkInvalid: "The link must be a web address, such as https://example.com.",
   profileLinkInvalid: "The profile link must be a web address, such as https://linkedin.com/in/name.",
+  joinUrlInvalid: "The attend link must be a web address, such as https://meet.google.com/abc-defg-hij.",
+  joinUrlTooLong: `The attend link must be under ${JOIN_URL_MAX_LENGTH.toLocaleString()} characters.`,
+  // Said where the link is put on a whole series, so it is clear what the tick box did
+  seriesLinkApplied: "Saved on this meeting and every later one in the series.",
   profileLinkTooLong: `The profile link must be under ${PROFILE_LINK_MAX_LENGTH} characters.`,
   emptyToday: "Nothing scheduled today.",
   emptyMonth: "No meetings this month.",

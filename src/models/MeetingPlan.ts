@@ -31,6 +31,9 @@ export interface IMeetingPlan {
   personName: string | null
   // A link straight to their profile, read from what was pasted or typed by the user
   profileLink: string | null
+  // Where the meeting is attended: the Meet, Zoom or Teams link, opened and copied as it starts.
+  // Null on every meeting saved before this, which simply shows no attend link
+  joinUrl: string | null
   prepEnabled: boolean
   profileInfo: string | null
   conversationHistory: string | null
@@ -67,6 +70,7 @@ const MeetingPlanSchema = new Schema<IMeetingPlan>(
     completedAt: { type: Date, default: null },
     personName: { type: String, default: null, trim: true },
     profileLink: { type: String, default: null, trim: true },
+    joinUrl: { type: String, default: null, trim: true },
     prepEnabled: { type: Boolean, required: true, default: false },
     profileInfo: { type: String, default: null },
     conversationHistory: { type: String, default: null },

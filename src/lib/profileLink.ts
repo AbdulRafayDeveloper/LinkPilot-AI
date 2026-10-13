@@ -1,4 +1,4 @@
-import { normalizeProjectLink } from "@/lib/meetingScript"
+import { isWebLink, normalizeProjectLink } from "@/lib/meetingScript"
 
 /**
  * The link to the person a meeting is with. It is kept on the meeting so the page can open their
@@ -77,7 +77,4 @@ export function findProfileLink(text: string | null | undefined): string {
 export const normalizeProfileLink = normalizeProjectLink
 
 /** Whether a normalized profile link is one the page will actually open. */
-export const isUsableProfileLink = (link: string): boolean => {
-  const host = hostOf(link)
-  return host !== null && /^https?:$/i.test(new URL(link).protocol)
-}
+export const isUsableProfileLink = isWebLink

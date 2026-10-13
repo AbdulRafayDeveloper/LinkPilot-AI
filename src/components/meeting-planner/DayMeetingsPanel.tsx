@@ -7,6 +7,7 @@ import { MEETING_PLANNER_MESSAGES, type MeetingPlanStatusId } from "@/constants/
 import { MEETING_PLAN_LINK_MESSAGES } from "@/constants/meetings"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
+import { JoinLink } from "./JoinLink"
 import { MeetingStatusButton } from "./MeetingStatusButton"
 import { PrepBadge } from "./PrepBadge"
 import { SeriesBadge } from "./SeriesBadge"
@@ -100,6 +101,8 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
               </Link>
               <div className="flex flex-wrap items-center justify-end gap-0.5">
+                {/* The attend link first, so any day's meeting is joined and copied from here */}
+                <JoinLink url={meeting.joinUrl} name={meeting.name} />
                 {/* What it was written up as, when there is something: the records of this meeting */}
                 {(meeting.linkedCount ?? 0) > 0 && (
                   <button

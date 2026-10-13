@@ -7,6 +7,7 @@ import {
   ISO_MONTH_PATTERN,
   MAX_TODAY_DRIFT_DAYS,
   MEETING_NAME_MAX_LENGTH,
+  JOIN_URL_MAX_LENGTH,
   MEETING_PLANNER_MESSAGES,
   PERSON_NAME_MAX_LENGTH,
   PREP_INPUT_MAX_LENGTH,
@@ -17,6 +18,7 @@ import {
 } from "@/constants/meetingPlanner"
 import { datesForCount, defaultCount, recurrenceDates } from "@/lib/meetingRecurrence"
 import { isUsableProfileLink, normalizeProfileLink } from "@/lib/profileLink"
+import { isWebLink, normalizeProjectLink } from "@/lib/meetingScript"
 import { createMeeting, listMonth } from "@/services/meetingPlanner/plans"
 import { requireViewer } from "@/services/auth/viewer"
 import { withIdempotency } from "@/services/idempotency"
@@ -72,6 +74,18 @@ export const MeetingInputSchema = z.object({
     .transform((value) => normalizeProfileLink(value ?? ""))
     .refine((link) => link === "" || isUsableProfileLink(link), MEETING_PLANNER_MESSAGES.profileLinkInvalid)
     .transform((link) => link || null),
+  /**
+   * Where the meeting is attended. Made into an address before it is checked, exactly as the
+   * profile link is, so a Meet or Zoom link pasted without its scheme is still saved.
+   */
+  joinUrl: z
+    .string()
+    .trim()
+    .max(JOIN_URL_MAX_LENGTH, MEETING_PLANNER_MESSAGES.joinUrlTooLong)
+    .nullish()
+    .transform((value) => normalizeProjectLink(value ?? ""))
+    .refine((link) => link === "" || isWebLink(link), MEETING_PLANNER_MESSAGES.joinUrlInvalid)
+    .transform((link) => link || null),
   prepEnabled: z.boolean().default(false),
   profileInfo: optionalText(PREP_INPUT_MAX_LENGTH),
   conversationHistory: optionalText(PREP_INPUT_MAX_LENGTH),
@@ -94,6 +108,12 @@ const RecurrenceSchema = z.object({
   pattern: z.enum(RECURRENCE_PATTERN_IDS, { error: MEETING_PLANNER_MESSAGES.recurrenceInvalid }),
   count: z.number().int().optional(),
   until: IsoDateSchema.optional(),
+  /**
+   * Whether the attend link goes on every meeting of the series or on the first alone. A series
+   * is nearly always attended on the same link, so it defaults to every meeting, and a caller
+   * written before this gets exactly that.
+   */
+  linkEveryMeeting: z.boolean().optional(),
 })
 
 export type RecurrenceRequest = z.infer<typeof RecurrenceSchema>
@@ -174,7 +194,13 @@ async function handlePost(req: NextRequest) {
     const meeting = await createMeeting(
       auth.viewer,
       input,
-      recurrence ? { pattern: recurrence.pattern, count: recurrenceCountOf(recurrence, input.meetingDate) } : null
+      recurrence
+        ? {
+            pattern: recurrence.pattern,
+            count: recurrenceCountOf(recurrence, input.meetingDate),
+            linkEveryMeeting: recurrence.linkEveryMeeting,
+          }
+        : null
     )
     const message = meeting.seriesSize ? MEETING_PLANNER_MESSAGES.seriesCreated(meeting.seriesSize) : MEETING_PLANNER_MESSAGES.created
     return NextResponse.json({ success: true, message, data: meeting }, { status: 201 })

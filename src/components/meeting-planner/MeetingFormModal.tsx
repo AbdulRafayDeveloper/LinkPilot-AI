@@ -1,10 +1,11 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { Loader2, Repeat, Save, Sparkles } from "lucide-react"
+import { Loader2, Repeat, Save, Sparkles, Video } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import {
   DEFAULT_RECURRENCE_PATTERN,
+  JOIN_URL_MAX_LENGTH,
   MEETING_NAME_MAX_LENGTH,
   RECURRENCE_MAX_OCCURRENCES,
   MEETING_PLANNER_MESSAGES,
@@ -13,6 +14,7 @@ import {
   PROFILE_LINK_MAX_LENGTH,
   RECURRENCE_PATTERNS,
   type RecurrencePatternId,
+  type UpdateScopeId,
 } from "@/constants/meetingPlanner"
 import { findProfileLink } from "@/lib/profileLink"
 import { dayLabel } from "@/lib/meetingDates"
@@ -27,6 +29,8 @@ export interface MeetingFormValues {
   meetingTime: string
   personName: string
   profileLink: string
+  // Where the meeting is attended: the Meet, Zoom or Teams link, opened and copied as it starts
+  joinUrl: string
   prepEnabled: boolean
   profileInfo: string
   conversationHistory: string
@@ -40,6 +44,14 @@ export interface MeetingFormValues {
   repeat: boolean
   repeatPattern: RecurrencePatternId
   repeatCount: number
+  /**
+   * What the attend link does to the rest of the series, asked in both places the owner asked for
+   * it: **creating** a repeating meeting (`linkEveryMeeting`, on by default, since a series is
+   * nearly always attended on the same link), and **editing** one that already repeats
+   * (`applyToSeries`, off by default, so an edit stays this meeting's own until it is asked for).
+   */
+  linkEveryMeeting: boolean
+  applyToSeries: boolean
 }
 
 /** The days the series will meet on, worked out exactly as the server will. */
@@ -48,7 +60,16 @@ export const seriesDatesOf = (values: MeetingFormValues): string[] =>
 
 /** What a new meeting sends about repeating: nothing for a one-off meeting. */
 export const recurrenceOf = (values: MeetingFormValues): MeetingRecurrence | null =>
-  values.repeat && values.meetingDate ? { pattern: values.repeatPattern, count: values.repeatCount } : null
+  values.repeat && values.meetingDate
+    ? { pattern: values.repeatPattern, count: values.repeatCount, linkEveryMeeting: values.linkEveryMeeting }
+    : null
+
+/**
+ * Which meetings an edit touches: this one, or this one and every later meeting of its series.
+ * A meeting that repeats is the only place the choice is offered, so everything else is "one",
+ * which is exactly what the route does when no scope is sent.
+ */
+export const updateScopeOf = (values: MeetingFormValues): UpdateScopeId => (values.applyToSeries ? "series" : "one")
 
 interface MeetingFormModalProps {
   title: string
@@ -74,6 +95,7 @@ export const emptyMeetingForm = (date: string, time: string): MeetingFormValues 
   meetingTime: time,
   personName: "",
   profileLink: "",
+  joinUrl: "",
   prepEnabled: false,
   profileInfo: "",
   conversationHistory: "",
@@ -81,6 +103,8 @@ export const emptyMeetingForm = (date: string, time: string): MeetingFormValues 
   repeat: false,
   repeatPattern: DEFAULT_RECURRENCE_PATTERN,
   repeatCount: defaultCount(DEFAULT_RECURRENCE_PATTERN),
+  linkEveryMeeting: true,
+  applyToSeries: false,
 })
 
 export const formValuesOf = (meeting: MeetingPlanDetail): MeetingFormValues => ({
@@ -89,6 +113,7 @@ export const formValuesOf = (meeting: MeetingPlanDetail): MeetingFormValues => (
   meetingTime: meeting.meetingTime,
   personName: meeting.personName ?? "",
   profileLink: meeting.profileLink ?? "",
+  joinUrl: meeting.joinUrl ?? "",
   prepEnabled: meeting.prepEnabled,
   profileInfo: meeting.profileInfo ?? "",
   conversationHistory: meeting.conversationHistory ?? "",
@@ -96,6 +121,8 @@ export const formValuesOf = (meeting: MeetingPlanDetail): MeetingFormValues => (
   repeat: false,
   repeatPattern: meeting.recurrencePattern ?? DEFAULT_RECURRENCE_PATTERN,
   repeatCount: defaultCount(meeting.recurrencePattern ?? DEFAULT_RECURRENCE_PATTERN),
+  linkEveryMeeting: true,
+  applyToSeries: false,
 })
 
 /**
@@ -251,13 +278,62 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
               Opens straight from the meeting during the call. Paste a profile below and this fills itself in.
             </p>
           </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="meeting-join-url" className={labelClass}>
+              Attend link <span className="normal-case tracking-normal">(optional)</span>
+            </label>
+            <input
+              id="meeting-join-url"
+              inputMode="url"
+              value={values.joinUrl}
+              onChange={(event) => set("joinUrl", event.target.value)}
+              maxLength={JOIN_URL_MAX_LENGTH}
+              disabled={isSaving}
+              placeholder="meet.google.com/abc-defg-hij"
+              className={fieldClass}
+            />
+            <p className="mt-1 text-[11px] text-outline">
+              Where the meeting is attended: Meet, Zoom, Teams, anything. It sits on the meeting with a Join button and
+              a Copy button, so it is one click when the call starts.
+            </p>
+          </div>
         </div>
 
         {existingSeries && (
-          <p className="flex items-start gap-2 rounded-xl border border-secondary/40 bg-secondary-fixed px-3 py-2.5 text-[12px] leading-relaxed text-on-secondary-fixed-variant">
-            <Repeat size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
-            This meeting is part of a repeating series ({existingSeries}). Changes here apply to this meeting only.
-          </p>
+          <div className="flex flex-col gap-2 rounded-xl border border-secondary/40 bg-secondary-fixed px-3 py-2.5 text-[12px] leading-relaxed text-on-secondary-fixed-variant">
+            <p className="flex items-start gap-2">
+              <Repeat size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+              This meeting is part of a repeating series ({existingSeries}).
+            </p>
+            {/* Adding the attend link to a weekly meeting is what this is for, at the owner's
+                request: tick it once and every later meeting of the series gets it */}
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={values.applyToSeries}
+                onChange={(event) => set("applyToSeries", event.target.checked)}
+                disabled={isSaving}
+                className="peer sr-only"
+              />
+              <span
+                aria-hidden="true"
+                className={`mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40 ${
+                  values.applyToSeries
+                    ? "border-primary bg-primary text-white"
+                    : "border-on-secondary-fixed-variant/40 text-transparent"
+                }`}
+              >
+                <Repeat size={11} aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-semibold">Apply to this meeting and every later one</span>
+                <span className="block text-[11px]">
+                  The name, the day, the time, the person and the attend link go on all of them. Each meeting keeps its
+                  own preparation notes. Left unticked, only this meeting changes.
+                </span>
+              </span>
+            </label>
+          </div>
         )}
 
         {allowRepeat && (
@@ -354,6 +430,35 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
                       ` Only ${seriesDates.length} fit inside the year a series may run for.`}
                     {values.prepEnabled && " Preparation is written for the first one; switch it on for any other from its own page."}
                   </p>
+                )}
+                {/* The same choice the edit form offers, asked where the series is first made, so a
+                    weekly meeting's attend link is on every week from the start */}
+                {values.joinUrl.trim() && (
+                  <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-surface-container-lowest p-2.5 sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={values.linkEveryMeeting}
+                      onChange={(event) => set("linkEveryMeeting", event.target.checked)}
+                      disabled={isSaving}
+                      className="peer sr-only"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className={`mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40 ${
+                        values.linkEveryMeeting ? "border-primary bg-primary text-white" : "border-outline-variant text-transparent"
+                      }`}
+                    >
+                      <Video size={11} aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[12px] font-semibold text-on-surface">
+                        Put the attend link on every meeting in the series
+                      </span>
+                      <span className="block text-[11px] leading-relaxed text-on-surface-variant">
+                        Unticked, only the first meeting carries it and the rest are given their own later.
+                      </span>
+                    </span>
+                  </label>
                 )}
               </div>
             )}

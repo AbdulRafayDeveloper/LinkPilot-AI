@@ -133,6 +133,8 @@ export interface MeetingPlan {
   personName: string | null
   // Their profile address, when one was typed or found in the pasted profile
   profileLink: string | null
+  // Where the meeting is actually attended (Meet, Zoom, Teams); null until one is added
+  joinUrl: string | null
   prepEnabled: boolean
   prepStatus: PrepStatusId
   prepError: string | null
@@ -160,6 +162,8 @@ export interface MeetingPlan {
 export interface MeetingRecurrence {
   pattern: RecurrencePatternId
   count: number
+  // Whether the attend link goes on every meeting of the series; left out, it does
+  linkEveryMeeting?: boolean
 }
 
 /**
