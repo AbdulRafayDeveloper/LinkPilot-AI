@@ -5,11 +5,68 @@
 | Task | What it is | Status |
 |---|---|---|
 | 0 | Commit and deploy every session's pending work, then test it live | **COMPLETED** 13 Oct 2026 (see the run notes) |
-| 1 | Sidebar: rename Client Projects to Projects Management | PENDING |
-| 2 | Client Projects: create a .txt document in place, and a folder hierarchy for documents and links | PENDING |
-| 3 | Meeting Planner: link meeting notes and recordings to calendar events, both ways | PENDING |
+| 1 | Sidebar: rename Client Projects to Projects Management | **COMPLETED** (code only, as asked) |
+| 2 | Client Projects: create a .txt document in place, and a folder hierarchy for documents and links | **COMPLETED** (code only; not run in a browser) |
+| 3 | Meeting Planner: link meeting notes and recordings to calendar events, both ways | **COMPLETED** (code only; not run in a browser) |
 
 Tasks 1 to 3 are code only, at the owner's instruction: no build, no commit, no push.
+
+### Task 3 (13 Oct 2026) — done, code only
+
+**A meeting on the calendar and the record of it now point at each other.** One nullable field on
+the record (`planId` on `meetings`), so every meeting saved before this reads as linked to nothing
+and neither module changes until a link is made. A planned meeting may hold several records; a
+record belongs to one planned meeting.
+
+From the records: the meetings list ticks rows (the selection it already had) and offers **Link to a
+planned meeting** over them, which lists last month, this month and next from the planner, newest
+first, searched by typing. `PUT /api/meetings/link` links them and the same call unlinks. Every
+linked row names the meeting it points at, with Unlink beside it.
+
+From the calendar: a planned meeting with records carries a count on its chip and a numbered button
+in the day panel, which opens the records newest first, each saying whether it was recorded in the
+app or pasted in, and each opening its own page.
+
+Deleting either side keeps the other: a planned meeting that goes leaves its records and stops being
+pointed at.
+
+Checked: `tsc` clean, `eslint` clean, `npm test` **493/493** (7 new tests over the shape of the
+link, its index, the two different "link" vocabularies in that module, and the feature gate).
+
+**Not verified in a browser**, for the same reason as Task 2: no build and no deploy, as asked.
+
+### Task 2 (13 Oct 2026) — done, code only
+
+**Folders for Documents and Links, nested**, which is the app's first folder tree: a new collection
+(`client_project_folders`), the folder on the item (`folderId`), folder CRUD routes under the
+project, the move on the item's own PUT, and the tree, the move picker and the scoped search on the
+page. Deleting a folder brings what was inside it up one level; a project, a client or an account
+that goes takes its folders with it.
+
+**A document can be written in the app**: a name and the text, stored as one `.txt` and attached to
+a document item in the same request, filed in the folder being looked at. Everything after that is
+the uploaded file's own code, so preview, download and delete needed nothing.
+
+Checked: `tsc` clean, `eslint` clean, `npm test` **486/486** (10 new tests over the tree's rules and
+the schemas: depth, sibling names, branches that cannot loop, the move, the document).
+
+**Not verified in a browser.** The owner asked for no build and no deploy, so the UI is type-checked
+and lint-clean but has never been rendered. Two things from the task's own list were left alone on
+purpose: the **shared link** still lists a tab's items flat (the client sees everything, nothing
+hidden, and a client-facing change deserves its own decision), and a share link still carries no
+folder path.
+
+### Task 1 (13 Oct 2026) — done, code only
+
+`CLIENT_PROJECTS_TOOL.title` is now **Projects Management**, which renames it in the sidebar, the
+Jump to a tool switcher, the sitemap and the manifest shortcut at once (`constants/linkedinTools.ts`
+is the one navigation source). The page's own h1 and its breadcrumb follow, so the page and the
+sidebar never disagree. The tool's **id stays `client-projects`**: it is the feature switch, the SEO
+key and the API path. `tsc` clean and the 76 tests over those three files pass. Not built, not
+committed and not pushed, as the owner asked.
+
+Left alone deliberately: the page's `<title>` in `constants/seo.ts` still reads "Client Projects and
+Tasks", which is what search engines and the browser tab show. Say the word and it changes too.
 
 ### Task 0 run notes (13 Oct 2026)
 
