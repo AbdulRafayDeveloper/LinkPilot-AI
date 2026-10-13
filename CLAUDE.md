@@ -183,7 +183,7 @@ Each tool route has two parts:
 - `toStored` keeps uploaded `File`s (memory only) and unfinished requests out of storage. Bump `version` when a store's shape changes.
 - Signing out clears every tool's saved state from the browser (`clearAllToolState`), so the next account to sign in there starts clean.
 - Trending Topics loads the account's saved topics once per page load (a new tab or a refresh), not when a tab comes back into view.
-- Every tool header has `components/ui/ResetButton` next to Update Prompt: it clears the pasted/uploaded data and the result, and keeps the chosen tone/tune/type/style/context.
+- Every tool header has `components/ui/ResetButton` next to Update Prompt: it clears the pasted/uploaded data and the result, and keeps the chosen tone/tune/type/style/context. **It is the icon alone**, a 42px square with no label, at the owner's request: the arrow says what it does faster than the word did and leaves the room to the buttons whose names cannot be guessed. What the word carried is the `title` and the `aria-label`, so a tooltip and a screen reader still say "Reset"; the square matches the height of the buttons beside it and is well over the 24px a tap target must be. It is the one shared component, so this is every module at once; a button that only resets part of a page (an employee's Reset day, AI Model Priority's Default) keeps its own words.
 
 Styling is Tailwind with Material-3 color tokens from `tailwind.config.ts` (`bg-surface-container`, `text-on-surface-variant`, `bg-primary-container`, …). Use those tokens, not raw colors. The app is light theme only.
 - The scheme is **Signal Violet & Gold** (it replaced the original teal, blue-tinted surfaces and orange):

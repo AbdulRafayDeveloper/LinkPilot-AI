@@ -12,16 +12,22 @@ interface ResetButtonProps {
 /**
  * The page-header button every tool uses to start over: it clears the inputs, the
  * selections and the result (cancelling a request that's still running).
+ *
+ * **It is the icon alone**, at the owner's request: the arrow says what it does faster than the
+ * word did and leaves the room to the buttons whose names cannot be guessed (Update Prompt, Dummy
+ * Data, Clients). What the word carried is still there for anyone who needs it, as the tooltip and
+ * as the name a screen reader reads out, and the square is 42px, the height of the buttons beside
+ * it and well over the 24px a tap target must be.
  */
 export const ResetButton: React.FC<ResetButtonProps> = ({ onReset, disabled = false }) => (
   <button
     type="button"
     onClick={onReset}
     disabled={disabled}
-    title="Clear the inputs and the result"
-    className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+    title="Reset: clear the inputs and the result"
+    aria-label="Reset"
+    className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-outline-variant bg-white text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white"
   >
-    <RotateCcw size={16} aria-hidden="true" />
-    Reset
+    <RotateCcw size={18} aria-hidden="true" />
   </button>
 )
