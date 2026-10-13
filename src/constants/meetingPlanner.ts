@@ -78,6 +78,10 @@ export const RECURRENCE_PATTERN_IDS = RECURRENCE_PATTERNS.map((pattern) => patte
   ...RecurrencePatternId[],
 ]
 export const DEFAULT_RECURRENCE_PATTERN: RecurrencePatternId = "weekly"
+
+/** How a repeating meeting is named in the owner's own words; an unknown or missing pattern reads as "Repeating". */
+export const recurrenceLabel = (pattern: string | null | undefined): string =>
+  RECURRENCE_PATTERNS.find((entry) => entry.id === pattern)?.label ?? "Repeating"
 /**
  * How long a series may run. The owner asked to choose the length themselves rather than take a
  * month, so a series is counted in **occurrences** and the days are worked out from the pattern;
