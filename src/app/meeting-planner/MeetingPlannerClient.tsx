@@ -24,8 +24,11 @@ import {
   MEETING_PLANNER_ENDPOINT,
   MEETING_PLANNER_MESSAGES,
   type DeleteScopeId,
+  type MeetingPlanStatusId,
+  type UpdateScopeId,
 } from "@/constants/meetingPlanner"
 import type { MeetingPlan, MeetingPlanDetail, MeetingPlannerPage } from "@/types/meetingPlanner"
+import { MeetingNotesModal } from "@/components/meeting-planner/MeetingNotesModal"
 
 export default function MeetingPlannerClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -49,6 +52,13 @@ export default function MeetingPlannerClient() {
   const [moving, setMoving] = useState<MeetingPlan | null>(null)
   const [isMoving, setIsMoving] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
+  /**
+   * The meeting whose notes are open. The lists carry only `hasNotes`, so the notes themselves are
+   * read with the meeting when the panel opens and kept here while it is on screen.
+   */
+  const [notesFor, setNotesFor] = useState<MeetingPlan | null>(null)
+  const [notesText, setNotesText] = useState("")
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false)
   const [deleting, setDeleting] = useState<MeetingPlan | null>(null)
   const [deletingScope, setDeletingScope] = useState<DeleteScopeId | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -177,22 +187,44 @@ export default function MeetingPlannerClient() {
   }
 
   /**
-   * Moves one meeting to another day or time. In a series it moves that occurrence only: the others
-   * keep their own days, since each is its own record. The calendar is read again afterwards, so a
-   * meeting moved into another month leaves this one.
+   * Opens a meeting's notes. A list never carries the notes themselves (they can be as long as any
+   * other text box here), so the meeting is read first and the panel opens on what it holds.
    */
-  const moveMeeting = async (meetingDate: string, meetingTime: string) => {
+  const openNotes = async (meeting: MeetingPlan) => {
+    setNotesFor(meeting)
+    setNotesText("")
+    if (!meeting.hasNotes) return
+    setIsLoadingNotes(true)
+    try {
+      const { data } = await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${meeting.id}`)
+      setNotesText(data.notes)
+    } catch (error: unknown) {
+      setNotesFor(null)
+      setNotice(null)
+      setLoadError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.loadFailed)
+    } finally {
+      setIsLoadingNotes(false)
+    }
+  }
+
+  /**
+   * Moves a meeting to another day or time. With `scope: "series"` the new time becomes the series'
+   * time: this meeting and every later one of it move, and a changed day moves them all by the same
+   * number of days. "one" moves that occurrence alone, which is what it always did. The calendar is
+   * read again afterwards, so a meeting moved into another month leaves this one.
+   */
+  const moveMeeting = async (meetingDate: string, meetingTime: string, scope: UpdateScopeId) => {
     if (!moving || isMoving) return
     setIsMoving(true)
     setMoveError(null)
     try {
-      await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${moving.id}`, {
+      const { message } = await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${moving.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meetingDate, meetingTime }),
+        body: JSON.stringify({ meetingDate, meetingTime, scope }),
       })
       setMoving(null)
-      setNotice(MEETING_PLANNER_MESSAGES.moved)
+      setNotice(scope === "series" ? message || MEETING_PLANNER_MESSAGES.seriesUpdated : MEETING_PLANNER_MESSAGES.moved)
       reload()
     } catch (error: unknown) {
       setMoveError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.updateFailed)
@@ -222,9 +254,8 @@ export default function MeetingPlannerClient() {
   }
 
   // The status changes on screen at once and is written in the background
-  const toggleStatus = async (meeting: MeetingPlan) => {
+  const changeStatus = async (meeting: MeetingPlan, status: MeetingPlanStatusId) => {
     if (savingIds.has(meeting.id)) return
-    const status = meeting.status === "completed" ? "pending" : "completed"
     setSavingIds((current) => new Set(current).add(meeting.id))
     const apply = (updated: MeetingPlan) =>
       setPage((current) =>
@@ -344,13 +375,15 @@ export default function MeetingPlannerClient() {
                 todayDate={page?.todayDate ?? today}
                 pendingToday={page?.pendingToday ?? 0}
                 savingIds={savingIds}
-                onToggleStatus={toggleStatus}
+                onChangeStatus={changeStatus}
+                onNotes={(meeting) => void openNotes(meeting)}
               />
               <DayMeetingsPanel
                 date={selectedDate}
                 meetings={dayMeetings}
                 savingIds={savingIds}
-                onToggleStatus={toggleStatus}
+                onChangeStatus={changeStatus}
+                onNotes={(meeting) => void openNotes(meeting)}
                 onAddMeeting={openForm}
                 onEdit={(meeting) => {
                   setMoveError(null)
@@ -394,8 +427,31 @@ export default function MeetingPlannerClient() {
           meeting={moving}
           isSaving={isMoving}
           error={moveError}
-          onSubmit={(meetingDate, meetingTime) => void moveMeeting(meetingDate, meetingTime)}
+          onSubmit={(meetingDate, meetingTime, scope) => void moveMeeting(meetingDate, meetingTime, scope)}
           onClose={() => setMoving(null)}
+        />
+      )}
+      {/* The notes panel waits for the meeting to be read, so it never opens on an empty box that
+          then fills in underneath the caret. */}
+      {notesFor && !isLoadingNotes && (
+        <MeetingNotesModal
+          key={notesFor.id}
+          meeting={notesFor}
+          notes={notesText}
+          onSaved={(meeting) => {
+            // The lists only know whether there are notes, so the row follows the save at once
+            setNotesFor((current) => (current ? { ...current, hasNotes: meeting.hasNotes, notesUpdatedAt: meeting.notesUpdatedAt } : current))
+            setPage((current) =>
+              current
+                ? {
+                    ...current,
+                    meetings: current.meetings.map((entry) => (entry.id === meeting.id ? { ...entry, hasNotes: meeting.hasNotes, notesUpdatedAt: meeting.notesUpdatedAt } : entry)),
+                    today: current.today.map((entry) => (entry.id === meeting.id ? { ...entry, hasNotes: meeting.hasNotes, notesUpdatedAt: meeting.notesUpdatedAt } : entry)),
+                  }
+                : current
+            )
+          }}
+          onClose={() => setNotesFor(null)}
         />
       )}
       {deleting && (

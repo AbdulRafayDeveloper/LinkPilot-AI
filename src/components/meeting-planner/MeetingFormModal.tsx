@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal"
 import {
   DEFAULT_RECURRENCE_PATTERN,
   MEETING_NAME_MAX_LENGTH,
+  RECURRENCE_MAX_OCCURRENCES,
   MEETING_PLANNER_MESSAGES,
   PERSON_NAME_MAX_LENGTH,
   PREP_INPUT_MAX_LENGTH,
@@ -15,7 +16,7 @@ import {
 } from "@/constants/meetingPlanner"
 import { findProfileLink } from "@/lib/profileLink"
 import { dayLabel } from "@/lib/meetingDates"
-import { defaultUntil, latestUntil, recurrenceDates } from "@/lib/meetingRecurrence"
+import { datesForCount, defaultCount } from "@/lib/meetingRecurrence"
 import type { MeetingPlanDetail, MeetingRecurrence } from "@/types/meetingPlanner"
 import { describeSeries } from "./SeriesBadge"
 import { TimeField } from "./TimeField"
@@ -30,25 +31,24 @@ export interface MeetingFormValues {
   profileInfo: string
   conversationHistory: string
   additionalInfo: string
-  // A new meeting only: whether it repeats, how, and the last day chosen ("" for the pattern's default)
+  /**
+   * A new meeting only: whether it repeats, how, and **how many meetings** the series holds, the
+   * first one included. The owner asked to say how long a weekly meeting runs for rather than take
+   * a month of it, and a count says that in the words they used ("the next 6 weeks") where a last
+   * day has to be worked out from a calendar.
+   */
   repeat: boolean
   repeatPattern: RecurrencePatternId
-  repeatUntil: string
+  repeatCount: number
 }
 
-/**
- * The last day of the series the form will ask for: the one picked, when it still fits the first
- * meeting's day, otherwise the pattern's default (a week of days, a month of weeks).
- */
-export function effectiveUntil(values: Pick<MeetingFormValues, "meetingDate" | "repeatPattern" | "repeatUntil">): string {
-  const { meetingDate, repeatPattern, repeatUntil } = values
-  const fits = repeatUntil && repeatUntil >= meetingDate && repeatUntil <= latestUntil(meetingDate)
-  return fits ? repeatUntil : defaultUntil(meetingDate, repeatPattern)
-}
+/** The days the series will meet on, worked out exactly as the server will. */
+export const seriesDatesOf = (values: MeetingFormValues): string[] =>
+  values.repeat && values.meetingDate ? datesForCount(values.meetingDate, values.repeatPattern, values.repeatCount) : []
 
 /** What a new meeting sends about repeating: nothing for a one-off meeting. */
 export const recurrenceOf = (values: MeetingFormValues): MeetingRecurrence | null =>
-  values.repeat && values.meetingDate ? { pattern: values.repeatPattern, until: effectiveUntil(values) } : null
+  values.repeat && values.meetingDate ? { pattern: values.repeatPattern, count: values.repeatCount } : null
 
 interface MeetingFormModalProps {
   title: string
@@ -80,7 +80,7 @@ export const emptyMeetingForm = (date: string, time: string): MeetingFormValues 
   additionalInfo: "",
   repeat: false,
   repeatPattern: DEFAULT_RECURRENCE_PATTERN,
-  repeatUntil: "",
+  repeatCount: defaultCount(DEFAULT_RECURRENCE_PATTERN),
 })
 
 export const formValuesOf = (meeting: MeetingPlanDetail): MeetingFormValues => ({
@@ -95,7 +95,7 @@ export const formValuesOf = (meeting: MeetingPlanDetail): MeetingFormValues => (
   additionalInfo: meeting.additionalInfo ?? "",
   repeat: false,
   repeatPattern: meeting.recurrencePattern ?? DEFAULT_RECURRENCE_PATTERN,
-  repeatUntil: "",
+  repeatCount: defaultCount(meeting.recurrencePattern ?? DEFAULT_RECURRENCE_PATTERN),
 })
 
 /**
@@ -134,9 +134,7 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
   )
   const willRegenerate = Boolean(existing?.prep) && values.prepEnabled
   // The days the series will meet on, worked out the same way the server will
-  const seriesDates = allowRepeat && values.repeat && values.meetingDate
-    ? recurrenceDates(values.meetingDate, values.repeatPattern, effectiveUntil(values))
-    : []
+  const seriesDates = allowRepeat ? seriesDatesOf(values) : []
   const seriesTooShort = allowRepeat && values.repeat && seriesDates.length < 2
   const shortDay = (date: string) => dayLabel(date, { weekday: "short", month: "short" })
   const existingSeries = existing ? describeSeries(existing) : null
@@ -283,7 +281,8 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
               <span className="min-w-0">
                 <span className="block text-[13px] font-semibold text-on-surface">Repeat this meeting</span>
                 <span className="block text-[12px] leading-relaxed text-on-surface-variant">
-                  Puts the same meeting on every day it repeats, up to a month ahead. Each one can be moved or deleted on its own later.
+                  Puts the same meeting on every day it repeats, for as many meetings as you choose. Each one can be
+                  moved, cancelled or deleted on its own later, and the series can be extended from any one of them.
                 </span>
               </span>
             </label>
@@ -298,12 +297,16 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
                     id="meeting-repeat-pattern"
                     value={values.repeatPattern}
                     onChange={(event) =>
-                      setValues((current) => ({
-                        ...current,
-                        repeatPattern: event.target.value as RecurrencePatternId,
-                        // A new pattern starts from its own default length
-                        repeatUntil: "",
-                      }))
+                      setValues((current) => {
+                        const repeatPattern = event.target.value as RecurrencePatternId
+                        // A new pattern starts from its own default length, unless one was typed
+                        const wasDefault = current.repeatCount === defaultCount(current.repeatPattern)
+                        return {
+                          ...current,
+                          repeatPattern,
+                          repeatCount: wasDefault ? defaultCount(repeatPattern) : current.repeatCount,
+                        }
+                      })
                     }
                     disabled={isSaving}
                     className={fieldClass}
@@ -316,16 +319,25 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="meeting-repeat-until" className={labelClass}>
-                    Until
+                  <label htmlFor="meeting-repeat-count" className={labelClass}>
+                    How many meetings
                   </label>
                   <input
-                    id="meeting-repeat-until"
-                    type="date"
-                    value={values.meetingDate ? effectiveUntil(values) : ""}
-                    min={values.meetingDate}
-                    max={values.meetingDate ? latestUntil(values.meetingDate) : undefined}
-                    onChange={(event) => set("repeatUntil", event.target.value)}
+                    id="meeting-repeat-count"
+                    type="number"
+                    inputMode="numeric"
+                    value={values.repeatCount}
+                    min={2}
+                    max={RECURRENCE_MAX_OCCURRENCES}
+                    step={1}
+                    /* An empty or half-typed box keeps the value it had, so the preview below never
+                       flickers to one meeting while a two-digit number is being typed. */
+                    onChange={(event) => {
+                      const typed = Number(event.target.value)
+                      if (Number.isFinite(typed) && typed >= 1) {
+                        set("repeatCount", Math.min(Math.floor(typed), RECURRENCE_MAX_OCCURRENCES))
+                      }
+                    }}
                     disabled={isSaving || !values.meetingDate}
                     className={fieldClass}
                   />
@@ -338,7 +350,9 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
                     : {seriesDates.length <= 6
                       ? seriesDates.map(shortDay).join(", ")
                       : `${shortDay(seriesDates[0])} to ${shortDay(seriesDates[seriesDates.length - 1])}`}
-                    .{values.prepEnabled && " Preparation is written for the first one; switch it on for any other from its own page."}
+                    .{values.repeatCount > seriesDates.length &&
+                      ` Only ${seriesDates.length} fit inside the year a series may run for.`}
+                    {values.prepEnabled && " Preparation is written for the first one; switch it on for any other from its own page."}
                   </p>
                 )}
               </div>

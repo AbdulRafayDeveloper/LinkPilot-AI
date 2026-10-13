@@ -1,4 +1,5 @@
 import { CalendarPlus, type LucideIcon } from "lucide-react"
+import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
 
 /**
  * Meeting Planner & Preparation: meetings that haven't happened yet. A meeting is a name, a day
@@ -36,6 +37,8 @@ export const MAX_TODAY_DRIFT_DAYS = 1
 export const MEETING_PLAN_STATUSES = [
   { id: "pending", label: "Pending", description: "Not held yet" },
   { id: "completed", label: "Completed", description: "The meeting took place" },
+  // Called off: it is not waiting to happen and it never will, so it counts as neither
+  { id: "cancelled", label: "Cancelled", description: "Called off, it will not happen" },
 ] as const
 
 export type MeetingPlanStatusId = (typeof MEETING_PLAN_STATUSES)[number]["id"]
@@ -65,9 +68,9 @@ export const MEETING_PLANNER_ENDPOINT = "/api/meeting-planner"
  * written: at most RECURRENCE_MAX_DAYS after the first meeting, never an open-ended series.
  */
 export const RECURRENCE_PATTERNS = [
-  { id: "daily", label: "Every day", description: "Every day, weekends included", defaultDays: 6 },
-  { id: "weekdays", label: "Every weekday", description: "Monday to Friday", defaultDays: 6 },
-  { id: "weekly", label: "Every week", description: "The same day each week", defaultDays: 28 },
+  { id: "daily", label: "Every day", description: "Every day, weekends included", defaultCount: 7 },
+  { id: "weekdays", label: "Every weekday", description: "Monday to Friday", defaultCount: 5 },
+  { id: "weekly", label: "Every week", description: "The same day each week", defaultCount: 4 },
 ] as const
 export type RecurrencePatternId = (typeof RECURRENCE_PATTERNS)[number]["id"]
 export const RECURRENCE_PATTERN_IDS = RECURRENCE_PATTERNS.map((pattern) => pattern.id) as [
@@ -75,8 +78,28 @@ export const RECURRENCE_PATTERN_IDS = RECURRENCE_PATTERNS.map((pattern) => patte
   ...RecurrencePatternId[],
 ]
 export const DEFAULT_RECURRENCE_PATTERN: RecurrencePatternId = "weekly"
-// How far past the first meeting a series may run: about a month
-export const RECURRENCE_MAX_DAYS = 31
+/**
+ * How long a series may run. The owner asked to choose the length themselves rather than take a
+ * month, so a series is counted in **occurrences** and the days are worked out from the pattern;
+ * `RECURRENCE_MAX_DAYS` is only the outer edge that keeps a year of weekly meetings from becoming
+ * an open-ended series. Weekly at the ceiling is a year, daily is capped by the occurrences first.
+ */
+export const RECURRENCE_MAX_DAYS = 366
+export const RECURRENCE_MAX_OCCURRENCES = 52
+export const DEFAULT_RECURRENCE_COUNT = 4
+
+/**
+ * A meeting's own notes, written before it or after it, in the same rich text every other written
+ * box in the app uses. Nothing here is ever sent to a model, so it follows the plain text boxes
+ * rule (constants/textLimits.ts) rather than carrying a model-facing limit of its own.
+ */
+export const MEETING_NOTES_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
+// Notes save themselves once typing settles, the pause every other written box in the app uses
+export const MEETING_NOTES_AUTOSAVE_DELAY_MS = 1_500
+
+// Changing one meeting of a series, or this one and every later meeting in it
+export const UPDATE_SCOPES = ["one", "series"] as const
+export type UpdateScopeId = (typeof UPDATE_SCOPES)[number]
 
 // Deleting one meeting of a series, or every meeting still in it
 export const DELETE_SCOPES = ["one", "series"] as const
@@ -133,6 +156,17 @@ export const MEETING_PLANNER_MESSAGES = {
   updated: "Meeting updated.",
   deleted: "Meeting deleted.",
   statusUpdated: "Status updated.",
+  notesSaved: "Notes saved.",
+  notesTooLong: `Notes must be under ${MEETING_NOTES_MAX_LENGTH.toLocaleString()} characters.`,
+  notesFailed: "Couldn't save the notes. Please try again.",
+  seriesUpdated: "This meeting and every later one in the series were updated.",
+  seriesExtended: "The series was extended.",
+  seriesExtendHint: "Nothing is ever removed here: a smaller number changes nothing, and a meeting is dropped by deleting it.",
+  notASeries: "This meeting does not repeat, so there is no series to change.",
+  badCount: `Choose between 2 and ${RECURRENCE_MAX_OCCURRENCES} meetings.`,
+  badExtendCount: `Choose between 1 and ${RECURRENCE_MAX_OCCURRENCES} more meetings.`,
+  seriesFull: `A series holds at most ${RECURRENCE_MAX_OCCURRENCES} meetings.`,
+  extendFailed: "Couldn't add more meetings to the series. Please try again.",
   saveFailed: "Couldn't save the meeting. Please try again.",
   loadFailed: "Couldn't load your meetings.",
   updateFailed: "Couldn't update the meeting. Please try again.",

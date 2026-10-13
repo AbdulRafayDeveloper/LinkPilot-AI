@@ -40,6 +40,14 @@ export interface IMeetingPlan {
   // The whole MeetingPrep, validated against its schema before it is written
   prep: unknown
   preparedAt: Date | null
+  /**
+   * The user's own notes on this meeting, written before it or after it, in the same rich text
+   * (lib/richText.ts) every other written box in the app uses. Never read by a model, so it is
+   * one of the plain text boxes. Empty until something is written, and `notesUpdatedAt` is null
+   * until then, which is how a meeting with notes is told from one without.
+   */
+  notes: string
+  notesUpdatedAt: Date | null
   // A repeating meeting: every occurrence shares the series id and says how the series was set up.
   // All null on a one-off meeting, and on every meeting saved before series existed
   seriesId: string | null
@@ -67,6 +75,8 @@ const MeetingPlanSchema = new Schema<IMeetingPlan>(
     prepError: { type: String, default: null },
     prep: { type: Schema.Types.Mixed, default: null },
     preparedAt: { type: Date, default: null },
+    notes: { type: String, default: "" },
+    notesUpdatedAt: { type: Date, default: null },
     seriesId: { type: String, default: null },
     // Checked against RECURRENCE_PATTERN_IDS by the route before it is ever written
     recurrencePattern: { type: String, default: null },

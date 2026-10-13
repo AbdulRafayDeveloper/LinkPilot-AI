@@ -84,6 +84,16 @@ export function dayLabel(date: string, options: Intl.DateTimeFormatOptions = {})
 export const dayOfMonth = (date: string): number => Number(date.slice(8, 10))
 
 /**
+ * How many whole days from `from` to `to`, negative when `to` is earlier. Read in UTC, like every
+ * other plain date here, so moving a whole series by the days one meeting moved never drifts an
+ * hour across a daylight-saving change.
+ */
+export function daysBetween(from: string, to: string): number {
+  const day = 86_400_000
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / day)
+}
+
+/**
  * A wall-clock HH:mm as the reader's locale writes it ("2:30 PM" or "14:30"). The date part is
  * fixed and read back in UTC, so the hour shown is always the hour that was saved.
  */

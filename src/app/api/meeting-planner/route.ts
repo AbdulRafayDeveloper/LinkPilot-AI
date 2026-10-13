@@ -11,10 +11,11 @@ import {
   PERSON_NAME_MAX_LENGTH,
   PREP_INPUT_MAX_LENGTH,
   PROFILE_LINK_MAX_LENGTH,
+  RECURRENCE_MAX_OCCURRENCES,
   RECURRENCE_PATTERN_IDS,
   TIME_PATTERN,
 } from "@/constants/meetingPlanner"
-import { latestUntil, recurrenceDates } from "@/lib/meetingRecurrence"
+import { datesForCount, defaultCount, recurrenceDates } from "@/lib/meetingRecurrence"
 import { isUsableProfileLink, normalizeProfileLink } from "@/lib/profileLink"
 import { createMeeting, listMonth } from "@/services/meetingPlanner/plans"
 import { requireViewer } from "@/services/auth/viewer"
@@ -83,20 +84,40 @@ export const MeetingInputSchema = z.object({
  * meeting into a series. The series must end on or after the first meeting, within a month of it,
  * and hold at least two meetings.
  */
+/**
+ * How a new meeting repeats. A series is **counted in meetings**, so `count` is what the form sends
+ * and what the series is built from. `until` is still read for a caller written before that: it is
+ * the last day the series may meet on, and the count is however many meetings that window holds, so
+ * an older request creates exactly the series it always did.
+ */
+const RecurrenceSchema = z.object({
+  pattern: z.enum(RECURRENCE_PATTERN_IDS, { error: MEETING_PLANNER_MESSAGES.recurrenceInvalid }),
+  count: z.number().int().optional(),
+  until: IsoDateSchema.optional(),
+})
+
+export type RecurrenceRequest = z.infer<typeof RecurrenceSchema>
+
+/** How many meetings a request asks for: its own count, the window it names, or the pattern's own. */
+export function recurrenceCountOf(recurrence: RecurrenceRequest, meetingDate: string): number {
+  if (typeof recurrence.count === "number") return recurrence.count
+  if (recurrence.until) return recurrenceDates(meetingDate, recurrence.pattern, recurrence.until).length
+  return defaultCount(recurrence.pattern)
+}
+
 export const CreateMeetingSchema = MeetingInputSchema.extend({
-  recurrence: z
-    .object({
-      pattern: z.enum(RECURRENCE_PATTERN_IDS, { error: MEETING_PLANNER_MESSAGES.recurrenceInvalid }),
-      until: IsoDateSchema,
-    })
-    .nullish(),
+  recurrence: RecurrenceSchema.nullish(),
 }).superRefine((body, context) => {
   if (!body.recurrence) return
   const { pattern, until } = body.recurrence
-  const fail = (message: string) => context.addIssue({ code: "custom", message, path: ["recurrence", "until"] })
-  if (until < body.meetingDate) return fail(MEETING_PLANNER_MESSAGES.recurrenceUntilBefore)
-  if (until > latestUntil(body.meetingDate)) return fail(MEETING_PLANNER_MESSAGES.recurrenceUntilTooFar)
-  if (recurrenceDates(body.meetingDate, pattern, until).length < 2) fail(MEETING_PLANNER_MESSAGES.recurrenceTooShort)
+  const path = typeof body.recurrence.count === "number" ? "count" : "until"
+  const fail = (message: string) => context.addIssue({ code: "custom", message, path: ["recurrence", path] })
+  if (until && until < body.meetingDate) return fail(MEETING_PLANNER_MESSAGES.recurrenceUntilBefore)
+  const count = recurrenceCountOf(body.recurrence, body.meetingDate)
+  if (count < 2) return fail(MEETING_PLANNER_MESSAGES.recurrenceTooShort)
+  if (count > RECURRENCE_MAX_OCCURRENCES) return fail(MEETING_PLANNER_MESSAGES.badCount)
+  // A series that would run past the window is cut to it, so it must still hold two meetings
+  if (datesForCount(body.meetingDate, pattern, count).length < 2) fail(MEETING_PLANNER_MESSAGES.recurrenceTooShort)
 })
 
 /** Preparation has to have something of the lead's to read; the meeting itself never does. */
@@ -150,7 +171,11 @@ async function handlePost(req: NextRequest) {
     }
 
     const { recurrence, ...input } = parsed.data
-    const meeting = await createMeeting(auth.viewer, input, recurrence)
+    const meeting = await createMeeting(
+      auth.viewer,
+      input,
+      recurrence ? { pattern: recurrence.pattern, count: recurrenceCountOf(recurrence, input.meetingDate) } : null
+    )
     const message = meeting.seriesSize ? MEETING_PLANNER_MESSAGES.seriesCreated(meeting.seriesSize) : MEETING_PLANNER_MESSAGES.created
     return NextResponse.json({ success: true, message, data: meeting }, { status: 201 })
   } catch (error: unknown) {

@@ -7,9 +7,11 @@ import {
   AlertTriangle,
   ArrowLeft,
   CalendarDays,
+  CalendarPlus,
   Clock,
   ExternalLink,
   Loader2,
+  NotebookPen,
   Pencil,
   RefreshCw,
   Sparkles,
@@ -30,8 +32,18 @@ import { MeetingFormModal, formValuesOf, type MeetingFormValues } from "@/compon
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
-import { MEETING_PLANNER_ENDPOINT, MEETING_PLANNER_MESSAGES, type DeleteScopeId } from "@/constants/meetingPlanner"
-import type { MeetingPlanDetail } from "@/types/meetingPlanner"
+import {
+  MEETING_PLANNER_ENDPOINT,
+  MEETING_PLANNER_MESSAGES,
+  type DeleteScopeId,
+  type MeetingPlanStatusId,
+  type UpdateScopeId,
+} from "@/constants/meetingPlanner"
+import type { MeetingPlan, MeetingPlanDetail } from "@/types/meetingPlanner"
+import { MeetingNotesModal } from "@/components/meeting-planner/MeetingNotesModal"
+import { MoveMeetingModal } from "@/components/meeting-planner/MoveMeetingModal"
+import { ExtendSeriesModal } from "@/components/meeting-planner/ExtendSeriesModal"
+import { RichTextView } from "@/components/ui/RichTextView"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 
 /** One of the three things the user pasted, shown only when there is something to show. */
@@ -58,6 +70,8 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
   const [isSavingStatus, setIsSavingStatus] = useState(false)
   const [isPreparing, setIsPreparing] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  // What just worked (the series extended), said once rather than left to be guessed from the page
+  const [notice, setNotice] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
@@ -65,6 +79,15 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
   // Which delete is running: this meeting, or the whole series it belongs to
   const [deletingScope, setDeletingScope] = useState<DeleteScopeId | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isWritingNotes, setIsWritingNotes] = useState(false)
+  // Changing the day or time with a choice of this meeting or the whole series
+  const [isMoving, setIsMoving] = useState(false)
+  const [isSavingMove, setIsSavingMove] = useState(false)
+  const [moveError, setMoveError] = useState<string | null>(null)
+  // Making the series run for longer, from this meeting of it
+  const [isExtending, setIsExtending] = useState(false)
+  const [isSavingExtend, setIsSavingExtend] = useState(false)
+  const [extendError, setExtendError] = useState<string | null>(null)
   const [isConfirmingPrepare, setIsConfirmingPrepare] = useState(false)
   // A new preparation replaces the conversation, so an edited or half-edited one is confirmed first
   const draft = useConversationDraft()
@@ -94,9 +117,8 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
     setLoadAttempt((attempt) => attempt + 1)
   }, [])
 
-  const toggleStatus = async () => {
+  const changeStatus = async (_meeting: MeetingPlan, status: MeetingPlanStatusId) => {
     if (!meeting || isSavingStatus) return
-    const status = meeting.status === "completed" ? "pending" : "completed"
     setIsSavingStatus(true)
     setActionError(null)
     const previous = meeting
@@ -113,6 +135,57 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
       setActionError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.updateFailed)
     } finally {
       setIsSavingStatus(false)
+    }
+  }
+
+  /**
+   * Changes the day or time. With the series scope it becomes the series' own time: this meeting and
+   * every later one of it move, and a changed day moves them all by the same number of days.
+   */
+  const moveMeeting = async (meetingDate: string, meetingTime: string, scope: UpdateScopeId) => {
+    if (!meeting || isSavingMove) return
+    setIsSavingMove(true)
+    setMoveError(null)
+    try {
+      const { data, message } = await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${meeting.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meetingDate, meetingTime, scope }),
+      })
+      showMeeting(data)
+      setIsMoving(false)
+      setActionError(null)
+      setNotice(scope === "series" ? message || MEETING_PLANNER_MESSAGES.seriesUpdated : MEETING_PLANNER_MESSAGES.moved)
+    } catch (error: unknown) {
+      setMoveError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.updateFailed)
+    } finally {
+      setIsSavingMove(false)
+    }
+  }
+
+  /**
+   * Makes the series run for the next `count` meetings after this one. The answer says how many were
+   * added, and the meeting is read again so its series count and the notice agree with the database.
+   */
+  const extendSeries = async (count: number) => {
+    if (!meeting || isSavingExtend) return
+    setIsSavingExtend(true)
+    setExtendError(null)
+    try {
+      const { message } = await requestApi<{ added: number; seriesSize: number; lastDate: string }>(
+        `${MEETING_PLANNER_ENDPOINT}/${meeting.id}/series`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ count }) },
+        // It creates meetings, so a retry carries the same key and can never add them twice
+        { idempotent: true }
+      )
+      setIsExtending(false)
+      setActionError(null)
+      setNotice(message || MEETING_PLANNER_MESSAGES.seriesExtended)
+      reload()
+    } catch (error: unknown) {
+      setExtendError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.extendFailed)
+    } finally {
+      setIsSavingExtend(false)
     }
   }
 
@@ -275,7 +348,45 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <MeetingStatusButton meeting={meeting} isSaving={isSavingStatus} onToggle={toggleStatus} />
+                      <MeetingStatusButton meeting={meeting} isSaving={isSavingStatus} onChange={changeStatus} />
+                      {/* Notes, before the meeting or after it. The dot says there is something to read. */}
+                      <button
+                        type="button"
+                        onClick={() => setIsWritingNotes(true)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                      >
+                        <NotebookPen size={14} aria-hidden="true" />
+                        Notes
+                        {meeting.hasNotes && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-label="has notes" />}
+                      </button>
+                      {/* A repeating meeting's time is changed here, for this one or for the series.
+                          A one-off meeting's day and time are part of Edit, as they always were. */}
+                      {meeting.seriesId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMoveError(null)
+                            setIsMoving(true)
+                          }}
+                          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                        >
+                          <Clock size={14} aria-hidden="true" />
+                          Day or time
+                        </button>
+                      )}
+                      {meeting.seriesId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExtendError(null)
+                            setIsExtending(true)
+                          }}
+                          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                        >
+                          <CalendarPlus size={14} aria-hidden="true" />
+                          Repeat for longer
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -302,14 +413,53 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                   </div>
 
                   <div className="min-h-[20px] text-[12px]" aria-live="polite">
-                    {actionError && (
+                    {actionError ? (
                       <p role="alert" className="text-error">
                         {actionError}
                       </p>
+                    ) : (
+                      notice && <p className="font-semibold text-success">{notice}</p>
                     )}
                   </div>
 
-                  {/* Preparation: its state, and the button that writes or rewrites it */}
+                    {/* The notes themselves, read without opening anything, so a meeting says what it
+                      is for at a glance. Writing them is the Notes button above. */}
+                  {meeting.notes.trim() && (
+                    <div className="flex flex-col gap-2 rounded-xl border border-outline-variant bg-surface-container-low p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
+                          <NotebookPen size={15} className="text-primary" aria-hidden="true" />
+                          Notes
+                        </h2>
+                        <div className="flex items-center gap-2">
+                          {meeting.notesUpdatedAt && (
+                            <span className="text-[11px] text-outline">
+                              Written{" "}
+                              {new Date(meeting.notesUpdatedAt).toLocaleString(undefined, {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setIsWritingNotes(true)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                          >
+                            <Pencil size={12} aria-hidden="true" />
+                            Edit notes
+                          </button>
+                        </div>
+                      </div>
+                      <div className="custom-scrollbar max-h-72 overflow-y-auto">
+                        <RichTextView text={meeting.notes} />
+                      </div>
+                    </div>
+                  )}
+
+                {/* Preparation: its state, and the button that writes or rewrites it */}
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant bg-surface-container-low p-3">
                     <p className="flex items-center gap-2 text-[13px] text-on-surface-variant">
                       <Sparkles size={15} className="shrink-0 text-primary" aria-hidden="true" />
@@ -425,6 +575,43 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
             Your edits to the conversation can&apos;t be brought back afterwards.
           </p>
         </Modal>
+      )}
+
+      {isWritingNotes && meeting && (
+        <MeetingNotesModal
+          meeting={meeting}
+          notes={meeting.notes}
+          onSaved={showMeeting}
+          onClose={() => setIsWritingNotes(false)}
+        />
+      )}
+
+      {isMoving && meeting && (
+        <MoveMeetingModal
+          meeting={meeting}
+          isSaving={isSavingMove}
+          error={moveError}
+          onSubmit={(meetingDate, meetingTime, scope) => void moveMeeting(meetingDate, meetingTime, scope)}
+          onClose={() => {
+            if (isSavingMove) return
+            setIsMoving(false)
+            setMoveError(null)
+          }}
+        />
+      )}
+
+      {isExtending && meeting && (
+        <ExtendSeriesModal
+          meeting={meeting}
+          isSaving={isSavingExtend}
+          error={extendError}
+          onSubmit={(count) => void extendSeries(count)}
+          onClose={() => {
+            if (isSavingExtend) return
+            setIsExtending(false)
+            setExtendError(null)
+          }}
+        />
       )}
 
       {isConfirmingDelete && meeting && (

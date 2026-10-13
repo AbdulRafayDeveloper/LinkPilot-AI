@@ -2,8 +2,8 @@
 
 import React from "react"
 import Link from "next/link"
-import { CalendarPlus, ChevronRight, Pencil, Trash2 } from "lucide-react"
-import { MEETING_PLANNER_MESSAGES } from "@/constants/meetingPlanner"
+import { CalendarPlus, ChevronRight, NotebookPen, Pencil, Trash2 } from "lucide-react"
+import { MEETING_PLANNER_MESSAGES, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
 import { MeetingStatusButton } from "./MeetingStatusButton"
@@ -14,11 +14,13 @@ interface DayMeetingsPanelProps {
   date: string
   meetings: MeetingPlan[]
   savingIds: ReadonlySet<string>
-  onToggleStatus: (meeting: MeetingPlan) => void
+  onChangeStatus: (meeting: MeetingPlan, status: MeetingPlanStatusId) => void
   onAddMeeting: (date: string) => void
   // Moving this one meeting to another day or time, and deleting it (or its whole series)
   onEdit: (meeting: MeetingPlan) => void
   onDelete: (meeting: MeetingPlan) => void
+  // Opening the meeting's notes, written before it or after it
+  onNotes: (meeting: MeetingPlan) => void
 }
 
 const iconButton =
@@ -34,10 +36,11 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
   date,
   meetings,
   savingIds,
-  onToggleStatus,
+  onChangeStatus,
   onAddMeeting,
   onEdit,
   onDelete,
+  onNotes,
 }) => (
   <section
     aria-label={`Meetings on ${date}`}
@@ -62,7 +65,9 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
             className={`rounded-xl border p-3 ${
               meeting.status === "completed"
                 ? "border-success/40 bg-success-container/40"
-                : "border-outline-variant bg-surface-container-lowest"
+                : meeting.status === "cancelled"
+                  ? "border-error/30 bg-error-container/30"
+                  : "border-outline-variant bg-surface-container-lowest"
             }`}
           >
             <div className="flex items-start justify-between gap-2">
@@ -76,13 +81,31 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                   <SeriesBadge meeting={meeting} />
                 </span>
                 <span className="mt-0.5 flex items-center gap-1 text-[13px] font-semibold text-on-surface group-hover:text-primary">
-                  <span className="truncate">{meeting.name}</span>
+                  {/* A cancelled meeting is struck through, so the list says so without its chip being read */}
+                  <span className={`truncate ${meeting.status === "cancelled" ? "line-through decoration-error/60" : ""}`}>
+                    {meeting.name}
+                  </span>
                   <ChevronRight size={13} className="shrink-0 text-outline" aria-hidden="true" />
                 </span>
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
               </Link>
               <div className="flex shrink-0 items-center gap-0.5">
-                <MeetingStatusButton meeting={meeting} isSaving={savingIds.has(meeting.id)} onToggle={onToggleStatus} />
+                <MeetingStatusButton meeting={meeting} isSaving={savingIds.has(meeting.id)} onChange={onChangeStatus} />
+                <button
+                  type="button"
+                  onClick={() => onNotes(meeting)}
+                  aria-label={`${meeting.hasNotes ? "Read or write" : "Write"} notes for ${meeting.name}`}
+                  title={meeting.hasNotes ? "Notes on this meeting" : "Write notes for this meeting"}
+                  className={`${iconButton} relative hover:bg-primary/5 hover:text-primary ${
+                    meeting.hasNotes ? "text-primary" : ""
+                  }`}
+                >
+                  <NotebookPen size={14} aria-hidden="true" />
+                  {/* A dot rather than a count: a list says there is something to read, not how much */}
+                  {meeting.hasNotes && (
+                    <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                  )}
+                </button>
                 <button
                   type="button"
                   onClick={() => onEdit(meeting)}

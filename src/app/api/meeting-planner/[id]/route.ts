@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
-import { DELETE_SCOPES, MEETING_PLANNER_MESSAGES, MEETING_PLAN_STATUS_IDS } from "@/constants/meetingPlanner"
-import { deleteMeeting, deleteSeries, getMeeting, seriesSizeOf, updateMeeting } from "@/services/meetingPlanner/plans"
+import {
+  DELETE_SCOPES,
+  MEETING_PLANNER_MESSAGES,
+  MEETING_PLAN_STATUS_IDS,
+  UPDATE_SCOPES,
+} from "@/constants/meetingPlanner"
+import {
+  deleteMeeting,
+  deleteSeries,
+  getMeeting,
+  seriesSizeOf,
+  updateMeeting,
+  updateSeriesSchedule,
+} from "@/services/meetingPlanner/plans"
 import { MeetingInputSchema, hasPrepInput } from "../route"
 import { requireViewer } from "@/services/auth/viewer"
 
@@ -18,7 +30,17 @@ export const dynamic = "force-dynamic"
  * change that says nothing about preparation leaves preparation alone.
  */
 export const UpdateSchema = MeetingInputSchema.partial()
-  .extend({ prepEnabled: z.boolean().optional(), status: z.enum(MEETING_PLAN_STATUS_IDS).optional() })
+  .extend({
+    prepEnabled: z.boolean().optional(),
+    status: z.enum(MEETING_PLAN_STATUS_IDS).optional(),
+    /**
+     * Which meetings the change touches. "one" is this meeting alone, which is what every caller
+     * written before this sent by not sending it at all, so the default keeps them unchanged.
+     * "series" is this meeting and every later one of its series, which is how a repeating
+     * meeting's time is moved for good rather than for one week.
+     */
+    scope: z.enum(UPDATE_SCOPES).optional(),
+  })
   .refine((body) => Object.keys(body).length > 0, MEETING_PLANNER_MESSAGES.updateFailed)
 
 // Which meetings a DELETE takes: this one (the default, as before) or its whole series
@@ -83,9 +105,23 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
-    const meeting = await updateMeeting(auth.viewer, id, changes)
+    const { scope, ...fields } = changes
+    if (scope === "series") {
+      const result = await updateSeriesSchedule(auth.viewer, id, fields)
+      if (result === "not-found") return notFound()
+      // A one-off meeting has no series, so the change lands on the meeting itself rather than failing
+      if (result !== "not-a-series") {
+        return NextResponse.json({
+          success: true,
+          message: MEETING_PLANNER_MESSAGES.seriesUpdated,
+          data: { ...result.meeting, changed: result.changed },
+        })
+      }
+    }
+
+    const meeting = await updateMeeting(auth.viewer, id, fields)
     if (!meeting) return notFound()
-    const message = changes.status ? MEETING_PLANNER_MESSAGES.statusUpdated : MEETING_PLANNER_MESSAGES.updated
+    const message = fields.status ? MEETING_PLANNER_MESSAGES.statusUpdated : MEETING_PLANNER_MESSAGES.updated
     return NextResponse.json({ success: true, message, data: meeting })
   } catch (error: unknown) {
     console.error("PUT Meeting Plan Exception:", error)

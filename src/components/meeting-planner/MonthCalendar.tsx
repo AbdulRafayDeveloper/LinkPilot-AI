@@ -136,11 +136,14 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
                   return (
                     <span
                       key={meeting.id}
-                      title={`${formatTime(meeting.meetingTime)} ${meeting.name}${hasPrep ? " · preparation ready" : ""}${meeting.seriesId ? " · repeats" : ""}`}
+                      title={`${formatTime(meeting.meetingTime)} ${meeting.name}${meeting.status === "cancelled" ? " · cancelled" : meeting.status === "completed" ? " · completed" : ""}${hasPrep ? " · preparation ready" : ""}${meeting.seriesId ? " · repeats" : ""}`}
                       className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${
                         meeting.status === "completed"
                           ? "bg-success-container text-on-success-container"
-                          : "bg-primary-fixed text-on-primary-fixed-variant"
+                          : meeting.status === "cancelled"
+                            ? // A called-off meeting stays on its day, struck through, so the week still reads as it was planned
+                              "bg-error-container/60 text-on-error-container line-through decoration-on-error-container/60"
+                            : "bg-primary-fixed text-on-primary-fixed-variant"
                       } ${hasPrep ? "ring-1 ring-primary/50" : ""}`}
                     >
                       {hasPrep && (

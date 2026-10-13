@@ -2,8 +2,8 @@
 
 import React from "react"
 import Link from "next/link"
-import { CalendarCheck, ChevronRight, Sun } from "lucide-react"
-import { MEETING_PLANNER_MESSAGES } from "@/constants/meetingPlanner"
+import { CalendarCheck, ChevronRight, NotebookPen, Sun } from "lucide-react"
+import { MEETING_PLANNER_MESSAGES, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
 import { MeetingStatusButton } from "./MeetingStatusButton"
@@ -15,7 +15,9 @@ interface TodayMeetingsProps {
   todayDate: string
   pendingToday: number
   savingIds: ReadonlySet<string>
-  onToggleStatus: (meeting: MeetingPlan) => void
+  onChangeStatus: (meeting: MeetingPlan, status: MeetingPlanStatusId) => void
+  // Opening the meeting's notes, written before it or after it
+  onNotes: (meeting: MeetingPlan) => void
 }
 
 /**
@@ -27,7 +29,8 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
   todayDate,
   pendingToday,
   savingIds,
-  onToggleStatus,
+  onChangeStatus,
+  onNotes,
 }) => (
   <section
     aria-label="Today's meetings"
@@ -58,8 +61,12 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
         {meetings.map((meeting) => (
           <li key={meeting.id}>
             <div
-              className={`flex items-center gap-3 rounded-xl border p-3 ${
-                meeting.status === "completed" ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-surface-container-lowest"
+              className={`flex items-center gap-2 rounded-xl border p-3 ${
+                meeting.status === "completed"
+                  ? "border-success/40 bg-success-container/40"
+                  : meeting.status === "cancelled"
+                    ? "border-error/30 bg-error-container/30"
+                    : "border-outline-variant bg-surface-container-lowest"
               }`}
             >
               <span className="shrink-0 rounded-lg bg-primary-fixed px-2 py-1 text-[12px] font-bold tabular-nums text-on-primary-fixed-variant">
@@ -70,17 +77,34 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                 className="group min-w-0 flex-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
                 <span className="flex min-w-0 items-center gap-1 text-[13px] font-semibold text-on-surface group-hover:text-primary">
-                  <span className="truncate">{meeting.name}</span>
+                  {/* A cancelled meeting is struck through as well as chipped, so it never rests on colour */}
+                  <span className={`truncate ${meeting.status === "cancelled" ? "line-through decoration-error/60" : ""}`}>
+                    {meeting.name}
+                  </span>
                   <ChevronRight size={13} className="shrink-0 text-outline" aria-hidden="true" />
                 </span>
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
                 <PrepBadge meeting={meeting} className="mt-1" />
                 <SeriesBadge meeting={meeting} className="mt-1" />
               </Link>
+              <button
+                type="button"
+                onClick={() => onNotes(meeting)}
+                aria-label={`${meeting.hasNotes ? "Read or write" : "Write"} notes for ${meeting.name}`}
+                title={meeting.hasNotes ? "Notes on this meeting" : "Write notes for this meeting"}
+                className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-primary/5 hover:text-primary ${
+                  meeting.hasNotes ? "text-primary" : "text-outline"
+                }`}
+              >
+                <NotebookPen size={14} aria-hidden="true" />
+                {meeting.hasNotes && (
+                  <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                )}
+              </button>
               <MeetingStatusButton
                 meeting={meeting}
                 isSaving={savingIds.has(meeting.id)}
-                onToggle={onToggleStatus}
+                onChange={onChangeStatus}
                 size="compact"
               />
             </div>

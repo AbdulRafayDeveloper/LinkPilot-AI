@@ -141,13 +141,20 @@ export interface MeetingPlan {
   seriesId: string | null
   recurrencePattern: RecurrencePatternId | null
   recurrenceUntil: string | null
+  /**
+   * Whether the meeting carries notes, and when they were last written. The notes themselves are
+   * never in a list: they are one of the plain text boxes and can be a million characters, so the
+   * calendar and today's list only need to know there is something to read.
+   */
+  hasNotes: boolean
+  notesUpdatedAt: string | null
   createdAt: string
 }
 
-/** How a new meeting repeats: the pattern, and the last day the series may meet on. */
+/** How a new meeting repeats: the pattern, and how many meetings the series holds in all. */
 export interface MeetingRecurrence {
   pattern: RecurrencePatternId
-  until: string
+  count: number
 }
 
 /**
@@ -158,6 +165,8 @@ export interface MeetingPlanDetail extends MeetingPlan {
   profileInfo: string | null
   conversationHistory: string | null
   additionalInfo: string | null
+  // The notes in full; only the meeting's own view reads them
+  notes: string
   prep: MeetingPrep | null
   // How many meetings its series still holds, this one included; only the meeting's own GET and a
   // new series carry it, since counting it costs a query
