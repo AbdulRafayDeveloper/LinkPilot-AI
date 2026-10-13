@@ -182,10 +182,15 @@ export const ProjectDocumentSchema = z.object({
         .min(1, PROJECT_FOLDER_MESSAGES.writeMissingName)
         .max(PROJECT_DOCUMENT_NAME_MAX_LENGTH, PROJECT_FOLDER_MESSAGES.nameTooLong)
     ),
+  /**
+   * What the document says, kept **exactly as it was typed**: its spacing and its line breaks are
+   * the document. Only the check for an empty one looks past the whitespace, so a file of nothing
+   * but spaces is refused while a file that happens to start with them is not changed.
+   */
   text: z
     .string({ error: PROJECT_FOLDER_MESSAGES.writeMissingText })
-    .min(1, PROJECT_FOLDER_MESSAGES.writeMissingText)
-    .max(PROJECT_DOCUMENT_TEXT_MAX_LENGTH, PROJECT_TASK_MESSAGES.descriptionTooLong),
+    .max(PROJECT_DOCUMENT_TEXT_MAX_LENGTH, PROJECT_TASK_MESSAGES.descriptionTooLong)
+    .refine((value) => value.trim().length > 0, PROJECT_FOLDER_MESSAGES.writeMissingText),
   folderId: ProjectFolderIdSchema.optional().transform((value) => value ?? null),
 })
 

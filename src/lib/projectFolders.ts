@@ -1,4 +1,17 @@
+import { UserFacingError } from "@/lib/errors"
 import type { ProjectFolder } from "@/types/clientProjectTasks"
+
+/**
+ * Something about the tree the caller can put right: a name already used beside it, a folder too
+ * deep, a folder moved inside itself, or an id that names no folder of this project.
+ *
+ * It extends `UserFacingError`, so **every route answers it as 400 with its own message**, including
+ * the ones that know nothing about folders: moving an item is one field on the item's own PUT, and
+ * that route's existing `UserFacingError` branch is what makes a bad folder read as "that folder no
+ * longer exists" rather than a 500. It lives here rather than in the service because this file is
+ * the tree's rules and needs nothing from the environment.
+ */
+export class FolderProblem extends UserFacingError {}
 
 /**
  * Reading a project's folder tree: which folders are inside which, and the path to one.

@@ -2,6 +2,7 @@ import { connectDatabase } from "@/lib/db"
 import { ClientProjectFolderModel, type IClientProjectFolder } from "@/models/ClientProjectFolder"
 import { ClientProjectTaskModel } from "@/models/ClientProjectTask"
 import { escapeForSearch } from "@/lib/listQuery"
+import { FolderProblem } from "@/lib/projectFolders"
 import {
   MAX_PROJECT_FOLDERS,
   PROJECT_FOLDER_MAX_DEPTH,
@@ -30,7 +31,7 @@ import type { ProjectFolder, ProjectFolderInput } from "@/types/clientProjectTas
 
 type StoredFolder = IClientProjectFolder & { _id: { toString: () => string } }
 
-export class FolderProblem extends Error {}
+
 
 const tidyName = (name: string) => name.replace(/\s+/g, " ").trim()
 // Two folders called "Invoices" and "invoices" are the same folder to a reader
@@ -244,3 +245,7 @@ export async function deleteFoldersOfProjects(projectIds: readonly string[]): Pr
   const { deletedCount } = await ClientProjectFolderModel.deleteMany({ projectId: { $in: [...projectIds] } })
   return deletedCount
 }
+
+// The tree's own error type lives in lib/projectFolders.ts, where nothing needs the environment;
+// it is re-exported here because every caller of this service throws and catches it.
+export { FolderProblem }
