@@ -4,6 +4,7 @@ import { UserFacingError } from "@/lib/errors"
 import { AssetFile, type IAssetFile } from "@/models/AssetFile"
 import {
   ASSET_PAGE_SIZE,
+  EVERY_FOLDER,
   IMPORTANT_FILES_MESSAGES,
   MULTIPART_THRESHOLD_BYTES,
   UPLOAD_PART_BYTES,
@@ -15,6 +16,8 @@ import {
 import type { Asset, AssetMetadataInput, AssetsPage, UploadPlan, UploadRequest } from "@/types/importantFiles"
 import type { Viewer } from "@/types/auth"
 import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
+import { folderBranch } from "@/lib/folderTree"
+import { folderForAsset, listDriveFolders } from "@/services/importantFiles/folders"
 import {
   abortMultipartUpload,
   buildStorageKey,
@@ -29,11 +32,16 @@ import {
 } from "@/services/storage/s3"
 
 /**
- * Important Files live in the important_files collection, read newest first in batches. The
+ * Personal Drive's files live in the important_files collection, read newest first in batches. The
  * file itself is in S3; this is only what the app knows about it.
  *
  * A record is written before the browser starts uploading and stays "uploading" until S3 has
  * confirmed the finished object, so a list only ever shows files that are really there.
+ *
+ * **Which folder is open decides what is listed** (`filesIn`): a folder shows what is filed directly
+ * in it, the way a drive does, while a search covers that folder and everything inside it. The top
+ * of the drive is its own files when browsing and the whole tree when searching, because that is
+ * what searching My Drive means.
  */
 type StoredAsset = IAssetFile & { _id: { toString: () => string } }
 
@@ -46,6 +54,7 @@ const toAsset = (record: StoredAsset, previewUrl: string | null): Asset => ({
   id: record._id.toString(),
   name: record.name,
   description: record.description ?? "",
+  folderId: record.folderId ?? null,
   originalName: record.originalName,
   contentType: record.contentType,
   category: record.category as AssetCategoryId,
@@ -81,11 +90,32 @@ function matching(search: string) {
 
 const inCategory = (type: AssetFilterId) => (type === "all" ? [] : [{ category: type }])
 
+/** Which folder is open: an id, null for the top of the drive, or EVERY_FOLDER for all of it. */
+export type DriveScope = string | null
+
+/**
+ * The files one view holds.
+ *
+ * Browsing shows what is filed **directly** in the folder, which is what makes clicking through a
+ * drive mean anything. Searching widens it to that folder and everything inside it, so a file is
+ * found without remembering which subfolder it ended up in, and searching from the top of the drive
+ * covers the lot. `EVERY_FOLDER` is the same thing asked for outright.
+ */
+async function filesIn(viewer: Viewer, folder: DriveScope, isSearching: boolean) {
+  if (folder === EVERY_FOLDER) return []
+  if (!isSearching) return [{ folderId: folder }]
+  if (folder === null) return []
+  const branch = [...folderBranch(await listDriveFolders(viewer), folder)].filter((id): id is string => id !== null)
+  return [{ folderId: { $in: branch } }]
+}
+
 interface ListOptions {
   search?: string
   type?: AssetFilterId
   cursor?: string | null
   limit?: number
+  // The folder being looked at: an id, null for the top of the drive, EVERY_FOLDER for all of it
+  folder?: DriveScope
 }
 
 /**
@@ -98,10 +128,17 @@ export async function listAssets(viewer: Viewer, {
   type = "all",
   cursor = null,
   limit = ASSET_PAGE_SIZE,
+  folder = EVERY_FOLDER,
 }: ListOptions = {}): Promise<AssetsPage> {
   await connectDatabase()
   const size = Math.min(Math.max(1, Math.trunc(limit) || ASSET_PAGE_SIZE), ASSET_PAGE_SIZE)
-  const ready = [{ status: "ready" as const }, visibleTo(viewer), ...matching(search), ...inCategory(type)]
+  const ready = [
+    { status: "ready" as const },
+    visibleTo(viewer),
+    ...matching(search),
+    ...inCategory(type),
+    ...(await filesIn(viewer, folder, Boolean(search.trim()))),
+  ]
   const [records, total] = await Promise.all([
     // One extra row answers "is there more?" without a second count
     AssetFile.find({ $and: [...ready, ...olderThan(cursor)] })
@@ -159,14 +196,18 @@ function checkUpload(contentType: string, size: number): AssetCategoryId {
  * Small files go up in one PUT. Anything over MULTIPART_THRESHOLD_BYTES is split into parts, so
  * the app never carries the bytes and Vercel's request limit never applies to them.
  */
-export async function planUpload(viewer: Viewer, { name, description, originalName, contentType, size }: UploadRequest): Promise<UploadPlan> {
+export async function planUpload(viewer: Viewer, { name, description, originalName, contentType, size, folderId }: UploadRequest): Promise<UploadPlan> {
   const category = checkUpload(contentType, size)
+  // The folder is checked before anything is stored, so an upload never lands in a folder that has
+  // gone: an unknown one is reported rather than quietly filed at the top of the drive
+  const folder = await folderForAsset(viewer, folderId)
   await connectDatabase()
 
   const record = await AssetFile.create({
     ownerId: viewer.dataOwnerId,
     name: name.trim(),
     description: description.trim(),
+    folderId: folder,
     originalName,
     contentType,
     category,
@@ -254,19 +295,50 @@ export async function cancelUpload(viewer: Viewer, id: string): Promise<boolean>
 }
 
 /**
- * Changes only what the user typed. The stored object is never touched here, which is why an
- * edit cannot replace the file behind a name.
+ * Changes only what the user typed, and which folder the file is filed in. The stored object is
+ * never touched here, which is why an edit cannot replace the file behind a name.
+ *
+ * **It writes only the fields it is given**, so moving a file is a body of `{ folderId }` alone and
+ * never carries a stale name and description over what another tab has saved: the rule Important
+ * Content's entries follow.
  */
-export async function updateAssetMetadata(viewer: Viewer, id: string, { name, description }: AssetMetadataInput): Promise<Asset | null> {
+export async function updateAssetMetadata(
+  viewer: Viewer,
+  id: string,
+  changes: Partial<AssetMetadataInput> & { folderId?: string | null }
+): Promise<Asset | null> {
   const filter = visibleById(viewer, id)
   if (!filter) return null
   await connectDatabase()
-  const record = (await AssetFile.findOneAndUpdate(
-    { ...filter, status: "ready" },
-    { name: name.trim(), description: description.trim() },
-    { returnDocument: "after", runValidators: true }
-  ).lean()) as unknown as StoredAsset | null
+  const update: Record<string, unknown> = {}
+  if (changes.name !== undefined) update.name = changes.name.trim()
+  if (changes.description !== undefined) update.description = changes.description.trim()
+  if (changes.folderId !== undefined) update.folderId = await folderForAsset(viewer, changes.folderId)
+  if (Object.keys(update).length === 0) return null
+  const record = (await AssetFile.findOneAndUpdate({ ...filter, status: "ready" }, update, {
+    returnDocument: "after",
+    runValidators: true,
+  }).lean()) as unknown as StoredAsset | null
   return record ? toAsset(record, await presignDownload(record.storageKey, record.contentType)) : null
+}
+
+/**
+ * Files several files in one folder at once: the picked ones, or the one dragged onto a folder.
+ *
+ * It is one write for the lot and stays inside what the viewer may see, so an id belonging to
+ * another account simply matches nothing. The folder is checked first, so one that has gone is
+ * reported rather than leaving the files half moved.
+ */
+export async function moveAssets(viewer: Viewer, ids: string[], folderId: string | null): Promise<number> {
+  const wanted = ids.filter((id) => ID_PATTERN.test(id))
+  if (wanted.length === 0) return 0
+  const folder = await folderForAsset(viewer, folderId)
+  await connectDatabase()
+  const { modifiedCount } = await AssetFile.updateMany(
+    { $and: [visibleTo(viewer), { _id: { $in: wanted.map((id) => new mongoose.Types.ObjectId(id)) }, status: "ready" }] },
+    { $set: { folderId: folder } }
+  )
+  return modifiedCount
 }
 
 /**
@@ -319,7 +391,7 @@ export async function assetText(viewer: Viewer, id: string, maxBytes: number): P
  */
 export async function deleteAssets(
   viewer: Viewer,
-  filters: { search: string; type: AssetFilterId },
+  filters: { search: string; type: AssetFilterId; folder?: DriveScope },
   ids?: string[]
 ): Promise<{ deleted: number; failed: number }> {
   await connectDatabase()
@@ -327,6 +399,9 @@ export async function deleteAssets(
     ids ? visibleTo(viewer) : ownedForClearing(viewer),
     ...matching(filters.search),
     ...inCategory(filters.type),
+    // The same folder the list was showing, so "delete all matching" can never reach a file the page
+    // was not showing, which is the rule every bulk delete in the app follows
+    ...(await filesIn(viewer, filters.folder ?? EVERY_FOLDER, Boolean(filters.search.trim()))),
     ...(ids ? [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] : []),
   ]
   const records = (await AssetFile.find({ $and: matchingFiles }).lean()) as unknown as StoredAsset[]

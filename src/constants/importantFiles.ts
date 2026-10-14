@@ -2,8 +2,15 @@ import { FileArchive, FileAudio, FileText, FileType, FileVideo, Image, Files, ty
 import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
 
 /**
- * Important Files: the images, documents, videos and audio worth keeping to hand and sending
- * again. Every file is stored in S3 under one prefix and reached only through signed URLs.
+ * Personal Drive: the images, documents, videos and audio worth keeping to hand and sending again,
+ * filed in folders the user makes. Every file is stored in S3 under one prefix and reached only
+ * through signed URLs.
+ *
+ * It was called **Important Files** until the owner asked for a drive. The code keeps that name
+ * (this file, `important_files`, `/api/important-files`, the tool's id), because the id is what an
+ * account's own tool choices are stored against and the API path is what the feature gate maps:
+ * renaming either would turn a saved choice into a choice about a tool nobody has. What changed is
+ * what is read on screen, the address of the page, and folders.
  *
  * The categories below are the single mapping from a content type to what the app calls it.
  * Both the filters and the server-side validation read them, so a type the app cannot place
@@ -217,6 +224,56 @@ export const ASSET_SEARCH_MAX_LENGTH = 100
 export const SIGNED_URL_TTL_SECONDS = 15 * 60
 
 export const IMPORTANT_FILES_ENDPOINT = "/api/important-files"
+export const DRIVE_FOLDERS_ENDPOINT = `${IMPORTANT_FILES_ENDPOINT}/folders`
+
+/**
+ * The folders the drive files everything in. They are **nested**, like a client project's documents
+ * and unlike Prompt Creator's and Important Content's flat lists, because that is what a drive is:
+ * a folder inside a folder, as deep as `DRIVE_FOLDER_MAX_DEPTH`.
+ */
+export const DRIVE_FOLDER_MAX_DEPTH = 6
+// Per account. A list longer than this is a sign of a search rather than of folders
+export const MAX_DRIVE_FOLDERS = 500
+export const DRIVE_FOLDER_NAME_MAX_LENGTH = 60
+// The top of the tree, where a file sits in no folder at all
+export const DRIVE_ROOT_LABEL = "My Drive"
+// What the picker calls "wherever it is", so a search can cover every folder at once
+export const EVERY_FOLDER = "all"
+
+export const DRIVE_FOLDER_MESSAGES = {
+  root: DRIVE_ROOT_LABEL,
+  newFolder: "New folder",
+  newSubfolder: "New folder inside this one",
+  rename: "Rename",
+  move: "Move",
+  moveHere: "Move here",
+  missingName: "Name the folder.",
+  nameTooLong: `Keep the folder name under ${DRIVE_FOLDER_NAME_MAX_LENGTH} characters.`,
+  duplicate: "A folder with that name is already here.",
+  tooDeep: `Folders go ${DRIVE_FOLDER_MAX_DEPTH} levels deep at most.`,
+  tooMany: `You can keep up to ${MAX_DRIVE_FOLDERS} folders.`,
+  notFound: "That folder no longer exists.",
+  // Moving a folder into itself, or into one of its own folders, would cut it off the tree
+  intoItself: "A folder can't be moved inside itself.",
+  createFailed: "Couldn't make the folder. Please try again.",
+  renameFailed: "Couldn't rename the folder. Please try again.",
+  moveFailed: "Couldn't move it. Please try again.",
+  deleteFailed: "Couldn't delete the folder. Please try again.",
+  // Nothing is lost with a folder: what was in it comes up one level
+  deleteExplains: "Nothing inside is deleted: the folders and the files in it come up one level.",
+  deleted: "Folder deleted. What was inside came up one level.",
+  empty: "This folder is empty. Upload a file here, or drag one onto it.",
+  emptyRoot: "Nothing here yet. Upload a file, or make a folder to keep things in.",
+  noMatch: "Nothing here matches that search.",
+  searchHere: "Search this folder",
+  // Said under the search box, so it is never a guess what is being searched
+  searchScope: "Searching this folder and the folders inside it.",
+  searchScopeAll: "Searching every folder in your drive.",
+  everywhere: "Search the whole drive",
+  moved: "Moved.",
+  movedMany: (count: number) => `${count} ${count === 1 ? "file" : "files"} moved.`,
+  dropHint: "Drag a file onto a folder to file it there.",
+} as const
 
 export const IMPORTANT_FILES_MESSAGES = {
   missingFile: "Choose the file you want to keep.",
@@ -232,17 +289,26 @@ export const IMPORTANT_FILES_MESSAGES = {
   deleted: "Deleted.",
   saveFailed: "Couldn't save it. Please try again.",
   deleteFailed: "Couldn't delete it. Please try again.",
-  loadFailed: "Couldn't load your files.",
+  loadFailed: "Couldn't load your drive.",
   moreFailed: "Couldn't load more. Scroll again to retry.",
   notFound: "That file no longer exists.",
   linkFailed: "Couldn't open that file. Please try again.",
-  empty: "Nothing saved yet. Add the images, documents, videos and audio you send again and again.",
+  empty: "Nothing saved yet. Upload the images, documents, videos and audio you send again and again.",
   noResults: "Nothing matches that search.",
   copied: "Copied.",
   copyFailed: "Couldn't copy that file. Download it instead.",
 } as const
 
-// The module's sidebar entry, with the other things the user keeps rather than generates
+// Where the drive lives. It was /important-files, which next.config.ts still sends here
+export const PERSONAL_DRIVE_HREF = "/personal-drive"
+
+/**
+ * The module's sidebar entry, with the other things the user keeps rather than generates.
+ *
+ * **The id stays `important-files`** although the module is called Personal Drive now: it is what
+ * each account's own tool choices are stored against (`enabledTools` / `disabledTools`) and what
+ * `FEATURE_API_PATHS` maps to `/api/important-files`.
+ */
 export const IMPORTANT_FILES_TOOL: {
   id: string
   title: string
@@ -252,9 +318,9 @@ export const IMPORTANT_FILES_TOOL: {
   group: "workspace"
 } = {
   id: "important-files",
-  title: "Important Files",
-  description: "Images, docs, video & audio",
+  title: "Personal Drive",
+  description: "Your files, in your own folders",
   icon: Files,
-  href: "/important-files",
+  href: PERSONAL_DRIVE_HREF,
   group: "workspace",
 }

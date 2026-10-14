@@ -1,5 +1,6 @@
 import type { Collection } from "mongoose"
 import { AssetFile } from "@/models/AssetFile"
+import { AssetFolder } from "@/models/AssetFolder"
 import { Client } from "@/models/Client"
 import { CreatedPromptModel } from "@/models/CreatedPrompt"
 import { DailyTask } from "@/models/DailyTask"
@@ -27,6 +28,7 @@ import { ClientProjectTaskModel } from "@/models/ClientProjectTask"
 import { ProfileScheduleModel } from "@/models/ProfileSchedule"
 import { TrendingSearch } from "@/models/TrendingSearch"
 import { APP_TOOLS } from "@/constants/linkedinTools"
+import { PERSONAL_DRIVE_HREF } from "@/constants/importantFiles"
 import type { ToolUsage } from "@/types/admin"
 
 /**
@@ -70,7 +72,9 @@ export const SOURCES: ActivitySource[] = [
   { href: "/daily-tasks", collection: () => DailyTask.collection },
   { href: "/quick-notes", collection: () => QuickNote.collection },
   { href: "/reference-content", collection: () => ReferenceItem.collection },
-  { href: "/important-files", collection: () => AssetFile.collection, match: { status: "ready" } },
+  { href: PERSONAL_DRIVE_HREF, label: "files", collection: () => AssetFile.collection, match: { status: "ready" } },
+  // The drive's own folders, counted and deleted with the account the way every other module's are
+  { href: PERSONAL_DRIVE_HREF, label: "folders", collection: () => AssetFolder.collection },
   { href: "/important-content", collection: () => ImportantContentModel.collection },
   { href: "/important-content", label: "folders", collection: () => ContentFolderModel.collection },
   // Prompt Creator's folders, which a client project also makes one of; counted and deleted with

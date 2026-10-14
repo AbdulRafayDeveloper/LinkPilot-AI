@@ -123,11 +123,12 @@ const TOOL_SEO: Record<string, { title: string; description: string; keywords: s
       "Say or paste a message in any language and get it back as a short, clear English message that keeps what you meant, ready to edit and send.",
     keywords: ["message rewriter", "message shortener", "translate message to English", "make my message clearer"],
   },
+  // Keyed by the tool's id, which stayed `important-files` when the module became Personal Drive
   "important-files": {
-    title: "Important Files and Assets Manager",
+    title: "Personal Drive for Your Own Files",
     description:
-      "Keep the images, PDFs, Word files, text files, videos and audio you reuse, under names you choose, with search, type filters, preview and download.",
-    keywords: ["file manager", "asset library", "store important files", "upload large video"],
+      "Keep the images, PDFs, Word files, text files, videos and audio you reuse in folders you make, under names you choose, with search, preview and download.",
+    keywords: ["personal drive", "file manager", "folders for files", "store important files", "upload large video"],
   },
   "client-voices": {
     title: "Client Voice Messages to Transcript and Task List",

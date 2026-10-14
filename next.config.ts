@@ -43,6 +43,14 @@ const nextConfig: NextConfig = {
       },
     ]
   },
+  /**
+   * Important Files became Personal Drive at /personal-drive. The old address still opens it, as a
+   * **307**, never a permanent redirect: a browser keeps a permanent one for good and would follow
+   * it without asking the server again, which is exactly what made the root redirect a problem.
+   */
+  async redirects() {
+    return [{ source: "/important-files", destination: "/personal-drive", permanent: false }]
+  },
   // The manifest is app/manifest.ts (/manifest.webmanifest); tools that look for the other common names find it too
   async rewrites() {
     return [

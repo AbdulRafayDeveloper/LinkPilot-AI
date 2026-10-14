@@ -1,4 +1,5 @@
 import type { AssetCategoryId, AssetFilterId } from "@/constants/importantFiles"
+import type { FolderNode } from "@/lib/folderTree"
 
 /**
  * One stored file as the page sees it. The storage key never leaves the server: previews and
@@ -8,6 +9,8 @@ export interface Asset {
   id: string
   name: string
   description: string
+  // The folder it is filed in, null at the top of the drive
+  folderId: string | null
   originalName: string
   contentType: string
   category: AssetCategoryId
@@ -30,6 +33,28 @@ export interface AssetsPage {
   total: number
 }
 
+/**
+ * One folder of the drive, with how much is filed in it directly and in everything inside it, so a
+ * closed folder still says its size. It is `FolderNode` plus those counts, which is the same shape
+ * a client project's folders have (`lib/folderTree.ts`).
+ */
+export interface DriveFolder extends FolderNode {
+  fileCount: number
+  totalFileCount: number
+}
+
+/** Making a folder, or making one inside another. */
+export interface DriveFolderInput {
+  name: string
+  parentId?: string | null
+}
+
+/** Renaming a folder, moving it under another, or both. */
+export interface DriveFolderChange {
+  name?: string
+  parentId?: string | null
+}
+
 /** What the user can change afterwards. The stored file itself is never touched by an edit. */
 export interface AssetMetadataInput {
   name: string
@@ -41,6 +66,8 @@ export interface UploadRequest extends AssetMetadataInput {
   originalName: string
   contentType: string
   size: number
+  // The folder to put it in, left out for the top of the drive
+  folderId?: string | null
 }
 
 /**
@@ -66,4 +93,6 @@ export interface AssetQuery {
   search: string
   type: AssetFilterId
   cursor: string | null
+  // The folder being looked at: an id, null for the top of the drive, "all" for every folder
+  folder: string | null
 }

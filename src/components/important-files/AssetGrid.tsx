@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useRef, useState } from "react"
+import { useDraggable } from "@dnd-kit/core"
 import {
   AlertTriangle,
   Check,
@@ -10,6 +11,8 @@ import {
   Download,
   Eye,
   Files,
+  FolderInput,
+  GripVertical,
   Loader2,
   Pencil,
   RefreshCw,
@@ -19,6 +22,7 @@ import {
 import { formatBytes } from "@/components/important-files/AddAssetDialog"
 import {
   ASSET_DESCRIPTION_PREVIEW_LENGTH,
+  DRIVE_FOLDER_MESSAGES,
   IMPORTANT_FILES_MESSAGES,
   assetCategory,
   getCategoryLabel,
@@ -44,6 +48,12 @@ interface AssetGridProps {
   onCopy: (asset: Asset) => Promise<boolean>
   onEdit: (asset: Asset) => void
   onDelete: (asset: Asset) => void
+  // Filing a file in a folder: the Move button, and the handle it is dragged onto a folder by
+  onMove: (asset: Asset) => void
+  // The folders of the open folder, drawn above the files so a drive is browsed by clicking
+  beforeItems?: React.ReactNode
+  // What an empty view says, which is a folder's own line rather than the module's
+  emptyText?: string
 }
 
 const actionButton =
@@ -92,7 +102,11 @@ const AssetCard: React.FC<{
   onCopy: (asset: Asset) => Promise<boolean>
   onEdit: (asset: Asset) => void
   onDelete: (asset: Asset) => void
-}> = ({ asset, isPicked, onPick, isBusy, onView, onDownload, onCopy, onEdit, onDelete }) => {
+  onMove: (asset: Asset) => void
+}> = ({ asset, isPicked, onPick, isBusy, onView, onDownload, onCopy, onEdit, onDelete, onMove }) => {
+  // The whole card travels, but only the handle starts the drag (`setActivatorNodeRef`), so every
+  // button on the card still works, the way a row is dragged everywhere else in the app
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({ id: asset.id })
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false)
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "failed">("idle")
   const { icon: CategoryIcon } = assetCategory(asset.category)
@@ -109,11 +123,12 @@ const AssetCard: React.FC<{
 
   return (
     <li
+      ref={setNodeRef}
       className={`relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-opacity ${
         isPicked ? "border-primary" : "border-outline-variant"
-      } ${isBusy ? "opacity-50" : ""}`}
+      } ${isBusy || isDragging ? "opacity-50" : ""}`}
     >
-      {/* Ticking a file picks it for deleting several at once */}
+      {/* Ticking a file picks it for deleting or moving several at once */}
       <label className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-white/90 shadow-sm">
         <input
           type="checkbox"
@@ -124,6 +139,20 @@ const AssetCard: React.FC<{
           className="h-4 w-4 accent-primary"
         />
       </label>
+      {/* Dragged onto a folder to file it there; Move does the same thing without a pointer */}
+      <button
+        ref={setActivatorNodeRef}
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label={`Drag ${asset.name} onto a folder`}
+        title={DRIVE_FOLDER_MESSAGES.dropHint}
+        className={`absolute right-2 top-2 z-10 flex h-6 w-6 cursor-grab touch-none items-center justify-center rounded-md bg-white/90 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+          isDragging ? "cursor-grabbing text-primary" : "text-outline hover:text-primary"
+        }`}
+      >
+        <GripVertical size={14} aria-hidden="true" />
+      </button>
       {/* What the file looks like, for the kinds that look like anything */}
       <button
         type="button"
@@ -223,10 +252,20 @@ const AssetCard: React.FC<{
           )}
           <button
             type="button"
+            onClick={() => onMove(asset)}
+            disabled={isBusy}
+            aria-label={`Move ${asset.name} to a folder`}
+            className={`${actionButton} ml-auto text-outline hover:bg-surface-container hover:text-primary`}
+          >
+            <FolderInput size={13} aria-hidden="true" />
+            {DRIVE_FOLDER_MESSAGES.move}
+          </button>
+          <button
+            type="button"
             onClick={() => onEdit(asset)}
             disabled={isBusy}
             aria-label={`Edit ${asset.name}`}
-            className={`${actionButton} ml-auto text-outline hover:bg-surface-container hover:text-primary`}
+            className={`${actionButton} text-outline hover:bg-surface-container hover:text-primary`}
           >
             <Pencil size={13} aria-hidden="true" />
             Edit
@@ -248,8 +287,12 @@ const AssetCard: React.FC<{
 }
 
 /**
- * The stored files as cards, newest first. The next batch loads as the grid is scrolled, so the
- * page never holds more than what has been scrolled to.
+ * What the open folder holds: its own folders first (`beforeItems`), then its files as cards, newest
+ * first. The next batch loads as the view is scrolled, so the page never holds more than what has
+ * been scrolled to.
+ *
+ * The folders are drawn **inside the same scrolling area** as the files, and on every state of it,
+ * so an empty folder still shows the folders inside it and can still be dropped on.
  */
 export const AssetGrid: React.FC<AssetGridProps> = ({
   assets,
@@ -268,6 +311,9 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   onCopy,
   onEdit,
   onDelete,
+  onMove,
+  beforeItems,
+  emptyText,
 }) => {
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -286,8 +332,16 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
     return () => observer.disconnect()
   }, [hasMore, isLoadingMore, error, onLoadMore])
 
+  // Every state is drawn inside the one scrolling area, under the folders of the open folder
+  const inView = (children: React.ReactNode) => (
+    <div className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
+      {beforeItems}
+      {children}
+    </div>
+  )
+
   if (error && assets.length === 0) {
-    return (
+    return inView(
       <CenteredState
         role="alert"
         icon={
@@ -310,7 +364,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   }
 
   if (isLoading && assets.length === 0) {
-    return (
+    return inView(
       <CenteredState
         role="status"
         icon={<Loader2 size={22} className="animate-spin text-primary" aria-hidden="true" />}
@@ -320,20 +374,20 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   }
 
   if (assets.length === 0) {
-    return (
+    return inView(
       <CenteredState
         icon={
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/5 text-primary">
             {isFiltering ? <SearchX size={20} aria-hidden="true" /> : <Files size={20} aria-hidden="true" />}
           </div>
         }
-        text={isFiltering ? IMPORTANT_FILES_MESSAGES.noResults : IMPORTANT_FILES_MESSAGES.empty}
+        text={isFiltering ? IMPORTANT_FILES_MESSAGES.noResults : emptyText ?? IMPORTANT_FILES_MESSAGES.empty}
       />
     )
   }
 
-  return (
-    <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
+  return inView(
+    <>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {assets.map((asset) => (
           <AssetCard
@@ -347,6 +401,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
             onCopy={onCopy}
             onEdit={onEdit}
             onDelete={onDelete}
+            onMove={onMove}
           />
         ))}
       </ul>
@@ -371,6 +426,6 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
           <span>That is everything.</span>
         )}
       </div>
-    </div>
+    </>
   )
 }

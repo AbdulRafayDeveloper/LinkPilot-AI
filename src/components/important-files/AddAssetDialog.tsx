@@ -18,6 +18,8 @@ import type { UploadProgress } from "@/types/importantFiles"
 
 interface AddAssetDialogProps {
   progress: UploadProgress | null
+  // The folder it will land in, which is whichever one is open in the drive
+  folderName: string
   onUpload: (file: File, metadata: { name: string; description: string }) => void
   onCancelUpload: () => void
   onClose: () => void
@@ -55,7 +57,7 @@ const STAGE_TEXT = {
  * four megabyte threshold goes up in parts, straight to storage, and the bar follows the bytes
  * storage has actually taken, so a large video shows real progress rather than a spinner.
  */
-export const AddAssetDialog: React.FC<AddAssetDialogProps> = ({ progress, onUpload, onCancelUpload, onClose }) => {
+export const AddAssetDialog: React.FC<AddAssetDialogProps> = ({ progress, folderName, onUpload, onCancelUpload, onClose }) => {
   const [file, setFile] = useState<File | null>(null)
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -104,8 +106,8 @@ export const AddAssetDialog: React.FC<AddAssetDialogProps> = ({ progress, onUplo
 
   return (
     <Modal
-      title="Add a file"
-      description="Keep an image, PDF, Word file, text file, video, audio or archive here, under a name you will recognise later."
+      title="Upload a file"
+      description={`An image, PDF, Word file, text file, video, audio or archive, under a name you will recognise later. It goes into ${folderName}.`}
       onClose={onClose}
       isCloseDisabled={isBusy}
       size="default"

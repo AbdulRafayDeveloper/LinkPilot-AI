@@ -96,7 +96,8 @@ async function giveUp(assetId: string): Promise<void> {
  */
 export async function uploadAsset(
   file: File,
-  metadata: { name: string; description: string },
+  // The folder it goes in is part of what is saved, so a file lands where the user is looking
+  metadata: { name: string; description: string; folderId?: string | null },
   { onProgress, onStage, signal }: UploadHandlers
 ): Promise<Asset> {
   onStage("preparing")
