@@ -238,7 +238,6 @@ export default function PublicProjectClient({ token }: { token: string }) {
               <ProjectTasks
                 tasks={project.tasks.filter((task) => task.kind === tab)}
                 kind={tab}
-                projectName={project.name}
                 busyId={busyId}
                 onTick={tick}
                 onEdit={setEditing}

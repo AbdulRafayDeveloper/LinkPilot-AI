@@ -13,7 +13,7 @@ import {
   type ProjectPriority,
 } from "@/constants/clientProjectTasks"
 import { EstimateChip, PriorityChip, PrioritySelect } from "./ItemFields"
-import { itemCode, shownItems } from "@/lib/projectItems"
+import { shownItems } from "@/lib/projectItems"
 import { clock } from "./VoiceNoteField"
 import { FileKindIcon, fileSize } from "./ProjectFilesField"
 import { FilePreviewDialog } from "./FilePreviewDialog"
@@ -23,11 +23,6 @@ interface ProjectTasksProps {
   tasks: ProjectTask[]
   // Which tab these are, so the empty line, the tick's label and the shape of a row are that tab's
   kind: ProjectItemKind
-  /**
-   * The project's own name, which every item is numbered under: "AA Change 12". It is the project's
-   * rather than the tab's so a number can be said out loud to someone working on several projects.
-   */
-  projectName: string
   busyId?: string | null
   onTick: (task: ProjectTask, done: boolean) => void
   onEdit: (task: ProjectTask) => void
@@ -181,7 +176,6 @@ const ItemFiles: React.FC<{ files: ProjectFileView[]; onPreview: (file: ProjectF
 export const ProjectTasks: React.FC<ProjectTasksProps> = ({
   tasks,
   kind,
-  projectName,
   busyId,
   onTick,
   onEdit,
@@ -211,7 +205,6 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
 
   const row = (task: ProjectTask, number: number, handle: React.ReactNode) => {
     const isDone = task.status === "done"
-    const code = itemCode(projectName, kind, number)
     return (
       <div
         className={`flex flex-col gap-2 rounded-2xl border p-3 transition-colors ${
@@ -220,6 +213,9 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
       >
         <div className="flex items-start gap-2">
           {handle}
+          {/* The row's own number, down the side of the list: 1. 2. 3. It is the item's own, kept in
+              the database, so dragging the list never renumbers anything */}
+          <span className="mt-1 w-7 shrink-0 text-right text-[12px] font-semibold tabular-nums text-outline">{number}.</span>
           {shape.tick && (
             <input
               type="checkbox"
@@ -231,13 +227,8 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
             />
           )}
           <div className="min-w-0 flex-1">
-            {/* What it is called, how urgent it is and how long it takes, above the words themselves */}
+            {/* How urgent it is and how long it takes, above the words themselves */}
             <div className="mb-1 flex flex-wrap items-center gap-1.5">
-              {code && (
-                <span className="rounded-md bg-primary-fixed px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-on-primary-fixed-variant">
-                  {code}
-                </span>
-              )}
               {onPriority ? (
                 <PrioritySelect
                   value={task.priority}

@@ -99,33 +99,6 @@ export function itemProblem(
   return null
 }
 
-/**
- * The short form of a project's name, which is what its items are numbered under: "Askraa App"
- * gives AA, "Morality" gives M. Up to three letters, so a long name does not turn the number into a
- * sentence, and nothing at all when the name has no letters in it, in which case an item is simply
- * "Change 12" rather than carrying an empty prefix.
- */
-export const projectTag = (name: string): string =>
-  (name.match(/[\p{L}\p{N}]+/gu) ?? [])
-    .slice(0, 3)
-    .map((word) => word[0].toUpperCase())
-    .join("")
-
-/**
- * What one item is called when it is referred to: **AA Change 12**, the project's own short form,
- * the tab's word and the number that item was given when it was added. It is the item's name for
- * good: the list can be dragged into any order and anything around it can be deleted, and this
- * stays what it says, which is exactly what row-wise numbering could never do.
- *
- * An item saved before numbering has none (0), and then there is nothing to show rather than a made
- * up number that would clash with a real one.
- */
-export const itemCode = (projectName: string, kind: ProjectItemKind, number: number): string => {
-  if (!number) return ""
-  const tag = projectTag(projectName)
-  return `${tag ? `${tag} ` : ""}${projectItemKind(kind).tag} ${number}`
-}
-
 /** How long something is expected to take, in words: "2 days", "1 hour", "" when nobody has said. */
 export const estimateLabel = (estimate: ProjectEstimate | null | undefined): string => {
   if (!estimate || !estimate.value) return ""
@@ -134,9 +107,13 @@ export const estimateLabel = (estimate: ProjectEstimate | null | undefined): str
 }
 
 /**
- * One tab's items as they are shown. A numbered tab (the backups) is **newest first and numbered
- * from the oldest**, so the newest backup is at the top while #1 stays the first one ever taken;
- * every other tab is the order the items were put in, which is what their `position` already is.
+ * One tab's items as they are shown, each with **its own number**: the one it was given when it was
+ * added and keeps for good, which is what the list draws down its side (1. 2. 3.). Dragging the
+ * list changes where an item sits, never the number beside it.
+ *
+ * A numbered tab (the backups) is **newest first**, so the newest backup is at the top while #1
+ * stays the first one ever taken; every other tab is in the order it was dragged into. An item
+ * saved before numbering falls back to its place in the list, so nothing is ever drawn without one.
  */
 export const shownItems = <T extends { number?: number }>(kind: ProjectItemKind, items: readonly T[]): { item: T; number: number }[] => {
   // The number is the item's own, given when it was added, so dragging the list never renumbers it

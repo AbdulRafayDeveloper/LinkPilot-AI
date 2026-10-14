@@ -396,7 +396,6 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                     <ProjectTasks
                       tasks={tasks.filter((task) => task.kind === tab)}
                       kind={tab}
-                      projectName={project.name}
                       busyId={busyId}
                       onTick={tick}
                       onEdit={setEditing}
@@ -501,8 +500,7 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                               <ProjectTasks
                                 tasks={searched}
                                 kind={tab}
-                                projectName={project.name}
-                                busyId={busyId}
+                                          busyId={busyId}
                                 onTick={tick}
                                 onEdit={setEditing}
                                 onDelete={setDeleting}
