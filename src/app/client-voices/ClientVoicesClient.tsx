@@ -350,7 +350,11 @@ export default function ClientVoicesClient() {
               </p>
             )}
 
-            <div className="grid grid-cols-1 gap-5 short:gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+            {/* The voices are what goes in and the tasks are what the page is for, so the batch takes
+                30% and the task list and the transcripts get the rest. The 260px floor only binds
+                below about 1300px, where a 30% column wrapped the drop zone's words into so many
+                lines that the page gained 138px of scrolling (measured at 1093x540). */}
+            <div className="grid grid-cols-1 gap-5 short:gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(260px,30fr)_minmax(0,70fr)]">
               <VoiceInputPanel
                 voices={voices}
                 isProcessing={isProcessing}

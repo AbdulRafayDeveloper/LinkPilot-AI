@@ -200,22 +200,27 @@ export const VoiceInputPanel: React.FC<VoiceInputPanelProps> = ({
       ) : (
         <ul className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
           {voices.map((voice) => (
+            // The name has the row's own line and the size and the state sit under it, because this
+            // column is 30% of the page: with the state chip beside the name there was nothing left
+            // of the name at all on a laptop (measured 0px of 155 at 1093x540)
             <li
               key={voice.id}
-              className="flex items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2"
+              className="flex items-start gap-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2"
             >
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/5 text-[11px] font-bold text-primary">
                 {voice.position}
               </span>
-              <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <p className="truncate text-[12px] font-semibold text-on-surface">{voice.name}</p>
-                <p className="text-[11px] text-outline">
-                  {formatSize(voice.size)} · {voice.source === "paste" ? "pasted" : voice.source === "drop" ? "dropped" : "chosen"}
-                </p>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-[11px] text-outline">
+                    {formatSize(voice.size)} · {voice.source === "paste" ? "pasted" : voice.source === "drop" ? "dropped" : "chosen"}
+                  </span>
+                  <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${statusClass[voice.status]}`}>
+                    {statusLabel[voice.status]}
+                  </span>
+                </div>
               </div>
-              <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold ${statusClass[voice.status]}`}>
-                {statusLabel[voice.status]}
-              </span>
               <button
                 type="button"
                 onClick={() => onRemove(voice.id)}
