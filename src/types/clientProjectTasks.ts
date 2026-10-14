@@ -1,4 +1,11 @@
-import type { ProjectFileCategory, ProjectItemAuthor, ProjectItemKind, ProjectTaskStatus } from "@/constants/clientProjectTasks"
+import type {
+  EstimateUnit,
+  ProjectFileCategory,
+  ProjectItemAuthor,
+  ProjectItemKind,
+  ProjectPriority,
+  ProjectTaskStatus,
+} from "@/constants/clientProjectTasks"
 import type { TaskImage, TaskImageView } from "./taskAttachment"
 import type { ClientProjectStatus } from "@/constants/clients"
 
@@ -63,6 +70,15 @@ export interface ProjectFileProgress {
   totalBytes: number
 }
 
+/**
+ * How long a backlog item is expected to take: a number and the unit it is counted in. Null on an
+ * item nobody has estimated, and on every tab but the backlog.
+ */
+export interface ProjectEstimate {
+  value: number
+  unit: EstimateUnit
+}
+
 /** One item on a client project, as it is stored. */
 export interface ProjectTaskRecord {
   content: string
@@ -76,6 +92,8 @@ export interface ProjectTaskRecord {
   status: ProjectTaskStatus
   kind: ProjectItemKind
   addedBy: ProjectItemAuthor
+  priority: ProjectPriority
+  estimate: ProjectEstimate | null
 }
 
 /** One item as a page receives it: its links are signed and short-lived. */
@@ -97,6 +115,16 @@ export interface ProjectTask {
   // The folder it is filed in, on the tabs that have folders; null at the top of the tree
   folderId: string | null
   position: number
+  // How urgent it is, on every tab. An item saved before priorities reads as Medium
+  priority: ProjectPriority
+  // How long it is expected to take, on the backlog; null everywhere else and when nobody has said
+  estimate: ProjectEstimate | null
+  /**
+   * Its number **on its own tab**, given when it was added and kept for good: AA Change 12 stays
+   * AA Change 12 however the list is ordered and whatever is deleted around it. An item saved
+   * before numbering has 0, which reads as no number rather than as the first one.
+   */
+  number: number
   createdAt: string
   updatedAt: string
 }
@@ -143,9 +171,14 @@ export interface ProjectTaskInput {
   files?: ProjectFile[]
   voiceNote?: VoiceNote | null
   status?: ProjectTaskStatus
+  // Which tab it is on. On a change it **moves the item to that tab**, which only the tabs people
+  // write on allow; left out, the item stays where it is
   kind?: ProjectItemKind
   // Where to file it, or null for the top. Left out, an item is not moved
   folderId?: string | null
+  priority?: ProjectPriority
+  // The estimate, on the backlog. Null clears it; left out, it is not touched
+  estimate?: ProjectEstimate | null
 }
 
 /** How one tab of a project stands: how many items it holds and how many are ticked off. */

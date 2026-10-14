@@ -1,6 +1,7 @@
-import { changeProjectTask, createProjectTask, publicTaskById, removeProjectTask } from "./tasks"
+import { changeProjectTask, createProjectTask, publicTaskById, removeProjectTask, reorderProjectTasks, PUBLIC_KINDS_ONLY } from "./tasks"
 import { projectFromToken } from "./projects"
 import type { ProjectTask, ProjectTaskInput } from "@/types/clientProjectTasks"
+import type { ProjectItemKind } from "@/constants/clientProjectTasks"
 
 /**
  * What someone holding a project's shared link may write. They are signed in to nothing, so the
@@ -69,6 +70,17 @@ export async function deletePublicProjectTask(token: string, taskId: string): Pr
   const project = await projectFromToken(token)
   if (!project) return failed("link")
   return (await removeProjectTask(filter, project._id.toString())) ? { ok: true, value: true } : failed("item")
+}
+
+/**
+ * Puts one tab in the order a drag left it, through a shared link. The kinds filter is on the write
+ * as well as on the schema, so an order naming a credential or a backup matches nothing and the
+ * whole order is refused rather than partly written.
+ */
+export async function orderPublicProjectTasks(token: string, kind: ProjectItemKind, orderedIds: readonly string[]): Promise<PublicWrite<true>> {
+  const project = await projectFromToken(token)
+  if (!project) return failed("link")
+  return (await reorderProjectTasks(PUBLIC_KINDS_ONLY, project._id.toString(), kind, orderedIds)) ? { ok: true, value: true } : failed("item")
 }
 
 /** Whether a token still opens a project, for the upload routes to check before storing anything. */

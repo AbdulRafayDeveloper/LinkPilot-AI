@@ -5,12 +5,16 @@ import { UserFacingError } from "@/lib/errors"
 import { ClientProjectModel, type IClientProject } from "@/models/ClientProject"
 import { ClientProjectTaskModel, type IClientProjectTask } from "@/models/ClientProjectTask"
 import {
+  DEFAULT_ESTIMATE_UNIT,
   DEFAULT_PROJECT_ITEM_KIND,
   MAX_PROJECT_TASKS,
   PROJECT_ITEM_KINDS,
   PROJECT_TASK_MESSAGES,
   PUBLIC_ITEM_KIND_IDS,
+  isMovableItemKind,
   projectItemKind,
+  projectPriority,
+  projectItemShape,
   type ProjectItemAuthor,
   type ProjectItemKind,
   hasFolders,
@@ -20,7 +24,7 @@ import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { deleteTaskImages, taskImageView } from "@/services/taskImages"
 import { deleteVoiceNotes, voiceNoteView } from "./voiceNotes"
 import { deleteProjectFiles, projectFileView, storedProjectFile } from "./files"
-import type { ProjectTask, ProjectTaskInput } from "@/types/clientProjectTasks"
+import type { ProjectEstimate, ProjectTask, ProjectTaskInput } from "@/types/clientProjectTasks"
 import type { Viewer } from "@/types/auth"
 
 /**
@@ -71,6 +75,29 @@ export async function projectOrNull(viewer: Viewer, projectId: string): Promise<
   return (await ClientProjectModel.findOne(filter).lean()) as unknown as StoredProject | null
 }
 
+/**
+ * The estimate as a page receives it, from the two flat fields it is stored in. Null unless both of
+ * them are there and the number says something, so a cleared estimate and one nobody ever wrote
+ * read the same.
+ */
+const storedEstimate = (record: Pick<IClientProjectTask, "estimateValue" | "estimateUnit">): ProjectEstimate | null =>
+  record.estimateValue && record.estimateUnit
+    ? { value: record.estimateValue, unit: (record.estimateUnit as ProjectEstimate["unit"]) ?? DEFAULT_ESTIMATE_UNIT }
+    : null
+
+/**
+ * The next number on one tab of one project: one past the highest ever given out there, so a number
+ * is never reused and an item keeps the one it was added with for good. Deleting the newest item
+ * leaves a gap on purpose, because "AA Change 12" naming two different items at two different times
+ * would be worse than a missing 12.
+ */
+async function nextNumber(projectId: string, kind: ProjectItemKind): Promise<number> {
+  const highest = (await ClientProjectTaskModel.findOne({ projectId, kind }).sort({ number: -1 }).select({ number: 1 }).lean()) as {
+    number?: number
+  } | null
+  return (highest?.number ?? 0) + 1
+}
+
 /** One item with its links signed, ready for a page. */
 async function toTask(record: StoredTask): Promise<ProjectTask> {
   const [images, files, voiceNote] = await Promise.all([
@@ -95,6 +122,11 @@ async function toTask(record: StoredTask): Promise<ProjectTask> {
     // Null at the top of the tree, and on every item saved before folders existed
     folderId: record.folderId ?? null,
     position: record.position ?? 0,
+    // An item saved before priorities existed reads as Medium, so every item always has one
+    priority: projectPriority(record.priority).id,
+    estimate: storedEstimate(record),
+    // 0 on an item saved before numbering, which reads as having no number rather than as the first
+    number: record.number ?? 0,
     createdAt: new Date(record.createdAt).toISOString(),
     updatedAt: new Date(record.updatedAt).toISOString(),
   }
@@ -137,6 +169,11 @@ const cleanInput = (input: ProjectTaskInput, kind: ProjectItemKind) => ({
   })),
   voiceNote: input.voiceNote ? { assetId: input.voiceNote.assetId, contentType: input.voiceNote.contentType, seconds: input.voiceNote.seconds } : null,
   status: input.status === "done" ? "done" : "open",
+  priority: projectPriority(input.priority).id,
+  // Only the tab that asks for one keeps it, so a change carried to the backlog can gain an
+  // estimate and one carried back out of it does not keep a number nothing shows
+  estimateValue: projectItemShape(kind).estimate ? (input.estimate?.value ?? null) : null,
+  estimateUnit: projectItemShape(kind).estimate && input.estimate?.value ? input.estimate.unit : null,
 })
 
 interface CreateOptions {
@@ -179,6 +216,8 @@ export async function createProjectTask({ project, projectId, ownerId, addedBy, 
     folderId,
     addedBy,
     position: (last?.position ?? count - 1) + 1,
+    // Its name on this tab from now on, whatever happens to the order around it
+    number: await nextNumber(projectId, kind),
   })
   return toTask(record.toObject() as unknown as StoredTask)
 }
@@ -200,8 +239,16 @@ export async function changeProjectTask(
   const current = (await ClientProjectTaskModel.findOne({ ...filter, projectId }).lean()) as unknown as StoredTask | null
   if (!current) return null
 
+  /**
+   * The tab it is on once this change lands. An item **moves between the tabs people write on**, so
+   * both ends have to be movable: a change may become an idea, and nothing may become a credential,
+   * a link, a document or a backup, each of which needs something a change has not got.
+   */
+  const was = projectItemKind(current.kind).id
+  const moving = input.kind !== undefined && input.kind !== was
+  if (moving && !(isMovableItemKind(was) && isMovableItemKind(input.kind))) throw new UserFacingError(PROJECT_TASK_MESSAGES.cannotMoveKind)
   // The item as it would be once this change lands, which is what the tab's own rule is asked about
-  const kind = projectItemKind(current.kind).id
+  const kind = moving ? (input.kind as ProjectItemKind) : was
   const merged: ProjectTaskInput = {
     content: input.content ?? current.content,
     description: input.description ?? current.description ?? "",
@@ -210,6 +257,8 @@ export async function changeProjectTask(
     images: input.images ?? current.images ?? [],
     voiceNote: input.voiceNote !== undefined ? input.voiceNote : current.voiceNote,
     status: input.status,
+    priority: input.priority ?? projectPriority(current.priority).id,
+    estimate: input.estimate !== undefined ? input.estimate : storedEstimate(current),
   }
   const problem = itemProblem(kind, merged)
   if (problem) throw new UserFacingError(problem)
@@ -224,6 +273,29 @@ export async function changeProjectTask(
   if (input.files !== undefined) changes.files = cleaned.files
   if (input.voiceNote !== undefined) changes.voiceNote = cleaned.voiceNote
   if (input.status !== undefined) changes.status = cleaned.status
+  if (input.priority !== undefined) changes.priority = cleaned.priority
+  // The estimate is written when it is sent, and whenever the item changes tab, since the tab it
+  // lands on decides whether it keeps one at all
+  if (input.estimate !== undefined || moving) {
+    changes.estimateValue = cleaned.estimateValue
+    changes.estimateUnit = cleaned.estimateUnit
+  }
+  /**
+   * Moving it to another tab: it keeps everything it carries and takes **that tab's own next
+   * number** and the end of its list, so the tab it joins reads as if it had been added there,
+   * while the tab it left simply has one fewer. Its old number is not kept, because two items on
+   * one tab sharing a number is the one thing numbering must never do.
+   */
+  if (moving) {
+    changes.kind = kind
+    changes.number = await nextNumber(projectId, kind)
+    const last = (await ClientProjectTaskModel.findOne({ projectId, kind }).sort({ position: -1 }).select({ position: 1 }).lean()) as {
+      position?: number
+    } | null
+    changes.position = (last?.position ?? -1) + 1
+    // Folders belong to one tab, so an item that leaves its tab leaves its folder with it
+    changes.folderId = null
+  }
   /**
    * Moving it between folders is one field like any other, checked against this project and this
    * tab, so a move can never file an item into another project's tree. A tab without folders takes
@@ -260,6 +332,58 @@ export async function removeProjectTask(filter: Record<string, unknown>, project
   await deleteProjectFiles((record.files ?? []).map(storedProjectFile))
   await deleteVoiceNotes([record.voiceNote])
   return true
+}
+
+/**
+ * Puts one tab's items in the order a drag left them.
+ *
+ * It writes **only the items it is given**, into the places those items already occupy: their own
+ * positions, sorted, handed back out in the new order. That is what lets a tab with folders be
+ * dragged inside one folder without disturbing what is filed in the others, and it is why the
+ * positions are made distinct first (every row saved before ordering has 0, so without that step
+ * there would be nothing to hand back out).
+ *
+ * An order naming an item that is not on this tab of this project, or that the caller may not
+ * reach, changes **nothing at all**: the page is told the list moved on and reads it again, rather
+ * than being left with half an order written.
+ */
+export async function reorderProjectTasks(
+  filter: Record<string, unknown>,
+  projectId: string,
+  kind: ProjectItemKind,
+  orderedIds: readonly string[]
+): Promise<boolean> {
+  await connectDatabase()
+  const inTab = { ...filter, projectId, kind }
+  const all = (await ClientProjectTaskModel.find(inTab).sort({ position: 1, createdAt: 1, _id: 1 }).select({ position: 1 }).lean()) as unknown as {
+    _id: { toString: () => string }
+    position?: number
+  }[]
+  const ids = [...new Set(orderedIds)]
+  if (ids.length !== orderedIds.length) return false
+  const here = new Map(all.map((record) => [record._id.toString(), record.position ?? 0]))
+  if (ids.some((id) => !here.has(id))) return false
+
+  // Every item of the tab gets a place of its own first, so there are real slots to hand out
+  const spread = new Set(all.map((record) => record.position ?? 0)).size !== all.length
+  if (spread) {
+    await ClientProjectTaskModel.bulkWrite(
+      all.map((record, index) => ({ updateOne: { filter: { _id: record._id }, update: { $set: { position: index } } } }))
+    )
+    all.forEach((record, index) => here.set(record._id.toString(), index))
+  }
+
+  const slots = ids.map((id) => here.get(id) ?? 0).sort((left, right) => left - right)
+  await ClientProjectTaskModel.bulkWrite(
+    ids.map((id, index) => ({ updateOne: { filter: { _id: id, projectId, kind }, update: { $set: { position: slots[index] } } } }))
+  )
+  return true
+}
+
+/** Puts one tab in order as the signed-in owner. False when the project or an item is out of reach. */
+export async function orderProjectTasks(viewer: Viewer, projectId: string, kind: ProjectItemKind, orderedIds: readonly string[]): Promise<boolean> {
+  if (!(await projectOrNull(viewer, projectId))) return false
+  return reorderProjectTasks(visibleTo(viewer), projectId, kind, orderedIds)
 }
 
 /** Adds one item as the signed-in owner. Null when the project is gone or another account's. */

@@ -20,6 +20,12 @@ import {
   PROJECT_FOLDER_NAME_MAX_LENGTH,
   PROJECT_DOCUMENT_NAME_MAX_LENGTH,
   PROJECT_DOCUMENT_TEXT_MAX_LENGTH,
+  ESTIMATE_MAX_VALUE,
+  ESTIMATE_UNIT_IDS,
+  MAX_PROJECT_TASKS,
+  MOVABLE_ITEM_KIND_IDS,
+  PROJECT_PRIORITY_IDS,
+  PUBLIC_MOVABLE_KIND_IDS,
 } from "@/constants/clientProjectTasks"
 import { ASSET_CATEGORY_IDS, categoryForContentType } from "@/constants/importantFiles"
 import { PROJECT_DESCRIPTION_MAX_LENGTH, type ProjectItemKind } from "@/constants/clientProjectTasks"
@@ -69,11 +75,26 @@ const FileSchema = z.object({
 const files = z.array(FileSchema).max(PROJECT_MAX_FILES, PROJECT_TASK_MESSAGES.tooManyFiles).optional()
 const voiceNote = VoiceNoteSchema.nullable().optional()
 const status = z.enum(PROJECT_TASK_STATUS_IDS, { error: PROJECT_TASK_MESSAGES.badStatus }).optional()
+const priority = z.enum(PROJECT_PRIORITY_IDS, { error: PROJECT_TASK_MESSAGES.badPriority }).optional()
+
+/**
+ * How long a backlog item is expected to take: a number and its unit, or null for "nobody has
+ * said". A value of zero is no estimate either, so a cleared field and an empty one are the same
+ * thing rather than two states a page would have to tell apart.
+ */
+const estimate = z
+  .object({
+    value: z.coerce.number().min(0).max(ESTIMATE_MAX_VALUE, PROJECT_TASK_MESSAGES.badEstimate),
+    unit: z.enum(ESTIMATE_UNIT_IDS, { error: PROJECT_TASK_MESSAGES.badEstimate }),
+  })
+  .nullable()
+  .optional()
+  .transform((value) => (value && value.value > 0 ? value : value === undefined ? undefined : null))
 
 /** An item's own id, as a path or a body names it. */
 const taskId = z.string().regex(/^[0-9a-f]{24}$/, PROJECT_TASK_MESSAGES.taskNotFound)
 
-const itemFields = { content: content.optional(), description, url, images, files, voiceNote, status }
+const itemFields = { content: content.optional(), description, url, images, files, voiceNote, status, priority, estimate }
 
 /**
  * A new item, on the tabs the surface allows. The owner's page may write any tab; a shared link may
@@ -107,8 +128,12 @@ export const ProjectTaskSchema = newItemSchema(PROJECT_ITEM_KIND_IDS)
 
 /**
  * The fields a change to an item may carry. Only the ones sent are written, so ticking an item off
- * is `{ status }` alone and never has to carry its text, images and voice note back. `kind` is not
- * among them: which tab an item belongs to is settled when it is added.
+ * is `{ status }` alone and never has to carry its text, images and voice note back.
+ *
+ * **`kind` is among them now**: an item moves between the tabs people write on, at the owner's
+ * request (a change becomes an idea, an idea goes to the backlog). Only those tabs are offered, so
+ * a body naming Credentials, Links, Documents or Backups is refused here, before anything is read;
+ * the service checks the tab it is leaving as well, since both ends have to be movable.
  */
 const editFields = {
   content: content.optional(),
@@ -118,16 +143,20 @@ const editFields = {
   files,
   voiceNote,
   status,
+  priority,
+  estimate,
   // Where it is filed. Left out, the item is not moved; null moves it to the top of the tree
   folderId: z.union([z.string().regex(/^[0-9a-f]{24}$/), z.null()]).optional(),
 }
 // Named rather than counted, so the shared link's body can carry `taskId` as well and that alone
 // still reads as "nothing to change"
-const EDIT_FIELDS = Object.keys(editFields)
+const EDIT_FIELDS = [...Object.keys(editFields), "kind"]
 const saysSomething = (body: Record<string, unknown>) => EDIT_FIELDS.some((name) => body[name] !== undefined)
 
 /** A change to an item. A body with nothing in it is refused rather than saved as an empty change. */
-export const ProjectTaskEditSchema = z.object(editFields).refine(saysSomething, PROJECT_TASK_MESSAGES.saveFailed)
+export const ProjectTaskEditSchema = z
+  .object({ ...editFields, kind: z.enum(MOVABLE_ITEM_KIND_IDS, { error: PROJECT_TASK_MESSAGES.cannotMoveKind }).optional() })
+  .refine(saysSomething, PROJECT_TASK_MESSAGES.saveFailed)
 
 /**
  * The same three bodies again for the shared link, which names the item in the body because the
@@ -136,8 +165,26 @@ export const ProjectTaskEditSchema = z.object(editFields).refine(saysSomething, 
  * even by a caller writing the body by hand.
  */
 export const PublicProjectTaskSchema = newItemSchema(PUBLIC_ITEM_KIND_IDS)
-export const PublicTaskEditSchema = z.object({ taskId, ...editFields }).refine(saysSomething, PROJECT_TASK_MESSAGES.saveFailed)
+export const PublicTaskEditSchema = z
+  .object({ taskId, ...editFields, kind: z.enum(PUBLIC_MOVABLE_KIND_IDS, { error: PROJECT_TASK_MESSAGES.cannotMoveKind }).optional() })
+  .refine(saysSomething, PROJECT_TASK_MESSAGES.saveFailed)
 export const PublicTaskDeleteSchema = z.object({ taskId })
+
+/**
+ * The new order of one tab, as a drag leaves it: the tab, and its items in the order they are now
+ * shown. Every id is checked against that project and that tab in the service, so an order naming
+ * an item from somewhere else changes nothing at all rather than part of a list.
+ */
+export const ProjectOrderSchema = z.object({
+  kind: z.enum(PROJECT_ITEM_KIND_IDS, { error: PROJECT_TASK_MESSAGES.badKind }),
+  orderedIds: z.array(taskId).min(1, PROJECT_TASK_MESSAGES.reorderFailed).max(MAX_PROJECT_TASKS, PROJECT_TASK_MESSAGES.reorderFailed),
+})
+
+/** The same from a shared link, which may only put a tab it is allowed to see in order. */
+export const PublicProjectOrderSchema = z.object({
+  kind: z.enum(PUBLIC_ITEM_KIND_IDS, { error: PROJECT_TASK_MESSAGES.badKind }),
+  orderedIds: z.array(taskId).min(1, PROJECT_TASK_MESSAGES.reorderFailed).max(MAX_PROJECT_TASKS, PROJECT_TASK_MESSAGES.reorderFailed),
+})
 
 /**
  * What a file says about itself before it is sent. The server checks the type against the one

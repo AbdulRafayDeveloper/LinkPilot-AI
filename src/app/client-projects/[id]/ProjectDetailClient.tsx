@@ -8,11 +8,12 @@ import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
 import { ProjectTasks, deleteItemTitle } from "@/components/client-projects/ProjectTasks"
 import { ProjectTabs } from "@/components/client-projects/ProjectTabs"
-import { countsOf } from "@/lib/projectItems"
+import { countsOf, reorderItems } from "@/lib/projectItems"
 import { TaskComposer } from "@/components/client-projects/TaskComposer"
 import { ProjectLinkPanel } from "@/components/client-projects/ProjectLinkPanel"
 import { ProjectFolderTree, folderBranch, folderPath } from "@/components/client-projects/ProjectFolderTree"
 import { FolderNameDialog, MoveToFolderDialog, WriteDocumentDialog } from "@/components/client-projects/ProjectFolderDialogs"
+import { MoveToTabDialog } from "@/components/client-projects/MoveToTabDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { filterByWords } from "@/lib/nameSearch"
@@ -22,7 +23,9 @@ import {
   PROJECT_FOLDER_MESSAGES,
   PROJECT_TASK_MESSAGES,
   hasFolders,
+  isMovableItemKind,
   type ProjectItemKind,
+  type ProjectPriority,
 } from "@/constants/clientProjectTasks"
 import type { ProjectFolder, ProjectTask, ProjectTaskInput, ProjectWithTasks } from "@/types/clientProjectTasks"
 
@@ -66,6 +69,8 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
   const [movingFolder, setMovingFolder] = useState<ProjectFolder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<ProjectFolder | null>(null)
   const [isWriting, setIsWriting] = useState(false)
+  // The item being moved to another tab, which is its own dialog
+  const [movingTab, setMovingTab] = useState<ProjectTask | null>(null)
   const [editing, setEditing] = useState<ProjectTask | null>(null)
   const [deleting, setDeleting] = useState<ProjectTask | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -129,6 +134,51 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
     } finally {
       setBusyId(null)
     }
+  }
+
+  /** How urgent an item is: the chip changes at once and goes back if the write fails. */
+  const changePriority = async (task: ProjectTask, priority: ProjectPriority) => {
+    setBusyId(task.id)
+    setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, priority } : row)))
+    try {
+      await saveTask(task, { priority })
+      setTaskError(null)
+    } catch (reason: unknown) {
+      setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, priority: task.priority } : row)))
+      setTaskError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.saveFailed)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  /**
+   * The order a drag left a tab in. The list moves at once and the new order is sent as the ids of
+   * the items shown, which is what the server writes into those same items' places; a refusal puts
+   * the list back and reads the project again, since something changed somewhere else.
+   */
+  const reorder = async (orderedIds: string[]) => {
+    const before = tasks
+    setTasks((current) => (current ? reorderItems(current, orderedIds) : current))
+    try {
+      await requestApi(`${CLIENT_PROJECTS_ENDPOINT}/${projectId}/tasks/order`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: tab, orderedIds }),
+      })
+      setTaskError(null)
+    } catch (reason: unknown) {
+      setTasks(before)
+      setTaskError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.reorderFailed)
+      setAttempt((count) => count + 1)
+    }
+  }
+
+  /** Moves one item to another tab. It keeps what it carries and takes that tab's own number. */
+  const moveToTab = async (kind: ProjectItemKind) => {
+    const task = movingTab
+    if (!task) return
+    await saveTask(task, { kind })
+    setMovingTab(null)
   }
 
   /** Every folder call answers with the folder, so the tree follows without reading it again. */
@@ -346,10 +396,14 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                     <ProjectTasks
                       tasks={tasks.filter((task) => task.kind === tab)}
                       kind={tab}
+                      projectName={project.name}
                       busyId={busyId}
                       onTick={tick}
                       onEdit={setEditing}
                       onDelete={setDeleting}
+                      onMoveTab={isMovableItemKind(tab) ? setMovingTab : undefined}
+                      onPriority={changePriority}
+                      onReorder={reorder}
                       clientTag={PROJECT_TASK_MESSAGES.fromClient}
                     />
                   ) : (
@@ -447,6 +501,7 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                               <ProjectTasks
                                 tasks={searched}
                                 kind={tab}
+                                projectName={project.name}
                                 busyId={busyId}
                                 onTick={tick}
                                 onEdit={setEditing}
@@ -455,6 +510,10 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                                   setFolderError(null)
                                   setMovingTask(task)
                                 }}
+                                onPriority={changePriority}
+                                // A search or a folder shows part of the tab, and the order written is
+                                // of exactly what is on screen, which is what the server expects
+                                onReorder={reorder}
                                 clientTag={PROJECT_TASK_MESSAGES.fromClient}
                               />
                             )}
@@ -503,6 +562,8 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
           }}
         />
       )}
+
+      {movingTab && <MoveToTabDialog task={movingTab} onMove={moveToTab} onClose={() => setMovingTab(null)} />}
 
       {isWriting && (
         <WriteDocumentDialog

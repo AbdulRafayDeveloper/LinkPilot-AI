@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useState } from "react"
-import { Download, Eye, FolderInput, Link2, Loader2, Pencil, Trash2 } from "lucide-react"
+import { ArrowLeftRight, Download, Eye, FolderInput, Link2, Loader2, Pencil, Trash2 } from "lucide-react"
+import { SortableList } from "@/components/ui/SortableList"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 import {
   PROJECT_DETAILS_OPEN_MAX_CHARS,
@@ -9,8 +10,10 @@ import {
   PROJECT_TASK_MESSAGES,
   projectItemKind,
   type ProjectItemKind,
+  type ProjectPriority,
 } from "@/constants/clientProjectTasks"
-import { shownItems } from "@/lib/projectItems"
+import { EstimateChip, PriorityChip, PrioritySelect } from "./ItemFields"
+import { itemCode, shownItems } from "@/lib/projectItems"
 import { clock } from "./VoiceNoteField"
 import { FileKindIcon, fileSize } from "./ProjectFilesField"
 import { FilePreviewDialog } from "./FilePreviewDialog"
@@ -20,6 +23,11 @@ interface ProjectTasksProps {
   tasks: ProjectTask[]
   // Which tab these are, so the empty line, the tick's label and the shape of a row are that tab's
   kind: ProjectItemKind
+  /**
+   * The project's own name, which every item is numbered under: "AA Change 12". It is the project's
+   * rather than the tab's so a number can be said out loud to someone working on several projects.
+   */
+  projectName: string
   busyId?: string | null
   onTick: (task: ProjectTask, done: boolean) => void
   onEdit: (task: ProjectTask) => void
@@ -29,6 +37,18 @@ interface ProjectTasksProps {
    * on a document and a link and nowhere else.
    */
   onMove?: (task: ProjectTask) => void
+  /**
+   * Moving the item to another **tab** (a change becomes an idea, an idea joins the backlog). Only
+   * the tabs people write on pass it, since the others each need something a change has not got.
+   */
+  onMoveTab?: (task: ProjectTask) => void
+  /** Changing how urgent it is, where it is read. Left out, the chip is shown and cannot be changed. */
+  onPriority?: (task: ProjectTask, priority: ProjectPriority) => void
+  /**
+   * The order a drag left the tab in, as ids. Left out, the list cannot be dragged, which is what a
+   * numbered tab does: a backup's place in the list **is** its number.
+   */
+  onReorder?: (orderedIds: string[]) => void
   /**
    * How an item added from the shared link is tagged. The two surfaces word it differently (the
    * owner reads "From the client"; the client reads nothing about themselves), so each passes its
@@ -158,7 +178,21 @@ const ItemFiles: React.FC<{ files: ProjectFileView[]; onPreview: (file: ProjectF
  * only how an item added from the link is tagged, whether the details start open, and which tabs
  * the link is given at all (never Credentials or Backups).
  */
-export const ProjectTasks: React.FC<ProjectTasksProps> = ({ tasks, kind, busyId, onTick, onEdit, onDelete, onMove, clientTag, detailsOpen }) => {
+export const ProjectTasks: React.FC<ProjectTasksProps> = ({
+  tasks,
+  kind,
+  projectName,
+  busyId,
+  onTick,
+  onEdit,
+  onDelete,
+  onMove,
+  onMoveTab,
+  onPriority,
+  onReorder,
+  clientTag,
+  detailsOpen,
+}) => {
   const words = projectItemKind(kind)
   const shape = words.shape
   // The file being looked at, over the whole popup. One at a time, for the whole list
@@ -168,99 +202,152 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({ tasks, kind, busyId,
     return <p className="rounded-xl border border-dashed border-outline-variant px-3 py-6 text-center text-[13px] text-outline">{words.empty}</p>
   }
 
+  const rows = shownItems(kind, tasks)
+  /**
+   * A numbered tab is never dragged: a backup's place in the list **is** its number, newest first,
+   * so there is no order of your own to put it in. Everything else is dragged by its handle.
+   */
+  const canDrag = Boolean(onReorder) && !shape.numbered
+
+  const row = (task: ProjectTask, number: number, handle: React.ReactNode) => {
+    const isDone = task.status === "done"
+    const code = itemCode(projectName, kind, number)
+    return (
+      <div
+        className={`flex flex-col gap-2 rounded-2xl border p-3 transition-colors ${
+          isDone && shape.tick ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-white"
+        }`}
+      >
+        <div className="flex items-start gap-2">
+          {handle}
+          {shape.tick && (
+            <input
+              type="checkbox"
+              checked={isDone}
+              disabled={busyId === task.id}
+              onChange={(event) => onTick(task, event.target.checked)}
+              aria-label={`${task.content} is ${words.doneLabel}`}
+              className="mt-1.5 h-4 w-4 shrink-0 accent-primary"
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            {/* What it is called, how urgent it is and how long it takes, above the words themselves */}
+            <div className="mb-1 flex flex-wrap items-center gap-1.5">
+              {code && (
+                <span className="rounded-md bg-primary-fixed px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-on-primary-fixed-variant">
+                  {code}
+                </span>
+              )}
+              {onPriority ? (
+                <PrioritySelect
+                  value={task.priority}
+                  onChange={(priority) => onPriority(task, priority)}
+                  disabled={busyId === task.id}
+                  label={task.content}
+                />
+              ) : (
+                <PriorityChip priority={task.priority} />
+              )}
+              {shape.estimate && <EstimateChip estimate={task.estimate} />}
+              {shape.numbered && <span className="text-[11px] text-outline">{savedOn(task.createdAt)}</span>}
+              {clientTag && task.addedBy === "client" && (
+                <span className="inline-block rounded-full bg-primary-fixed px-2 py-0.5 text-[10px] font-semibold text-on-primary-fixed-variant">
+                  {clientTag}
+                </span>
+              )}
+            </div>
+            <p className={`break-words text-[13px] ${isDone && shape.tick ? "text-on-surface-variant line-through" : "text-on-surface"}`}>{task.content}</p>
+            {shape.url && task.url && (
+              <a
+                href={task.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-0.5 inline-flex max-w-full items-center gap-1 text-[12px] font-semibold text-primary hover:underline"
+              >
+                <Link2 size={12} className="shrink-0" aria-hidden="true" />
+                <span className="min-w-0 truncate">{task.url}</span>
+              </a>
+            )}
+          </div>
+          {busyId === task.id && <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-primary" aria-hidden="true" />}
+          {/* The actions wrap onto their own line on a phone rather than squeezing the words */}
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-0.5">
+            {onMoveTab && (
+              <button
+                type="button"
+                onClick={() => onMoveTab(task)}
+                aria-label={PROJECT_TASK_MESSAGES.moveToTabOf(task.content)}
+                title={PROJECT_TASK_MESSAGES.moveToTab}
+                className={`${actionButton} hover:text-primary`}
+              >
+                <ArrowLeftRight size={13} aria-hidden="true" />
+                Tab
+              </button>
+            )}
+            {onMove && (
+              <button
+                type="button"
+                onClick={() => onMove(task)}
+                aria-label={`Move ${task.content} to another folder`}
+                className={`${actionButton} hover:text-primary`}
+              >
+                <FolderInput size={13} aria-hidden="true" />
+                Move
+              </button>
+            )}
+            <button type="button" onClick={() => onEdit(task)} aria-label={`Edit ${task.content}`} className={`${actionButton} hover:text-primary`}>
+              <Pencil size={13} aria-hidden="true" />
+              Edit
+            </button>
+            <button type="button" onClick={() => onDelete(task)} aria-label={`Delete ${task.content}`} className={`${actionButton} hover:text-error`}>
+              <Trash2 size={13} aria-hidden="true" />
+              Delete
+            </button>
+          </div>
+        </div>
+
+        {(task.description || task.images.length > 0) && (
+          <div className="pl-6">
+            <TaskDetailsView
+              description={task.description}
+              images={task.images}
+              label={task.content}
+              // What the tab is for is open from the start (the credentials themselves), and so
+              // is a note on a shared link, unless it is long enough to bury the list
+              defaultOpen={(detailsOpen || shape.text?.required) && task.description.length <= PROJECT_DETAILS_OPEN_MAX_CHARS}
+            />
+          </div>
+        )}
+        {task.files.length > 0 && (
+          <div className="pl-6">
+            <ItemFiles files={task.files} onPreview={setPreview} />
+          </div>
+        )}
+        {task.voiceNote && <div className="pl-6">{<VoiceNotePlayer task={task} />}</div>}
+      </div>
+    )
+  }
+
   return (
     <>
-      <ul className="flex flex-col gap-2">
-        {shownItems(kind, tasks).map(({ item: task, number }) => {
-          const isDone = task.status === "done"
-          return (
-            <li
-              key={task.id}
-              className={`flex flex-col gap-2 rounded-2xl border p-3 transition-colors ${
-                isDone && shape.tick ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-white"
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                {shape.tick ? (
-                  <input
-                    type="checkbox"
-                    checked={isDone}
-                    disabled={busyId === task.id}
-                    onChange={(event) => onTick(task, event.target.checked)}
-                    aria-label={`${task.content} is ${words.doneLabel}`}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                  />
-                ) : (
-                  shape.numbered && <span className="mt-0.5 shrink-0 rounded-md bg-primary-fixed px-1.5 py-0.5 text-[11px] font-bold text-on-primary-fixed-variant">#{number}</span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className={`break-words text-[13px] ${isDone && shape.tick ? "text-on-surface-variant line-through" : "text-on-surface"}`}>{task.content}</p>
-                  {shape.url && task.url && (
-                    <a
-                      href={task.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-0.5 inline-flex max-w-full items-center gap-1 text-[12px] font-semibold text-primary hover:underline"
-                    >
-                      <Link2 size={12} className="shrink-0" aria-hidden="true" />
-                      <span className="min-w-0 truncate">{task.url}</span>
-                    </a>
-                  )}
-                  <span className="mt-1 flex flex-wrap items-center gap-2">
-                    {shape.numbered && <span className="text-[11px] text-outline">{savedOn(task.createdAt)}</span>}
-                    {clientTag && task.addedBy === "client" && (
-                      <span className="inline-block rounded-full bg-primary-fixed px-2 py-0.5 text-[10px] font-semibold text-on-primary-fixed-variant">
-                        {clientTag}
-                      </span>
-                    )}
-                  </span>
-                </div>
-                {busyId === task.id && <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-primary" aria-hidden="true" />}
-                <div className="flex shrink-0 items-center gap-0.5">
-                  {onMove && (
-                    <button
-                      type="button"
-                      onClick={() => onMove(task)}
-                      aria-label={`Move ${task.content} to another folder`}
-                      className={`${actionButton} hover:text-primary`}
-                    >
-                      <FolderInput size={13} aria-hidden="true" />
-                      Move
-                    </button>
-                  )}
-                  <button type="button" onClick={() => onEdit(task)} aria-label={`Edit ${task.content}`} className={`${actionButton} hover:text-primary`}>
-                    <Pencil size={13} aria-hidden="true" />
-                    Edit
-                  </button>
-                  <button type="button" onClick={() => onDelete(task)} aria-label={`Delete ${task.content}`} className={`${actionButton} hover:text-error`}>
-                    <Trash2 size={13} aria-hidden="true" />
-                    Delete
-                  </button>
-                </div>
-              </div>
-
-              {(task.description || task.images.length > 0) && (
-                <div className="pl-6">
-                  <TaskDetailsView
-                    description={task.description}
-                    images={task.images}
-                    label={task.content}
-                    // What the tab is for is open from the start (the credentials themselves), and so
-                    // is a note on a shared link, unless it is long enough to bury the list
-                    defaultOpen={(detailsOpen || shape.text?.required) && task.description.length <= PROJECT_DETAILS_OPEN_MAX_CHARS}
-                  />
-                </div>
-              )}
-              {task.files.length > 0 && (
-                <div className="pl-6">
-                  <ItemFiles files={task.files} onPreview={setPreview} />
-                </div>
-              )}
-              {task.voiceNote && <div className="pl-6">{<VoiceNotePlayer task={task} />}</div>}
-            </li>
-          )
-        })}
-      </ul>
+      {canDrag ? (
+        <SortableList
+          items={rows}
+          getId={({ item }) => item.id}
+          getLabel={({ item }) => item.content}
+          onReorder={(ids) => onReorder?.(ids)}
+          renderItem={({ item, number }, handle) => row(item, number, handle)}
+          label={`${words.label} in the order they are worked in`}
+          itemNoun={`${words.one}s`}
+          className="flex flex-col gap-2"
+        />
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {rows.map(({ item: task, number }) => (
+            <li key={task.id}>{row(task, number, null)}</li>
+          ))}
+        </ul>
+      )}
       {preview && <FilePreviewDialog file={preview} onClose={() => setPreview(null)} />}
     </>
   )

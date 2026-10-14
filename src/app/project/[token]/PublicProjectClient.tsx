@@ -6,18 +6,22 @@ import { FolderKanban, Loader2, PencilLine } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { ProjectTasks, deleteItemTitle } from "@/components/client-projects/ProjectTasks"
 import { ProjectTabs } from "@/components/client-projects/ProjectTabs"
-import { countsOf } from "@/lib/projectItems"
+import { countsOf, reorderItems } from "@/lib/projectItems"
 import { TaskComposer } from "@/components/client-projects/TaskComposer"
+import { MoveToTabDialog } from "@/components/client-projects/MoveToTabDialog"
 import { requestApi } from "@/lib/apiClient"
 import { SITE_LOGO_PNG, SITE_NAME } from "@/config/site"
 import {
   DEFAULT_PUBLIC_ITEM_KIND,
+  MOVABLE_ITEM_KINDS,
   PROJECT_TASK_MESSAGES,
   PUBLIC_ITEM_KINDS,
   PUBLIC_PROJECT_ENDPOINT,
   PUBLIC_PROJECT_MESSAGES,
   PUBLIC_UPLOAD_PATHS,
+  isMovableItemKind,
   type ProjectItemKind,
+  type ProjectPriority,
 } from "@/constants/clientProjectTasks"
 import type { ProjectTask, ProjectTaskInput, PublicProject } from "@/types/clientProjectTasks"
 
@@ -48,6 +52,7 @@ export default function PublicProjectClient({ token }: { token: string }) {
   const [writeError, setWriteError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [editing, setEditing] = useState<ProjectTask | null>(null)
+  const [movingTab, setMovingTab] = useState<ProjectTask | null>(null)
   const [deleting, setDeleting] = useState<ProjectTask | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -104,6 +109,49 @@ export default function PublicProjectClient({ token }: { token: string }) {
     } finally {
       setBusyId(null)
     }
+  }
+
+  /** How urgent an item is, changed on the item itself, as the owner's page does. */
+  const changePriority = async (task: ProjectTask, priority: ProjectPriority) => {
+    setBusyId(task.id)
+    setTasks((current) => current.map((row) => (row.id === task.id ? { ...row, priority } : row)))
+    try {
+      await saveTask(task, { priority })
+      setWriteError(null)
+    } catch (reason: unknown) {
+      setTasks((current) => current.map((row) => (row.id === task.id ? { ...row, priority: task.priority } : row)))
+      setWriteError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.saveFailed)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  /**
+   * The order a drag left a tab in. It is the client's to set, like everything else on the public
+   * tabs: the list moves at once, and a refusal puts it back and says the list moved on.
+   */
+  const reorder = async (orderedIds: string[]) => {
+    const before = project?.tasks ?? []
+    setTasks((current) => reorderItems(current, orderedIds))
+    try {
+      await requestApi(`${endpoint}/order`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: tab, orderedIds }),
+      })
+      setWriteError(null)
+    } catch (reason: unknown) {
+      setTasks(() => before)
+      setWriteError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.reorderFailed)
+    }
+  }
+
+  /** Moves one item to another tab, from the tabs this link shows. */
+  const moveToTab = async (kind: ProjectItemKind) => {
+    const task = movingTab
+    if (!task) return
+    await saveTask(task, { kind })
+    setMovingTab(null)
   }
 
   const removeTask = async () => {
@@ -190,10 +238,14 @@ export default function PublicProjectClient({ token }: { token: string }) {
               <ProjectTasks
                 tasks={project.tasks.filter((task) => task.kind === tab)}
                 kind={tab}
+                projectName={project.name}
                 busyId={busyId}
                 onTick={tick}
                 onEdit={setEditing}
                 onDelete={setDeleting}
+                onMoveTab={isMovableItemKind(tab) ? setMovingTab : undefined}
+                onPriority={changePriority}
+                onReorder={reorder}
                 detailsOpen
               />
             </section>
@@ -216,6 +268,16 @@ export default function PublicProjectClient({ token }: { token: string }) {
             }}
           />
         </Modal>
+      )}
+
+      {movingTab && (
+        <MoveToTabDialog
+          task={movingTab}
+          onMove={moveToTab}
+          onClose={() => setMovingTab(null)}
+          // Only the tabs this link shows, so a client is never offered one they cannot open
+          kinds={MOVABLE_ITEM_KINDS.filter((kind) => kind.isPublic)}
+        />
       )}
 
       {deleting && (

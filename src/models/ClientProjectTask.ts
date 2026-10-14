@@ -1,6 +1,14 @@
 import mongoose, { Schema, type Model } from "mongoose"
 import { OWNER_ID } from "./owner"
-import { DEFAULT_PROJECT_ITEM_KIND, PROJECT_ITEM_AUTHORS, PROJECT_ITEM_KIND_IDS, PROJECT_TASK_STATUS_IDS } from "@/constants/clientProjectTasks"
+import {
+  DEFAULT_PROJECT_ITEM_KIND,
+  DEFAULT_PROJECT_PRIORITY,
+  ESTIMATE_UNIT_IDS,
+  PROJECT_ITEM_AUTHORS,
+  PROJECT_ITEM_KIND_IDS,
+  PROJECT_PRIORITY_IDS,
+  PROJECT_TASK_STATUS_IDS,
+} from "@/constants/clientProjectTasks"
 
 /**
  * One item on a client project: a change, an idea, something in the discussion, a set of
@@ -37,8 +45,23 @@ export interface IClientProjectTask {
   kind: string
   // Whether the owner added it or someone writing from the shared link did
   addedBy: string
-  // Where it sits in its tab's list; a new item goes to the end
+  // Where it sits in its tab's list; a new item goes to the end, and a drag writes them all
   position: number
+  // How urgent it is, on every tab. Missing on a row saved before priorities, which reads as medium
+  priority: string
+  /**
+   * How long it is expected to take, kept as two flat fields rather than one object, which is what
+   * this repo's Mongoose rule asks for. Null on every tab but the backlog, and on an item nobody
+   * has estimated.
+   */
+  estimateValue: number | null
+  estimateUnit: string | null
+  /**
+   * Its number on its own tab, given when it was added and never reused: the list can be dragged
+   * into any order and items can be deleted around it, and "Change 12" is still that item. 0 on a
+   * row saved before numbering, which reads as having no number at all.
+   */
+  number: number
   createdAt: Date
   updatedAt: Date
 }
@@ -80,6 +103,10 @@ const ClientProjectTaskSchema = new Schema<IClientProjectTask>(
     kind: { type: String, enum: PROJECT_ITEM_KIND_IDS, default: DEFAULT_PROJECT_ITEM_KIND },
     addedBy: { type: String, enum: PROJECT_ITEM_AUTHORS, default: "owner" },
     position: { type: Number, default: 0 },
+    priority: { type: String, enum: PROJECT_PRIORITY_IDS, default: DEFAULT_PROJECT_PRIORITY },
+    estimateValue: { type: Number, default: null },
+    estimateUnit: { type: String, enum: [...ESTIMATE_UNIT_IDS, null], default: null },
+    number: { type: Number, default: 0 },
   },
   { timestamps: true, collection: "client_project_tasks" }
 )
@@ -87,6 +114,8 @@ const ClientProjectTaskSchema = new Schema<IClientProjectTask>(
 ClientProjectTaskSchema.index({ projectId: 1, kind: 1, position: 1, createdAt: 1, _id: 1 })
 // How each tab of each project stands, for the list of projects (one grouped query for them all)
 ClientProjectTaskSchema.index({ ownerId: 1, projectId: 1, kind: 1, status: 1 })
+// The highest number given out on one tab, which is what the next item takes one past
+ClientProjectTaskSchema.index({ projectId: 1, kind: 1, number: -1 })
 
 export const ClientProjectTaskModel =
   (mongoose.models.ClientProjectTask as Model<IClientProjectTask> | undefined) ??

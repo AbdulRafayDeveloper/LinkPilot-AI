@@ -56,6 +56,8 @@ export interface ProjectItemShape {
   numbered: boolean
   // The line may be left empty and is taken from the file, which is how a backup is usually saved
   nameFromFile: boolean
+  // How long the work is expected to take, which only the backlog asks for
+  estimate: boolean
 }
 
 // A change, an idea and a message all carry the same pieces, so they share one shape
@@ -67,7 +69,10 @@ const TALK: ProjectItemShape = {
   tick: true,
   numbered: false,
   nameFromFile: false,
+  estimate: false,
 }
+// The backlog is a change with one thing more: how long it is expected to take
+const BACKLOG: ProjectItemShape = { ...TALK, estimate: true }
 // A note beside a link, a document or a backup: never needed, always allowed
 const NOTE = { label: "Note", hint: "Anything worth saying about it", required: false }
 
@@ -92,6 +97,10 @@ export const PROJECT_ITEM_KINDS = [
     id: "change",
     label: "Changes",
     one: "change",
+    // What its items are numbered as, under the project's own initials: "AA Change 12"
+    tag: "Change",
+    // Whether an item of this tab may be moved to another tab (the tabs people write on, below)
+    movable: true,
     // The composer's heading and its button, above the list
     addLabel: "Add a change",
     placeholder: "What needs changing on this project",
@@ -102,20 +111,40 @@ export const PROJECT_ITEM_KINDS = [
     shape: TALK,
   },
   {
+    // The project's own ideas. It was "Ideas" until the owner asked for the three kinds of idea to
+    // be told apart, so the **id stays `idea`** and every item already saved reads as it did
     id: "idea",
-    label: "Ideas",
-    one: "idea",
-    addLabel: "Add new idea",
-    placeholder: "An idea worth trying on this project",
+    label: "Product Ideas",
+    one: "product idea",
+    tag: "Idea",
+    movable: true,
+    addLabel: "Add a product idea",
+    placeholder: "An idea worth trying on the product",
     doneLabel: "picked up",
-    empty: "No ideas yet. Add the first one above.",
+    empty: "No product ideas yet. Add the first one above.",
     isPublic: true,
     shape: TALK,
+  },
+  {
+    // The work that is agreed but not started: a change with how long it is expected to take
+    id: "backlog",
+    label: "Backlog",
+    one: "backlog item",
+    tag: "Backlog",
+    movable: true,
+    addLabel: "Add to the backlog",
+    placeholder: "What is lined up to be done",
+    doneLabel: "done",
+    empty: "Nothing in the backlog yet. Add the first one above.",
+    isPublic: true,
+    shape: BACKLOG,
   },
   {
     id: "discussion",
     label: "Discussion",
     one: "message",
+    tag: "Discussion",
+    movable: true,
     addLabel: "Add to the discussion",
     placeholder: "Something to ask, answer or agree on",
     doneLabel: "settled",
@@ -128,6 +157,8 @@ export const PROJECT_ITEM_KINDS = [
     id: "credentials",
     label: "Credentials",
     one: "credential",
+    tag: "Credential",
+    movable: false,
     addLabel: "Add credentials",
     placeholder: "What these are for (the hosting panel, the database, the mail account)",
     doneLabel: "done",
@@ -141,41 +172,75 @@ export const PROJECT_ITEM_KINDS = [
       tick: false,
       numbered: false,
       nameFromFile: false,
+      estimate: false,
     },
   },
   {
     id: "link",
     label: "Links",
     one: "link",
+    tag: "Link",
+    movable: false,
     addLabel: "Add a link",
     placeholder: "What the link is (the live site, the design, the repository)",
     doneLabel: "done",
     empty: "No links on this project yet. Add the first one above.",
     isPublic: true,
-    shape: { text: NOTE, url: true, talk: false, files: "none", tick: false, numbered: false, nameFromFile: false },
+    shape: { text: NOTE, url: true, talk: false, files: "none", tick: false, numbered: false, nameFromFile: false, estimate: false },
   },
   {
     id: "document",
     label: "Documents",
     one: "document",
+    tag: "Document",
+    movable: false,
     addLabel: "Add a document",
     placeholder: "What the document is (left empty, the file's own name is used)",
     doneLabel: "done",
     empty: "No documents on this project yet. Add the first one above.",
     isPublic: true,
-    shape: { text: NOTE, url: false, talk: false, files: "required", tick: false, numbered: false, nameFromFile: true },
+    shape: { text: NOTE, url: false, talk: false, files: "required", tick: false, numbered: false, nameFromFile: true, estimate: false },
   },
   {
     // A file kept with the day it was taken and its number, so a backup is never lost among the rest
     id: "backup",
     label: "Backups",
     one: "backup",
+    tag: "Backup",
+    movable: false,
     addLabel: "Add a backup",
     placeholder: "What this backup is (left empty, the file's own name is used)",
     doneLabel: "done",
     empty: "No backups kept on this project yet. Upload the first one above.",
     isPublic: false,
-    shape: { text: NOTE, url: false, talk: false, files: "required", tick: false, numbered: true, nameFromFile: true },
+    shape: { text: NOTE, url: false, talk: false, files: "required", tick: false, numbered: true, nameFromFile: true, estimate: false },
+  },
+  {
+    // How the work is sold and talked about, kept apart from the product's own ideas
+    id: "marketing-idea",
+    label: "Marketing Ideas",
+    one: "marketing idea",
+    tag: "Marketing",
+    movable: true,
+    addLabel: "Add a marketing idea",
+    placeholder: "An idea for reaching the people this is for",
+    doneLabel: "picked up",
+    empty: "No marketing ideas yet. Add the first one above.",
+    isPublic: true,
+    shape: TALK,
+  },
+  {
+    id: "sales-idea",
+    label: "Sales Ideas",
+    one: "sales idea",
+    tag: "Sales",
+    movable: true,
+    addLabel: "Add a sales idea",
+    placeholder: "An idea for winning the work or selling it on",
+    doneLabel: "picked up",
+    empty: "No sales ideas yet. Add the first one above.",
+    isPublic: true,
+    shape: TALK,
   },
 ] as const
 
@@ -200,6 +265,59 @@ export const PUBLIC_ITEM_KIND_IDS = PUBLIC_ITEM_KINDS.map((kind) => kind.id) as 
 export const DEFAULT_PUBLIC_ITEM_KIND: ProjectItemKind = PUBLIC_ITEM_KINDS[0].id
 /** Whether a shared link may ever show an item of that kind. An unknown kind reads as a change. */
 export const isPublicItemKind = (id: string | null | undefined): boolean => projectItemKind(id).isPublic
+
+/**
+ * The tabs an item can be **moved between**: the ones people write on, which all carry the same
+ * pieces (a change, an idea of any of the three kinds, something in the discussion, a backlog
+ * item). A credential, a link, a document and a backup stay where they are, because each of those
+ * tabs needs something the others have not got (an address, a file), so a move between them could
+ * only ever produce an item its own tab would refuse.
+ */
+export const MOVABLE_ITEM_KINDS = PROJECT_ITEM_KINDS.filter((kind) => kind.movable)
+export const MOVABLE_ITEM_KIND_IDS = MOVABLE_ITEM_KINDS.map((kind) => kind.id) as [ProjectItemKind, ...ProjectItemKind[]]
+export const isMovableItemKind = (id: string | null | undefined): boolean => projectItemKind(id).movable
+/** The tabs a shared link may move an item between: the movable ones it is also allowed to see. */
+export const PUBLIC_MOVABLE_KIND_IDS = MOVABLE_ITEM_KINDS.filter((kind) => kind.isPublic).map((kind) => kind.id) as [
+  ProjectItemKind,
+  ...ProjectItemKind[],
+]
+
+/**
+ * How urgent an item is, on **every tab**: a change, an idea, a credential, a backup, all of them.
+ * It is one of three rather than a number, because what the owner and the client need from it is
+ * "which of these do we do first", and the word is on the chip, so it never rests on colour alone.
+ *
+ * Medium is the default, which is also what an item saved before priorities existed reads as: that
+ * way every item has one and the picker always has something to change rather than an empty state.
+ */
+export const PROJECT_PRIORITIES = [
+  { id: "high", label: "High", short: "High", description: "Do this first" },
+  { id: "medium", label: "Medium", short: "Med", description: "The usual" },
+  { id: "low", label: "Low", short: "Low", description: "When there is room" },
+] as const
+export type ProjectPriority = (typeof PROJECT_PRIORITIES)[number]["id"]
+export const PROJECT_PRIORITY_IDS = PROJECT_PRIORITIES.map((priority) => priority.id) as [ProjectPriority, ...ProjectPriority[]]
+export const DEFAULT_PROJECT_PRIORITY: ProjectPriority = "medium"
+/** One priority by its id, falling back to the default, which is what every older item reads as. */
+export const projectPriority = (id: string | null | undefined) =>
+  PROJECT_PRIORITIES.find((priority) => priority.id === id) ?? PROJECT_PRIORITIES.find((priority) => priority.id === DEFAULT_PROJECT_PRIORITY)!
+
+/**
+ * How long a backlog item is expected to take: a number and the unit it is counted in, so "2 days"
+ * and "90 minutes" are both easy to write and both mean something a reader can add up. It is
+ * optional on the one tab that has it, and nothing else carries it.
+ */
+export const ESTIMATE_UNITS = [
+  { id: "minutes", label: "minutes", one: "minute" },
+  { id: "hours", label: "hours", one: "hour" },
+  { id: "days", label: "days", one: "day" },
+  { id: "weeks", label: "weeks", one: "week" },
+] as const
+export type EstimateUnit = (typeof ESTIMATE_UNITS)[number]["id"]
+export const ESTIMATE_UNIT_IDS = ESTIMATE_UNITS.map((unit) => unit.id) as [EstimateUnit, ...EstimateUnit[]]
+export const DEFAULT_ESTIMATE_UNIT: EstimateUnit = "hours"
+// A number nobody would write past, kept small so a typed "100000" is caught rather than stored
+export const ESTIMATE_MAX_VALUE = 9_999
 
 /**
  * Who put an item there: the account that owns the project, or someone writing from the shared
@@ -318,6 +436,24 @@ export const PROJECT_TASK_MESSAGES = {
   filesUploading: "Wait for the files to finish uploading.",
   badStatus: "Choose whether it is still to do or finished.",
   badKind: "Choose which tab it belongs on.",
+  // The priority, the estimate, moving an item to another tab and putting a tab in order
+  badPriority: "Choose High, Medium or Low.",
+  badEstimate: "Give the time as a number and a unit, or leave it out.",
+  priority: "Priority",
+  priorityOf: (name: string) => `How urgent ${name} is`,
+  estimate: "Estimated time",
+  estimateHint: "How long you think it takes. Leave it out if you don't know yet.",
+  moveToTab: "Move to another tab",
+  moveToTabOf: (name: string) => `Move ${name} to another tab`,
+  moveToTabExplains: "It keeps everything it carries and gets its own number on the tab it moves to.",
+  moveToTabSame: "It is already on that tab.",
+  cannotMoveKind: "Items on this tab stay on it.",
+  moved: (label: string) => `Moved to ${label}.`,
+  moveItemFailed: "Couldn't move it. Please try again.",
+  // Putting a tab's items in the order they should be worked in
+  dragHint: "Drag an item by its handle to put the list in the order you want.",
+  reorderFailed: "Couldn't save the new order. Please try again.",
+  staleOrder: "This list changed somewhere else. It has been loaded again.",
   // The link, the document and the backup tabs each need one thing of their own
   missingUrl: "Give the web address, starting with http:// or https://.",
   badUrl: "That web address doesn't look right. It must start with http:// or https://.",
@@ -352,7 +488,7 @@ export const PROJECT_TASK_MESSAGES = {
   linkInvalid: "That link doesn't open anything.",
   linkFailed: "Couldn't change the link. Please try again.",
   linkExplains:
-    "Anyone with this link can read this project and add, change and remove its changes, ideas, discussion, links and documents, with images and voice notes, without signing in. Send it to the client; turn it off to stop it.",
+    "Anyone with this link can read this project and add, change, order and remove everything on its public tabs, with images, files and voice notes, without signing in. Send it to the client; turn it off to stop it.",
   linkReplaced: "New link made. The old one stopped working.",
   linkOff: "Link turned off.",
   linkCopied: "Link copied.",

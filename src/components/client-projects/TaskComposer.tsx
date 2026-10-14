@@ -7,6 +7,7 @@ import { VoiceNoteField } from "./VoiceNoteField"
 import { ProjectFilesField } from "./ProjectFilesField"
 import { itemProblem } from "@/lib/projectItems"
 import {
+  DEFAULT_PROJECT_PRIORITY,
   PROJECT_DESCRIPTION_MAX_LENGTH,
   PROJECT_MAX_IMAGES,
   PROJECT_TASK_MAX_LENGTH,
@@ -14,9 +15,11 @@ import {
   PROJECT_URL_MAX_LENGTH,
   projectItemKind,
   type ProjectItemKind,
+  type ProjectPriority,
 } from "@/constants/clientProjectTasks"
+import { EstimateField, PrioritySelect } from "./ItemFields"
 import { emptyTaskDetails, toStoredImages, type TaskDetailsDraft } from "@/types/taskAttachment"
-import type { ProjectFileView, ProjectTask, ProjectTaskInput, VoiceNoteView } from "@/types/clientProjectTasks"
+import type { ProjectEstimate, ProjectFileView, ProjectTask, ProjectTaskInput, VoiceNoteView } from "@/types/clientProjectTasks"
 
 interface TaskComposerProps {
   // The item being changed, or null when one is being added
@@ -68,6 +71,9 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   )
   const [voiceNote, setVoiceNote] = useState<VoiceNoteView | null>(task?.voiceNote ?? null)
   const [files, setFiles] = useState<ProjectFileView[]>(task?.files ?? [])
+  // How urgent it is, on every tab, and how long it takes, on the one tab that asks
+  const [priority, setPriority] = useState<ProjectPriority>(task?.priority ?? DEFAULT_PROJECT_PRIORITY)
+  const [estimate, setEstimate] = useState<ProjectEstimate | null>(task?.estimate ?? null)
   // Files still going up, so the item is never saved without one of them
   const [sending, setSending] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -100,6 +106,8 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         })),
         voiceNote: voiceNote ? { assetId: voiceNote.assetId, contentType: voiceNote.contentType, seconds: voiceNote.seconds } : null,
         kind,
+        priority,
+        estimate: shape.estimate ? estimate : null,
       })
       if (!isEdit) {
         // Adding leaves the form ready for the next one; editing closes itself
@@ -108,6 +116,8 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         setDetails(emptyTaskDetails())
         setVoiceNote(null)
         setFiles([])
+        setPriority(DEFAULT_PROJECT_PRIORITY)
+        setEstimate(null)
       }
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.saveFailed)
@@ -163,6 +173,22 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
           </div>
         </div>
       )}
+
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <span className={labelClass}>{PROJECT_TASK_MESSAGES.priority}</span>
+          <PrioritySelect
+            value={priority}
+            onChange={setPriority}
+            disabled={disabled || isSaving}
+            label={content.trim() || words.one}
+            className="h-10 px-3 text-[11px]"
+          />
+        </div>
+        {shape.estimate && (
+          <EstimateField estimate={estimate} onChange={setEstimate} disabled={disabled || isSaving} idPrefix={fieldId} />
+        )}
+      </div>
 
       {shape.text && (
         <TaskDetailsFields
