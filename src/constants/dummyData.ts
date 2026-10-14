@@ -8,6 +8,7 @@ import {
   CONVERSATION_REPLY_CONVERSATION_MAX_LENGTH,
   CONVERSATION_REPLY_PROFILE_MAX_LENGTH,
 } from "@/constants/conversationReply"
+import { POST_CONTENT_MAX_LENGTH } from "@/constants/postImages"
 
 export interface DummyDataField {
   key: string
@@ -163,6 +164,23 @@ export const DUMMY_DATA_KINDS = {
       },
     ],
     uses: ["/prompt-creator"],
+  },
+  "post-images": {
+    label: "Posts to draw",
+    item: "post",
+    description:
+      "Sample posts for Post Image Creator: the words the picture is made from. Saved for everyone: edit, add or remove them here, copy one, or use it to fill the post content.",
+    namePlaceholder: "e.g. Launch post for an AI scheduling app",
+    fields: [
+      {
+        key: "post",
+        label: "Post content",
+        placeholder: "Paste the post the image goes with...",
+        maxLength: POST_CONTENT_MAX_LENGTH,
+        required: true,
+      },
+    ],
+    uses: ["/post-image-creator"],
   },
   "messages-to-rewrite": {
     label: "Messages to rewrite",

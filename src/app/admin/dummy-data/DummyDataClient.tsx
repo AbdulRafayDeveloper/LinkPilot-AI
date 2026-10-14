@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import { useRouter } from "next/navigation"
-import { FlaskConical, Loader2, Pencil, Play, RefreshCw, Search } from "lucide-react"
+import { FlaskConical, Loader2, Pencil, Play, Plus, RefreshCw, Search } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { DummyDataModal } from "@/components/dummy-data/DummyDataModal"
@@ -11,30 +11,74 @@ import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { putDummyHandoff } from "@/lib/dummyHandoff"
 import { matchesWords } from "@/lib/nameSearch"
-import { APP_TOOLS } from "@/constants/linkedinTools"
+import { dummyTools, type DummyTool } from "@/lib/dummyTools"
 import { DUMMY_DATA_ENDPOINT, DUMMY_DATA_KINDS, DUMMY_DATA_MESSAGES, type DummyDataKind } from "@/constants/dummyData"
 import type { DummyDataGroup, DummyItem } from "@/types/dummyData"
 
 /**
- * Dummy Data for Testing: every piece of sample data in the app, in one place.
+ * Dummy Data for Testing: every piece of sample data in the app, read **tool wise**.
  *
  * It used to be a button on each tool's own header, which cost every tool a button for something
- * only an admin ever uses. Now the tools carry nothing: an item is opened here, read in full, and
- * **Use** opens the tool it belongs to with its inputs already filled (lib/dummyHandoff.ts). A kind
- * several tools share, like a profile, offers each of them.
+ * only an admin ever uses. Then it became one page listing every kind at once, which is how it grew
+ * an "All" chip and cards carrying three tool names each. An admin is never testing "all tools":
+ * they are about to use one, so the tools are the chips, one is always chosen, and the page shows
+ * that tool's sample data alone with a single **Use in <tool>** on each card. The names and their
+ * order come from `APP_TOOLS` through `lib/dummyTools.ts`, so they are exactly the sidebar's own.
  *
  * Admins only, three times over as the rest of the admin area is: the page checks the role, every
  * route behind it checks the role, and the sidebar never offers it to a user.
  */
 
-// What a kind is called on screen; written out per kind, since two kinds share an item name
-const kindLabel = (kind: DummyDataKind) => DUMMY_DATA_KINDS[kind].label
-
-const toolTitle = (href: string) => APP_TOOLS.find((tool) => tool.href === href)?.title ?? href
-
 interface Row {
   kind: DummyDataKind
   item: DummyItem
+}
+
+const TOOLS = dummyTools()
+const FIRST_TOOL = TOOLS[0]?.href ?? ""
+
+/**
+ * Which tool was last looked at, kept per browser the way the sidebar keeps being collapsed: an
+ * admin testing one tool opens this page several times in a row, and landing on the first tool each
+ * time is work. Read through `useSyncExternalStore`, as the sidebar's own choices are, so the
+ * server render and the browser's first render agree and nothing is set from inside an effect.
+ */
+const CHOICE_KEY = "linkpilot:dummy-data-tool"
+const CHOICE_EVENT = "dummy-data-tool-change"
+
+const subscribeChoice = (onChange: () => void) => {
+  window.addEventListener(CHOICE_EVENT, onChange)
+  return () => window.removeEventListener(CHOICE_EVENT, onChange)
+}
+
+const readChoice = () => {
+  try {
+    const saved = localStorage.getItem(CHOICE_KEY)
+    return saved && TOOLS.some((tool) => tool.href === saved) ? saved : FIRST_TOOL
+  } catch {
+    return FIRST_TOOL
+  }
+}
+
+const rememberChoice = (href: string) => {
+  try {
+    localStorage.setItem(CHOICE_KEY, href)
+  } catch {
+    // Not being able to remember it costs nothing: the chip is still chosen for this visit
+  }
+  window.dispatchEvent(new Event(CHOICE_EVENT))
+}
+
+const charactersOf = (item: DummyItem) => Object.values(item.fields).reduce((total, value) => total + value.length, 0)
+
+/** "Connection Note and InMail Message", or nothing when this tool's sample data is its own. */
+const sharedWith = (kind: DummyDataKind, href: string) => {
+  const others = DUMMY_DATA_KINDS[kind].uses
+    .filter((entry) => entry !== href)
+    .map((entry) => TOOLS.find((tool) => tool.href === entry)?.title ?? entry)
+  if (others.length === 0) return ""
+  const last = others[others.length - 1]
+  return others.length === 1 ? last : `${others.slice(0, -1).join(", ")} and ${last}`
 }
 
 export default function DummyDataClient() {
@@ -44,7 +88,8 @@ export default function DummyDataClient() {
   const [groups, setGroups] = useState<DummyDataGroup[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
-  const [kind, setKind] = useState<DummyDataKind | "all">("all")
+  // The tool being tested. One is always chosen: there is no "every tool at once" to choose
+  const href = useSyncExternalStore(subscribeChoice, readChoice, () => FIRST_TOOL)
   const [search, setSearch] = useState("")
   // The item being read, and the kind whose editor is open
   const [reading, setReading] = useState<Row | null>(null)
@@ -64,29 +109,48 @@ export default function DummyDataClient() {
     return () => controller.abort()
   }, [attempt])
 
-  const rows = useMemo<Row[]>(() => {
-    const all = (groups ?? []).flatMap((group) => group.items.map((item) => ({ kind: group.kind, item })))
-    return all
-      .filter((row) => kind === "all" || row.kind === kind)
-      .filter((row) => !search.trim() || matchesWords(`${row.item.name} ${kindLabel(row.kind)}`, search))
-  }, [groups, kind, search])
+  const chosen = useMemo<DummyTool | null>(() => TOOLS.find((tool) => tool.href === href) ?? TOOLS[0] ?? null, [href])
 
+  /** How much sample data each tool has, so a chip says whether it is worth opening. */
   const counts = useMemo(() => {
     const byKind = new Map<DummyDataKind, number>()
     for (const group of groups ?? []) byKind.set(group.kind, group.items.length)
-    return byKind
+    const byTool = new Map<string, number>()
+    for (const tool of TOOLS) {
+      byTool.set(
+        tool.href,
+        tool.kinds.reduce((total, kind) => total + (byKind.get(kind) ?? 0), 0)
+      )
+    }
+    return byTool
   }, [groups])
 
-  /** Leaves the item for the tool and opens it; the popup goes with the page. */
-  const use = (row: Row, href: string) => {
-    putDummyHandoff(row.kind, row.item.name, row.item.fields)
-    setReading(null)
-    router.push(href)
+  const rows = useMemo<Row[]>(() => {
+    if (!chosen) return []
+    const kinds = new Set<DummyDataKind>(chosen.kinds)
+    return (groups ?? [])
+      .filter((group) => kinds.has(group.kind))
+      .flatMap((group) => group.items.map((item) => ({ kind: group.kind, item })))
+      .filter((row) => !search.trim() || matchesWords(row.item.name, search))
+  }, [groups, chosen, search])
+
+  const choose = (where: string) => {
+    rememberChoice(where)
+    setSearch("")
   }
 
-  const kinds = (groups ?? []).map((group) => group.kind)
+  /** Leaves the item for the tool and opens it; the popup goes with the page. */
+  const use = (row: Row, where: string) => {
+    putDummyHandoff(row.kind, row.item.name, row.item.fields)
+    setReading(null)
+    router.push(where)
+  }
+
   const buttonClass =
     "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+  // The headings the chips are grouped under, in the sidebar's own order
+  const headings = TOOLS.reduce<string[]>((all, tool) => (all.includes(tool.heading) ? all : [...all, tool.heading]), [])
+  const shared = chosen ? chosen.kinds.map((kind) => sharedWith(kind, chosen.href)).filter(Boolean) : []
 
   return (
     <div className="font-body-md text-body-md flex h-screen min-h-screen overflow-hidden bg-background text-on-surface">
@@ -110,31 +174,29 @@ export default function DummyDataClient() {
               </button>
             </div>
 
-            {/* One chip per kind, each with how much it holds, plus a search over the names */}
+            {/* One chip per tool, under its sidebar heading, each saying how much sample data it has */}
             <div className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setKind("all")}
-                  aria-pressed={kind === "all"}
-                  className={`rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-                    kind === "all" ? "bg-primary text-white" : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
-                  }`}
-                >
-                  All ({(groups ?? []).reduce((total, group) => total + group.items.length, 0)})
-                </button>
-                {kinds.map((entry) => (
-                  <button
-                    key={entry}
-                    type="button"
-                    onClick={() => setKind(entry)}
-                    aria-pressed={kind === entry}
-                    className={`rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-                      kind === entry ? "bg-primary text-white" : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
-                    }`}
-                  >
-                    {kindLabel(entry)} ({counts.get(entry) ?? 0})
-                  </button>
+              <div className="flex flex-col gap-2" role="group" aria-label="Which tool to show the sample data of">
+                {headings.map((heading) => (
+                  <div key={heading} className="flex flex-wrap items-center gap-1.5">
+                    <span className="mr-1 shrink-0 text-[11px] font-bold uppercase tracking-wider text-outline">{heading}</span>
+                    {TOOLS.filter((tool) => tool.heading === heading).map((tool) => (
+                      <button
+                        key={tool.href}
+                        type="button"
+                        onClick={() => choose(tool.href)}
+                        aria-pressed={chosen?.href === tool.href}
+                        title={`Show the sample data for ${tool.title}`}
+                        className={`rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                          chosen?.href === tool.href
+                            ? "bg-primary text-white"
+                            : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+                        }`}
+                      >
+                        {tool.title} ({counts.get(tool.href) ?? 0})
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-outline-variant px-3 py-2">
@@ -142,12 +204,38 @@ export default function DummyDataClient() {
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search by name"
-                  aria-label="Search the sample data by name"
+                  placeholder={chosen ? `Search the sample data for ${chosen.title}` : "Search by name"}
+                  aria-label="Search this tool's sample data by name"
                   className="min-w-0 flex-1 bg-transparent text-sm text-on-surface placeholder:text-outline focus:outline-none"
                 />
               </div>
             </div>
+
+            {chosen && (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-[15px] font-bold text-on-surface">
+                    {chosen.title}
+                    <span className="ml-2 text-[12px] font-semibold text-outline">
+                      {rows.length} {rows.length === 1 ? "piece" : "pieces"} of sample data
+                    </span>
+                  </h2>
+                  {shared.length > 0 && (
+                    <p className="mt-0.5 text-[11px] text-outline">
+                      The same {DUMMY_DATA_KINDS[chosen.kinds[0]].item}s fill {shared.join("; ")}, so a change here changes them there too.
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {chosen.kinds.map((kind) => (
+                    <button key={kind} type="button" onClick={() => setEditing(kind)} className={buttonClass}>
+                      <Plus size={13} aria-hidden="true" />
+                      Add or remove {DUMMY_DATA_KINDS[kind].item}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {error ? (
               <p role="alert" className="rounded-2xl border border-error/40 bg-error-container px-4 py-3 text-[13px] text-error">
@@ -163,39 +251,31 @@ export default function DummyDataClient() {
                 {search.trim() ? DUMMY_DATA_MESSAGES.noResults : DUMMY_DATA_MESSAGES.empty}
               </p>
             ) : (
-              <ul className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
+              <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-3">
+                {/* `grid-cols-1` is not decoration: without it the single column is sized by a card's
+                    own buttons, which pushed a card 45px past the right edge of a phone */}
                 {rows.map((row) => (
                   <li key={`${row.kind}:${row.item.id}`}>
                     <div className="flex h-full flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
-                      <button
-                        type="button"
-                        onClick={() => setReading(row)}
-                        className="group min-w-0 text-left"
-                        aria-label={`Read ${row.item.name}`}
-                      >
-                        <span className="block truncate text-[13px] font-semibold text-on-surface group-hover:text-primary">
-                          {row.item.name}
-                        </span>
+                      <button type="button" onClick={() => setReading(row)} className="group min-w-0 text-left" aria-label={`Read ${row.item.name}`}>
+                        <span className="block truncate text-[13px] font-semibold text-on-surface group-hover:text-primary">{row.item.name}</span>
                         <span className="mt-0.5 block text-[11px] text-outline">
-                          {kindLabel(row.kind)} · {DUMMY_DATA_KINDS[row.kind].uses.map(toolTitle).join(", ")}
+                          {DUMMY_DATA_KINDS[row.kind].item} · {charactersOf(row.item).toLocaleString()} characters
                         </span>
                       </button>
                       <div className="mt-auto flex flex-wrap items-center gap-1.5">
                         <button type="button" onClick={() => setReading(row)} className={buttonClass}>
                           Open
                         </button>
-                        {DUMMY_DATA_KINDS[row.kind].uses.map((href) => (
-                          <button
-                            key={href}
-                            type="button"
-                            onClick={() => use(row, href)}
-                            title={`Open ${toolTitle(href)} with this filled in`}
-                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
-                          >
-                            <Play size={12} aria-hidden="true" />
-                            Use in {toolTitle(href)}
-                          </button>
-                        ))}
+                        <button
+                          type="button"
+                          onClick={() => use(row, chosen?.href ?? DUMMY_DATA_KINDS[row.kind].uses[0])}
+                          title={`Open ${chosen?.title ?? "the tool"} with this filled in`}
+                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                        >
+                          <Play size={12} aria-hidden="true" />
+                          Use in {chosen?.title ?? "the tool"}
+                        </button>
                         <button
                           type="button"
                           onClick={() => setEditing(row.kind)}
@@ -211,16 +291,6 @@ export default function DummyDataClient() {
                 ))}
               </ul>
             )}
-
-            {/* Adding and removing stays in the editor each kind already had */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[12px] text-outline">Add or remove:</span>
-              {kinds.map((entry) => (
-                <button key={entry} type="button" onClick={() => setEditing(entry)} className={buttonClass}>
-                  {kindLabel(entry)}
-                </button>
-              ))}
-            </div>
           </div>
         </main>
       </div>
@@ -229,7 +299,8 @@ export default function DummyDataClient() {
         <DummyItemDialog
           kind={reading.kind}
           item={reading.item}
-          onUse={(href) => use(reading, href)}
+          tool={chosen ?? undefined}
+          onUse={(where) => use(reading, where)}
           onEdit={() => {
             setEditing(reading.kind)
             setReading(null)
@@ -241,10 +312,10 @@ export default function DummyDataClient() {
         <DummyDataModal
           kind={editing}
           onUse={(fields) => {
-            const href = DUMMY_DATA_KINDS[editing].uses[0]
+            const where = chosen?.href ?? DUMMY_DATA_KINDS[editing].uses[0]
             putDummyHandoff(editing, "sample data", fields)
             setEditing(null)
-            router.push(href)
+            router.push(where)
           }}
           onClose={() => {
             setEditing(null)

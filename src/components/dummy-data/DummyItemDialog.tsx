@@ -4,33 +4,38 @@ import React from "react"
 import { Pencil, Play } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { CopyButton } from "@/components/ui/CopyButton"
-import { APP_TOOLS } from "@/constants/linkedinTools"
+import { toolForKind, type DummyTool } from "@/lib/dummyTools"
 import { DUMMY_DATA_KINDS, type DummyDataKind } from "@/constants/dummyData"
 import type { DummyItem } from "@/types/dummyData"
 
 interface DummyItemDialogProps {
   kind: DummyDataKind
   item: DummyItem
+  /**
+   * The tool being tested, which is the one Use offers. A kind several tools share is read under
+   * whichever of them the admin chose, so the popup never carries a row of tool buttons; left out,
+   * it falls back to the first tool the kind names.
+   */
+  tool?: DummyTool
   // Opens the tool at this address with the item already in its inputs
   onUse: (href: string) => void
   onEdit: () => void
   onClose: () => void
 }
 
-const toolTitle = (href: string) => APP_TOOLS.find((tool) => tool.href === href)?.title ?? href
-
 /**
  * One piece of sample data, read in full: every field as it is saved, each with its own Copy, and
- * **Use in <tool>** for each tool this kind fills. Using it closes the popup and opens that tool
- * with the fields already in place, so the admin never pastes sample data by hand.
+ * one **Use in <tool>** for the tool it is being read under. Using it closes the popup and opens
+ * that tool with the fields already in place, so the admin never pastes sample data by hand.
  */
-export const DummyItemDialog: React.FC<DummyItemDialogProps> = ({ kind, item, onUse, onEdit, onClose }) => {
-  const { fields, uses, item: noun } = DUMMY_DATA_KINDS[kind]
+export const DummyItemDialog: React.FC<DummyItemDialogProps> = ({ kind, item, tool, onUse, onEdit, onClose }) => {
+  const { fields, item: noun } = DUMMY_DATA_KINDS[kind]
+  const opens = tool ?? toolForKind(kind)
 
   return (
     <Modal
       title={item.name}
-      description={`Sample ${noun}. Use it to open the tool with this already filled in.`}
+      description={`Sample ${noun}. Use it to open ${opens ? opens.title : "the tool"} with this already filled in.`}
       onClose={onClose}
       size="large"
       footer={
@@ -43,17 +48,16 @@ export const DummyItemDialog: React.FC<DummyItemDialogProps> = ({ kind, item, on
             <Pencil size={14} aria-hidden="true" />
             Edit
           </button>
-          {uses.map((href) => (
+          {opens && (
             <button
-              key={href}
               type="button"
-              onClick={() => onUse(href)}
+              onClick={() => onUse(opens.href)}
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
             >
               <Play size={15} aria-hidden="true" />
-              Use in {toolTitle(href)}
+              Use in {opens.title}
             </button>
-          ))}
+          )}
         </div>
       }
     >

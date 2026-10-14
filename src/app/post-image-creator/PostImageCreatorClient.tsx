@@ -10,6 +10,7 @@ import { BrandSettingsDialog } from "@/components/post-images/BrandSettingsDialo
 import { PostImageResult } from "@/components/post-images/PostImageResult"
 import { PostImagePromptModal } from "@/components/post-images/PostImagePromptModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
+import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { requestApi } from "@/lib/apiClient"
@@ -53,7 +54,7 @@ export default function PostImageCreatorClient() {
   const [notice, setNotice] = useState<string | null>(null)
   const { postContent, assetId, pose, size } = useToolStore(formStore)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
-  const { status, result, error, generate } = useGenerationRequest(generation)
+  const { status, result, error, generate, reset } = useGenerationRequest(generation)
   const isGenerating = status === "loading"
 
   // The defaults are shared, so they are read on arrival and after the dialog changes them
@@ -72,6 +73,17 @@ export default function PostImageCreatorClient() {
     if (!settings || !assetId) return
     if (!settings.assets.some((asset) => asset.id === assetId)) formStore.update({ assetId: null })
   }, [settings, assetId])
+
+  const loadDummyPost = ({ post }: Record<string, string>) => {
+    formStore.update({ postContent: post ?? "" })
+    reset()
+    setFormError(null)
+    setNotice(null)
+  }
+
+  // Sample data comes from the Dummy Data module (Administration), which opens this tool with
+  // an item already chosen; the tool itself carries no button for it
+  useDummyHandoff("post-images", loadDummyPost)
 
   const submit = () => {
     if (isGenerating) return
