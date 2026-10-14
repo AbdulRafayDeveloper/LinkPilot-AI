@@ -1,4 +1,4 @@
-import { Users, type LucideIcon } from "lucide-react"
+import { Send, type LucideIcon } from "lucide-react"
 
 /**
  * Where a client message is sent. Each channel decides the length and the shape of the
@@ -81,7 +81,8 @@ export const CLIENT_MESSAGING_TOOL: {
   id: "client-messaging",
   title: "Client Tasks Messaging",
   description: "Updates in each client's format",
-  icon: Users,
+  // A message on its way, not people: people is the Client Work area's own icon on the rail
+  icon: Send,
   href: "/client-messaging",
   group: "clients",
 }

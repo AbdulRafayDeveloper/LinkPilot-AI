@@ -1,9 +1,7 @@
 import {
+  Briefcase,
   Flame,
   Hand,
-  Handshake,
-  LayoutGrid,
-  Megaphone,
   History,
   SquarePlus,
   Mail,
@@ -11,10 +9,12 @@ import {
   MessagesSquare,
   Repeat,
   Reply,
-  ShieldCheck,
+  Settings,
   UserPlus,
+  Users,
   type LucideIcon,
 } from "lucide-react"
+import { LinkedInIcon } from "@/components/ui/LinkedInIcon"
 import { CLIENTS_TOOL } from "./clients"
 import { CLIENT_PROJECTS_TOOL } from "./clientProjectTasks"
 import { CLIENT_MESSAGING_TOOL } from "./clientMessaging"
@@ -45,7 +45,11 @@ import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./
  *
  * Each one carries its own icon, because the rail is icons alone: the tooltip and the panel's
  * heading are where the label is read, and `hint` is the line under the heading that says what the
- * area is for. **A hint is one line**, so keep it short (about 30 characters): the panel is 236px
+ * area is for. **The icon has to say which area it is on its own**, at the owner's request (a grid,
+ * a megaphone, a handshake and a shield were asked to be made clear): a briefcase is the user's own
+ * work, LinkedIn's own mark is LinkedIn, people are the clients, and a gear is administration. A
+ * tool's icon must not repeat its area's, since the collapsed rail draws the two one above the
+ * other. **A hint is one line**, so keep it short (about 30 characters): the panel is 236px
  * wide on a phone, and a hint that wrapped to two lines was asked to be fixed.
  *
  * **Administration is an area of its own, and only an admin ever sees it**: its one tool is
@@ -55,14 +59,14 @@ import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./
  */
 export const TOOL_GROUPS = [
   // The day's own work: the prompts written for other AI tools, the tasks, the notes and the files
-  { id: "workspace", label: "Workspace", icon: LayoutGrid, hint: "Your own day's work" },
+  { id: "workspace", label: "Workspace", icon: Briefcase, hint: "Your own day's work" },
   // Everything written for LinkedIn itself, from the post to the reply
-  { id: "linkedin", label: "LinkedIn Tools", icon: Megaphone, hint: "Everything you post on LinkedIn" },
+  { id: "linkedin", label: "LinkedIn Tools", icon: LinkedInIcon, hint: "Everything you post on LinkedIn" },
   // The people the work is for: what you send them, what they send back, the text you reuse with
   // them, and the meetings
-  { id: "clients", label: "Client Work", icon: Handshake, hint: "The people the work is for" },
+  { id: "clients", label: "Client Work", icon: Users, hint: "The people the work is for" },
   // Admins only: the sign-ins, the accounts, the AI models, the backups and the sample data
-  { id: "admin", label: "Administration", icon: ShieldCheck, hint: "Accounts, AI models and backups" },
+  { id: "admin", label: "Administration", icon: Settings, hint: "Accounts, AI models and backups" },
 ] as const
 
 export type ToolGroupId = (typeof TOOL_GROUPS)[number]["id"]
