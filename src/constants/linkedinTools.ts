@@ -45,7 +45,8 @@ import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./
  *
  * Each one carries its own icon, because the rail is icons alone: the tooltip and the panel's
  * heading are where the label is read, and `hint` is the line under the heading that says what the
- * area is for.
+ * area is for. **A hint is one line**, so keep it short (about 30 characters): the panel is 236px
+ * wide on a phone, and a hint that wrapped to two lines was asked to be fixed.
  *
  * **Administration is an area of its own, and only an admin ever sees it**: its one tool is
  * `adminOnly`, so for a user the area holds nothing and the rail never draws it (the sidebar lists
@@ -54,14 +55,14 @@ import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./
  */
 export const TOOL_GROUPS = [
   // The day's own work: the prompts written for other AI tools, the tasks, the notes and the files
-  { id: "workspace", label: "Workspace", icon: LayoutGrid, hint: "Your own day: prompts, tasks, notes and files" },
+  { id: "workspace", label: "Workspace", icon: LayoutGrid, hint: "Your own day's work" },
   // Everything written for LinkedIn itself, from the post to the reply
-  { id: "linkedin", label: "LinkedIn Tools", icon: Megaphone, hint: "Everything written for LinkedIn, from the post to the reply" },
+  { id: "linkedin", label: "LinkedIn Tools", icon: Megaphone, hint: "Everything you post on LinkedIn" },
   // The people the work is for: what you send them, what they send back, the text you reuse with
   // them, and the meetings
-  { id: "clients", label: "Client Work", icon: Handshake, hint: "The people the work is for: their projects, messages and meetings" },
+  { id: "clients", label: "Client Work", icon: Handshake, hint: "The people the work is for" },
   // Admins only: the sign-ins, the accounts, the AI models, the backups and the sample data
-  { id: "admin", label: "Administration", icon: ShieldCheck, hint: "Sign-ins, accounts, AI models, backups and sample data" },
+  { id: "admin", label: "Administration", icon: ShieldCheck, hint: "Accounts, AI models and backups" },
 ] as const
 
 export type ToolGroupId = (typeof TOOL_GROUPS)[number]["id"]

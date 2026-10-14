@@ -48,22 +48,35 @@ const railHintHandlers = (isCollapsed: boolean, title: string, detail: string, o
   return { onMouseEnter: show, onFocus: show, onMouseLeave: () => onHint(null), onBlur: () => onHint(null) }
 }
 
-// Rows are kept tight so a whole area, an open dropdown included, fits a 900px screen without scrolling
+/**
+ * A row is comfortable to read and to hit (about 40px, a 28px icon tile, 14px text), because the
+ * rail cut one list of nineteen tools into four of five to nine: the room is there now. In a
+ * **short window** (`tight:`, at most 740px high, whatever the width) it goes back to the old tight
+ * row, so an area with a dropdown open still fits without scrolling. That is the window's height
+ * alone rather than the app's `short:`, because a 640px phone has as little room as a 540px laptop.
+ */
 const rowClass = (isCollapsed: boolean, isActive: boolean, compact = false) =>
-  `group flex w-full items-center gap-2.5 rounded-lg px-2 ${compact ? "py-px" : "py-[3px]"} text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${whenCollapsed(
+  `group flex w-full items-center gap-3 rounded-xl px-2.5 ${
+    compact ? "py-1.5 tight:py-px" : "py-2 tight:py-[3px]"
+  } text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${whenCollapsed(
     isCollapsed,
     "lg:justify-center lg:px-0"
   )} ${isActive ? "bg-primary-fixed/45" : "hover:bg-surface-container-low"}`
 
 const tileClass = (isActive: boolean, compact = false) =>
-  `relative flex ${compact ? "h-5 w-5 rounded-md" : "h-6 w-6 rounded-md"} shrink-0 items-center justify-center transition-colors duration-150 ${
+  `relative flex ${
+    compact ? "h-6 w-6 tight:h-5 tight:w-5" : "h-8 w-8 tight:h-6 tight:w-6"
+  } shrink-0 items-center justify-center rounded-lg transition-colors duration-150 ${
     isActive
       ? "bg-primary text-on-primary shadow-sm"
       : "bg-surface-container-low text-on-surface-variant group-hover:bg-surface-container-lowest group-hover:text-primary group-hover:shadow-sm"
   }`
 
-const titleClass = (isCollapsed: boolean, isActive: boolean) =>
-  `min-w-0 flex-1 truncate text-[13px] leading-5 ${
+// The icon is sized in CSS, not by lucide's `size`, so it can shrink with the row on a short window
+const iconClass = (compact = false) => (compact ? "h-3.5 w-3.5 tight:h-3 tight:w-3" : "h-4 w-4 tight:h-3.5 tight:w-3.5")
+
+const titleClass = (isCollapsed: boolean, isActive: boolean, compact = false) =>
+  `min-w-0 flex-1 truncate ${compact ? "text-[13px] tight:text-[12px]" : "text-[14px] tight:text-[13px]"} leading-5 ${
     isActive ? "font-semibold text-on-surface" : "font-medium text-on-surface-variant group-hover:text-on-surface"
   } ${whenCollapsed(isCollapsed, "lg:sr-only")}`
 
@@ -127,10 +140,10 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ link, isActive, isCollapsed, 
         className={rowClass(isCollapsed, isActive, compact)}
       >
         <span className={tileClass(isActive, compact)}>
-          <Icon size={compact ? 12 : 14} aria-hidden="true" />
+          <Icon className={iconClass(compact)} aria-hidden="true" />
           {activity && isCollapsed && <ActivityMark state={activity} className="absolute -right-1 -top-1 hidden lg:block" />}
         </span>
-        <span className={titleClass(isCollapsed, isActive)}>{title}</span>
+        <span className={titleClass(isCollapsed, isActive, compact)}>{title}</span>
         {activity && (
           <span className={`flex shrink-0 items-center ${whenCollapsed(isCollapsed, "lg:hidden")}`}>
             <ActivityMark state={activity} />
@@ -192,7 +205,7 @@ const SidebarDropdown: React.FC<SidebarDropdownProps> = ({
         className={rowClass(isCollapsed, showsAsActive)}
       >
         <span className={tileClass(showsAsActive)}>
-          <Icon size={14} aria-hidden="true" />
+          <Icon className={iconClass()} aria-hidden="true" />
           {hiddenActivity && isCollapsed && <ActivityMark state={hiddenActivity} className="absolute -right-1 -top-1 hidden lg:block" />}
         </span>
         <span className={titleClass(isCollapsed, containsActive)}>{title}</span>
@@ -202,9 +215,11 @@ const SidebarDropdown: React.FC<SidebarDropdownProps> = ({
           </span>
         )}
         <ChevronDown
-          size={14}
           aria-hidden="true"
-          className={`shrink-0 text-outline transition-transform duration-150 ${isOpen ? "rotate-180" : ""} ${whenCollapsed(isCollapsed, "lg:hidden")}`}
+          className={`h-4 w-4 tight:h-3.5 tight:w-3.5 shrink-0 text-outline transition-transform duration-150 ${isOpen ? "rotate-180" : ""} ${whenCollapsed(
+            isCollapsed,
+            "lg:hidden"
+          )}`}
         />
       </button>
 
@@ -213,7 +228,10 @@ const SidebarDropdown: React.FC<SidebarDropdownProps> = ({
         id={listId}
         hidden={!isOpen}
         aria-label={`${title} pages`}
-        className={`ml-[18px] border-l border-outline-variant/80 pl-2 ${whenCollapsed(isCollapsed, "lg:ml-0 lg:border-l-0 lg:pl-0")}`}
+        className={`ml-[26px] tight:ml-[18px] border-l border-outline-variant/80 pl-2 ${whenCollapsed(
+          isCollapsed,
+          "lg:ml-0 lg:border-l-0 lg:pl-0"
+        )}`}
       >
         {links.map((link) => (
           <SidebarLink
@@ -399,7 +417,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-[45] flex h-screen w-[296px] flex-shrink-0 border-r border-outline-variant/80 bg-white transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-[45] flex h-screen w-[min(86vw,328px)] flex-shrink-0 border-r border-outline-variant/80 bg-white transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
           isOpen ? "translate-x-0 shadow-xl lg:shadow-none" : "-translate-x-full"
         } ${isCollapsed ? "lg:w-[72px]" : "lg:w-[320px] xl:w-[352px]"}`}
       >
@@ -508,9 +526,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
 
           {/* Which area is on screen, so the rail's icon is never the only thing that says it */}
           {area && !isSearching && (
-            <div className="shrink-0 px-4 pt-3">
-              <h2 className="text-[11px] font-bold uppercase leading-4 tracking-[0.11em] text-primary">{area.group.label}</h2>
-              <p className="mt-0.5 text-[11px] leading-4 text-outline">{area.group.hint}</p>
+            <div className="shrink-0 px-4 pt-3 tight:pt-2">
+              <h2 className="truncate text-[11px] font-bold uppercase leading-4 tracking-[0.11em] text-primary">{area.group.label}</h2>
+              {/* One line, always: the hints are short enough to fit the narrowest panel, and `truncate` is the guard */}
+              <p className="mt-0.5 truncate text-[11px] leading-4 text-outline" title={area.group.hint}>
+                {area.group.hint}
+              </p>
             </div>
           )}
 
@@ -565,7 +586,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
             role="tabpanel"
             aria-label={area ? `${area.group.label} tools` : "Tools"}
             onScroll={handleNavScroll}
-            className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-1.5"
+            className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-2.5 py-1.5"
           >
             {isSearching && matchCount === 0 && <p className="px-2 py-3 text-[12px] text-outline">No tool matches &ldquo;{query.trim()}&rdquo;.</p>}
             {shownAreas.map(({ group, tools: areaTools }, index) => (

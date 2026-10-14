@@ -111,6 +111,9 @@ const config: Config = {
     // variant, not a `screens` entry: a raw screen would switch off the min-[…] and max-[…] width variants
     plugin(({ addVariant }) => {
       addVariant("short", "@media (min-width: 1024px) and (max-height: 860px)")
+      // `tight:` is a short window of any width, phone or laptop: the sidebar's rows use it, because a
+      // 640px-high phone has as little room for a list of nine tools as a 540px-high laptop does
+      addVariant("tight", "@media (max-height: 740px)")
     }),
   ],
 }
