@@ -7,6 +7,7 @@ import {
   projectItemKind,
   projectItemShape,
   type ProjectItemKind,
+  type ProjectTaskStatus,
 } from "@/constants/clientProjectTasks"
 import type { ProjectEstimate, ProjectItemCount } from "@/types/clientProjectTasks"
 
@@ -114,11 +115,22 @@ export const estimateLabel = (estimate: ProjectEstimate | null | undefined): str
  * A numbered tab (the backups) is **newest first**, so the newest backup is at the top while #1
  * stays the first one ever taken; every other tab is in the order it was dragged into. An item
  * saved before numbering falls back to its place in the list, so nothing is ever drawn without one.
+ *
+ * **A ticked item goes to the end of its list, the rule a Daily Task follows** (at the owner's
+ * request): on a tab whose items are ticked off, what is done sinks below what is still open, each
+ * group keeping the order it was dragged into, and unticking brings an item back where it was. It
+ * is a rule of how the list is **shown**, applied here on both surfaces, so it holds on load and
+ * the moment a box is ticked, and nothing is written for it: an item's `position` is still the
+ * drag order, and a drag sends the ids in the order on screen, so the next save simply writes
+ * what was seen. Tabs with nothing to tick (credentials, links, documents, backups) are untouched.
  */
-export const shownItems = <T extends { number?: number }>(kind: ProjectItemKind, items: readonly T[]): { item: T; number: number }[] => {
+export const shownItems = <T extends { number?: number; status?: ProjectTaskStatus }>(kind: ProjectItemKind, items: readonly T[]): { item: T; number: number }[] => {
+  const shape = projectItemKind(kind).shape
   // The number is the item's own, given when it was added, so dragging the list never renumbers it
   const numbered = items.map((item, index) => ({ item, number: item.number || index + 1 }))
-  return projectItemKind(kind).shape.numbered ? [...numbered].reverse() : numbered
+  if (shape.numbered) return [...numbered].reverse()
+  // A stable sort: only ticked and unticked change places
+  return shape.tick ? [...numbered].sort((first, second) => Number(first.item.status === "done") - Number(second.item.status === "done")) : numbered
 }
 
 /**
