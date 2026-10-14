@@ -179,6 +179,8 @@ export default function ImportantContentClient() {
     setDialog(null)
     setPage(1)
     reload()
+    // The dialog files the entry itself now, so the folder counts are read again with the list
+    folders.reload()
   }
 
   /**
@@ -519,6 +521,7 @@ export default function ImportantContentClient() {
         <ContentDialog
           entry={dialog.entry}
           knownTypes={result?.types ?? []}
+          folders={folders.folders}
           // An edit that auto-saved on the way is a change like any other, and moves to the top
           onClose={(changed) => (changed ? saved() : setDialog(null))}
           onSaved={saved}

@@ -1,3 +1,5 @@
+import type { ImportantContent } from "./importantContent"
+
 /**
  * One saved note, as the API serves it and the list shows it. `content` is formatted text (the
  * Markdown subset of lib/richText.ts), so a note saved as plain text reads exactly as it was typed.
@@ -15,6 +17,15 @@ export interface QuickNote {
 export interface QuickNoteInput {
   title?: string
   content: string
+}
+
+/**
+ * What moving a note into Important Content answers: the entry it became, and whether the note
+ * really left Quick Notes (false when the entry was saved but the note's delete failed).
+ */
+export interface MovedNote {
+  entry: ImportantContent
+  noteDeleted: boolean
 }
 
 /**

@@ -101,21 +101,40 @@ export async function listEntries(viewer: Viewer, filters: ContentFilters & { pa
   return { items: await toEntries(viewer, records, folders), page, pageSize, total, totalPages, types }
 }
 
+/**
+ * Saves a new entry, filed in the folder the dialog chose (checked to be one the viewer may use, so
+ * a folder deleted meanwhile throws rather than filing the entry into nothing) or in none.
+ */
 export async function createEntry(viewer: Viewer, input: ImportantContentInput): Promise<ImportantContent> {
   await connectDatabase()
-  const record = await ImportantContentModel.create({ ownerId: viewer.dataOwnerId, ...input, textSize: input.textSize ?? DEFAULT_CONTENT_TEXT_SIZE })
+  const folderId = await folderForMove(viewer, input.folderId ?? null)
+  const record = await ImportantContentModel.create({
+    ownerId: viewer.dataOwnerId,
+    name: input.name,
+    description: input.description,
+    type: input.type,
+    textSize: input.textSize ?? DEFAULT_CONTENT_TEXT_SIZE,
+    folderId,
+  })
   return (await toEntries(viewer, [record.toObject() as unknown as StoredEntry], await folderNames(viewer)))[0]
 }
 
 /**
- * Replaces an entry's name, description and type, and its text size when one is sent (a caller that
- * doesn't know about sizes leaves it as it was). Null when it's gone or belongs to another account.
+ * Replaces an entry's name, description and type, its text size when one is sent (a caller that
+ * doesn't know about sizes leaves it as it was) and its folder when one is sent (the same rule).
+ * Null when it's gone or belongs to another account.
  */
 export async function updateEntry(viewer: Viewer, id: string, input: ImportantContentInput): Promise<ImportantContent | null> {
   const filter = visibleById(viewer, id)
   if (!filter) return null
   await connectDatabase()
-  const changes = { name: input.name, description: input.description, type: input.type, ...(input.textSize === undefined ? {} : { textSize: input.textSize }) }
+  const changes = {
+    name: input.name,
+    description: input.description,
+    type: input.type,
+    ...(input.textSize === undefined ? {} : { textSize: input.textSize }),
+    ...(input.folderId === undefined ? {} : { folderId: await folderForMove(viewer, input.folderId) }),
+  }
   const record = (await ImportantContentModel.findOneAndUpdate(filter, { $set: changes }, { returnDocument: "after", runValidators: true }).lean()) as unknown as StoredEntry | null
   return record ? (await toEntries(viewer, [record], await folderNames(viewer)))[0] : null
 }

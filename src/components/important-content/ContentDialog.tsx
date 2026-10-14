@@ -1,37 +1,22 @@
 "use client"
 
-import React, { useCallback, useEffect, useId, useRef, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import { AlertCircle, CheckCircle2, Clock, Loader2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
-import { RichTextEditor, type RichTextImages } from "@/components/ui/RichTextEditor"
 import { requestApi } from "@/lib/apiClient"
-import { CONTENT_IMAGES_ENDPOINT } from "@/lib/contentImages"
-import {
-  CONTENT_AUTOSAVE_DELAY_MS,
-  CONTENT_DESCRIPTION_MAX_LENGTH,
-  CONTENT_IMAGE_ACCEPT,
-  CONTENT_IMAGE_MAX_BYTES,
-  CONTENT_NAME_MAX_LENGTH,
-  CONTENT_TEXT_SIZES,
-  CONTENT_TYPE_MAX_LENGTH,
-  DEFAULT_CONTENT_TEXT_SIZE,
-  IMPORTANT_CONTENT_ENDPOINT,
-  IMPORTANT_CONTENT_MESSAGES,
-} from "@/constants/importantContent"
+import { CONTENT_AUTOSAVE_DELAY_MS, CONTENT_DESCRIPTION_MAX_LENGTH, IMPORTANT_CONTENT_ENDPOINT, IMPORTANT_CONTENT_MESSAGES } from "@/constants/importantContent"
 import { canKeepalive } from "@/constants/textLimits"
-import type { ImportantContent, ImportantContentInput } from "@/types/importantContent"
-
-const fieldClass =
-  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
-const labelClass = "text-[13px] font-semibold text-on-surface"
-
-type Form = Required<ImportantContentInput>
+import type { ImportantContent } from "@/types/importantContent"
+import type { RecordFolder } from "@/types/folders"
+import { ContentFields, contentFormOf, isContentSaveable, type ContentForm } from "./ContentFields"
 
 interface ContentDialogProps {
   // The entry being edited, or null to add a new one
   entry: ImportantContent | null
   // The types already in use, suggested as the user types; any other type is fine too
   knownTypes: string[]
+  // The folders the entry can be filed in, from the page's one list; null while they load
+  folders: RecordFolder[] | null
   // Closed without the Save button; `changed` when an edit was auto-saved on the way
   onClose: (changed: boolean) => void
   onSaved: (entry: ImportantContent) => void
@@ -40,55 +25,28 @@ interface ContentDialogProps {
 // Where auto-save has got to, shown beside the buttons (an edit only)
 type AutoSave = { state: "idle" } | { state: "saving" } | { state: "saved"; at: string } | { state: "failed"; message: string }
 
-const formOf = (entry: ImportantContent | null): Form =>
-  entry
-    ? { name: entry.name, description: entry.description, type: entry.type, textSize: entry.textSize ?? DEFAULT_CONTENT_TEXT_SIZE }
-    : { name: "", description: "", type: "", textSize: DEFAULT_CONTENT_TEXT_SIZE }
-
-// What the server would refuse anyway; an edit in this state waits instead of failing every few seconds
-const isSaveable = (form: Form) => Boolean(form.name.trim() && form.type.trim()) && form.description.length <= CONTENT_DESCRIPTION_MAX_LENGTH
-
 const clock = () => new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
 
-/** Stores one picture through the app and answers the address the description names it by. */
-async function uploadImage(file: File): Promise<string> {
-  const { data } = await requestApi<{ src: string }>(CONTENT_IMAGES_ENDPOINT, { method: "POST", headers: { "Content-Type": file.type }, body: file }, { retry: true })
-  return data.src
-}
-
-const IMAGES: RichTextImages = {
-  accept: CONTENT_IMAGE_ACCEPT,
-  maxBytes: CONTENT_IMAGE_MAX_BYTES,
-  upload: uploadImage,
-  messages: {
-    unsupported: IMPORTANT_CONTENT_MESSAGES.imageUnsupported,
-    tooLarge: IMPORTANT_CONTENT_MESSAGES.imageTooLarge,
-    failed: IMPORTANT_CONTENT_MESSAGES.imageUploadFailed,
-    badAddress: IMPORTANT_CONTENT_MESSAGES.imageBadAddress,
-  },
-}
-
 /**
- * Add and Edit share one dialog, so editing starts from what was saved. The description is written on
- * a visual page (images, headings, lists, a text size of its own), and a Markdown tab shows the same
- * text as marks. The type is free text: the types already used are only suggestions. The server
- * checks every field again.
+ * Add and Edit share one dialog, so editing starts from what was saved. The fields are the shared
+ * `ContentFields` (the name, the type, **the folder it goes in**, and the description on a visual
+ * page with its own text size): a new entry starts in no folder and goes into whichever is chosen,
+ * exactly as Move would file it afterwards, and an edit opens on the folder the entry is in and can
+ * change it. The server checks every field again.
  *
  * **An edit saves itself** a moment after each change (CONTENT_AUTOSAVE_DELAY_MS) and says when it
  * last did; Save changes still saves at once and closes, and closing saves anything still waiting.
  * **A new entry never does**: it is created only by Save content, so nothing half-written is added.
  */
-export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes, onClose, onSaved }) => {
-  const [form, setForm] = useState<Form>(() => formOf(entry))
+export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes, folders, onClose, onSaved }) => {
+  const [form, setForm] = useState<ContentForm>(() => contentFormOf(entry))
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [autoSave, setAutoSave] = useState<AutoSave>({ state: "idle" })
   const nameRef = useRef<HTMLInputElement>(null)
-  const typeListId = useId()
-  const descriptionId = useId()
   const isEdit = entry !== null
   // What the server holds now, and the entry as it last answered, so closing knows whether anything is left
-  const savedForm = useRef(JSON.stringify(formOf(entry)))
+  const savedForm = useRef(JSON.stringify(contentFormOf(entry)))
   const latest = useRef<ImportantContent | null>(entry)
   const changedOnServer = useRef(false)
   const running = useRef<Promise<boolean> | null>(null)
@@ -99,7 +57,7 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
   }, [form])
 
   // A message about the last attempt stops being true once the form changes
-  const update = <K extends keyof Form>(key: K, value: Form[K]) => {
+  const update = <K extends keyof ContentForm>(key: K, value: ContentForm[K]) => {
     setForm((current) => ({ ...current, [key]: value }))
     setError(null)
   }
@@ -139,7 +97,7 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
 
   // An edit saves itself once typing settles; a new entry waits for Save content
   useEffect(() => {
-    if (!isEdit || !isSaveable(form) || JSON.stringify(form) === savedForm.current) return
+    if (!isEdit || !isContentSaveable(form) || JSON.stringify(form) === savedForm.current) return
     const timer = window.setTimeout(() => void saveEdit(), CONTENT_AUTOSAVE_DELAY_MS)
     return () => window.clearTimeout(timer)
   }, [form, isEdit, saveEdit])
@@ -148,7 +106,7 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
   useEffect(() => {
     if (!entry) return
     const flush = () => {
-      if (!isDirty() || !isSaveable(formRef.current)) return
+      if (!isDirty() || !isContentSaveable(formRef.current)) return
       const body = JSON.stringify(formRef.current)
       void fetch(`${IMPORTANT_CONTENT_ENDPOINT}/${entry.id}`, {
         method: "PUT",
@@ -169,10 +127,10 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
     setIsSaving(true)
     setError(null)
     if (isEdit) {
-      const ok = isSaveable(form) ? await saveEdit() : false
+      const ok = isContentSaveable(form) ? await saveEdit() : false
       if (ok && latest.current) onSaved(latest.current)
       else {
-        setError(isSaveable(form) ? IMPORTANT_CONTENT_MESSAGES.saveFailed : IMPORTANT_CONTENT_MESSAGES.autosaveWaiting)
+        setError(isContentSaveable(form) ? IMPORTANT_CONTENT_MESSAGES.saveFailed : IMPORTANT_CONTENT_MESSAGES.autosaveWaiting)
         setIsSaving(false)
       }
       return
@@ -193,7 +151,7 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
   /** Closing an edit saves what is still waiting first; if that fails, the dialog stays open and says so. */
   const close = async () => {
     if (isSaving) return
-    if (isEdit && isDirty() && isSaveable(formRef.current)) {
+    if (isEdit && isDirty() && isContentSaveable(formRef.current)) {
       setIsSaving(true)
       const ok = await saveEdit()
       setIsSaving(false)
@@ -205,7 +163,7 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
   const status = (() => {
     if (!isEdit) return null
     // A blank name or type is never what the server holds, so the edit is waiting on it
-    if (!isSaveable(form)) {
+    if (!isContentSaveable(form)) {
       return (
         <span className="inline-flex items-center gap-1.5 text-on-secondary-fixed-variant">
           <Clock size={14} aria-hidden="true" />
@@ -245,7 +203,7 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
   return (
     <Modal
       title={entry ? "Edit content" : "Add new content"}
-      description={entry ? entry.name : "A name, the text itself, and a type of your own."}
+      description={entry ? entry.name : "A name, the text itself, a type of your own, and the folder it goes in."}
       onClose={() => void close()}
       isCloseDisabled={isSaving}
       initialFocusRef={nameRef}
@@ -278,64 +236,7 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
       }
     >
       <form id="important-content-form" onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col gap-4">
-        <div className="grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <label className="flex flex-col gap-1.5">
-            <span className={labelClass}>Name</span>
-            <input
-              ref={nameRef}
-              name="name"
-              value={form.name}
-              maxLength={CONTENT_NAME_MAX_LENGTH}
-              onChange={(event) => update("name", event.target.value)}
-              placeholder="e.g. Acme staging login"
-              className={`${fieldClass} h-10`}
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className={labelClass}>Type</span>
-            <input
-              name="type"
-              value={form.type}
-              maxLength={CONTENT_TYPE_MAX_LENGTH}
-              onChange={(event) => update("type", event.target.value)}
-              list={typeListId}
-              placeholder="e.g. Credentials"
-              autoComplete="off"
-              className={`${fieldClass} h-10`}
-              required
-            />
-            <datalist id={typeListId}>
-              {knownTypes.map((type) => (
-                <option key={type} value={type} />
-              ))}
-            </datalist>
-          </label>
-        </div>
-        {/* Not a <label> around the field: the toolbar's buttons can't sit inside one */}
-        <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-          <span className="flex items-baseline justify-between gap-2">
-            <label htmlFor={descriptionId} className={labelClass}>
-              Description <span className="font-normal text-outline">(optional)</span>
-            </label>
-            <span className={`text-[11px] ${overLimit ? "font-semibold text-error" : "text-outline"}`}>
-              {form.description.length.toLocaleString()} / {CONTENT_DESCRIPTION_MAX_LENGTH.toLocaleString()}
-            </span>
-          </span>
-          <RichTextEditor
-            id={descriptionId}
-            value={form.description}
-            maxLength={CONTENT_DESCRIPTION_MAX_LENGTH}
-            onChange={(value) => update("description", value)}
-            rows={12}
-            placeholder="The text you want to keep: a login, a link, steps, anything. Use the buttons above for headings, lists, images and more."
-            ariaLabel="Description"
-            visual
-            fill
-            images={IMAGES}
-            textSize={{ value: form.textSize, steps: CONTENT_TEXT_SIZES, onChange: (size) => update("textSize", size) }}
-          />
-        </div>
+        <ContentFields form={form} onChange={update} knownTypes={knownTypes} folders={folders} nameRef={nameRef} />
         {(error || overLimit) && (
           <p role="alert" className="flex shrink-0 gap-2 rounded-xl bg-error-container px-3 py-2.5 text-[13px] text-error">
             <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />

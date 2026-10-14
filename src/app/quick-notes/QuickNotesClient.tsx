@@ -1,26 +1,36 @@
 "use client"
 
 import React, { useCallback, useEffect, useId, useRef, useState } from "react"
+import Link from "next/link"
 import { NotebookPen, Save, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { RichTextEditor } from "@/components/ui/RichTextEditor"
 import { SavedNotesList } from "@/components/quick-notes/SavedNotesList"
 import { NoteEditorDialog } from "@/components/quick-notes/NoteEditorDialog"
+import { MoveNoteDialog } from "@/components/quick-notes/MoveNoteDialog"
 import { NOTE_EDITOR_IMAGES } from "@/components/quick-notes/noteEditorImages"
 import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { ClearNotesDialog } from "@/components/quick-notes/ClearNotesDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
+import { useVisibleTools } from "@/hooks/useCurrentUser"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { requestApi } from "@/lib/apiClient"
+import { IMPORTANT_CONTENT_TOOL } from "@/constants/importantContent"
 import { NOTE_MAX_LENGTH, NOTE_TITLE_MAX_LENGTH, QUICK_NOTES_ENDPOINT, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
-import type { QuickNote, QuickNotesFeed } from "@/types/quickNotes"
+import type { MovedNote, QuickNote, QuickNotesFeed } from "@/types/quickNotes"
 
-// What is being written survives switching tools, like every other tool's input (version 2 added the title)
+// What is being written survives switching tools, like every other tool's input (version 2 added the name, kept as `title`)
 const draftStore = createToolStore("quick-notes:draft", { title: "", content: "" }, { version: 2 })
 
-type SaveState = { type: "idle" } | { type: "saving" } | { type: "saved"; message: string } | { type: "error"; message: string }
+type SaveState =
+  | { type: "idle" }
+  | { type: "saving" }
+  | { type: "saved"; message: string }
+  | { type: "error"; message: string }
+  // A note taken into Important Content, with the way there
+  | { type: "moved"; message: string }
 
 // What the list holds right now: the batches scrolled through so far
 interface Feed {
@@ -48,6 +58,10 @@ export default function QuickNotesClient() {
   const [isDeletingPicked, setIsDeletingPicked] = useState(false)
   // The note open in the editor, which saves itself as it is edited
   const [editing, setEditing] = useState<QuickNote | null>(null)
+  // The note being taken into Important Content
+  const [moving, setMoving] = useState<QuickNote | null>(null)
+  // Moving is offered only while Important Content is a tool this account has; its API refuses it either way
+  const canMoveToContent = useVisibleTools().some((tool) => tool.href === IMPORTANT_CONTENT_TOOL.href)
   const { title, content } = useToolStore(draftStore)
   const titleRef = useRef<HTMLInputElement>(null)
   const contentId = useId()
@@ -157,6 +171,18 @@ export default function QuickNotesClient() {
     setFeed((current) => ({ ...current, notes: current.notes.map((note) => (note.id === saved.id ? saved : note)) }))
   }, [])
 
+  /**
+   * A note that went into Important Content leaves the list at once; one whose entry was saved but
+   * whose delete failed stays, and the message says so, since moving it again would make a second entry.
+   */
+  const noteMoved = (moved: MovedNote, message: string, note: QuickNote) => {
+    setMoving(null)
+    if (moved.noteDeleted) {
+      setFeed((current) => ({ ...current, notes: current.notes.filter((entry) => entry.id !== note.id), total: Math.max(0, current.total - 1) }))
+    }
+    setSaveState({ type: "moved", message })
+  }
+
   const selection = useRowSelection(feed.notes.map((note) => note.id))
 
   /** Deletes the ticked notes in one call, behind the same kind of confirmation as Clear All. */
@@ -265,6 +291,7 @@ export default function QuickNotesClient() {
                 onLoadMore={loadMore}
                 onDelete={deleteNote}
                 onEdit={setEditing}
+                onMoveToContent={canMoveToContent ? setMoving : undefined}
               />
 
               {/* Save something new */}
@@ -273,8 +300,9 @@ export default function QuickNotesClient() {
                 className="flex min-h-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 short:p-3 shadow-sm"
               >
                 <h2 className="text-sm font-bold text-on-surface">Save Content</h2>
+                {/* The name is the `title` field in the API; it is the word Important Content uses, where a note may go next */}
                 <label htmlFor="quick-note-title" className="text-[10px] font-bold uppercase tracking-wider text-outline">
-                  Title <span className="font-normal normal-case tracking-normal">(optional)</span>
+                  Name <span className="font-normal normal-case tracking-normal">(optional)</span>
                 </label>
                 <input
                   id="quick-note-title"
@@ -333,6 +361,14 @@ export default function QuickNotesClient() {
                     </p>
                   )}
                   {saveState.type === "saved" && <p className="text-primary">{saveState.message}</p>}
+                  {saveState.type === "moved" && (
+                    <p className="flex flex-wrap items-center gap-2 text-primary">
+                      {saveState.message}
+                      <Link href={IMPORTANT_CONTENT_TOOL.href} className="font-semibold underline hover:no-underline">
+                        Open Important Content
+                      </Link>
+                    </p>
+                  )}
                 </div>
 
                 <button
@@ -351,6 +387,7 @@ export default function QuickNotesClient() {
       </div>
 
       {editing && <NoteEditorDialog key={editing.id} note={editing} onSaved={noteSaved} onClose={() => setEditing(null)} />}
+      {moving && <MoveNoteDialog key={moving.id} note={moving} onMoved={(moved, message) => noteMoved(moved, message, moving)} onClose={() => setMoving(null)} />}
       {isConfirmingPicked && (
         <ConfirmBulkDelete
           count={selection.pickedIds.size}

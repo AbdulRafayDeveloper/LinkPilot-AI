@@ -20,6 +20,9 @@ export interface ImportantContentInput {
   type: string
   // Left out, an entry keeps the size it has (a new one gets the default)
   textSize?: number
+  // The folder to file it in, null for none. Left out, an edit keeps the folder the entry is in and
+  // a new entry goes in none, so a caller from before the dialog chose folders is unchanged
+  folderId?: string | null
 }
 
 /** One page of entries. Paging is by page number, 50 to a page, so the page can jump between them. */

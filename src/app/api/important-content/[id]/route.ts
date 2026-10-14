@@ -42,6 +42,8 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     const entry = await updateEntry(auth.viewer, (await params).id, parsed.data)
     return entry ? NextResponse.json({ success: true, message: IMPORTANT_CONTENT_MESSAGES.updated, data: entry }) : notFound()
   } catch (error: unknown) {
+    // The edit named a folder that is gone, which is the one thing the service refuses by name
+    if (error instanceof UserFacingError) return NextResponse.json({ success: false, message: error.message }, { status: 404 })
     console.error("PUT Important Content Exception:", error instanceof Error ? error.message : error)
     return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_CONTENT_MESSAGES.saveFailed) }, { status: 500 })
   }

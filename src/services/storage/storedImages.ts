@@ -1,8 +1,8 @@
 import mongoose from "mongoose"
 import { UserFacingError } from "@/lib/errors"
 import { detectImageMimeType } from "@/lib/imageType"
-import type { StoredImageRef, StoredImages } from "@/lib/storedImages"
-import { deleteObject, isStorageConfigured, presignDownload, putObject } from "./s3"
+import { withMovedImages, type StoredImageRef, type StoredImages } from "@/lib/storedImages"
+import { deleteObject, getObjectBytes, isStorageConfigured, presignDownload, putObject } from "./s3"
 import type { Viewer } from "@/types/auth"
 
 /**
@@ -39,6 +39,32 @@ export async function storeImage(images: StoredImages, viewer: Viewer, bytes: Bu
   if (!key) throw new UserFacingError(messages.uploadFailed)
   await putObject(key, bytes, type)
   return images.pathOf(ref)
+}
+
+/**
+ * Copies every image a text names from one module's store into another's, under this account, and
+ * answers the text naming the copies instead: what a record needs when it moves between modules
+ * (a Quick Note into Important Content), because the images of the record left behind go with it.
+ * An image that can't be read is left named as it was rather than failing the move, and with no
+ * storage configured the text is answered unchanged, since no image could be shown either way.
+ */
+export async function copyImagesInto(from: StoredImages, to: StoredImages, viewer: Viewer, text: string): Promise<string> {
+  const refs = from.imagesIn(text)
+  if (refs.length === 0 || !isStorageConfigured()) return text
+  const moved = new Map<string, string>()
+  for (const ref of refs) {
+    const key = from.keyOf(ref)
+    const type = from.typeOf(ref.file)
+    if (!key || !type) continue
+    const bytes = await getObjectBytes(key)
+    if (!bytes) continue
+    const copy: StoredImageRef = { ownerId: viewer.dataOwnerId, file: to.fileOf(new mongoose.Types.ObjectId().toString(), type) }
+    const copyKey = to.keyOf(copy)
+    if (!copyKey) continue
+    await putObject(copyKey, bytes, type)
+    moved.set(from.pathOf(ref), to.pathOf(copy))
+  }
+  return withMovedImages(text, moved)
 }
 
 /**

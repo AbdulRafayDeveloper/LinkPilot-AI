@@ -35,6 +35,9 @@ export const ImportantContentSchema = z.object({
     .number({ error: IMPORTANT_CONTENT_MESSAGES.badTextSize })
     .refine((size) => (CONTENT_TEXT_SIZES as readonly number[]).includes(size), IMPORTANT_CONTENT_MESSAGES.badTextSize)
     .optional(),
+  // The folder chosen in the dialog. Optional, so a caller that never offered one leaves the folder
+  // alone on an edit and files a new entry in none
+  folderId: z.union([z.string().regex(/^[0-9a-f]{24}$/, CONTENT_FOLDER_MESSAGES.notFound), z.null()]).optional(),
 })
 
 export const ImportantContentQuerySchema = z.object({
@@ -47,7 +50,11 @@ export const ImportantContentQuerySchema = z.object({
   folder: z.preprocess(blankToEmpty, z.string().max(FOLDER_NAME_MAX_LENGTH)).transform((value) => (isFolderFilter(value) ? value : "")),
 })
 
-/** A folder id, or null for "no folder", as an entry names where it is filed. */
-export const ContentFolderIdSchema = z.object({
+/**
+ * A folder id, or null for "no folder", as an entry names where it is filed. **Strict**: a body
+ * carrying anything else is the full edit, which now carries a folder of its own, and must never be
+ * taken for a filing that would leave the text unsaved.
+ */
+export const ContentFolderIdSchema = z.strictObject({
   folderId: z.union([z.string().regex(/^[0-9a-f]{24}$/, CONTENT_FOLDER_MESSAGES.notFound), z.null()]),
 })

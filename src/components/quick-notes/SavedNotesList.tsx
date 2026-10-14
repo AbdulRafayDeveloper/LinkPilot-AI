@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useRef } from "react"
-import { AlertTriangle, Loader2, NotebookPen, Pencil, RefreshCw, Trash2 } from "lucide-react"
+import { AlertTriangle, FileKey2, Loader2, NotebookPen, Pencil, RefreshCw, Trash2 } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { RichTextView } from "@/components/ui/RichTextView"
 import { NOTE_IMAGES } from "@/lib/noteImages"
@@ -25,16 +25,19 @@ interface SavedNotesListProps {
   onDelete: (note: QuickNote) => void
   // Opens the note in the editor
   onEdit: (note: QuickNote) => void
+  // Opens the dialog that takes the note into Important Content; left out when that tool is off
+  onMoveToContent?: (note: QuickNote) => void
 }
 
 const savedAt = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
 
 /**
- * One saved note: its title when it has one, the text as it is formatted (pictures included), when it
- * was saved, Edit (the editor, which saves itself), a copy action that always takes the whole note,
- * and a delete that removes it straight away. Notes are small and easy to save again, so deleting
- * one does not ask first.
+ * One saved note: its name when it has one, the text as it is formatted (pictures included), when it
+ * was saved, Edit (the editor, which saves itself), Move to Important Content (where a note worth
+ * keeping gets a type and a folder), a copy action that always takes the whole note, and a delete
+ * that removes it straight away. Notes are small and easy to save again, so deleting one does not
+ * ask first.
  */
 const NoteCard: React.FC<{
   note: QuickNote
@@ -43,7 +46,8 @@ const NoteCard: React.FC<{
   onPick: (id: string, isRange: boolean) => void
   onDelete: (note: QuickNote) => void
   onEdit: (note: QuickNote) => void
-}> = ({ note, isDeleting, isPicked, onPick, onDelete, onEdit }) => {
+  onMoveToContent?: (note: QuickNote) => void
+}> = ({ note, isDeleting, isPicked, onPick, onDelete, onEdit, onMoveToContent }) => {
   // A long note, or one with pictures, is shown to a set height; the editor shows all of it
   const isCut = note.content.length > NOTE_PREVIEW_MAX_LENGTH || NOTE_IMAGES.imagesIn(note.content).length > 0
   const name = note.title || `the note saved ${savedAt(note.createdAt)}`
@@ -77,6 +81,18 @@ const NoteCard: React.FC<{
           >
             <Pencil size={14} aria-hidden="true" />
           </button>
+          {onMoveToContent && (
+            <button
+              type="button"
+              onClick={() => onMoveToContent(note)}
+              disabled={isDeleting}
+              aria-label={`Move ${name} to Important Content`}
+              title="Move to Important Content"
+              className="inline-flex items-center gap-1 rounded-md p-1 text-[11px] text-outline transition-colors hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <FileKey2 size={14} aria-hidden="true" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onDelete(note)}
@@ -131,6 +147,7 @@ export const SavedNotesList: React.FC<SavedNotesListProps> = ({
   onLoadMore,
   onDelete,
   onEdit,
+  onMoveToContent,
 }) => {
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -198,6 +215,7 @@ export const SavedNotesList: React.FC<SavedNotesListProps> = ({
                 onPick={onPick}
                 onDelete={onDelete}
                 onEdit={onEdit}
+                onMoveToContent={onMoveToContent}
               />
             ))}
           </ul>

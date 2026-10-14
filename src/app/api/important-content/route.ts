@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { statusFor, toUserFacingMessage } from "@/lib/errors"
+import { statusFor, toUserFacingMessage, UserFacingError } from "@/lib/errors"
 import { ImportantContentQuerySchema, ImportantContentSchema } from "@/lib/validation/importantContent"
 import { BulkDeleteSchema } from "@/lib/validation/listFilters"
 import { IMPORTANT_CONTENT_MESSAGES } from "@/constants/importantContent"
@@ -38,6 +38,8 @@ async function handlePost(req: NextRequest) {
     const entry = await createEntry(auth.viewer, parsed.data)
     return NextResponse.json({ success: true, message: IMPORTANT_CONTENT_MESSAGES.created, data: entry }, { status: 201 })
   } catch (error: unknown) {
+    // The dialog chose a folder that is gone, which is the one refusal the service names
+    if (error instanceof UserFacingError) return NextResponse.json({ success: false, message: error.message }, { status: 404 })
     console.error("POST Important Content Exception:", error instanceof Error ? error.message : error)
     return NextResponse.json({ success: false, message: toUserFacingMessage(error, IMPORTANT_CONTENT_MESSAGES.saveFailed) }, { status: statusFor(error, 500) })
   }

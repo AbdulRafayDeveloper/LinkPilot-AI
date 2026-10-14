@@ -11,7 +11,8 @@ export const NOTE_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
 export const NOTES_BATCH_SIZE = 40
 // How much of a long note the list shows before it is cut; copying always takes the whole note
 export const NOTE_PREVIEW_MAX_LENGTH = 600
-// A title is a name to find the note by, not a second note
+// A name to find the note by, not a second note. The field is still `title` in the API and the
+// database; only the word on the page changed, to Name, so it is the same word Important Content uses
 export const NOTE_TITLE_MAX_LENGTH = 120
 /**
  * An edited note saves itself this long after the last change, the same pause Important Content
@@ -30,7 +31,7 @@ export const QUICK_NOTES_ENDPOINT = "/api/quick-notes"
 export const QUICK_NOTES_MESSAGES = {
   missingContent: "Write or paste something to save.",
   contentTooLong: `A note must be under ${NOTE_MAX_LENGTH.toLocaleString()} characters.`,
-  titleTooLong: `A title must be under ${NOTE_TITLE_MAX_LENGTH} characters.`,
+  titleTooLong: `A name must be under ${NOTE_TITLE_MAX_LENGTH} characters.`,
   notFound: "That note no longer exists.",
   imageUnsupported: "Add a PNG, JPG or WEBP image.",
   imageTooLarge: `Images must be ${NOTE_IMAGE_MAX_BYTES / (1024 * 1024)} MB or smaller.`,
@@ -50,6 +51,12 @@ export const QUICK_NOTES_MESSAGES = {
   moreFailed: "Couldn't load more notes. Scroll again to retry.",
   cleared: "All notes deleted.",
   empty: "Nothing saved yet. Paste or write something on the right and save it to keep it here.",
+  // Moving a note into Important Content, where it becomes a named entry with a type
+  moveExplains: "The note is saved in Important Content with this name and type, and leaves Quick Notes.",
+  moved: (name: string) => `"${name}" is now in Important Content.`,
+  movedButKept: (name: string) => `"${name}" is saved in Important Content, but the note could not be deleted here. Delete it yourself.`,
+  moveFailed: "Couldn't move the note to Important Content. It is still here; please try again.",
+  moveUnavailable: "Important Content is turned off for this account, so a note cannot be moved there.",
 } as const
 
 // The module's sidebar entry, listed with the other non-LinkedIn modules

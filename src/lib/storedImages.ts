@@ -40,6 +40,18 @@ export interface StoredImages {
 
 const escapeForPattern = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
 
+/**
+ * The same text with every image path in `moved` replaced by the path it now has, which is how a
+ * text follows its images from one module's store to another's (a Quick Note moved into Important
+ * Content). A path not in the map is left exactly as it was, and the paths themselves are escaped,
+ * so nothing in them is read as a pattern.
+ */
+export function withMovedImages(text: string, moved: ReadonlyMap<string, string>): string {
+  let result = text
+  for (const [from, to] of moved) result = result.replace(new RegExp(escapeForPattern(from), "g"), to)
+  return result
+}
+
 export function defineStoredImages(endpoint: string, keyPrefix: string): StoredImages {
   const path = new RegExp(`${escapeForPattern(endpoint)}/([0-9a-f]{24})/([0-9a-f]{24}\\.(?:png|jpg|webp))`, "g")
   return {

@@ -34,7 +34,7 @@ const fieldClass =
   "h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
 
 /**
- * One saved note, open to edit: an optional title above the shared visual editor, which takes
+ * One saved note, open to edit: an optional name (the `title` field) above the shared visual editor, which takes
  * formatting and images (pasted, dropped or picked). **It saves itself** a moment after each change
  * (NOTE_AUTOSAVE_DELAY_MS, the pause Important Content waits) and says when it last did; closing saves
  * anything still waiting, and leaving the page sends it as the page goes. Saves never overlap.
@@ -163,7 +163,7 @@ export const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({ note, onSave
   return (
     <Modal
       title="Edit note"
-      description={note.title || "A title is optional."}
+      description={note.title || "A name is optional."}
       onClose={() => void close()}
       isCloseDisabled={isClosing}
       initialFocusRef={titleRef}
@@ -188,7 +188,7 @@ export const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({ note, onSave
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         <label className="flex shrink-0 flex-col gap-1.5">
           <span className="text-[13px] font-semibold text-on-surface">
-            Title <span className="font-normal text-outline">(optional)</span>
+            Name <span className="font-normal text-outline">(optional)</span>
           </span>
           <input
             ref={titleRef}
