@@ -89,12 +89,35 @@ const trimTitle = (title: string) => title.replace(/["'`*#]/g, "").replace(/\s+/
  * Reads one chunk of the transcript. The chunk is untrusted text inside its own tags, and the tail
  * of the chunk before it comes along as context the model may read but must not extract again.
  */
+/**
+ * What the user's own calendar says this meeting was, as a block the model may read.
+ *
+ * **It is added only when there is something to say**, so a meeting linked to nothing, and every
+ * meeting whose people the user has named, is asked exactly what it was asked before. A name here
+ * is the app's own record of who the conversation was with, which is why it may be put to a speaker
+ * the recording never names; it is marked `inferred`, never `stated`, because nobody said it aloud.
+ */
+const calendarBlock = (calendar: string | null) =>
+  calendar
+    ? [
+        {
+          variable: "calendar",
+          tag: "what_the_calendar_says",
+          label:
+            "What the user's own calendar says this meeting was. A name here may be given to a speaker the recording never names, as a participant marked inferred; never invent any other name",
+          content: calendar,
+        },
+      ]
+    : []
+
 export async function analyzeChunk(
   chunk: TranscriptChunk,
   totalChunks: number,
   signal: AbortSignal,
   // Who the user says was in the meeting, so the part is read knowing the names rather than guessing
-  people: string[] = []
+  people: string[] = [],
+  // What the calendar says this meeting was, when the user has not said who was in it
+  calendar: string | null = null
 ): Promise<ChunkResult> {
   const [system, instructions] = await Promise.all([loadPrompt("meeting-system"), loadPrompt("meeting-chunk")])
   const user = composePromptMessage(
@@ -115,6 +138,7 @@ export async function analyzeChunk(
         content: people.length > 0 ? people.join("\n") : null,
         emptyText: "Nobody has said who was in this meeting, so go only by what the transcript shows.",
       },
+      ...calendarBlock(people.length > 0 ? null : calendar),
     ],
     { part_number: String(chunk.index + 1), total_parts: String(totalChunks), my_name: SITE_AUTHOR }
   )
@@ -221,7 +245,7 @@ async function reduceToFitting(
  */
 export async function synthesizeMeeting(
   results: { index: number; result: ChunkResult }[],
-  options: { userTitle: string | null; signal: AbortSignal; onFold?: (remaining: number) => void; people?: string[] }
+  options: { userTitle: string | null; signal: AbortSignal; onFold?: (remaining: number) => void; people?: string[]; calendar?: string | null }
 ): Promise<{ analysis: MeetingAnalysis; title: string }> {
   const facts = aggregateChunkResults(results)
   const substance = hasMeetingSubstance(facts)
@@ -236,7 +260,10 @@ export async function synthesizeMeeting(
   const [system, instructions] = await Promise.all([loadPrompt("meeting-system"), loadPrompt("meeting-synthesis")])
   const user = composePromptMessage(
     instructions,
-    [{ variable: "meeting_notes", tag: "meeting_notes", label: "Everything the parts of the meeting gave up, merged and in order", content: digest }],
+    [
+      { variable: "meeting_notes", tag: "meeting_notes", label: "Everything the parts of the meeting gave up, merged and in order", content: digest },
+      ...calendarBlock((options.people ?? []).length > 0 ? null : (options.calendar ?? null)),
+    ],
     {
       my_name: SITE_AUTHOR,
       total_parts: String(results.length),
@@ -285,6 +312,8 @@ export async function synthesizeMeeting(
    */
   const people = options.people ?? []
   const participants = people.length > 0 ? participantsFromPeople(people) : foldParticipants(facts.participants, SITE_AUTHOR)
+  // A speaker the recording never named is still a person in the room, so the count is of everyone
+  // the meeting had; only the names it could not learn are left unnamed (lib/meetingPeople.ts)
 
   return {
     title: trimTitle(options.userTitle || data.title) || "Untitled meeting",

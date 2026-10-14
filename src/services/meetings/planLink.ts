@@ -59,6 +59,37 @@ export async function linkMeetingsToPlan(viewer: Viewer, meetingIds: readonly st
   return { changed: modifiedCount, plan }
 }
 
+/**
+ * What the calendar says one record's meeting was, for the analysis to read: the planned meeting's
+ * name and the person it was with.
+ *
+ * **A recording carries no speaker labels and often no names at all.** One real 36 minute call named
+ * nobody in its whole transcript, so the report could only say "Unnamed speaker 1" and "Unnamed
+ * speaker 2" — while the user's own calendar had the meeting as "Upwork - Jamal Discovery Call". The
+ * app already knew who it was with and was not using it.
+ *
+ * This is **not** the user's own list of who was in it (`people` on the meeting), which overrides
+ * everything and drops names the transcription invented; it is context, so a speaker the recording
+ * never names can be given the name the calendar has, marked `inferred` rather than stated. Null
+ * when the record is linked to nothing.
+ */
+export async function planContextOf(planId: string | null | undefined, ownerId: string | null | undefined): Promise<string | null> {
+  if (!planId || !ID_PATTERN.test(planId)) return null
+  await connectDatabase()
+  // The analysis runs as a job with no viewer, so the meeting's own owner is what scopes this: a
+  // planned meeting of any other account is not this meeting's calendar and is never read
+  const record = (await MeetingPlan.findOne({ _id: planId, ownerId: ownerId ?? null }, { name: 1, personName: 1, meetingDate: 1 }).lean()) as unknown as
+    | { name?: string; personName?: string | null; meetingDate?: string }
+    | null
+  if (!record) return null
+  const lines = [
+    record.name ? `It was scheduled as "${record.name}".` : null,
+    record.personName?.trim() ? `It was with ${record.personName.trim()}.` : null,
+    record.meetingDate ? `It was planned for ${record.meetingDate}.` : null,
+  ].filter(Boolean)
+  return lines.length > 0 ? lines.join(" ") : null
+}
+
 /** The planned meeting each of these meetings is linked to, for naming it in a list. */
 export async function plansOfMeetings(viewer: Viewer, planIds: readonly (string | null | undefined)[]): Promise<Map<string, MeetingPlanRef>> {
   const ids = [...new Set(planIds.filter((id): id is string => Boolean(id) && ID_PATTERN.test(id as string)))]

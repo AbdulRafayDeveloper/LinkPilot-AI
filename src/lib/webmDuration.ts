@@ -14,6 +14,9 @@ const INFO = 0x1549a966
 const CLUSTER = 0x1f43b675
 const TIMECODE_SCALE = 0x2ad7b1
 const DURATION = 0x4489
+// A Cluster's own id as bytes, to find one in the middle of a file, and its first child's id
+const CLUSTER_ID_BYTES = Buffer.from([0x1f, 0x43, 0xb6, 0x75])
+const CLUSTER_TIMECODE = 0xe7
 // Matroska's default: one timecode unit is a millisecond
 const DEFAULT_TIMECODE_SCALE = 1_000_000
 
@@ -147,6 +150,63 @@ export function setWebmDuration(buffer: Buffer, durationMs: number): Buffer | nu
   const infoId = buffer.subarray(info.start, info.start + (readId(buffer, info.start)?.length ?? 4))
   const newInfo = Buffer.concat([infoId, eightByteSize(infoData.length), infoData])
   return Buffer.concat([buffer.subarray(0, info.start), newInfo, buffer.subarray(info.end)])
+}
+
+/**
+ * How far into the recording the last Cluster in these bytes begins, in milliseconds.
+ *
+ * **This is the recording's own timeline, read from the media rather than from a clock**, which is
+ * what is left when the browser cannot say how long it ran: a recording whose tab closed is finished
+ * from the meeting's page, where nobody knows how long it was. A Cluster's Timecode is counted from
+ * the start of the whole file, so scanning only the **last** chunk gives the length of everything
+ * before it, and the answer is short of the true end by that last Cluster's own length (under a
+ * second on the recordings this app makes).
+ *
+ * The bytes are searched rather than walked, because a chunk is a cut through the middle of a file
+ * and has no element to start from. Each hit is then checked against the shape a Cluster really has
+ * (a size, then a Timecode of one to eight bytes), so the four-byte id turning up inside compressed
+ * video is passed over rather than read as a time.
+ */
+export function lastClusterTimecodeMs(buffer: Buffer, timecodeScale = DEFAULT_TIMECODE_SCALE): number | null {
+  let latest: number | null = null
+  for (let at = buffer.indexOf(CLUSTER_ID_BYTES); at !== -1; at = buffer.indexOf(CLUSTER_ID_BYTES, at + 1)) {
+    const size = readSize(buffer, at + CLUSTER_ID_BYTES.length)
+    if (!size) continue
+    const timecodeAt = at + CLUSTER_ID_BYTES.length + size.length
+    if (timecodeAt + 1 >= buffer.length || buffer[timecodeAt] !== CLUSTER_TIMECODE) continue
+    const width = readSize(buffer, timecodeAt + 1)
+    // One byte says how long the time is, which is all a Timecode ever needs
+    if (!width || width.length !== 1 || width.value < 1 || width.value > 8) continue
+    const end = timecodeAt + 2 + width.value
+    if (end > buffer.length) continue
+    const units = readUint(buffer, timecodeAt + 2, end)
+    if (latest === null || units > latest) latest = units
+  }
+  return latest === null ? null : (latest * timecodeScale) / 1_000_000
+}
+
+/** The unit a WebM counts its times in, read from its header. Null when these bytes have no header. */
+export function readTimecodeScale(buffer: Buffer): number | null {
+  const header = readElement(buffer, 0)
+  if (!header || header.id !== EBML_HEADER || header.end === null) return null
+  const segment = readElement(buffer, header.end)
+  if (!segment || segment.id !== SEGMENT) return null
+  for (let at = segment.dataStart; at < buffer.length; ) {
+    const child = readElement(buffer, at)
+    if (!child || child.id === CLUSTER) return null
+    if (child.id === INFO && child.end !== null) {
+      for (let inner = child.dataStart; inner < child.end; ) {
+        const field = readElement(buffer, inner)
+        if (!field || field.end === null) return null
+        if (field.id === TIMECODE_SCALE) return readUint(buffer, field.dataStart, field.end) || null
+        inner = field.end
+      }
+      return DEFAULT_TIMECODE_SCALE
+    }
+    if (child.end === null) return null
+    at = child.end
+  }
+  return null
 }
 
 /** The duration written in a WebM's header, in milliseconds, or null when it has none. For tests and checks. */

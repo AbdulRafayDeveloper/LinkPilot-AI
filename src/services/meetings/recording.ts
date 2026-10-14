@@ -17,7 +17,7 @@ import {
 import { isGroqTranscriptionConfigured } from "@/services/ai"
 import { transcribeRecording } from "@/services/transcribeAudio"
 import { detectAudioMimeType } from "@/lib/audioType"
-import { setWebmDuration } from "@/lib/webmDuration"
+import { lastClusterTimecodeMs, readTimecodeScale, setWebmDuration } from "@/lib/webmDuration"
 import { contiguousCount, formatOffset, groupIntoParts, recordingKeys } from "@/lib/recordingParts"
 import { countChunks, hashTranscript } from "@/lib/transcriptChunks"
 import {
@@ -205,6 +205,37 @@ export async function storeChunk(
 }
 
 /**
+ * How long the recording ran, read from the video itself.
+ *
+ * The browser's own clock is the first answer and is used whenever it is there (`finish.durationMs`),
+ * but a recording whose tab closed is finished later from the meeting's page, where nobody knows how
+ * long it was. **That is not a reason to leave the length out**: without it the header carries no
+ * Duration, so a player shows no total time and refuses to seek forward, which is exactly what one
+ * 36 minute meeting ended up as.
+ *
+ * So the last chunk that was kept is read and its final Cluster's own time taken, which is counted
+ * from the start of the file and is therefore the length of everything before it. Two chunks at most
+ * are read (the first for the unit times are counted in, the last for the time), never the recording.
+ * It answers null when there is nothing to read, and the recording is simply joined without a length,
+ * exactly as it was before.
+ */
+async function durationFromMedia(meetingId: string, track: StoredRecordingTrack | null | undefined, kept: number): Promise<number | null> {
+  if (!track || kept <= 0 || track.mimeType !== "video/webm") return null
+  try {
+    const first = await getObjectBytes(recordingKeys.chunk(meetingId, "screen", 0, track.mimeType))
+    if (!first) return null
+    const last = kept === 1 ? first : await getObjectBytes(recordingKeys.chunk(meetingId, "screen", kept - 1, track.mimeType))
+    if (!last) return null
+    const found = lastClusterTimecodeMs(last, readTimecodeScale(first) ?? undefined)
+    return found && found > 0 ? Math.round(found) : null
+  } catch (error: unknown) {
+    // A length is worth two reads, never the finish itself: without it the recording still joins
+    console.error("Reading the recording's length failed:", error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
+/**
  * Stops taking chunks and starts joining and writing out. With `counts`, every chunk the browser made
  * must already be confirmed (otherwise 409: some are still on their way). With `partial`, for a
  * recording whose page closed, it keeps what arrived: each video up to its first missing chunk, and
@@ -237,9 +268,15 @@ export async function finishRecording(
   }
 
   const nothing = (totals.screen ?? 0) === 0 && Object.keys(recording.audio.segments).length === 0
+  /**
+   * The browser's clock when it was there to stop the recording, and the video's own timeline when it
+   * was not. A **partial** finish never takes the browser's number even when one is sent, because it
+   * describes the whole recording while only the chunks that arrived are being kept.
+   */
+  const durationMs = (finish.partial ? null : finish.durationMs) ?? (await durationFromMedia(id, recording.tracks.screen, totals.screen ?? 0))
   const set: Record<string, unknown> = {
     "recording.stoppedAt": new Date().toISOString(),
-    "recording.durationMs": finish.partial ? null : (finish.durationMs ?? null),
+    "recording.durationMs": durationMs ?? null,
     "recording.stage": nothing ? "failed" : "consolidating",
     "recording.error": nothing ? RECORDING_MESSAGES.nothingUploaded : null,
     status: nothing ? "failed" : "transcribing",

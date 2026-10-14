@@ -7,6 +7,7 @@ import { splitTranscript } from "@/lib/transcriptChunks"
 import { CHUNKS_PER_REQUEST, CHUNK_CONCURRENCY, BUSY_WAIT_MS, MEETING_MESSAGES } from "@/constants/meetings"
 import type { MeetingRunState } from "@/types/meetings"
 import { analyzeChunk, ChunkResultSchema, synthesizeMeeting, type ChunkResult } from "./analysis"
+import { planContextOf } from "./planLink"
 import type { AiSource } from "@/types/ai"
 import { buildMeetingNotes } from "@/lib/meetingNotes"
 
@@ -41,11 +42,12 @@ async function readChunks(
   totalChunks: number,
   signal: AbortSignal,
   people: string[],
+  calendar: string | null,
   onResult: (index: number, result: ChunkResult) => Promise<void>
 ): Promise<void> {
   for (let at = 0; at < chunks.length; at += CHUNK_CONCURRENCY) {
     const batch = chunks.slice(at, at + CHUNK_CONCURRENCY)
-    const results = await Promise.all(batch.map((chunk) => analyzeChunk(chunk, totalChunks, signal, people)))
+    const results = await Promise.all(batch.map((chunk) => analyzeChunk(chunk, totalChunks, signal, people, calendar)))
     for (const [offset, result] of results.entries()) await onResult(batch[offset].index, result)
   }
 }
@@ -70,6 +72,12 @@ export async function runAnalysis(id: string, { signal }: RunOptions): Promise<M
   // Who the user said was in it: the model reads every part knowing the names, and the report is
   // written in them rather than in whatever the transcription heard (lib/meetingPeople.ts)
   const people = (meeting.people ?? []).map((name) => name.trim()).filter(Boolean)
+  /**
+   * What the calendar says, read only when the user has not said who was in it: a recording names
+   * nobody more often than not, and the planned meeting it is linked to is the app's own record of
+   * who the conversation was with.
+   */
+  const calendar = people.length > 0 ? null : await planContextOf(meeting.planId, meeting.ownerId)
 
   // Already analyzed, and the transcript has not changed since
   if (meeting.status === "completed" && meeting.analyzedHash === transcriptHash) {
@@ -91,7 +99,7 @@ export async function runAnalysis(id: string, { signal }: RunOptions): Promise<M
       )
       const batch = pending.slice(0, CHUNKS_PER_REQUEST)
       let analyzed = done.length
-      await readChunks(batch, totalChunks, signal, people, async (index, result) => {
+      await readChunks(batch, totalChunks, signal, people, calendar, async (index, result) => {
         // The unique index on (meeting, transcript, part) means a repeated run cannot store twice
         await MeetingChunk.updateOne(
           { meetingId, transcriptHash, index },
@@ -120,6 +128,7 @@ export async function runAnalysis(id: string, { signal }: RunOptions): Promise<M
       userTitle: meeting.isTitleGenerated ? null : meeting.title,
       signal,
       people,
+      calendar,
       onFold: (remaining) => console.info(`Meeting ${id}: folding notes into ${remaining} groups`),
     })
 
