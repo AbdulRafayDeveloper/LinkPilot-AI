@@ -1,9 +1,10 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { File as FileIcon, FileText, Film, ImageIcon, Loader2, Music, Paperclip, Trash2 } from "lucide-react"
+import { FileArchive, File as FileIcon, FileText, Film, ImageIcon, Loader2, Music, Paperclip, Trash2 } from "lucide-react"
 import { fileProblem, uploadProjectFile } from "@/lib/projectFileUpload"
-import { ACCEPTED_CONTENT_TYPES, PROJECT_MAX_FILES, PROJECT_TASK_MESSAGES, type ProjectFileCategory } from "@/constants/clientProjectTasks"
+import { PROJECT_MAX_FILES, PROJECT_TASK_MESSAGES, type ProjectFileCategory } from "@/constants/clientProjectTasks"
+import { FILE_PICKER_ACCEPT } from "@/constants/importantFiles"
 import type { ProjectFileView } from "@/types/clientProjectTasks"
 
 interface ProjectFilesFieldProps {
@@ -31,6 +32,7 @@ const ICONS: Record<ProjectFileCategory, React.ComponentType<{ size?: number; cl
   text: FileText,
   video: Film,
   audio: Music,
+  archive: FileArchive,
 }
 
 /** A size a person reads, rather than a number of bytes. */
@@ -54,10 +56,32 @@ export const FileKindIcon: React.FC<{ category: ProjectFileCategory; className?:
  * at all; the bar is what that costs the person in waiting. Nothing is on the item until the item
  * itself is saved, so taking a file off here before saving simply never attaches it.
  */
+/** One file on its way up: what it is called and how far it has got. */
+interface Going {
+  key: string
+  name: string
+  fraction: number
+}
+
 export const ProjectFilesField: React.FC<ProjectFilesFieldProps> = ({ files, onAdd, onRemove, onError, onUploading, endpoint, disabled, canAttach = true }) => {
   const input = useRef<HTMLInputElement | null>(null)
   // What is still going up, by a key of its own, each with how far it has got
-  const [going, setGoing] = useState<{ key: string; name: string; fraction: number }[]>([])
+  const [going, setGoing] = useState<Going[]>([])
+  /**
+   * The same list in a ref, so the next one is worked out **before** the state is set rather than
+   * inside an updater. React runs an updater while it renders, and telling the parent how many
+   * files are still going from in there is a setState during another component's render, which is
+   * what React warns about ("Cannot update a component while rendering a different component") and
+   * what the same rule in Daily Tasks' picking already says not to do.
+   */
+  const list = useRef<Going[]>([])
+
+  /** The one place the list changes: the ref, the state and the parent's count, in that order. */
+  const put = (next: Going[]) => {
+    list.current = next
+    setGoing(next)
+    onUploading(next.length)
+  }
 
   const room = PROJECT_MAX_FILES - files.length - going.length
 
@@ -67,38 +91,26 @@ export const ProjectFilesField: React.FC<ProjectFilesFieldProps> = ({ files, onA
     if (taking.length === 0) return
 
     const started = taking.map((file, index) => ({ key: `${Date.now()}-${index}-${file.name}`, name: file.name, fraction: 0, file }))
-    setGoing((current) => {
-      const next = [...current, ...started.map(({ key, name, fraction }) => ({ key, name, fraction }))]
-      onUploading(next.length)
-      return next
-    })
+    put([...list.current, ...started.map(({ key, name, fraction }) => ({ key, name, fraction }))])
 
     for (const { key, file } of started) {
       const problem = fileProblem(file)
       if (problem) {
         onError(problem)
-        setGoing((current) => {
-          const next = current.filter((row) => row.key !== key)
-          onUploading(next.length)
-          return next
-        })
+        put(list.current.filter((row) => row.key !== key))
         continue
       }
       try {
         const stored = await uploadProjectFile(file, {
           endpoint,
-          onProgress: (fraction) => setGoing((current) => current.map((row) => (row.key === key ? { ...row, fraction } : row))),
+          onProgress: (fraction) => put(list.current.map((row) => (row.key === key ? { ...row, fraction } : row))),
         })
         onAdd(stored)
         onError(null)
       } catch (error: unknown) {
         onError(error instanceof Error ? error.message : PROJECT_TASK_MESSAGES.fileUploadFailed)
       } finally {
-        setGoing((current) => {
-          const next = current.filter((row) => row.key !== key)
-          onUploading(next.length)
-          return next
-        })
+        put(list.current.filter((row) => row.key !== key))
       }
     }
   }
@@ -117,14 +129,14 @@ export const ProjectFilesField: React.FC<ProjectFilesFieldProps> = ({ files, onA
         </button>
         <span className="text-[11px] text-outline">
           {canAttach
-            ? `Word, PDF, text, images, video or audio. Up to ${PROJECT_MAX_FILES} files${room > 0 ? `, ${room} left` : ""}.`
+            ? `Word, PDF, text, images, video, audio or a zip. Up to ${PROJECT_MAX_FILES} files${room > 0 ? `, ${room} left` : ""}.`
             : PROJECT_TASK_MESSAGES.fileStorageUnavailable}
         </span>
         <input
           ref={input}
           type="file"
           multiple
-          accept={ACCEPTED_CONTENT_TYPES.join(",")}
+          accept={FILE_PICKER_ACCEPT}
           className="hidden"
           onChange={(event) => {
             const chosen = Array.from(event.target.files ?? [])

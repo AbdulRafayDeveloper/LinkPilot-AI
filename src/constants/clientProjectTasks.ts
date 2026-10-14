@@ -427,7 +427,7 @@ export const PROJECT_TASK_MESSAGES = {
   tooManyFiles: `An item can carry up to ${PROJECT_MAX_FILES} files.`,
   // The files
   missingFileName: "That file has no name.",
-  fileUnsupported: "That file type can't be attached. Images, PDF, Word, text, video and audio can.",
+  fileUnsupported: "That file type can't be attached. Images, PDF, Word, text, video, audio and archives (zip, tar, 7z) can.",
   fileTooLarge: "That file is larger than this type allows.",
   fileUploadFailed: "Couldn't upload that file. Please try again.",
   fileChunkFailed: "That upload stopped part way. Try it again.",

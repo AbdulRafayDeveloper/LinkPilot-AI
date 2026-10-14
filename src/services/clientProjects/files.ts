@@ -98,7 +98,8 @@ export const storedProjectFile = (file: {
  * first. Everything else keeps its own type, so a PDF opens in the PDF viewer and a video plays.
  */
 export const previewTypeOf = (file: Pick<ProjectFile, "category" | "contentType">): string | null => {
-  if (file.category === "word") return null
+  // Nothing a browser can render: a Word document, and an archive (a zip is a file to download)
+  if (file.category === "word" || file.category === "archive") return null
   return file.category === "text" ? "text/plain; charset=utf-8" : file.contentType
 }
 

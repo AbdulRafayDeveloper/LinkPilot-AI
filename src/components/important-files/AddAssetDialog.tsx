@@ -4,12 +4,13 @@ import React, { useRef, useState } from "react"
 import { Loader2, Paperclip, Upload } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import {
-  ACCEPTED_CONTENT_TYPES,
+  FILE_PICKER_ACCEPT,
   ASSET_DESCRIPTION_MAX_LENGTH,
   ASSET_NAME_MAX_LENGTH,
   IMPORTANT_FILES_MESSAGES,
   MULTIPART_THRESHOLD_BYTES,
   categoryForContentType,
+  contentTypeOf,
   getCategoryLabel,
   maxBytesFor,
 } from "@/constants/importantFiles"
@@ -63,7 +64,7 @@ export const AddAssetDialog: React.FC<AddAssetDialogProps> = ({ progress, onUplo
   const fileRef = useRef<HTMLInputElement>(null)
 
   const isBusy = progress !== null && ["preparing", "uploading", "finishing"].includes(progress.stage)
-  const category = file ? categoryForContentType(file.type) : null
+  const category = file ? categoryForContentType(contentTypeOf(file.name, file.type)) : null
 
   const chooseFile = (chosen: File | null) => {
     setProblem(null)
@@ -71,7 +72,7 @@ export const AddAssetDialog: React.FC<AddAssetDialogProps> = ({ progress, onUplo
       setFile(null)
       return
     }
-    const chosenCategory = categoryForContentType(chosen.type)
+    const chosenCategory = categoryForContentType(contentTypeOf(chosen.name, chosen.type))
     if (!chosenCategory) {
       setFile(null)
       setProblem(IMPORTANT_FILES_MESSAGES.unsupportedType)
@@ -104,7 +105,7 @@ export const AddAssetDialog: React.FC<AddAssetDialogProps> = ({ progress, onUplo
   return (
     <Modal
       title="Add a file"
-      description="Keep an image, PDF, Word file, text file, video or audio here, under a name you will recognise later."
+      description="Keep an image, PDF, Word file, text file, video, audio or archive here, under a name you will recognise later."
       onClose={onClose}
       isCloseDisabled={isBusy}
       size="default"
@@ -148,7 +149,7 @@ export const AddAssetDialog: React.FC<AddAssetDialogProps> = ({ progress, onUplo
             id="asset-file"
             ref={fileRef}
             type="file"
-            accept={ACCEPTED_CONTENT_TYPES.join(",")}
+            accept={FILE_PICKER_ACCEPT}
             disabled={isBusy}
             onChange={(event) => chooseFile(event.target.files?.[0] ?? null)}
             className={`${fieldClass} py-2.5 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-container file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-on-primary-container`}

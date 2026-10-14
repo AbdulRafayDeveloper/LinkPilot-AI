@@ -3,6 +3,7 @@
 import { requestApi } from "@/lib/apiClient"
 import { withRetry } from "@/lib/retry"
 import {
+  contentTypeOf,
   IMPORTANT_FILES_ENDPOINT,
   IMPORTANT_FILES_MESSAGES,
   UPLOAD_PART_RETRIES,
@@ -99,10 +100,13 @@ export async function uploadAsset(
   { onProgress, onStage, signal }: UploadHandlers
 ): Promise<Asset> {
   onStage("preparing")
+  // What the browser says, or what the name says when it says nothing: a signed part has to carry
+  // the same type the plan was made with, so it is worked out once and used everywhere below
+  const contentType = contentTypeOf(file.name, file.type)
   const request: UploadRequest = {
     ...metadata,
     originalName: file.name,
-    contentType: file.type,
+    contentType,
     size: file.size,
   }
   const { data: plan } = await requestApi<UploadPlan>(`${IMPORTANT_FILES_ENDPOINT}/uploads`, {
@@ -115,7 +119,7 @@ export async function uploadAsset(
   try {
     onStage("uploading")
     if (plan.mode === "single") {
-      await sendPart(plan.url, file, file.type, (bytes) => onProgress(Math.round((bytes / file.size) * 100)), signal)
+      await sendPart(plan.url, file, contentType, (bytes) => onProgress(Math.round((bytes / file.size) * 100)), signal)
     } else {
       // Every part's own progress is kept, so the total never jumps backwards on a retry
       const sent = new Array<number>(plan.urls.length).fill(0)
@@ -126,7 +130,7 @@ export async function uploadAsset(
         await sendPart(
           part.url,
           chunk,
-          file.type,
+          contentType,
           (bytes) => {
             sent[index] = bytes
             report()

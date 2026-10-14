@@ -6,7 +6,7 @@ import {
   PROJECT_TASK_MESSAGES,
   maxBytesFor,
 } from "@/constants/clientProjectTasks"
-import { categoryForContentType } from "@/constants/importantFiles"
+import { categoryForContentType, contentTypeOf } from "@/constants/importantFiles"
 import type { ProjectFileProgress, ProjectFileUploadPlan, ProjectFileView } from "@/types/clientProjectTasks"
 
 /**
@@ -24,12 +24,17 @@ import type { ProjectFileProgress, ProjectFileUploadPlan, ProjectFileView } from
 
 /** Whether the app can take this file at all, checked here so a doomed upload never starts. */
 export function fileProblem(file: File): string | null {
-  const category = categoryForContentType(file.type)
+  // What the browser says, or what the name says when it says nothing (`contentTypeOf`)
+  const contentType = fileContentType(file)
+  const category = categoryForContentType(contentType)
   // The list is a tuple of the exact types, so it is read as plain strings to ask about one
-  if (!category || !(ACCEPTED_CONTENT_TYPES as readonly string[]).includes(file.type)) return PROJECT_TASK_MESSAGES.fileUnsupported
+  if (!category || !(ACCEPTED_CONTENT_TYPES as readonly string[]).includes(contentType)) return PROJECT_TASK_MESSAGES.fileUnsupported
   if (file.size <= 0 || file.size > maxBytesFor(category)) return PROJECT_TASK_MESSAGES.fileTooLarge
   return null
 }
+
+/** The type to send for a file, which is the one the app judged it by. */
+export const fileContentType = (file: File): string => contentTypeOf(file.name, file.type)
 
 interface UploadOptions {
   // Where the file's own routes live: `/api/client-projects/<id>/files`, or the shared link's
@@ -50,7 +55,7 @@ export async function uploadProjectFile(file: File, { endpoint, onProgress, sign
 
   const { data: plan } = await requestApi<ProjectFileUploadPlan>(
     endpoint,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: file.name, contentType: file.type, size: file.size }), signal },
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: file.name, contentType: fileContentType(file), size: file.size }), signal },
     // Nothing is stored by planning, so a dropped request is safe to send again
     { retry: true }
   )
