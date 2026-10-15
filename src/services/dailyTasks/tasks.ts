@@ -1,5 +1,6 @@
 import mongoose from "mongoose"
 import { priorityOf, type Priority } from "@/constants/priorities"
+import { doerOf, type TaskDoer } from "@/constants/taskDoers"
 import { connectDatabase } from "@/lib/db"
 import { shiftDate } from "@/lib/taskDates"
 import { buildTree, completedLast, type TreeNode } from "@/lib/taskTree"
@@ -26,12 +27,14 @@ import { ownedBy, ownedForClearing, visibleById, visibleTo } from "@/services/au
  * deleting a task takes everything under it along.
  */
 // Only what the list draws
-const TASK_FIELDS = "content description image images taskDate priority isCompleted completedAt parentTaskId"
+const TASK_FIELDS = "content description image images taskDate priority doer isCompleted completedAt parentTaskId"
 
 type StoredTask = Pick<IDailyTask, "content" | "taskDate" | "isCompleted" | "completedAt"> & {
   _id: { toString: () => string }
   // Absent on every task saved before priorities, which `priorityOf` reads as the default
   priority?: string | null
+  // The same for who does it: absent on everything saved before it, which reads as Me
+  doer?: string | null
   description?: string
   image?: TaskImage | null
   images?: TaskImage[]
@@ -50,6 +53,7 @@ const toTask = (record: StoredTask, images: TaskImageView[] = []): DailyTask => 
   image: images[0] ?? null,
   taskDate: record.taskDate,
   priority: priorityOf(record.priority).id,
+  doer: doerOf(record.doer).id,
   isCompleted: record.isCompleted,
   completedAt: record.completedAt ? record.completedAt.toISOString() : null,
   parentTaskId: record.parentTaskId ? record.parentTaskId.toString() : null,
@@ -204,6 +208,7 @@ export async function createTasks(viewer: Viewer, taskDate: string, tasks: NewDa
       parentTaskId: parent,
       taskDate: day,
       priority: priorityOf(task.priority).id,
+      doer: doerOf(task.doer).id,
       position: start + index,
       isCompleted: false,
       completedAt: null,
@@ -225,6 +230,23 @@ export async function setTaskPriority(viewer: Viewer, id: string, priority: Prio
   const record = await DailyTaskModel.findOneAndUpdate(
     filter,
     { $set: { priority } },
+    { new: true, projection: TASK_FIELDS, lean: true }
+  )
+  return record ? (await toTasks([record as unknown as StoredTask]))[0] : null
+}
+
+/**
+ * Who does one task, changed from the row itself. One field, exactly like the priority above and
+ * for the same reason: a change made on the list can never carry a stale line or description over
+ * what the task's own editor has saved, and repeating it lands on the same state.
+ */
+export async function setTaskDoer(viewer: Viewer, id: string, doer: TaskDoer): Promise<DailyTask | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
+  await connectDatabase()
+  const record = await DailyTaskModel.findOneAndUpdate(
+    filter,
+    { $set: { doer } },
     { new: true, projection: TASK_FIELDS, lean: true }
   )
   return record ? (await toTasks([record as unknown as StoredTask]))[0] : null

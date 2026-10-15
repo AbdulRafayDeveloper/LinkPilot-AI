@@ -2,6 +2,7 @@ import mongoose, { Schema, type Model } from "mongoose"
 
 import { ISO_DATE_PATTERN } from "@/constants/dailyTasks"
 import { DEFAULT_PRIORITY, PRIORITY_IDS, type Priority } from "@/constants/priorities"
+import { DEFAULT_TASK_DOER, TASK_DOER_IDS, type TaskDoer } from "@/constants/taskDoers"
 import { TASK_IMAGE_TYPES } from "@/constants/taskAttachments"
 import type { TaskImage } from "@/types/taskAttachment"
 import { OWNER_ID } from "./owner"
@@ -27,6 +28,9 @@ export interface IDailyTask {
   // How urgent it is (constants/priorities.ts). A task saved before priorities reads as the default,
   // Medium, so every task always has one
   priority: Priority
+  // Who does it (constants/taskDoers.ts): the user, or an employee they get it done by. A task
+  // saved before this reads as the default, Me, so every task always has one
+  doer: TaskDoer
   // Where the task sits within its day, set by dragging; ties (tasks from before positions) keep the order they were written
   position: number
   isCompleted: boolean
@@ -55,6 +59,7 @@ const DailyTaskSchema = new Schema<IDailyTask>(
     parentTaskId: { type: Schema.Types.ObjectId, default: null },
     taskDate: { type: String, required: true, match: ISO_DATE_PATTERN },
     priority: { type: String, enum: PRIORITY_IDS, default: DEFAULT_PRIORITY },
+    doer: { type: String, enum: TASK_DOER_IDS, default: DEFAULT_TASK_DOER },
     position: { type: Number, required: true, default: 0 },
     isCompleted: { type: Boolean, required: true, default: false },
     completedAt: { type: Date, default: null },

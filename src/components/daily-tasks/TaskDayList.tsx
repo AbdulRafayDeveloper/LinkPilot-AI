@@ -48,8 +48,10 @@ import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 import { CopyTaskText } from "@/components/tasks/CopyTaskText"
 import { PrioritySelect } from "@/components/ui/PriorityPicker"
+import { DoerSelect } from "@/components/daily-tasks/DoerSelect"
 import { PRIORITIES, PRIORITY_TONE, type Priority } from "@/constants/priorities"
-import { onlyPriority } from "@/lib/taskFilters"
+import { TASK_DOERS, TASK_DOER_TONE, type TaskDoer } from "@/constants/taskDoers"
+import { NOTHING_NARROWED, isNarrowed, narrowDays, type TaskNarrowing } from "@/lib/taskFilters"
 import { emptyTaskDetails, hasTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
 
 /** Tasks dropped somewhere new: the day they now belong to, that day's whole order, and every day as it now looks. */
@@ -86,6 +88,8 @@ interface TaskDayListProps {
   onMoveToToday: (task: DailyTask) => void
   // How urgent a task is, changed from the row itself
   onPriority: (task: DailyTask, priority: Priority) => void
+  // Who does it, changed the same way
+  onDoer: (task: DailyTask, doer: TaskDoer) => void
   // Deletes every picked task at once; the page confirms first, since deleting is final
   onDeletePicked: (ids: string[]) => void
   onMove: (move: TaskMove) => void
@@ -134,6 +138,8 @@ interface TaskRowBodyProps {
   onMoveToToday?: (task: DailyTask) => void
   // How urgent the task is, changed on the row itself; absent on the copy that follows the pointer
   onPriority?: (task: DailyTask, priority: Priority) => void
+  // Who does it, the same way: the user, or an employee they get it done by
+  onDoer?: (task: DailyTask, doer: TaskDoer) => void
   handle: React.ReactNode
   // Picking tasks to move together: one click on the circle picks a task, Shift picks a run of them
   isSelected?: boolean
@@ -157,6 +163,7 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
   onOpenTask,
   onMoveToToday,
   onPriority,
+  onDoer,
   handle,
   isSelected = false,
   onSelect,
@@ -222,39 +229,49 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
           </span>
         )}
       </label>
-      {/* Changed where it is read. The whole row is the drag area, so the press that opens the list
-          must not pick the task up */}
-      <span onPointerDown={(event) => event.stopPropagation()} className="shrink-0">
-        <PrioritySelect
-          value={task.priority}
-          onChange={(priority) => onPriority?.(task, priority)}
-          disabled={isPending || !onPriority}
-          label={task.content}
-          className="mt-2"
-        />
+      {/* On a phone everything to the right of the task's words moves to a line of its own: beside
+          two chips and four buttons the words had about 60px left. From `sm` the wrapper is
+          `display: contents`, so it draws no box at all and the row is exactly what it always was */}
+      <span className={ROW_TAIL}>
+        {/* Both changed where they are read. The whole row is the drag area, so the press that opens
+            either list must not pick the task up */}
+        <span onPointerDown={(event) => event.stopPropagation()} className="flex flex-wrap items-center gap-1 md:mt-2 md:shrink-0 md:flex-nowrap">
+          <PrioritySelect
+            value={task.priority}
+            onChange={(priority) => onPriority?.(task, priority)}
+            disabled={isPending || !onPriority}
+            label={task.content}
+          />
+          <DoerSelect
+            value={task.doer}
+            onChange={(doer) => onDoer?.(task, doer)}
+            disabled={isPending || !onDoer}
+            label={task.content}
+          />
+        </span>
+        {/* The task's details and subtasks open in a popup rather than in the row: the whole row is
+            the drag area, so typing or picking an image inside it would start a drag */}
+        <RowActions task={task} depth={1} isPending={isPending} isOverdue={state === "overdue"} onOpenTask={onOpenTask} onMoveToToday={onMoveToToday} />
+        {isPending ? (
+          <span className="p-2.5" aria-hidden="true">
+            <Loader2 size={15} className="animate-spin text-outline" />
+          </span>
+        ) : onDelete ? (
+          <button
+            type="button"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => onDelete(task)}
+            aria-label={`Delete task: ${task.content}`}
+            className="mt-1 shrink-0 rounded-lg p-2 text-outline transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
+          >
+            <Trash2 size={15} aria-hidden="true" />
+          </button>
+        ) : (
+          <span className="mt-1 shrink-0 p-2 text-outline" aria-hidden="true">
+            <Trash2 size={15} />
+          </span>
+        )}
       </span>
-      {/* The task's details and subtasks open in a popup rather than in the row: the whole row is the
-          drag area, so typing or picking an image inside it would start a drag */}
-      <RowActions task={task} depth={1} isPending={isPending} isOverdue={state === "overdue"} onOpenTask={onOpenTask} onMoveToToday={onMoveToToday} />
-      {isPending ? (
-        <span className="p-2.5" aria-hidden="true">
-          <Loader2 size={15} className="animate-spin text-outline" />
-        </span>
-      ) : onDelete ? (
-        <button
-          type="button"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={() => onDelete(task)}
-          aria-label={`Delete task: ${task.content}`}
-          className="mt-1 shrink-0 rounded-lg p-2 text-outline transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
-        >
-          <Trash2 size={15} aria-hidden="true" />
-        </button>
-      ) : (
-        <span className="mt-1 shrink-0 p-2 text-outline" aria-hidden="true">
-          <Trash2 size={15} />
-        </span>
-      )}
     </>
   )
 }
@@ -344,17 +361,18 @@ interface SubtaskTreeProps {
   onDelete: (task: DailyTask) => void
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   onPriority: (task: DailyTask, priority: Priority) => void
+  onDoer: (task: DailyTask, doer: TaskDoer) => void
 }
 
 /** One subtask: its tick box and line, its details, its actions, and its own subtasks under it. */
-const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, depth, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority }) => {
+const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, depth, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority, onDoer }) => {
   const [isOpen, setIsOpen] = useState(true)
   const isPending = pendingIds.has(task.id)
   const state = taskState(task, today)
   const done = task.subtasks.filter((entry) => entry.isCompleted).length
   return (
     <li className="flex flex-col">
-      <div className="flex items-start gap-1">
+      <div className="flex flex-wrap items-start gap-1 md:flex-nowrap">
         {task.subtasks.length > 0 ? (
           <button
             type="button"
@@ -398,27 +416,30 @@ const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, d
             <TaskDetailsView description={task.description} images={task.images} label={task.content} />
           </span>
         </label>
-        <span onPointerDown={(event) => event.stopPropagation()} className="shrink-0">
-          <PrioritySelect value={task.priority} onChange={(priority) => onPriority(task, priority)} disabled={isPending} label={task.content} className="mt-1.5" />
-        </span>
-        <RowActions task={task} depth={depth} isPending={isPending} onOpenTask={onOpenTask} />
-        {isPending ? (
-          <span className="p-2.5" aria-hidden="true">
-            <Loader2 size={15} className="animate-spin text-outline" />
+        <span className={ROW_TAIL}>
+          <span onPointerDown={(event) => event.stopPropagation()} className="flex flex-wrap items-center gap-1 md:mt-1.5 md:shrink-0 md:flex-nowrap">
+            <PrioritySelect value={task.priority} onChange={(priority) => onPriority(task, priority)} disabled={isPending} label={task.content} />
+            <DoerSelect value={task.doer} onChange={(doer) => onDoer(task, doer)} disabled={isPending} label={task.content} />
           </span>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onDelete(task)}
-            aria-label={`Delete: ${task.content}`}
-            className="mt-1 shrink-0 rounded-lg p-2 text-outline transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
-          >
-            <Trash2 size={15} aria-hidden="true" />
-          </button>
-        )}
+          <RowActions task={task} depth={depth} isPending={isPending} onOpenTask={onOpenTask} />
+          {isPending ? (
+            <span className="p-2.5" aria-hidden="true">
+              <Loader2 size={15} className="animate-spin text-outline" />
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onDelete(task)}
+              aria-label={`Delete: ${task.content}`}
+              className="mt-1 shrink-0 rounded-lg p-2 text-outline transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
+            >
+              <Trash2 size={15} aria-hidden="true" />
+            </button>
+          )}
+        </span>
       </div>
       {isOpen && task.subtasks.length > 0 && (
-        <SubtaskTree {...{ depth: depth + 1, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority }} tasks={task.subtasks} />
+        <SubtaskTree {...{ depth: depth + 1, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority, onDoer }} tasks={task.subtasks} />
       )}
     </li>
   )
@@ -459,8 +480,24 @@ const SubtaskTree: React.FC<SubtaskTreeProps> = (props) => {
   )
 }
 
+/**
+ * Everything to the right of a task's own words: its two chips and its buttons. Below `md` it is one
+ * line of its own under the task (`order-last w-full`), because beside all of it the words were cut
+ * to about 60px on a 390px phone; from `md` it is `display: contents`, drawing no box at all, so the
+ * row is laid out exactly as it was before the second chip existed.
+ *
+ * `md` rather than `sm`: measured, a 640px window leaves the one-line row about 70px for the task's
+ * own words, which is no better than the phone was. 768px leaves about 240px.
+ */
+const ROW_TAIL = "order-last mb-2 flex w-full flex-wrap items-center gap-1 pl-1 md:order-none md:contents"
+
 const handleClass =
   "mt-2 ml-1 flex h-8 w-6 shrink-0 touch-none items-center justify-center rounded-md text-outline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+
+// The two controls that narrow the list, in the heading row the list already had: one line of it,
+// so neither costs the page any height
+const filterClass =
+  "h-6 cursor-pointer rounded-full border px-2 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
 /**
  * One task in its day, draggable by its handle. While it is being dragged its place stays as a
@@ -477,6 +514,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onMoveToToday,
   onSelect,
   onPriority,
+  onDoer,
   wasDragging,
   pendingIds,
   canDrag,
@@ -491,9 +529,10 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onMoveToToday: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
   onPriority: (task: DailyTask, priority: Priority) => void
+  onDoer: (task: DailyTask, doer: TaskDoer) => void
   wasDragging: () => boolean
   pendingIds: ReadonlySet<string>
-  // Off while one priority is being shown: the list is then only part of each day's order
+  // Off while the list is narrowed: it is then only part of each day's order
   canDrag: boolean
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
@@ -513,7 +552,9 @@ const SortableTaskRow = memo(function SortableTaskRow({
           : `transition-colors ${stateStyles[state]} ${isSelected ? "ring-2 ring-primary/50 ring-offset-1" : ""}`
       }`}
     >
-      <div className="flex items-start gap-1 pr-1">
+      {/* On a phone the two chips wrap to a line of their own (they are `order-last w-full`
+          below sm), because beside them a task's own words had no width left at all */}
+      <div className="flex flex-wrap items-start gap-1 pr-1 md:flex-nowrap">
         <TaskRowBody
           task={task}
           today={today}
@@ -525,6 +566,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
           onMoveToToday={onMoveToToday}
           onSelect={onSelect}
           onPriority={onPriority}
+          onDoer={onDoer}
           wasDragging={wasDragging}
           handle={
             // The whole row drags with a pointer; this is what the keyboard uses, and what says so
@@ -553,6 +595,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
           onDelete={onDelete}
           onOpenTask={onOpenTask}
           onPriority={onPriority}
+          onDoer={onDoer}
         />
       )}
     </li>
@@ -672,6 +715,7 @@ const DayGroup = memo(function DayGroup({
   onMoveToToday,
   onSelect,
   onPriority,
+  onDoer,
   onAddTask,
   wasDragging,
   canDrag,
@@ -689,6 +733,7 @@ const DayGroup = memo(function DayGroup({
   onMoveToToday: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
   onPriority: (task: DailyTask, priority: Priority) => void
+  onDoer: (task: DailyTask, doer: TaskDoer) => void
   onAddTask: AddTaskHandler
   wasDragging: () => boolean
   canDrag: boolean
@@ -736,6 +781,7 @@ const DayGroup = memo(function DayGroup({
                 onMoveToToday={onMoveToToday}
                 onSelect={onSelect}
                 onPriority={onPriority}
+                onDoer={onDoer}
                 wasDragging={wasDragging}
                 pendingIds={pendingIds}
                 canDrag={canDrag}
@@ -781,6 +827,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   onOpenTask,
   onMoveToToday,
   onPriority,
+  onDoer,
   onDeletePicked,
   onMove,
   onAddTask,
@@ -810,15 +857,16 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   const moving = useRef<DailyTask[]>([])
   const [movingCount, setMovingCount] = useState(0)
   /**
-   * Showing one priority only. It sits in the heading row that is already there, so it costs the
-   * page no height, and it is this component's own state: it holds while the day pages are turned
-   * and starts again on a reload, which is what a view choice should do.
+   * Showing one priority, one person's tasks, or both. Both controls sit in the heading row that is
+   * already there, so they cost the page no height, and they are this component's own state: they
+   * hold while the day pages are turned and start again on a reload, which is what a view choice
+   * should do.
    */
-  const [priorityFilter, setPriorityFilter] = useState<Priority | "">("")
-  const isFiltered = priorityFilter !== ""
+  const [narrowing, setNarrowing] = useState<TaskNarrowing>(NOTHING_NARROWED)
+  const isFiltered = isNarrowed(narrowing)
   /**
-   * A filtered list is read, not rearranged. A drag writes the destination day's **whole** order,
-   * and a filtered day is only part of it, so saving one would answer 409 and put the list back;
+   * A narrowed list is read, not rearranged. A drag writes the destination day's **whole** order,
+   * and a narrowed day is only part of it, so saving one would answer 409 and put the list back;
    * dragging is held off instead, exactly as it is on a filtered team in Employees.
    */
   const canDrag = !isFiltered
@@ -826,11 +874,11 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   // Today is always a place to drop on, on the page that shows it, even before it has a task
   const days = useMemo(() => {
     const shown = dragDays ?? page?.days ?? []
-    // Filtered, the list is read rather than rearranged, so an empty today is not a place to drop on
-    if (isFiltered) return onlyPriority(shown, priorityFilter)
+    // Narrowed, the list is read rather than rearranged, so an empty today is not a place to drop on
+    if (isFiltered) return narrowDays(shown, narrowing)
     if (!page || current !== 1 || !today || shown.length === 0 || shown.some((day) => day.date === today)) return shown
     return [{ date: today, tasks: [] }, ...shown]
-  }, [dragDays, page, current, today, isFiltered, priorityFilter])
+  }, [dragDays, page, current, today, isFiltered, narrowing])
 
   // The rows as the page shows them, kept for a Shift pick and for the order a group lands in. It is
   // read only when something is clicked or dragged, so it is put in the ref after the list is drawn
@@ -997,20 +1045,36 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-on-surface">{current === 1 ? `Last ${VISIBLE_DAYS} Days` : "Older Tasks"}</h2>
         <div className="flex flex-wrap items-center gap-2">
-          {/* In the heading's own row, so showing one priority costs the page no height at all */}
+          {/* In the heading's own row, so narrowing the list costs the page no height at all */}
           <select
-            value={priorityFilter}
-            onChange={(event) => setPriorityFilter(event.target.value as Priority | "")}
+            value={narrowing.priority}
+            onChange={(event) => setNarrowing((current) => ({ ...current, priority: event.target.value as Priority | "" }))}
             aria-label="Show only tasks of one priority"
-            title={isFiltered ? DAILY_TASKS_MESSAGES.filterOn : DAILY_TASKS_MESSAGES.filterAll}
-            className={`h-6 cursor-pointer rounded-full border px-2 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-              isFiltered ? `border-transparent ${PRIORITY_TONE[priorityFilter]}` : "border-outline-variant bg-white text-on-surface-variant"
+            title={narrowing.priority ? DAILY_TASKS_MESSAGES.filterOn : DAILY_TASKS_MESSAGES.filterAll}
+            className={`${filterClass} ${
+              narrowing.priority ? `border-transparent ${PRIORITY_TONE[narrowing.priority]}` : "border-outline-variant bg-white text-on-surface-variant"
             }`}
           >
             <option value="">{DAILY_TASKS_MESSAGES.filterAll}</option>
             {PRIORITIES.map((priority) => (
               <option key={priority.id} value={priority.id}>
                 {priority.label} only
+              </option>
+            ))}
+          </select>
+          <select
+            value={narrowing.doer}
+            onChange={(event) => setNarrowing((current) => ({ ...current, doer: event.target.value as TaskDoer | "" }))}
+            aria-label="Show only the tasks one person does"
+            title={narrowing.doer ? DAILY_TASKS_MESSAGES.doerOn : DAILY_TASKS_MESSAGES.doerAll}
+            className={`${filterClass} ${
+              narrowing.doer ? `border-transparent ${TASK_DOER_TONE[narrowing.doer]}` : "border-outline-variant bg-white text-on-surface-variant"
+            }`}
+          >
+            <option value="">{DAILY_TASKS_MESSAGES.doerAll}</option>
+            {TASK_DOERS.map((doer) => (
+              <option key={doer.id} value={doer.id}>
+                {doer.label} only
               </option>
             ))}
           </select>
@@ -1068,9 +1132,9 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/5 text-primary">
             <ListTodo size={20} aria-hidden="true" />
           </div>
-          <p className="max-w-xs text-sm leading-relaxed text-on-surface-variant">{DAILY_TASKS_MESSAGES.noneOfThatPriority}</p>
-          <button type="button" onClick={() => setPriorityFilter("")} className="text-[13px] font-semibold text-primary hover:underline">
-            {DAILY_TASKS_MESSAGES.filterAll}
+          <p className="max-w-xs text-sm leading-relaxed text-on-surface-variant">{DAILY_TASKS_MESSAGES.nothingMatches}</p>
+          <button type="button" onClick={() => setNarrowing(NOTHING_NARROWED)} className="text-[13px] font-semibold text-primary hover:underline">
+            {DAILY_TASKS_MESSAGES.clearFilters}
           </button>
         </div>
       ) : !hasDays ? (
@@ -1109,6 +1173,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 onOpenTask={onOpenTask}
                 onMoveToToday={onMoveToToday}
                 onPriority={onPriority}
+                onDoer={onDoer}
                 canDrag={canDrag}
                 onSelect={selectTask}
                 onAddTask={onAddTask}

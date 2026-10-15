@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { DAILY_TASKS_MESSAGES, ISO_DATE_PATTERN, MAX_TASKS_PER_DAY_ORDER, MAX_TODAY_DRIFT_DAYS } from "@/constants/dailyTasks"
 import { PRIORITY_IDS } from "@/constants/priorities"
+import { TASK_DOER_IDS } from "@/constants/taskDoers"
 import { shiftDate } from "@/lib/taskDates"
 
 /**
@@ -39,6 +40,15 @@ export const PrioritySchema = z.enum(PRIORITY_IDS, { message: DAILY_TASKS_MESSAG
 
 /** Changing only how urgent a task is, which is its own small update like a tick. */
 export const TaskPrioritySchema = z.object({ priority: PrioritySchema })
+
+/**
+ * Who does the task: me, or an employee. Optional everywhere for the same reason the priority is,
+ * so a request written before this takes the default, Me.
+ */
+export const DoerSchema = z.enum(TASK_DOER_IDS, { message: DAILY_TASKS_MESSAGES.invalidDoer })
+
+/** Changing only who does a task, its own small update like a tick. */
+export const TaskDoerSchema = z.object({ doer: DoerSchema })
 
 /**
  * A task dropped onto a day (its own or another), with that day's whole new order. Moving to a

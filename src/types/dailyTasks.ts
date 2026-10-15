@@ -1,4 +1,5 @@
 import type { Priority } from "@/constants/priorities"
+import type { TaskDoer } from "@/constants/taskDoers"
 import type { TaskImage, TaskImageView } from "./taskAttachment"
 
 /**
@@ -17,6 +18,8 @@ export interface DailyTask {
   taskDate: string
   // How urgent it is; a task saved before priorities reads as Medium, so this is never empty
   priority: Priority
+  // Who does it; a task saved before this reads as Me, so this is never empty either
+  doer: TaskDoer
   isCompleted: boolean
   completedAt: string | null
   // The task this one is a subtask of, or null for a task of its own
@@ -31,6 +34,7 @@ export interface NewDailyTask {
   description: string
   images: TaskImage[]
   priority: Priority
+  doer: TaskDoer
 }
 
 /**

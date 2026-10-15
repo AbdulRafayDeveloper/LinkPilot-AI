@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { DEFAULT_PRIORITY, type Priority } from "@/constants/priorities"
+import { DEFAULT_TASK_DOER, type TaskDoer } from "@/constants/taskDoers"
 import { AlertTriangle, CalendarArrowUp, ListTodo, Loader2, Plus, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
@@ -28,7 +29,8 @@ const draftStore = createToolStore(
   "daily-tasks:draft",
   { taskDate: "", rows: emptyRows() as TaskRow[] },
   {
-    version: 3,
+    // 4: every row now carries who does it as well as how urgent it is
+    version: 4,
     toStored: (state) => ({
       ...state,
       rows: state.rows.map((row) => ({ ...row, details: { ...row.details, uploading: 0 } })),
@@ -39,12 +41,12 @@ const draftStore = createToolStore(
 // A row with details opened on it is sent with them; a plain line is sent as the string it always was
 /**
  * One row as the API takes it. A line with nothing on it is still sent as a plain string, exactly
- * as every version before details and priorities sent it; anything else is the object form, which
- * always carries all of it, so a row can never be saved with half of what was written on it.
+ * as every version before details, priorities and who does it sent it; anything else is the object
+ * form, which always carries all of it, so a row can never be saved with half of what was written.
  */
-const rowBody = (content: string, details: TaskDetailsDraft, priority: Priority = DEFAULT_PRIORITY) =>
-  details.description.trim() || details.images.length > 0 || priority !== DEFAULT_PRIORITY
-    ? { content, description: details.description.trim(), images: toStoredImages(details.images), priority }
+const rowBody = (content: string, details: TaskDetailsDraft, priority: Priority = DEFAULT_PRIORITY, doer: TaskDoer = DEFAULT_TASK_DOER) =>
+  details.description.trim() || details.images.length > 0 || priority !== DEFAULT_PRIORITY || doer !== DEFAULT_TASK_DOER
+    ? { content, description: details.description.trim(), images: toStoredImages(details.images), priority, doer }
     : content
 
 // Every day's tasks with one task changed or taken away, wherever it sits
@@ -152,7 +154,7 @@ export default function DailyTasksClient() {
     const contents = rows
       .map((row) => ({ ...row, content: row.content.trim() }))
       .filter((row) => row.content)
-      .map((row) => rowBody(row.content, row.details, row.priority))
+      .map((row) => rowBody(row.content, row.details, row.priority, row.doer))
     if (contents.length === 0) {
       setSaveError(DAILY_TASKS_MESSAGES.missingContent)
       return
@@ -253,6 +255,29 @@ export default function DailyTasksClient() {
       show(data.priority)
     } catch (error: unknown) {
       show(task.priority)
+      setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.updateFailed)
+    }
+  }
+
+  /**
+   * Who does a task, changed from the row itself: the same one-field write as the priority above,
+   * shown at once and put back if it fails.
+   */
+  const setDoer = async (task: DailyTask, doer: TaskDoer) => {
+    if (pendingIds.has(task.id) || doer === task.doer) return
+    setTaskError(null)
+    const show = (value: TaskDoer) =>
+      setPage((current) => (current ? { ...current, days: changeTask(current.days, task.id, (entry) => ({ ...entry, doer: value })) } : current))
+    show(doer)
+    try {
+      const { data } = await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doer }),
+      })
+      show(data.doer)
+    } catch (error: unknown) {
+      show(task.doer)
       setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.updateFailed)
     }
   }
@@ -592,6 +617,7 @@ export default function DailyTasksClient() {
                 onOpenTask={(task, focusSubtask = false) => setEditing({ id: task.id, focusSubtask })}
                 onMoveToToday={(task) => void moveOverdue(task)}
                 onPriority={(task, priority) => void setPriority(task, priority)}
+                onDoer={(task, doer) => void setDoer(task, doer)}
               />
             </div>
           </div>
