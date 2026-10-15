@@ -6,10 +6,14 @@ import { DAILY_TASK_DESCRIPTION_MAX_LENGTH, INITIAL_TASK_ROWS, MAX_TASKS_PER_SUB
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { emptyTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
 import { writeTaskDetails } from "@/lib/taskDetailsAi"
+import { PrioritySelect } from "@/components/ui/PriorityPicker"
+import { DEFAULT_PRIORITY, type Priority } from "@/constants/priorities"
 
-/** One row of the composer: the task's line, and the optional detail opened on it. */
+/** One row of the composer: the task's line, how urgent it is, and the optional detail on it. */
 export interface TaskRow {
   content: string
+  // Each row has its own, because a list written in one go is rarely all of one urgency
+  priority: Priority
   details: TaskDetailsDraft
 }
 
@@ -27,7 +31,7 @@ interface TaskComposerProps {
   plain?: boolean
 }
 
-export const emptyRow = (content = ""): TaskRow => ({ content, details: emptyTaskDetails() })
+export const emptyRow = (content = ""): TaskRow => ({ content, priority: DEFAULT_PRIORITY, details: emptyTaskDetails() })
 
 export const emptyRows = (): TaskRow[] => Array.from({ length: INITIAL_TASK_ROWS }, () => emptyRow())
 
@@ -59,6 +63,10 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
 
   const focusRow = (index: number) => {
     window.requestAnimationFrame(() => inputsRef.current[index]?.focus())
+  }
+
+  const setPriority = (index: number, priority: Priority) => {
+    onRowsChange(rows.map((row, position) => (position === index ? { ...row, priority } : row)))
   }
 
   const setRow = (index: number, content: string) => {
@@ -183,6 +191,13 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
                 aria-label={`Task ${index + 1}`}
                 placeholder={index === 0 ? "What needs doing today?" : "Another task"}
                 className={rowClass}
+              />
+              <PrioritySelect
+                value={row.priority}
+                onChange={(priority) => setPriority(index, priority)}
+                disabled={isSaving}
+                label={row.content.trim() || `task ${index + 1}`}
+                className="shrink-0"
               />
               <button
                 type="button"

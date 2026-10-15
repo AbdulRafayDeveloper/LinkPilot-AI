@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
+import { DEFAULT_PRIORITY, type Priority } from "@/constants/priorities"
 import { AlertTriangle, CalendarArrowUp, ListTodo, Loader2, Plus, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
@@ -36,9 +37,14 @@ const draftStore = createToolStore(
 )
 
 // A row with details opened on it is sent with them; a plain line is sent as the string it always was
-const rowBody = (content: string, details: TaskDetailsDraft) =>
-  details.description.trim() || details.images.length > 0
-    ? { content, description: details.description.trim(), images: toStoredImages(details.images) }
+/**
+ * One row as the API takes it. A line with nothing on it is still sent as a plain string, exactly
+ * as every version before details and priorities sent it; anything else is the object form, which
+ * always carries all of it, so a row can never be saved with half of what was written on it.
+ */
+const rowBody = (content: string, details: TaskDetailsDraft, priority: Priority = DEFAULT_PRIORITY) =>
+  details.description.trim() || details.images.length > 0 || priority !== DEFAULT_PRIORITY
+    ? { content, description: details.description.trim(), images: toStoredImages(details.images), priority }
     : content
 
 // Every day's tasks with one task changed or taken away, wherever it sits
@@ -146,7 +152,7 @@ export default function DailyTasksClient() {
     const contents = rows
       .map((row) => ({ ...row, content: row.content.trim() }))
       .filter((row) => row.content)
-      .map((row) => rowBody(row.content, row.details))
+      .map((row) => rowBody(row.content, row.details, row.priority))
     if (contents.length === 0) {
       setSaveError(DAILY_TASKS_MESSAGES.missingContent)
       return
@@ -224,6 +230,30 @@ export default function DailyTasksClient() {
         next.delete(task.id)
         return next
       })
+    }
+  }
+
+  /**
+   * How urgent a task is, changed from the row itself. It shows at once and goes back if the write
+   * fails, the way a tick does, and it sends **only** the priority, so it can never carry a stale
+   * line or description over what the task's own editor has saved.
+   */
+  const setPriority = async (task: DailyTask, priority: Priority) => {
+    if (pendingIds.has(task.id) || priority === task.priority) return
+    setTaskError(null)
+    const show = (value: Priority) =>
+      setPage((current) => (current ? { ...current, days: changeTask(current.days, task.id, (entry) => ({ ...entry, priority: value })) } : current))
+    show(priority)
+    try {
+      const { data } = await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priority }),
+      })
+      show(data.priority)
+    } catch (error: unknown) {
+      show(task.priority)
+      setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.updateFailed)
     }
   }
 
@@ -561,6 +591,7 @@ export default function DailyTasksClient() {
                 onAddTask={addTaskToDay}
                 onOpenTask={(task, focusSubtask = false) => setEditing({ id: task.id, focusSubtask })}
                 onMoveToToday={(task) => void moveOverdue(task)}
+                onPriority={(task, priority) => void setPriority(task, priority)}
               />
             </div>
           </div>

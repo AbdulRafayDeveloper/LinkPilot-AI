@@ -1,4 +1,5 @@
 import mongoose from "mongoose"
+import { priorityOf, type Priority } from "@/constants/priorities"
 import { connectDatabase } from "@/lib/db"
 import { shiftDate } from "@/lib/taskDates"
 import { buildTree, completedLast, type TreeNode } from "@/lib/taskTree"
@@ -25,10 +26,12 @@ import { ownedBy, ownedForClearing, visibleById, visibleTo } from "@/services/au
  * deleting a task takes everything under it along.
  */
 // Only what the list draws
-const TASK_FIELDS = "content description image images taskDate isCompleted completedAt parentTaskId"
+const TASK_FIELDS = "content description image images taskDate priority isCompleted completedAt parentTaskId"
 
 type StoredTask = Pick<IDailyTask, "content" | "taskDate" | "isCompleted" | "completedAt"> & {
   _id: { toString: () => string }
+  // Absent on every task saved before priorities, which `priorityOf` reads as the default
+  priority?: string | null
   description?: string
   image?: TaskImage | null
   images?: TaskImage[]
@@ -46,6 +49,7 @@ const toTask = (record: StoredTask, images: TaskImageView[] = []): DailyTask => 
   images,
   image: images[0] ?? null,
   taskDate: record.taskDate,
+  priority: priorityOf(record.priority).id,
   isCompleted: record.isCompleted,
   completedAt: record.completedAt ? record.completedAt.toISOString() : null,
   parentTaskId: record.parentTaskId ? record.parentTaskId.toString() : null,
@@ -199,6 +203,7 @@ export async function createTasks(viewer: Viewer, taskDate: string, tasks: NewDa
       images: task.images,
       parentTaskId: parent,
       taskDate: day,
+      priority: priorityOf(task.priority).id,
       position: start + index,
       isCompleted: false,
       completedAt: null,
@@ -206,6 +211,23 @@ export async function createTasks(viewer: Viewer, taskDate: string, tasks: NewDa
     { ordered: true }
   )
   return { tasks: await toTasks(records as unknown as StoredTask[]) }
+}
+
+/**
+ * How urgent a task is, changed on its own. It writes **only** that one field, so it is the small
+ * atomic update a tick is: repeating it lands on the same state, and it can never carry a stale
+ * line or description over what another tab has saved.
+ */
+export async function setTaskPriority(viewer: Viewer, id: string, priority: Priority): Promise<DailyTask | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
+  await connectDatabase()
+  const record = await DailyTaskModel.findOneAndUpdate(
+    filter,
+    { $set: { priority } },
+    { new: true, projection: TASK_FIELDS, lean: true }
+  )
+  return record ? (await toTasks([record as unknown as StoredTask]))[0] : null
 }
 
 /**

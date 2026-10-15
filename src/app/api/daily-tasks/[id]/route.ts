@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { DAILY_TASKS_MESSAGES } from "@/constants/dailyTasks"
-import { deleteTask, setTaskCompletion, setTaskDetails, taskLineage } from "@/services/dailyTasks/tasks"
+import { deleteTask, setTaskCompletion, setTaskDetails, setTaskPriority, taskLineage } from "@/services/dailyTasks/tasks"
+import { TaskPrioritySchema } from "@/lib/validation/dailyTasks"
 import { writeTaskDetails } from "@/services/dailyTasks/writeDetails"
 import { TaskDetailsEditSchema } from "@/lib/validation/taskAttachment"
 import { requireViewer } from "@/services/auth/viewer"
@@ -15,9 +16,11 @@ const CompletionSchema = z.object({ isCompleted: z.boolean() })
 const notFound = () => NextResponse.json({ success: false, message: DAILY_TASKS_MESSAGES.invalidTask }, { status: 404 })
 
 /**
- * PUT: one of two changes to one task, told apart by what the body carries.
+ * PUT: one of three changes to one task, told apart by what the body carries.
  * - `{ isCompleted }` ticks it off or reopens it, writing only the completion fields, so the checkbox
  *   stays a single small update and repeating it lands on the same state.
+ * - `{ priority }` changes how urgent it is, the same way and for the same reason: one field, so a
+ *   change made on the list can never carry a stale line or description over another tab's save.
  * - `{ description, images, content? }` saves the task from its editor (the editor sends it as it is
  *   typed, so this is also its auto-save). The first version's `{ description, image }` still works.
  *   The description and the images (or image) are always sent, so a body that left them out cannot
@@ -31,8 +34,21 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const body = await req.json().catch(() => null)
     const { id } = await params
 
+    const named = (field: string) => body !== null && typeof body === "object" && field in body
+
+    // How urgent it is, on its own: the list's own control, which never sends anything else
+    if (named("priority") && !named("isCompleted") && !named("description")) {
+      const parsed = TaskPrioritySchema.safeParse(body)
+      if (!parsed.success) {
+        return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || DAILY_TASKS_MESSAGES.updateFailed }, { status: 400 })
+      }
+      const task = await setTaskPriority(auth.viewer, id, parsed.data.priority)
+      if (!task) return notFound()
+      return NextResponse.json({ success: true, message: "Task updated", data: task })
+    }
+
     // A tick always names isCompleted; anything else is an edit of the task
-    if (!(body !== null && typeof body === "object" && "isCompleted" in body)) {
+    if (!named("isCompleted")) {
       const details = TaskDetailsEditSchema.safeParse(body)
       if (!details.success) {
         return NextResponse.json({ success: false, message: details.error.issues[0]?.message || DAILY_TASKS_MESSAGES.detailsFailed }, { status: 400 })

@@ -46,6 +46,7 @@ export const DAILY_TASKS_MESSAGES = {
   invalidDate: "Pick a valid task date.",
   futureDate: "Tasks can be added for today or an earlier day.",
   invalidTask: "That task no longer exists.",
+  invalidPriority: "Choose High, Medium or Low.",
   saved: "Tasks added.",
   saveFailed: "Couldn't add the tasks. Please try again.",
   loadFailed: "Couldn't load your tasks.",

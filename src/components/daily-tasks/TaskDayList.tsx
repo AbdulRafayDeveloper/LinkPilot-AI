@@ -47,6 +47,8 @@ import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 import { CopyTaskText } from "@/components/tasks/CopyTaskText"
+import { PrioritySelect } from "@/components/ui/PriorityPicker"
+import type { Priority } from "@/constants/priorities"
 import { emptyTaskDetails, hasTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
 
 /** Tasks dropped somewhere new: the day they now belong to, that day's whole order, and every day as it now looks. */
@@ -81,6 +83,8 @@ interface TaskDayListProps {
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   // Brings one overdue task, with its subtasks, onto today
   onMoveToToday: (task: DailyTask) => void
+  // How urgent a task is, changed from the row itself
+  onPriority: (task: DailyTask, priority: Priority) => void
   // Deletes every picked task at once; the page confirms first, since deleting is final
   onDeletePicked: (ids: string[]) => void
   onMove: (move: TaskMove) => void
@@ -127,6 +131,8 @@ interface TaskRowBodyProps {
   // Opens the task's editor (details and subtasks); absent on the dragged copy
   onOpenTask?: (task: DailyTask, focusSubtask?: boolean) => void
   onMoveToToday?: (task: DailyTask) => void
+  // How urgent the task is, changed on the row itself; absent on the copy that follows the pointer
+  onPriority?: (task: DailyTask, priority: Priority) => void
   handle: React.ReactNode
   // Picking tasks to move together: one click on the circle picks a task, Shift picks a run of them
   isSelected?: boolean
@@ -149,6 +155,7 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
   onDelete,
   onOpenTask,
   onMoveToToday,
+  onPriority,
   handle,
   isSelected = false,
   onSelect,
@@ -214,6 +221,17 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
           </span>
         )}
       </label>
+      {/* Changed where it is read. The whole row is the drag area, so the press that opens the list
+          must not pick the task up */}
+      <span onPointerDown={(event) => event.stopPropagation()} className="shrink-0">
+        <PrioritySelect
+          value={task.priority}
+          onChange={(priority) => onPriority?.(task, priority)}
+          disabled={isPending || !onPriority}
+          label={task.content}
+          className="mt-2"
+        />
+      </span>
       {/* The task's details and subtasks open in a popup rather than in the row: the whole row is the
           drag area, so typing or picking an image inside it would start a drag */}
       <RowActions task={task} depth={1} isPending={isPending} isOverdue={state === "overdue"} onOpenTask={onOpenTask} onMoveToToday={onMoveToToday} />
@@ -324,10 +342,11 @@ interface SubtaskTreeProps {
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
+  onPriority: (task: DailyTask, priority: Priority) => void
 }
 
 /** One subtask: its tick box and line, its details, its actions, and its own subtasks under it. */
-const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, depth, today, pendingIds, onToggle, onDelete, onOpenTask }) => {
+const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, depth, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority }) => {
   const [isOpen, setIsOpen] = useState(true)
   const isPending = pendingIds.has(task.id)
   const state = taskState(task, today)
@@ -378,6 +397,9 @@ const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, d
             <TaskDetailsView description={task.description} images={task.images} label={task.content} />
           </span>
         </label>
+        <span onPointerDown={(event) => event.stopPropagation()} className="shrink-0">
+          <PrioritySelect value={task.priority} onChange={(priority) => onPriority(task, priority)} disabled={isPending} label={task.content} className="mt-1.5" />
+        </span>
         <RowActions task={task} depth={depth} isPending={isPending} onOpenTask={onOpenTask} />
         {isPending ? (
           <span className="p-2.5" aria-hidden="true">
@@ -394,7 +416,9 @@ const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, d
           </button>
         )}
       </div>
-      {isOpen && task.subtasks.length > 0 && <SubtaskTree {...{ depth: depth + 1, today, pendingIds, onToggle, onDelete, onOpenTask }} tasks={task.subtasks} />}
+      {isOpen && task.subtasks.length > 0 && (
+        <SubtaskTree {...{ depth: depth + 1, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority }} tasks={task.subtasks} />
+      )}
     </li>
   )
 }
@@ -451,6 +475,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onOpenTask,
   onMoveToToday,
   onSelect,
+  onPriority,
   wasDragging,
   pendingIds,
 }: {
@@ -463,6 +488,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   onMoveToToday: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
+  onPriority: (task: DailyTask, priority: Priority) => void
   wasDragging: () => boolean
   pendingIds: ReadonlySet<string>
 }) {
@@ -494,6 +520,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
           onOpenTask={onOpenTask}
           onMoveToToday={onMoveToToday}
           onSelect={onSelect}
+          onPriority={onPriority}
           wasDragging={wasDragging}
           handle={
             // The whole row drags with a pointer; this is what the keyboard uses, and what says so
@@ -519,6 +546,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
           onToggle={onToggle}
           onDelete={onDelete}
           onOpenTask={onOpenTask}
+          onPriority={onPriority}
         />
       )}
     </li>
@@ -637,6 +665,7 @@ const DayGroup = memo(function DayGroup({
   onOpenTask,
   onMoveToToday,
   onSelect,
+  onPriority,
   onAddTask,
   wasDragging,
 }: {
@@ -652,6 +681,7 @@ const DayGroup = memo(function DayGroup({
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   onMoveToToday: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
+  onPriority: (task: DailyTask, priority: Priority) => void
   onAddTask: AddTaskHandler
   wasDragging: () => boolean
 }) {
@@ -697,6 +727,7 @@ const DayGroup = memo(function DayGroup({
                 onOpenTask={onOpenTask}
                 onMoveToToday={onMoveToToday}
                 onSelect={onSelect}
+                onPriority={onPriority}
                 wasDragging={wasDragging}
                 pendingIds={pendingIds}
               />
@@ -740,6 +771,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   onDelete,
   onOpenTask,
   onMoveToToday,
+  onPriority,
   onDeletePicked,
   onMove,
   onAddTask,
@@ -1020,6 +1052,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 onDelete={onDelete}
                 onOpenTask={onOpenTask}
                 onMoveToToday={onMoveToToday}
+                onPriority={onPriority}
                 onSelect={selectTask}
                 onAddTask={onAddTask}
                 wasDragging={wasDragging}

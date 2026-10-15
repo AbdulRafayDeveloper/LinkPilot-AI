@@ -1,3 +1,4 @@
+import { DEFAULT_PRIORITY, PRIORITIES, PRIORITY_IDS, priorityOf, type Priority } from "./priorities"
 import { FolderKanban, type LucideIcon } from "lucide-react"
 import { TASK_IMAGE_MAX_BYTES, TASK_IMAGE_TYPES } from "./taskAttachments"
 import { VOICE_MAX_BYTES } from "./voiceInput"
@@ -284,23 +285,17 @@ export const PUBLIC_MOVABLE_KIND_IDS = MOVABLE_ITEM_KINDS.filter((kind) => kind.
 
 /**
  * How urgent an item is, on **every tab**: a change, an idea, a credential, a backup, all of them.
- * It is one of three rather than a number, because what the owner and the client need from it is
- * "which of these do we do first", and the word is on the chip, so it never rests on colour alone.
  *
- * Medium is the default, which is also what an item saved before priorities existed reads as: that
- * way every item has one and the picker always has something to change rather than an empty state.
+ * The three words, their colours and the fallback to Medium are **shared** (`constants/priorities.ts`)
+ * since Daily Tasks wanted the same ones; these are the names this module has always used, so every
+ * caller here is untouched and there is no second list to drift.
  */
-export const PROJECT_PRIORITIES = [
-  { id: "high", label: "High", short: "High", description: "Do this first" },
-  { id: "medium", label: "Medium", short: "Med", description: "The usual" },
-  { id: "low", label: "Low", short: "Low", description: "When there is room" },
-] as const
-export type ProjectPriority = (typeof PROJECT_PRIORITIES)[number]["id"]
-export const PROJECT_PRIORITY_IDS = PROJECT_PRIORITIES.map((priority) => priority.id) as [ProjectPriority, ...ProjectPriority[]]
-export const DEFAULT_PROJECT_PRIORITY: ProjectPriority = "medium"
+export const PROJECT_PRIORITIES = PRIORITIES
+export type ProjectPriority = Priority
+export const PROJECT_PRIORITY_IDS = PRIORITY_IDS
+export const DEFAULT_PROJECT_PRIORITY: ProjectPriority = DEFAULT_PRIORITY
 /** One priority by its id, falling back to the default, which is what every older item reads as. */
-export const projectPriority = (id: string | null | undefined) =>
-  PROJECT_PRIORITIES.find((priority) => priority.id === id) ?? PROJECT_PRIORITIES.find((priority) => priority.id === DEFAULT_PROJECT_PRIORITY)!
+export const projectPriority = priorityOf
 
 /**
  * How long a backlog item is expected to take: a number and the unit it is counted in, so "2 days"

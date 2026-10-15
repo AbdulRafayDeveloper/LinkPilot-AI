@@ -1,6 +1,7 @@
 import mongoose, { Schema, type Model } from "mongoose"
 
 import { ISO_DATE_PATTERN } from "@/constants/dailyTasks"
+import { DEFAULT_PRIORITY, PRIORITY_IDS, type Priority } from "@/constants/priorities"
 import { TASK_IMAGE_TYPES } from "@/constants/taskAttachments"
 import type { TaskImage } from "@/types/taskAttachment"
 import { OWNER_ID } from "./owner"
@@ -23,6 +24,9 @@ export interface IDailyTask {
   // at most (TASK_MAX_DEPTH); a task saved before subtasks existed has none
   parentTaskId: mongoose.Types.ObjectId | null
   taskDate: string
+  // How urgent it is (constants/priorities.ts). A task saved before priorities reads as the default,
+  // Medium, so every task always has one
+  priority: Priority
   // Where the task sits within its day, set by dragging; ties (tasks from before positions) keep the order they were written
   position: number
   isCompleted: boolean
@@ -50,6 +54,7 @@ const DailyTaskSchema = new Schema<IDailyTask>(
     images: { type: [TaskImageSchema], default: [] },
     parentTaskId: { type: Schema.Types.ObjectId, default: null },
     taskDate: { type: String, required: true, match: ISO_DATE_PATTERN },
+    priority: { type: String, enum: PRIORITY_IDS, default: DEFAULT_PRIORITY },
     position: { type: Number, required: true, default: 0 },
     isCompleted: { type: Boolean, required: true, default: false },
     completedAt: { type: Date, default: null },

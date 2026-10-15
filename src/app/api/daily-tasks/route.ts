@@ -3,7 +3,8 @@ import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { DAILY_TASKS_MESSAGES, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
 import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
-import { IsoDate, TodaySchema } from "@/lib/validation/dailyTasks"
+import { IsoDate, PrioritySchema, TodaySchema } from "@/lib/validation/dailyTasks"
+import { DEFAULT_PRIORITY, priorityOf } from "@/constants/priorities"
 import { DailyTaskDetailsSchema } from "@/lib/validation/taskAttachment"
 import type { NewDailyTask } from "@/types/dailyTasks"
 import { createTasks, deleteTasks, deleteTasksBeforeWindow, listTasks } from "@/services/dailyTasks/tasks"
@@ -29,7 +30,11 @@ export const CreateSchema = z
         z.union([
           z.string().max(TASK_MAX_LENGTH, DAILY_TASKS_MESSAGES.contentTooLong),
           z
-            .object({ content: z.string().max(TASK_MAX_LENGTH, DAILY_TASKS_MESSAGES.contentTooLong) })
+            .object({
+              content: z.string().max(TASK_MAX_LENGTH, DAILY_TASKS_MESSAGES.contentTooLong),
+              // Left out, the task takes the default, so a caller written before priorities is unchanged
+              priority: PrioritySchema.optional(),
+            })
             .and(DailyTaskDetailsSchema),
         ])
       )
@@ -41,7 +46,9 @@ export const CreateSchema = z
   // A task belongs to a day that has happened: a later one would never show in the seven-day view
   .refine((body) => body.taskDate <= body.today, { message: DAILY_TASKS_MESSAGES.futureDate, path: ["taskDate"] })
 
-type SubmittedRow = string | ({ content: string } & { description: string; image: SubmittedImage | null; images?: SubmittedImage[] })
+type SubmittedRow =
+  | string
+  | ({ content: string; priority?: string } & { description: string; image: SubmittedImage | null; images?: SubmittedImage[] })
 
 /**
  * Empty rows are dropped, and the same task written twice in one submission is kept once. A row
@@ -62,6 +69,7 @@ function cleanContents(contents: SubmittedRow[]): NewDailyTask[] {
       description: typeof row === "string" ? "" : row.description,
       // Several images when sent, else the first version's one
       images: typeof row === "string" ? [] : (row.images ?? (row.image ? [row.image] : [])),
+      priority: typeof row === "string" ? DEFAULT_PRIORITY : priorityOf(row.priority).id,
     })
   }
   return kept

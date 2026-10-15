@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { DAILY_TASKS_MESSAGES, ISO_DATE_PATTERN, MAX_TASKS_PER_DAY_ORDER, MAX_TODAY_DRIFT_DAYS } from "@/constants/dailyTasks"
+import { PRIORITY_IDS } from "@/constants/priorities"
 import { shiftDate } from "@/lib/taskDates"
 
 /**
@@ -29,6 +30,15 @@ export const TodaySchema = IsoDate.refine((date) => {
 }, DAILY_TASKS_MESSAGES.invalidDate)
 
 const TaskId = z.string().regex(/^[0-9a-f]{24}$/, DAILY_TASKS_MESSAGES.invalidOrder)
+
+/**
+ * How urgent a task is. It is **optional everywhere**, so a request written before priorities
+ * existed is accepted exactly as it was and the task simply takes the default, Medium.
+ */
+export const PrioritySchema = z.enum(PRIORITY_IDS, { message: DAILY_TASKS_MESSAGES.invalidPriority })
+
+/** Changing only how urgent a task is, which is its own small update like a tick. */
+export const TaskPrioritySchema = z.object({ priority: PrioritySchema })
 
 /**
  * A task dropped onto a day (its own or another), with that day's whole new order. Moving to a
