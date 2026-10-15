@@ -33,19 +33,23 @@ export const MESSAGE_REWRITER_MESSAGES = {
   providerUnavailable: "The writing model didn't answer. Please try again in a moment.",
 } as const
 
-// The module's sidebar entry, listed with the other non-LinkedIn modules
+/**
+ * The module's sidebar entry. **It is under Workspace, after Daily Tasks**, at the owner's request:
+ * it was under Client Work with the modules that are about one client, and the messages it rewrites
+ * are the owner's own, written through the day like the rest of that group.
+ */
 export const MESSAGE_REWRITER_TOOL: {
   id: string
   title: string
   description: string
   icon: LucideIcon
   href: string
-  group: "clients"
+  group: "workspace"
 } = {
   id: "message-rewriter",
   title: "Message Rewriter",
   description: "Any language into short English",
   icon: Languages,
   href: "/message-rewriter",
-  group: "clients",
+  group: "workspace",
 }

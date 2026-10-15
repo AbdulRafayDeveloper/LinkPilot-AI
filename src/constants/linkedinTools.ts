@@ -169,6 +169,8 @@ export const APP_TOOLS: LinkedInTool[] = [
   // Workspace: the prompts written for other AI tools come first, then the day's work
   { ...PROMPT_CREATOR_TOOL, links: savedOutputPages("prompt-creator") },
   DAILY_TASKS_TOOL,
+  // Right after Daily Tasks, where the owner asked for it; it was under Client Work
+  { ...MESSAGE_REWRITER_TOOL, links: savedOutputPages("message-rewriter") },
   IMPORTANT_CONTENT_TOOL,
   QUICK_NOTES_TOOL,
   EMPLOYEES_TOOL,
@@ -180,7 +182,6 @@ export const APP_TOOLS: LinkedInTool[] = [
   // the clients themselves and what their prompts are written for
   MEETING_PLANNER_TOOL,
   CLIENT_VOICES_TOOL,
-  { ...MESSAGE_REWRITER_TOOL, links: savedOutputPages("message-rewriter") },
   MEETINGS_TOOL,
   { ...CLIENT_MESSAGING_TOOL, links: savedOutputPages("client-messaging") },
   REFERENCE_CONTENT_TOOL,
