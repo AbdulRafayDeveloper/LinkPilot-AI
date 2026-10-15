@@ -4,7 +4,7 @@ import { readSSEStream } from "@/lib/sse"
 import { fetchWithRetry } from "@/lib/apiClient"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { countedOneComment } from "@/hooks/useCommentCount"
-import { autoCopyText, resetAutoCopy } from "@/lib/autoCopy"
+import { autoCopyText, resetAutoCopy, startAutoCopy } from "@/lib/autoCopy"
 import { COMMENT_WRITER_MESSAGES, type CommentTuneId } from "@/constants/commentWriter"
 import type { PostInputMode } from "@/constants/postInput"
 import type { ApiEnvelope } from "@/types/api"
@@ -62,8 +62,14 @@ async function generate(request: CommentRequest) {
   controller?.abort()
   const current = new AbortController()
   controller = current
-  const fail = (message: string) => store.update({ status: "error", error: message })
-  resetAutoCopy()
+  const fail = (message: string) => {
+    // Nothing is coming, so the clipboard claim is dropped and what the user had copied is left alone
+    resetAutoCopy()
+    store.update({ status: "error", error: message })
+  }
+  // **Claimed inside the user's own click**, which is what lets the comment land on the clipboard
+  // while they are still on LinkedIn; everything below here is too late to ask the browser
+  startAutoCopy()
   store.update({ status: "loading", result: null, stages: [], error: null })
 
   try {

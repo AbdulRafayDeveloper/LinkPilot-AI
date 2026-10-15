@@ -75,7 +75,7 @@ export const COMMENT_WRITER_MESSAGES = {
     copied: { label: "Copied for you", detail: "This comment is already on your clipboard, so you can paste it straight into LinkedIn." },
     waiting: {
       label: "Copying",
-      detail: "Your browser only copies while this page is in front of you, so the comment goes on your clipboard the moment you come back to it.",
+      detail: "The comment is going on your clipboard. If your browser holds it back, it lands the moment you are back on this page.",
     },
     failed: { label: "Use Copy", detail: "Your browser would not copy this on its own, so use the Copy button." },
   },
