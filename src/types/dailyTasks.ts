@@ -20,6 +20,8 @@ export interface DailyTask {
   priority: Priority
   // Who does it; a task saved before this reads as Me, so this is never empty either
   doer: TaskDoer
+  // Whether something else is holding it up; a task saved before this reads as unblocked
+  isBlocked: boolean
   isCompleted: boolean
   completedAt: string | null
   // The task this one is a subtask of, or null for a task of its own

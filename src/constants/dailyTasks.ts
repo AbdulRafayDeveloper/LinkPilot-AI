@@ -48,13 +48,25 @@ export const DAILY_TASKS_MESSAGES = {
   invalidTask: "That task no longer exists.",
   invalidPriority: "Choose High, Medium or Low.",
   invalidDoer: "Choose Me or Employee.",
-  // Narrowing the list: both controls sit in its own heading row, so they cost the page no height
+  // A task nothing can be done on until something else moves. Every task starts unblocked
+  block: "Block this task: nothing can be done on it yet",
+  unblock: "Unblock this task",
+  blocked: "Blocked",
+  // Narrowing the list: every control sits in its own heading row, so they cost the page no height
   filterAll: "All priorities",
   filterOn: "Showing one priority. Choose All priorities to see them all again.",
   doerAll: "Anyone",
   doerOn: "Showing one person's tasks. Choose Anyone to see them all again.",
-  filterNote: "Filtered",
-  clearFilters: "Show all tasks",
+  blockedAll: "Blocked or not",
+  blockedOnly: "Blocked only",
+  notBlocked: "Not blocked",
+  blockedOn: "Showing blocked tasks only. Choose Blocked or not to see them all again.",
+  doneAll: "Done or not",
+  doneOnly: "Done only",
+  notDone: "Not done",
+  doneOn: "Showing one state. Choose Done or not to see them all again.",
+  clearFilters: "Clear filters",
+  showAll: "Show all tasks",
   nothingMatches: "No task matches on these days. Try another page, or show them all.",
   // Dragging is off while the list is narrowed, because what is shown is not the whole day's order
   filterNoDrag: "A filter is on, so the tasks can't be dragged into a new order.",

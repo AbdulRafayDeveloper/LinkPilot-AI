@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { DAILY_TASKS_MESSAGES } from "@/constants/dailyTasks"
-import { deleteTask, setTaskCompletion, setTaskDetails, setTaskDoer, setTaskPriority, taskLineage } from "@/services/dailyTasks/tasks"
-import { TaskDoerSchema, TaskPrioritySchema } from "@/lib/validation/dailyTasks"
+import { deleteTask, setTaskBlocked, setTaskCompletion, setTaskDetails, setTaskDoer, setTaskPriority, taskLineage } from "@/services/dailyTasks/tasks"
+import { TaskBlockedSchema, TaskDoerSchema, TaskPrioritySchema } from "@/lib/validation/dailyTasks"
 import { writeTaskDetails } from "@/services/dailyTasks/writeDetails"
 import { TaskDetailsEditSchema } from "@/lib/validation/taskAttachment"
 import { requireViewer } from "@/services/auth/viewer"
@@ -22,7 +22,7 @@ const notFound = () => NextResponse.json({ success: false, message: DAILY_TASKS_
  * - `{ priority }` changes how urgent it is, the same way and for the same reason: one field, so a
  *   change made on the list can never carry a stale line or description over another tab's save.
  * - `{ doer }` changes who does it (me or an employee), which is its own one-field write for exactly
- *   the same reason.
+ *   the same reason, and `{ isBlocked }` blocks or unblocks it the same way.
  * - `{ description, images, content? }` saves the task from its editor (the editor sends it as it is
  *   typed, so this is also its auto-save). The first version's `{ description, image }` still works.
  *   The description and the images (or image) are always sent, so a body that left them out cannot
@@ -56,6 +56,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || DAILY_TASKS_MESSAGES.updateFailed }, { status: 400 })
       }
       const task = await setTaskDoer(auth.viewer, id, parsed.data.doer)
+      if (!task) return notFound()
+      return NextResponse.json({ success: true, message: "Task updated", data: task })
+    }
+
+    // Blocked or not, on its own: the row's own toggle, which never sends anything else either
+    if (named("isBlocked") && !named("isCompleted") && !named("description")) {
+      const parsed = TaskBlockedSchema.safeParse(body)
+      if (!parsed.success) {
+        return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || DAILY_TASKS_MESSAGES.updateFailed }, { status: 400 })
+      }
+      const task = await setTaskBlocked(auth.viewer, id, parsed.data.isBlocked)
       if (!task) return notFound()
       return NextResponse.json({ success: true, message: "Task updated", data: task })
     }

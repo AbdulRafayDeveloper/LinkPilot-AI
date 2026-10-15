@@ -27,7 +27,7 @@ import { ownedBy, ownedForClearing, visibleById, visibleTo } from "@/services/au
  * deleting a task takes everything under it along.
  */
 // Only what the list draws
-const TASK_FIELDS = "content description image images taskDate priority doer isCompleted completedAt parentTaskId"
+const TASK_FIELDS = "content description image images taskDate priority doer isBlocked isCompleted completedAt parentTaskId"
 
 type StoredTask = Pick<IDailyTask, "content" | "taskDate" | "isCompleted" | "completedAt"> & {
   _id: { toString: () => string }
@@ -35,6 +35,8 @@ type StoredTask = Pick<IDailyTask, "content" | "taskDate" | "isCompleted" | "com
   priority?: string | null
   // The same for who does it: absent on everything saved before it, which reads as Me
   doer?: string | null
+  // And for whether something is holding it up: absent reads as unblocked
+  isBlocked?: boolean | null
   description?: string
   image?: TaskImage | null
   images?: TaskImage[]
@@ -54,6 +56,7 @@ const toTask = (record: StoredTask, images: TaskImageView[] = []): DailyTask => 
   taskDate: record.taskDate,
   priority: priorityOf(record.priority).id,
   doer: doerOf(record.doer).id,
+  isBlocked: record.isBlocked === true,
   isCompleted: record.isCompleted,
   completedAt: record.completedAt ? record.completedAt.toISOString() : null,
   parentTaskId: record.parentTaskId ? record.parentTaskId.toString() : null,
@@ -247,6 +250,22 @@ export async function setTaskDoer(viewer: Viewer, id: string, doer: TaskDoer): P
   const record = await DailyTaskModel.findOneAndUpdate(
     filter,
     { $set: { doer } },
+    { new: true, projection: TASK_FIELDS, lean: true }
+  )
+  return record ? (await toTasks([record as unknown as StoredTask]))[0] : null
+}
+
+/**
+ * Blocks one task, or unblocks it: its own one-field write, like the tick and the two chips above,
+ * so it can never carry a stale line or description over what the task's own editor has saved.
+ */
+export async function setTaskBlocked(viewer: Viewer, id: string, isBlocked: boolean): Promise<DailyTask | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
+  await connectDatabase()
+  const record = await DailyTaskModel.findOneAndUpdate(
+    filter,
+    { $set: { isBlocked } },
     { new: true, projection: TASK_FIELDS, lean: true }
   )
   return record ? (await toTasks([record as unknown as StoredTask]))[0] : null

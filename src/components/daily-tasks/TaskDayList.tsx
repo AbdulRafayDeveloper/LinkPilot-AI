@@ -32,6 +32,8 @@ import {
   CornerDownRight,
   GripVertical,
   ListPlus,
+  Lock,
+  LockOpen,
   Paperclip,
   ListTodo,
   Loader2,
@@ -51,7 +53,7 @@ import { PrioritySelect } from "@/components/ui/PriorityPicker"
 import { DoerSelect } from "@/components/daily-tasks/DoerSelect"
 import { PRIORITIES, PRIORITY_TONE, type Priority } from "@/constants/priorities"
 import { TASK_DOERS, TASK_DOER_TONE, type TaskDoer } from "@/constants/taskDoers"
-import { NOTHING_NARROWED, isNarrowed, narrowDays, type TaskNarrowing } from "@/lib/taskFilters"
+import { NOTHING_NARROWED, isNarrowed, narrowDays, type TaskNarrowing, type YesOrNo } from "@/lib/taskFilters"
 import { emptyTaskDetails, hasTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
 
 /** Tasks dropped somewhere new: the day they now belong to, that day's whole order, and every day as it now looks. */
@@ -90,6 +92,8 @@ interface TaskDayListProps {
   onPriority: (task: DailyTask, priority: Priority) => void
   // Who does it, changed the same way
   onDoer: (task: DailyTask, doer: TaskDoer) => void
+  // Blocked or not, from the row's own toggle
+  onBlock: (task: DailyTask, isBlocked: boolean) => void
   // Deletes every picked task at once; the page confirms first, since deleting is final
   onDeletePicked: (ids: string[]) => void
   onMove: (move: TaskMove) => void
@@ -140,6 +144,8 @@ interface TaskRowBodyProps {
   onPriority?: (task: DailyTask, priority: Priority) => void
   // Who does it, the same way: the user, or an employee they get it done by
   onDoer?: (task: DailyTask, doer: TaskDoer) => void
+  // Blocked or not, the row's own toggle
+  onBlock?: (task: DailyTask, isBlocked: boolean) => void
   handle: React.ReactNode
   // Picking tasks to move together: one click on the circle picks a task, Shift picks a run of them
   isSelected?: boolean
@@ -164,6 +170,7 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
   onMoveToToday,
   onPriority,
   onDoer,
+  onBlock,
   handle,
   isSelected = false,
   onSelect,
@@ -248,6 +255,7 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
             disabled={isPending || !onDoer}
             label={task.content}
           />
+          <BlockButton task={task} isPending={isPending} onBlock={onBlock} />
         </span>
         {/* The task's details and subtasks open in a popup rather than in the row: the whole row is
             the drag area, so typing or picking an image inside it would start a drag */}
@@ -362,10 +370,11 @@ interface SubtaskTreeProps {
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   onPriority: (task: DailyTask, priority: Priority) => void
   onDoer: (task: DailyTask, doer: TaskDoer) => void
+  onBlock: (task: DailyTask, isBlocked: boolean) => void
 }
 
 /** One subtask: its tick box and line, its details, its actions, and its own subtasks under it. */
-const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, depth, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority, onDoer }) => {
+const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, depth, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority, onDoer, onBlock }) => {
   const [isOpen, setIsOpen] = useState(true)
   const isPending = pendingIds.has(task.id)
   const state = taskState(task, today)
@@ -420,6 +429,7 @@ const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, d
           <span onPointerDown={(event) => event.stopPropagation()} className="flex flex-wrap items-center gap-1 md:mt-1.5 md:shrink-0 md:flex-nowrap">
             <PrioritySelect value={task.priority} onChange={(priority) => onPriority(task, priority)} disabled={isPending} label={task.content} />
             <DoerSelect value={task.doer} onChange={(doer) => onDoer(task, doer)} disabled={isPending} label={task.content} />
+            <BlockButton task={task} isPending={isPending} onBlock={onBlock} />
           </span>
           <RowActions task={task} depth={depth} isPending={isPending} onOpenTask={onOpenTask} />
           {isPending ? (
@@ -439,7 +449,7 @@ const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, d
         </span>
       </div>
       {isOpen && task.subtasks.length > 0 && (
-        <SubtaskTree {...{ depth: depth + 1, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority, onDoer }} tasks={task.subtasks} />
+        <SubtaskTree {...{ depth: depth + 1, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority, onDoer, onBlock }} tasks={task.subtasks} />
       )}
     </li>
   )
@@ -489,15 +499,64 @@ const SubtaskTree: React.FC<SubtaskTreeProps> = (props) => {
  * `md` rather than `sm`: measured, a 640px window leaves the one-line row about 70px for the task's
  * own words, which is no better than the phone was. 768px leaves about 240px.
  */
+/**
+ * Blocked or not: a toggle rather than a third chip, because it is a yes or no and because three
+ * chips on a row left a task's own words no width. Unblocked it is a quiet icon; blocked it says
+ * the word, so the state never rests on colour.
+ */
+const BlockButton: React.FC<{ task: DailyTask; isPending: boolean; onBlock?: (task: DailyTask, isBlocked: boolean) => void }> = ({ task, isPending, onBlock }) => (
+  <button
+    type="button"
+    onPointerDown={(event) => event.stopPropagation()}
+    onClick={() => onBlock?.(task, !task.isBlocked)}
+    disabled={isPending || !onBlock}
+    aria-pressed={task.isBlocked}
+    aria-label={`${task.isBlocked ? DAILY_TASKS_MESSAGES.unblock : DAILY_TASKS_MESSAGES.block}: ${task.content}`}
+    title={task.isBlocked ? DAILY_TASKS_MESSAGES.unblock : DAILY_TASKS_MESSAGES.block}
+    className={`flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-bold uppercase tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+      task.isBlocked ? "bg-error-container text-error" : "text-outline hover:bg-surface-container-high hover:text-on-surface"
+    }`}
+  >
+    {task.isBlocked ? <Lock size={13} aria-hidden="true" /> : <LockOpen size={13} aria-hidden="true" />}
+    {task.isBlocked && DAILY_TASKS_MESSAGES.blocked}
+  </button>
+)
+
 const ROW_TAIL = "order-last mb-2 flex w-full flex-wrap items-center gap-1 pl-1 md:order-none md:contents"
 
 const handleClass =
   "mt-2 ml-1 flex h-8 w-6 shrink-0 touch-none items-center justify-center rounded-md text-outline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
-// The two controls that narrow the list, in the heading row the list already had: one line of it,
-// so neither costs the page any height
+// The controls that narrow the list, in the heading row the list already had: one line of it, so
+// none of them costs the page any height
 const filterClass =
   "h-6 cursor-pointer rounded-full border px-2 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+
+const plainFilter = "border-outline-variant bg-white text-on-surface-variant"
+
+/**
+ * One yes-or-no narrowing: blocked or not, done or not. Both read the same way and are built from
+ * the same three words, so a third one is three strings rather than more markup.
+ */
+const YesOrNoFilter: React.FC<{
+  value: YesOrNo
+  onChange: (value: YesOrNo) => void
+  label: string
+  words: { all: string; yes: string; no: string; on: string }
+  tone: string
+}> = ({ value, onChange, label, words, tone }) => (
+  <select
+    value={value}
+    onChange={(event) => onChange(event.target.value as YesOrNo)}
+    aria-label={label}
+    title={value ? words.on : words.all}
+    className={`${filterClass} ${value ? `border-transparent ${tone}` : plainFilter}`}
+  >
+    <option value="">{words.all}</option>
+    <option value="yes">{words.yes}</option>
+    <option value="no">{words.no}</option>
+  </select>
+)
 
 /**
  * One task in its day, draggable by its handle. While it is being dragged its place stays as a
@@ -515,6 +574,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onSelect,
   onPriority,
   onDoer,
+  onBlock,
   wasDragging,
   pendingIds,
   canDrag,
@@ -530,6 +590,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onSelect: (task: DailyTask, mode: SelectMode) => void
   onPriority: (task: DailyTask, priority: Priority) => void
   onDoer: (task: DailyTask, doer: TaskDoer) => void
+  onBlock: (task: DailyTask, isBlocked: boolean) => void
   wasDragging: () => boolean
   pendingIds: ReadonlySet<string>
   // Off while the list is narrowed: it is then only part of each day's order
@@ -567,6 +628,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
           onSelect={onSelect}
           onPriority={onPriority}
           onDoer={onDoer}
+          onBlock={onBlock}
           wasDragging={wasDragging}
           handle={
             // The whole row drags with a pointer; this is what the keyboard uses, and what says so
@@ -596,6 +658,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
           onOpenTask={onOpenTask}
           onPriority={onPriority}
           onDoer={onDoer}
+          onBlock={onBlock}
         />
       )}
     </li>
@@ -716,6 +779,7 @@ const DayGroup = memo(function DayGroup({
   onSelect,
   onPriority,
   onDoer,
+  onBlock,
   onAddTask,
   wasDragging,
   canDrag,
@@ -734,6 +798,7 @@ const DayGroup = memo(function DayGroup({
   onSelect: (task: DailyTask, mode: SelectMode) => void
   onPriority: (task: DailyTask, priority: Priority) => void
   onDoer: (task: DailyTask, doer: TaskDoer) => void
+  onBlock: (task: DailyTask, isBlocked: boolean) => void
   onAddTask: AddTaskHandler
   wasDragging: () => boolean
   canDrag: boolean
@@ -782,6 +847,7 @@ const DayGroup = memo(function DayGroup({
                 onSelect={onSelect}
                 onPriority={onPriority}
                 onDoer={onDoer}
+                onBlock={onBlock}
                 wasDragging={wasDragging}
                 pendingIds={pendingIds}
                 canDrag={canDrag}
@@ -828,6 +894,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   onMoveToToday,
   onPriority,
   onDoer,
+  onBlock,
   onDeletePicked,
   onMove,
   onAddTask,
@@ -1051,9 +1118,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
             onChange={(event) => setNarrowing((current) => ({ ...current, priority: event.target.value as Priority | "" }))}
             aria-label="Show only tasks of one priority"
             title={narrowing.priority ? DAILY_TASKS_MESSAGES.filterOn : DAILY_TASKS_MESSAGES.filterAll}
-            className={`${filterClass} ${
-              narrowing.priority ? `border-transparent ${PRIORITY_TONE[narrowing.priority]}` : "border-outline-variant bg-white text-on-surface-variant"
-            }`}
+            className={`${filterClass} ${narrowing.priority ? `border-transparent ${PRIORITY_TONE[narrowing.priority]}` : plainFilter}`}
           >
             <option value="">{DAILY_TASKS_MESSAGES.filterAll}</option>
             {PRIORITIES.map((priority) => (
@@ -1067,9 +1132,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
             onChange={(event) => setNarrowing((current) => ({ ...current, doer: event.target.value as TaskDoer | "" }))}
             aria-label="Show only the tasks one person does"
             title={narrowing.doer ? DAILY_TASKS_MESSAGES.doerOn : DAILY_TASKS_MESSAGES.doerAll}
-            className={`${filterClass} ${
-              narrowing.doer ? `border-transparent ${TASK_DOER_TONE[narrowing.doer]}` : "border-outline-variant bg-white text-on-surface-variant"
-            }`}
+            className={`${filterClass} ${narrowing.doer ? `border-transparent ${TASK_DOER_TONE[narrowing.doer]}` : plainFilter}`}
           >
             <option value="">{DAILY_TASKS_MESSAGES.doerAll}</option>
             {TASK_DOERS.map((doer) => (
@@ -1078,6 +1141,40 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
               </option>
             ))}
           </select>
+          <YesOrNoFilter
+            value={narrowing.blocked}
+            onChange={(blocked) => setNarrowing((current) => ({ ...current, blocked }))}
+            label="Show only blocked tasks, or only the ones that are not"
+            words={{
+              all: DAILY_TASKS_MESSAGES.blockedAll,
+              yes: DAILY_TASKS_MESSAGES.blockedOnly,
+              no: DAILY_TASKS_MESSAGES.notBlocked,
+              on: DAILY_TASKS_MESSAGES.blockedOn,
+            }}
+            tone="bg-error-container text-error"
+          />
+          <YesOrNoFilter
+            value={narrowing.done}
+            onChange={(done) => setNarrowing((current) => ({ ...current, done }))}
+            label="Show only tasks that are done, or only the ones that are not"
+            words={{
+              all: DAILY_TASKS_MESSAGES.doneAll,
+              yes: DAILY_TASKS_MESSAGES.doneOnly,
+              no: DAILY_TASKS_MESSAGES.notDone,
+              on: DAILY_TASKS_MESSAGES.doneOn,
+            }}
+            tone="bg-success-container text-on-success-container"
+          />
+          {/* Only while something is on, so the row is exactly as clean as it was when nothing is */}
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={() => setNarrowing(NOTHING_NARROWED)}
+              className="h-6 rounded-full border border-primary/40 px-2 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/5"
+            >
+              {DAILY_TASKS_MESSAGES.clearFilters}
+            </button>
+          )}
           {selectedIds.size > 0 && (
             <span role="status" className="flex shrink-0 items-center gap-2 text-[12px] font-semibold text-on-surface">
               {selectedIds.size} picked
@@ -1096,12 +1193,8 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
           )}
           {page && (
             <span className="text-[11px] text-outline">
-              {/* While a priority is being shown, the row says so rather than adding a line for it */}
-              {isFiltered
-                ? DAILY_TASKS_MESSAGES.filterNote
-                : current === 1
-                  ? `From ${page.windowStart}`
-                  : `Page ${current} of ${pageCount}`}
+              {/* The controls themselves say what is being shown, so this keeps saying where we are */}
+              {current === 1 ? `From ${page.windowStart}` : `Page ${current} of ${pageCount}`}
             </span>
           )}
         </div>
@@ -1134,7 +1227,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
           </div>
           <p className="max-w-xs text-sm leading-relaxed text-on-surface-variant">{DAILY_TASKS_MESSAGES.nothingMatches}</p>
           <button type="button" onClick={() => setNarrowing(NOTHING_NARROWED)} className="text-[13px] font-semibold text-primary hover:underline">
-            {DAILY_TASKS_MESSAGES.clearFilters}
+            {DAILY_TASKS_MESSAGES.showAll}
           </button>
         </div>
       ) : !hasDays ? (
@@ -1174,6 +1267,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 onMoveToToday={onMoveToToday}
                 onPriority={onPriority}
                 onDoer={onDoer}
+                onBlock={onBlock}
                 canDrag={canDrag}
                 onSelect={selectTask}
                 onAddTask={onAddTask}

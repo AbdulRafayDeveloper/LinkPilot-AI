@@ -50,6 +50,9 @@ export const DoerSchema = z.enum(TASK_DOER_IDS, { message: DAILY_TASKS_MESSAGES.
 /** Changing only who does a task, its own small update like a tick. */
 export const TaskDoerSchema = z.object({ doer: DoerSchema })
 
+/** Blocking a task or unblocking it, which is its own small update too. */
+export const TaskBlockedSchema = z.object({ isBlocked: z.boolean() })
+
 /**
  * A task dropped onto a day (its own or another), with that day's whole new order. Moving to a
  * later day than today is refused for the same reason adding to one is: it would never show.

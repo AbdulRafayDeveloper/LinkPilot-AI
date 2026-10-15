@@ -4,8 +4,8 @@ import type { DailyTask, DailyTaskDay } from "@/types/dailyTasks"
 
 /**
  * The days with only the tasks that match what the list is narrowed to: one priority, one person
- * doing them, or both at once. Each is "" when it is not being narrowed on, so nothing is chosen
- * means every task.
+ * doing them, blocked or not, done or not, or **any combination of those at once**. Each is "" when
+ * it is not being narrowed on, so nothing chosen means every task.
  *
  * Two rules, and both are about keeping what is left readable:
  *   - a task that matches **itself** is kept whole, with every subtask under it, because that task
@@ -18,18 +18,32 @@ import type { DailyTask, DailyTaskDay } from "@/types/dailyTasks"
  * It is pure and lives here rather than in the list, so the rule can be read and tested on its own
  * (`tests/taskFilters.test.mjs`).
  */
+
+/** A yes-or-no narrowing: "" is not narrowing on it at all. */
+export type YesOrNo = "" | "yes" | "no"
+
 export interface TaskNarrowing {
   priority: Priority | ""
   doer: TaskDoer | ""
+  // Whether something else is holding the task up
+  blocked: YesOrNo
+  // Whether it is ticked off
+  done: YesOrNo
 }
 
-export const NOTHING_NARROWED: TaskNarrowing = { priority: "", doer: "" }
+export const NOTHING_NARROWED: TaskNarrowing = { priority: "", doer: "", blocked: "", done: "" }
 
 /** Whether the list is being narrowed at all, which is also what turns dragging off. */
-export const isNarrowed = (narrowing: TaskNarrowing): boolean => narrowing.priority !== "" || narrowing.doer !== ""
+export const isNarrowed = (narrowing: TaskNarrowing): boolean => Object.values(narrowing).some((value) => value !== "")
 
+const agrees = (want: YesOrNo, is: boolean): boolean => want === "" || (want === "yes") === is
+
+// Every narrowing that is on has to agree, so several at once mean the task matches all of them
 const fits = (task: DailyTask, narrowing: TaskNarrowing): boolean =>
-  (narrowing.priority === "" || task.priority === narrowing.priority) && (narrowing.doer === "" || task.doer === narrowing.doer)
+  (narrowing.priority === "" || task.priority === narrowing.priority) &&
+  (narrowing.doer === "" || task.doer === narrowing.doer) &&
+  agrees(narrowing.blocked, task.isBlocked) &&
+  agrees(narrowing.done, task.isCompleted)
 
 const keep = (task: DailyTask, narrowing: TaskNarrowing): DailyTask | null => {
   if (fits(task, narrowing)) return task

@@ -282,6 +282,29 @@ export default function DailyTasksClient() {
     }
   }
 
+  /**
+   * Blocked or not, from the row's own toggle: the same one-field write as the two chips, shown at
+   * once and put back if it fails.
+   */
+  const setBlocked = async (task: DailyTask, isBlocked: boolean) => {
+    if (pendingIds.has(task.id) || isBlocked === task.isBlocked) return
+    setTaskError(null)
+    const show = (value: boolean) =>
+      setPage((current) => (current ? { ...current, days: changeTask(current.days, task.id, (entry) => ({ ...entry, isBlocked: value })) } : current))
+    show(isBlocked)
+    try {
+      const { data } = await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isBlocked }),
+      })
+      show(data.isBlocked)
+    } catch (error: unknown) {
+      show(task.isBlocked)
+      setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.updateFailed)
+    }
+  }
+
   // One more task on a day already on the list: it appears in that day, in the order written
   const addTaskToDay = async (date: string, content: string, details?: TaskDetailsDraft): Promise<boolean> => {
     setTaskError(null)
@@ -618,6 +641,7 @@ export default function DailyTasksClient() {
                 onMoveToToday={(task) => void moveOverdue(task)}
                 onPriority={(task, priority) => void setPriority(task, priority)}
                 onDoer={(task, doer) => void setDoer(task, doer)}
+                onBlock={(task, isBlocked) => void setBlocked(task, isBlocked)}
               />
             </div>
           </div>

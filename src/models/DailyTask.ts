@@ -31,6 +31,9 @@ export interface IDailyTask {
   // Who does it (constants/taskDoers.ts): the user, or an employee they get it done by. A task
   // saved before this reads as the default, Me, so every task always has one
   doer: TaskDoer
+  // Whether something else is holding it up. Every task starts unblocked, and one saved before this
+  // reads as unblocked, so it is never a special case
+  isBlocked: boolean
   // Where the task sits within its day, set by dragging; ties (tasks from before positions) keep the order they were written
   position: number
   isCompleted: boolean
@@ -60,6 +63,7 @@ const DailyTaskSchema = new Schema<IDailyTask>(
     taskDate: { type: String, required: true, match: ISO_DATE_PATTERN },
     priority: { type: String, enum: PRIORITY_IDS, default: DEFAULT_PRIORITY },
     doer: { type: String, enum: TASK_DOER_IDS, default: DEFAULT_TASK_DOER },
+    isBlocked: { type: Boolean, required: true, default: false },
     position: { type: Number, required: true, default: 0 },
     isCompleted: { type: Boolean, required: true, default: false },
     completedAt: { type: Date, default: null },
