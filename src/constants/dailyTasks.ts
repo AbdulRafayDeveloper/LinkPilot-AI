@@ -47,6 +47,13 @@ export const DAILY_TASKS_MESSAGES = {
   futureDate: "Tasks can be added for today or an earlier day.",
   invalidTask: "That task no longer exists.",
   invalidPriority: "Choose High, Medium or Low.",
+  // Showing one priority only: the control sits in the list's own heading row, so it costs no height
+  filterAll: "All priorities",
+  filterOn: "Showing one priority. Choose All priorities to see them all again.",
+  filterNote: "Showing one priority",
+  noneOfThatPriority: "No task of that priority on these days. Try another page, or show them all.",
+  // Dragging is off while a priority is being shown, because the list is not the whole day's order
+  filterNoDrag: "Showing one priority, so the tasks can't be dragged into a new order.",
   saved: "Tasks added.",
   saveFailed: "Couldn't add the tasks. Please try again.",
   loadFailed: "Couldn't load your tasks.",

@@ -48,7 +48,8 @@ import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 import { CopyTaskText } from "@/components/tasks/CopyTaskText"
 import { PrioritySelect } from "@/components/ui/PriorityPicker"
-import type { Priority } from "@/constants/priorities"
+import { PRIORITIES, PRIORITY_TONE, type Priority } from "@/constants/priorities"
+import { onlyPriority } from "@/lib/taskFilters"
 import { emptyTaskDetails, hasTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
 
 /** Tasks dropped somewhere new: the day they now belong to, that day's whole order, and every day as it now looks. */
@@ -478,6 +479,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onPriority,
   wasDragging,
   pendingIds,
+  canDrag,
 }: {
   task: DailyTask
   today: string
@@ -491,10 +493,12 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onPriority: (task: DailyTask, priority: Priority) => void
   wasDragging: () => boolean
   pendingIds: ReadonlySet<string>
+  // Off while one priority is being shown: the list is then only part of each day's order
+  canDrag: boolean
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
-    disabled: isPending,
+    disabled: isPending || !canDrag,
   })
   const state = taskState(task, today)
 
@@ -503,7 +507,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
       ref={setNodeRef}
       {...listeners}
       style={{ transform: CSS.Translate.toString(transform), transition, touchAction: "manipulation" }}
-      className={`relative flex flex-col rounded-xl border ${isPending ? "" : "cursor-grab active:cursor-grabbing"} ${
+      className={`relative flex flex-col rounded-xl border ${isPending || !canDrag ? "" : "cursor-grab active:cursor-grabbing"} ${
         isDragging
           ? "border-dashed border-primary/40 bg-primary-fixed/20 [&>*]:opacity-0"
           : `transition-colors ${stateStyles[state]} ${isSelected ? "ring-2 ring-primary/50 ring-offset-1" : ""}`
@@ -529,8 +533,10 @@ const SortableTaskRow = memo(function SortableTaskRow({
               ref={setActivatorNodeRef}
               {...attributes}
               onKeyDown={listeners?.onKeyDown as React.KeyboardEventHandler<HTMLButtonElement> | undefined}
+              disabled={!canDrag}
+              title={canDrag ? undefined : DAILY_TASKS_MESSAGES.filterNoDrag}
               aria-label={isSelected ? `Move the picked tasks, starting with: ${task.content}` : `Move task: ${task.content}`}
-              className={`${handleClass} ${isPending ? "cursor-not-allowed opacity-40" : "cursor-grab hover:bg-surface-container-high hover:text-on-surface active:cursor-grabbing"}`}
+              className={`${handleClass} ${isPending || !canDrag ? "cursor-not-allowed opacity-40" : "cursor-grab hover:bg-surface-container-high hover:text-on-surface active:cursor-grabbing"}`}
             >
               <GripVertical size={16} aria-hidden="true" />
             </button>
@@ -668,6 +674,7 @@ const DayGroup = memo(function DayGroup({
   onPriority,
   onAddTask,
   wasDragging,
+  canDrag,
 }: {
   day: DailyTaskDay
   today: string
@@ -684,6 +691,7 @@ const DayGroup = memo(function DayGroup({
   onPriority: (task: DailyTask, priority: Priority) => void
   onAddTask: AddTaskHandler
   wasDragging: () => boolean
+  canDrag: boolean
 }) {
   const { title, detail } = dayLabel(day.date, today)
   const done = day.tasks.filter((task) => task.isCompleted).length
@@ -730,6 +738,7 @@ const DayGroup = memo(function DayGroup({
                 onPriority={onPriority}
                 wasDragging={wasDragging}
                 pendingIds={pendingIds}
+                canDrag={canDrag}
               />
             ))
           )}
@@ -800,13 +809,28 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   // What is travelling with the pointer: one task, or every picked one, and how many that is
   const moving = useRef<DailyTask[]>([])
   const [movingCount, setMovingCount] = useState(0)
+  /**
+   * Showing one priority only. It sits in the heading row that is already there, so it costs the
+   * page no height, and it is this component's own state: it holds while the day pages are turned
+   * and starts again on a reload, which is what a view choice should do.
+   */
+  const [priorityFilter, setPriorityFilter] = useState<Priority | "">("")
+  const isFiltered = priorityFilter !== ""
+  /**
+   * A filtered list is read, not rearranged. A drag writes the destination day's **whole** order,
+   * and a filtered day is only part of it, so saving one would answer 409 and put the list back;
+   * dragging is held off instead, exactly as it is on a filtered team in Employees.
+   */
+  const canDrag = !isFiltered
 
   // Today is always a place to drop on, on the page that shows it, even before it has a task
   const days = useMemo(() => {
     const shown = dragDays ?? page?.days ?? []
+    // Filtered, the list is read rather than rearranged, so an empty today is not a place to drop on
+    if (isFiltered) return onlyPriority(shown, priorityFilter)
     if (!page || current !== 1 || !today || shown.length === 0 || shown.some((day) => day.date === today)) return shown
     return [{ date: today, tasks: [] }, ...shown]
-  }, [dragDays, page, current, today])
+  }, [dragDays, page, current, today, isFiltered, priorityFilter])
 
   // The rows as the page shows them, kept for a Shift pick and for the order a group lands in. It is
   // read only when something is clicked or dragged, so it is put in the ref after the list is drawn
@@ -973,6 +997,23 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-on-surface">{current === 1 ? `Last ${VISIBLE_DAYS} Days` : "Older Tasks"}</h2>
         <div className="flex flex-wrap items-center gap-2">
+          {/* In the heading's own row, so showing one priority costs the page no height at all */}
+          <select
+            value={priorityFilter}
+            onChange={(event) => setPriorityFilter(event.target.value as Priority | "")}
+            aria-label="Show only tasks of one priority"
+            title={isFiltered ? DAILY_TASKS_MESSAGES.filterOn : DAILY_TASKS_MESSAGES.filterAll}
+            className={`h-6 cursor-pointer rounded-full border px-2 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+              isFiltered ? `border-transparent ${PRIORITY_TONE[priorityFilter]}` : "border-outline-variant bg-white text-on-surface-variant"
+            }`}
+          >
+            <option value="">{DAILY_TASKS_MESSAGES.filterAll}</option>
+            {PRIORITIES.map((priority) => (
+              <option key={priority.id} value={priority.id}>
+                {priority.label} only
+              </option>
+            ))}
+          </select>
           {selectedIds.size > 0 && (
             <span role="status" className="flex shrink-0 items-center gap-2 text-[12px] font-semibold text-on-surface">
               {selectedIds.size} picked
@@ -991,7 +1032,12 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
           )}
           {page && (
             <span className="text-[11px] text-outline">
-              {current === 1 ? `From ${page.windowStart}` : `Page ${current} of ${pageCount}`}
+              {/* While a priority is being shown, the row says so rather than adding a line for it */}
+              {isFiltered
+                ? DAILY_TASKS_MESSAGES.filterNote
+                : current === 1
+                  ? `From ${page.windowStart}`
+                  : `Page ${current} of ${pageCount}`}
             </span>
           )}
         </div>
@@ -1016,6 +1062,16 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
         <div role="status" className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
           <Loader2 size={22} className="animate-spin text-primary" aria-hidden="true" />
           <p className="text-sm font-semibold text-on-surface">Loading your tasks...</p>
+        </div>
+      ) : isFiltered && days.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/5 text-primary">
+            <ListTodo size={20} aria-hidden="true" />
+          </div>
+          <p className="max-w-xs text-sm leading-relaxed text-on-surface-variant">{DAILY_TASKS_MESSAGES.noneOfThatPriority}</p>
+          <button type="button" onClick={() => setPriorityFilter("")} className="text-[13px] font-semibold text-primary hover:underline">
+            {DAILY_TASKS_MESSAGES.filterAll}
+          </button>
         </div>
       ) : !hasDays ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
@@ -1053,6 +1109,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 onOpenTask={onOpenTask}
                 onMoveToToday={onMoveToToday}
                 onPriority={onPriority}
+                canDrag={canDrag}
                 onSelect={selectTask}
                 onAddTask={onAddTask}
                 wasDragging={wasDragging}
