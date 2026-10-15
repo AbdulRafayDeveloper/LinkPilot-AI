@@ -8,7 +8,7 @@ import { Modal } from "@/components/ui/Modal"
 import { Pagination } from "@/components/ui/Pagination"
 import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { useRowSelection } from "@/hooks/useRowSelection"
-import { FilterPanel, SearchFilter, SearchableSelectFilter, SelectFilter, historyLabelClass } from "@/components/history/HistoryFilters"
+import { FilterPanel, SearchFilter, SearchableSelectFilter, historyLabelClass } from "@/components/history/HistoryFilters"
 import { ContentDialog } from "@/components/important-content/ContentDialog"
 import { ContentFullView } from "@/components/important-content/ContentFullView"
 import { FoldersDialog } from "@/components/saved-outputs/FoldersDialog"
@@ -312,17 +312,20 @@ export default function ImportantContentClient() {
                 }}
                 placeholder="Search by name"
               />
-              <SelectFilter
+              {/* Both choice filters are searched rather than scrolled: the types a user makes up
+                  grow as long as their folders do, so the two read and work the same way */}
+              <SearchableSelectFilter
                 label="Type"
                 allLabel="All types"
                 value={type}
                 options={typeOptions}
+                searchPlaceholder={IMPORTANT_CONTENT_MESSAGES.searchTypes}
+                emptyLabel={IMPORTANT_CONTENT_MESSAGES.noTypeMatch}
                 onChange={(value) => {
                   setType(value)
                   setPage(1)
                 }}
               />
-              {/* Searched rather than scrolled, because a hundred folders is a long list to open */}
               <SearchableSelectFilter
                 label="Folder"
                 allLabel={CONTENT_FOLDER_MESSAGES.allFolders}

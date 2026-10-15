@@ -51,6 +51,9 @@ export const IMPORTANT_CONTENT_MESSAGES = {
   notFound: "That content no longer exists.",
   empty: "Nothing saved yet. Add the logins, links and text you need to find again quickly.",
   noResults: "No content matches these filters.",
+  // The type filter is searched rather than scrolled, like the folder one beside it
+  searchTypes: "Search types",
+  noTypeMatch: "No type matches that name.",
   badTextSize: "Choose one of the text sizes offered.",
   imageUnsupported: "Add a PNG, JPG or WEBP image.",
   imageTooLarge: `Images must be ${CONTENT_IMAGE_MAX_BYTES / (1024 * 1024)} MB or smaller.`,
