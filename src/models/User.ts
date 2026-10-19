@@ -22,14 +22,15 @@ export interface IUser {
   // The client last chosen on Client Voices, so the page opens on it again on any browser; null for none
   clientVoicesClientId: string | null
   /**
-   * What Daily Tasks is narrowed to, kept on the account so the list opens the same way on any
-   * browser and after signing out and in. Each is "" when it is not being narrowed on, so a new
-   * account, and every account from before this, reads as nothing narrowed.
+   * What each page is filtered on, one entry per page (`constants/savedFilters.ts`), so every list
+   * opens the way its user left it: after a reload, after signing out and in, and on any machine.
    *
    * It is **the person's own**, like the Client Voices choice above and unlike the work itself: a
-   * child account looking at one priority never narrows its parent's list.
+   * child account narrowing its own list never narrows its parent's. It is `unknown` here and read
+   * through `cleanFilters`, which is the rule for anything nested in this repo: a page is only ever
+   * handed the keys it really has.
    */
-  dailyTaskFilters: { priority: string; doer: string; blocked: string; done: string }
+  viewFilters: unknown
   // Wrong passwords in a row, for the lockout; reset by a good sign-in
   failedLogins: number
   lockedUntil: Date | null
@@ -53,13 +54,8 @@ const UserSchema = new Schema<IUser>(
     disabledTools: { type: [String], default: [] },
     enabledTools: { type: [String], default: [] },
     clientVoicesClientId: { type: String, default: null },
-    // Four plain strings, so the document always holds the shape the page reads
-    dailyTaskFilters: {
-      priority: { type: String, default: "" },
-      doer: { type: String, default: "" },
-      blocked: { type: String, default: "" },
-      done: { type: String, default: "" },
-    },
+    // One entry per page; what may be in each is decided by lib/savedFilters.ts, not by the schema
+    viewFilters: { type: Schema.Types.Mixed, default: {} },
     failedLogins: { type: Number, required: true, default: 0 },
     loginCount: { type: Number, required: true, default: 0 },
     failedLoginCount: { type: Number, required: true, default: 0 },

@@ -10,6 +10,8 @@ import { FilterPanel, SearchFilter } from "@/components/history/HistoryFilters"
 import { ClientDialog } from "@/components/clients/ClientDialog"
 import { ClientProjectsPanel } from "@/components/clients/ClientProjectsPanel"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { requestApi } from "@/lib/apiClient"
 import { CLIENTS_ENDPOINT, CLIENTS_MESSAGES } from "@/constants/clients"
 import { SAMPLE_MESSAGE_COUNT } from "@/constants/clientMessaging"
@@ -81,6 +83,13 @@ export default function ClientsClient() {
   // Nobody chosen yet (a fresh load, or the chosen one was deleted): the first client is open
   const current = clients?.find((client) => client.id === selectedId) ?? shown[0] ?? null
   const hasFilters = search.trim().length > 0
+
+  // The search is kept on the account, so the list opens the way it was left (hooks/useSavedFilters)
+  useSavedFilters({
+    view: "clients",
+    filters: filtersOf({ search }),
+    apply: (saved: SavedFilters) => setSearch(savedText(saved.search)),
+  })
 
   const choose = (client: Client) => {
     setSelectedId(client.id)

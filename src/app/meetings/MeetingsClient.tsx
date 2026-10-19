@@ -14,12 +14,16 @@ import { DeleteMeetingDialog } from "@/components/meetings/DeleteMeetingDialog"
 import { MeetingFormDialog } from "@/components/meetings/MeetingFormDialog"
 import { MeetingsPromptModal } from "@/components/meetings/MeetingsPromptModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { ClearFiltersButton } from "@/components/history/HistoryFilters"
+import { filtersOf, oneOf, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { requestApi } from "@/lib/apiClient"
 import {
   MEETINGS_ENDPOINT,
   MEETING_MESSAGES,
   MEETING_SEARCH_MAX_LENGTH,
   MEETING_STATUSES,
+  MEETING_STATUS_IDS,
   RUNNING_STATUSES,
   SEARCH_DEBOUNCE_MS,
   type MeetingPromptId,
@@ -62,6 +66,19 @@ export default function MeetingsClient() {
     const timer = setTimeout(() => setSearch(typedSearch.trim()), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [typedSearch])
+
+  // The search and the status are kept on the account, so the history opens the way it was left
+  // (hooks/useSavedFilters). What is kept is the box as it is typed, and the search itself follows
+  // through the same settling as any other keystroke
+  useSavedFilters({
+    view: "meetings",
+    filters: filtersOf({ search: typedSearch, status }),
+    apply: (saved: SavedFilters) => {
+      setTypedSearch(savedText(saved.search))
+      setStatus(oneOf<MeetingStatusId>(saved.status, MEETING_STATUS_IDS))
+      setIsLoading(true)
+    },
+  })
 
   const query = useCallback(
     (cursor?: string) => {
@@ -223,6 +240,13 @@ export default function MeetingsClient() {
   }
 
   const isFiltering = search !== "" || status !== ""
+  const canClear = typedSearch !== "" || status !== ""
+
+  const clearFilters = () => {
+    setTypedSearch("")
+    setStatus("")
+    setIsLoading(true)
+  }
 
   /**
    * Links the ticked records to one planned meeting, or takes one record off the meeting it points
@@ -355,6 +379,7 @@ export default function MeetingsClient() {
               <p className="text-[11px] text-outline sm:ml-auto" aria-live="polite">
                 {total > 0 ? `${total.toLocaleString()} ${isFiltering ? "match" : "saved"}` : ""}
               </p>
+              {canClear && <ClearFiltersButton onClear={clearFilters} />}
             </div>
 
             {/* The history */}

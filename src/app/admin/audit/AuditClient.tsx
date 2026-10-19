@@ -12,9 +12,11 @@ import { DeviceLine, EventBadge, StatCard, dateTime } from "@/components/admin/A
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { useCursorList } from "@/hooks/useCursorList"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, oneOf, savedDay, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { appendDayRange, isBackwardsRange } from "@/lib/dayRange"
 import { HISTORY_DEBOUNCE_MS, HISTORY_MESSAGES } from "@/constants/historyFilters"
-import { ACTIVE_DAYS, ADMIN_ENDPOINTS, ADMIN_MESSAGES, AUDIT_HREF, LOGIN_EVENTS, USERS_HREF } from "@/constants/admin"
+import { ACTIVE_DAYS, ADMIN_ENDPOINTS, ADMIN_MESSAGES, AUDIT_HREF, LOGIN_EVENT_IDS, LOGIN_EVENTS, USERS_HREF } from "@/constants/admin"
 import type { AuditPage, LoginEventEntry } from "@/types/admin"
 
 const idOf = (entry: LoginEventEntry) => entry.id
@@ -35,6 +37,18 @@ export default function AuditClient() {
   const settledSearch = useDebouncedValue(search.trim(), HISTORY_DEBOUNCE_MS)
   const badDateRange = isBackwardsRange(fromDay, toDay)
   const hasFilters = Boolean(search || event || fromDay || toDay)
+
+  // The filters are kept on the account, so the log opens the way it was left (hooks/useSavedFilters)
+  useSavedFilters({
+    view: "admin-audit",
+    filters: filtersOf({ search, event, from: fromDay, to: toDay }),
+    apply: (saved: SavedFilters) => {
+      setSearch(savedText(saved.search))
+      setEvent(oneOf(saved.event, LOGIN_EVENT_IDS))
+      setFromDay(savedDay(saved.from))
+      setToDay(savedDay(saved.to))
+    },
+  })
 
   const params = new URLSearchParams()
   if (search.trim() && settledSearch) params.set("search", settledSearch)

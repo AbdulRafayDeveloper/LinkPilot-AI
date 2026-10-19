@@ -10,6 +10,9 @@ import { useRowSelection } from "@/hooks/useRowSelection"
 import { ReferenceItemDialog } from "@/components/reference-content/ReferenceItemDialog"
 import { DeleteReferenceDialog } from "@/components/reference-content/DeleteReferenceDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { ClearFiltersButton } from "@/components/history/HistoryFilters"
+import { filtersOf, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { requestApi } from "@/lib/apiClient"
 import {
   REFERENCE_CONTENT_ENDPOINT,
@@ -79,6 +82,16 @@ export default function ReferenceContentClient() {
     const timer = setTimeout(() => setSearch(typedSearch.trim()), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [typedSearch])
+
+  // The search is kept on the account, so the library opens the way it was left (hooks/useSavedFilters)
+  useSavedFilters({
+    view: "reference-content",
+    filters: filtersOf({ search: typedSearch }),
+    apply: (saved: SavedFilters) => {
+      setTypedSearch(savedText(saved.search))
+      setIsLoading(true)
+    },
+  })
 
   // The first batch: on arrival, whenever the search changes, and after saving or deleting
   useEffect(() => {
@@ -250,9 +263,12 @@ export default function ReferenceContentClient() {
                   </button>
                 )}
               </div>
-              <p className="text-[11px] text-outline" aria-live="polite">
-                {notice ?? (total > 0 ? `${total.toLocaleString()} ${isSearching ? "match this search" : "saved"}` : "")}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] text-outline" aria-live="polite">
+                  {notice ?? (total > 0 ? `${total.toLocaleString()} ${isSearching ? "match this search" : "saved"}` : "")}
+                </p>
+                {typedSearch !== "" && <ClearFiltersButton onClear={() => changeSearch("")} />}
+              </div>
             </div>
 
             <BulkDeleteBar

@@ -14,10 +14,12 @@ import { PlanLinkActions, PlanLinkConfirmDialog, PlanLinkPanel, usePlanLink } fr
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { useCursorList } from "@/hooks/useCursorList"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, oneOf, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { requestApi } from "@/lib/apiClient"
 import { HISTORY_DEBOUNCE_MS } from "@/constants/historyFilters"
-import { EMPLOYEES_ENDPOINT, EMPLOYEE_MESSAGES, EMPLOYEE_STATUSES } from "@/constants/employees"
+import { EMPLOYEES_ENDPOINT, EMPLOYEE_MESSAGES, EMPLOYEE_STATUSES, EMPLOYEE_STATUS_IDS } from "@/constants/employees"
 import type { Employee, EmployeesPage } from "@/types/employees"
 
 const idOf = (employee: Employee) => employee.id
@@ -95,6 +97,16 @@ export default function EmployeesClient() {
   })
   const counts = list.latest?.counts ?? { active: 0, inactive: 0 }
   const hasFilters = Boolean(search || status)
+
+  // The filters are kept on the account, so the team opens the way it was left (hooks/useSavedFilters)
+  useSavedFilters({
+    view: "employees",
+    filters: filtersOf({ search, status }),
+    apply: (saved: SavedFilters) => {
+      setSearch(savedText(saved.search))
+      setStatus(oneOf(saved.status, EMPLOYEE_STATUS_IDS))
+    },
+  })
   // Nobody chosen yet (a fresh load, or the chosen one was deleted): the first employee is open
   const current = selected ?? list.items[0] ?? null
   // The people picked in the list's own circles: dragging moves them together, and the bar deletes them

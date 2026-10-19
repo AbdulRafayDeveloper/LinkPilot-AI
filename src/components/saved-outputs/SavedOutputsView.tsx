@@ -49,10 +49,19 @@ import type { SavedOutput, SavedOutputDetail, SavedOutputsPage } from "@/types/s
 import type { PromptFolder } from "@/types/promptFolders"
 import { IN_ANY_FOLDER, PROMPT_FOLDER_MESSAGES, UNFILED_FOLDER } from "@/constants/promptFolders"
 import { usePromptFolders } from "@/hooks/usePromptFolders"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { savedOutputsView } from "@/constants/savedFilters"
+import { filtersOf, oneOf, savedDay, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { MoveToFolderDialog } from "./MoveToFolderDialog"
 import { FoldersDialog } from "./FoldersDialog"
 import { DependenciesDialog } from "./DependenciesDialog"
-import { DEPENDENCY_FILTERS, DEPENDENCY_STATE_LABELS, PROMPT_DEPENDENCY_MESSAGES, describePending } from "@/constants/promptDependencies"
+import {
+  DEPENDENCY_FILTERS,
+  DEPENDENCY_FILTER_IDS,
+  DEPENDENCY_STATE_LABELS,
+  PROMPT_DEPENDENCY_MESSAGES,
+  describePending,
+} from "@/constants/promptDependencies"
 import { dependencyState, pendingDependencies } from "@/lib/promptDependencies"
 import type { PromptDependency } from "@/types/promptCreator"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
@@ -71,6 +80,9 @@ interface FilterState {
 }
 
 const NO_FILTERS: FilterState = { search: "", option: "", context: "", folder: "", dependencies: "", fromDay: "", toDay: "" }
+
+// A tool that has not been resolved yet offers no choices, and the same array keeps the hook settled
+const EMPTY_FILTERS: SavedOutputTool["filters"] = []
 
 const writtenOn = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -471,6 +483,40 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
   const endpoint = `${SAVED_OUTPUTS_ENDPOINT}/${toolId}`
   const badDateRange = isBackwardsRange(filters.fromDay, filters.toDay)
   const hasFilters = JSON.stringify(filters) !== JSON.stringify(NO_FILTERS)
+
+  // The filters are kept on the account, each tool's own, so the list opens the way it was left
+  // (hooks/useSavedFilters). A choice the tool no longer has is read as off, except the ones whose
+  // options come from the records themselves, which the API takes as they are
+  useSavedFilters({
+    view: savedOutputsView(toolId),
+    filters: filtersOf({
+      search: filters.search,
+      option: filters.option,
+      context: filters.context,
+      folder: filters.folder,
+      dependency: filters.dependencies,
+      from: filters.fromDay,
+      to: filters.toDay,
+    }),
+    apply: (saved: SavedFilters) => {
+      const choice = (key: "option" | "context") => {
+        const filter = (tool?.filters ?? EMPTY_FILTERS).find((entry) => entry.key === key)
+        if (!filter) return ""
+        return filter.fromServer ? savedText(saved[key]) : oneOf(saved[key], filter.options.map((option) => option.id))
+      }
+      setFilters({
+        search: savedText(saved.search),
+        option: choice("option"),
+        context: choice("context"),
+        // A folder is one of the viewer's own, so it is kept as it is and matches nothing once gone
+        folder: savedText(saved.folder),
+        dependencies: oneOf(saved.dependency, DEPENDENCY_FILTER_IDS),
+        fromDay: savedDay(saved.from),
+        toDay: savedDay(saved.to),
+      })
+      setPage(1)
+    },
+  })
 
   // Typing settles before the list is asked for again, and an emptied search box counts at once
   const settledSearch = useDebouncedValue(filters.search.trim(), HISTORY_DEBOUNCE_MS)

@@ -14,6 +14,8 @@ import { ContentFullView } from "@/components/important-content/ContentFullView"
 import { FoldersDialog } from "@/components/saved-outputs/FoldersDialog"
 import { MoveToFolderDialog } from "@/components/saved-outputs/MoveToFolderDialog"
 import { usePromptFolders } from "@/hooks/usePromptFolders"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { requestApi } from "@/lib/apiClient"
@@ -131,6 +133,20 @@ export default function ImportantContentClient() {
 
   const reload = () => setAttempt((count) => count + 1)
   const hasFilters = Boolean(search || type || folder)
+
+  // The filters are kept on the account, so the list opens the way it was left
+  // (hooks/useSavedFilters). A type is the user's own word and a folder one of their own folders,
+  // so both are kept as they are and simply match nothing once the last entry using them is gone
+  useSavedFilters({
+    view: "important-content",
+    filters: filtersOf({ search, type, folder }),
+    apply: (saved: SavedFilters) => {
+      setSearch(savedText(saved.search))
+      setType(savedText(saved.type))
+      setFolder(savedText(saved.folder))
+      setPage(1)
+    },
+  })
   const selection = useRowSelection((result?.items ?? []).map((entry) => entry.id))
 
   /**

@@ -30,6 +30,7 @@ export const DEPENDENCY_FILTERS = [
 ] as const
 
 export type DependencyState = (typeof DEPENDENCY_FILTERS)[number]["id"]
+export const DEPENDENCY_FILTER_IDS = DEPENDENCY_FILTERS.map((filter) => filter.id) as [DependencyState, ...DependencyState[]]
 
 export const DEPENDENCY_STATE_LABELS: Record<DependencyState, string> = {
   independent: "Independent",

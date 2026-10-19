@@ -10,7 +10,9 @@ import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { filterByWords } from "@/lib/nameSearch"
 import { CLIENT_PROJECTS_ENDPOINT, PROJECT_TASK_MESSAGES } from "@/constants/clientProjectTasks"
-import { CLIENT_PROJECT_STATUSES } from "@/constants/clients"
+import { CLIENT_PROJECT_STATUSES, CLIENT_PROJECT_STATUS_IDS } from "@/constants/clients"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, oneOf, savedText, type SavedFilters } from "@/lib/savedFilters"
 import type { ClientProjectsPage } from "@/types/clientProjectTasks"
 
 /**
@@ -54,6 +56,18 @@ export default function ClientProjectsClient() {
   }, [page, client, status, search])
 
   const hasFilters = Boolean(search || client || status)
+
+  // The filters are kept on the account, so the list opens the way it was left (hooks/useSavedFilters)
+  useSavedFilters({
+    view: "client-projects",
+    filters: filtersOf({ search, client, status }),
+    apply: (saved: SavedFilters) => {
+      setSearch(savedText(saved.search))
+      // A client is any of the viewer's own, so it is kept as it is and simply matches nothing once gone
+      setClient(savedText(saved.client))
+      setStatus(oneOf(saved.status, CLIENT_PROJECT_STATUS_IDS))
+    },
+  })
   const statusOptions = CLIENT_PROJECT_STATUSES.map((entry) => ({ id: entry.id, label: entry.label }))
   const clientOptions = (page?.clients ?? []).map((entry) => ({ id: entry.id, label: entry.name }))
 

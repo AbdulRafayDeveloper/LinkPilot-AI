@@ -18,6 +18,8 @@ import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { useCursorList } from "@/hooks/useCursorList"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, oneOf, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { requestApi } from "@/lib/apiClient"
 import { HISTORY_DEBOUNCE_MS } from "@/constants/historyFilters"
 import { ACTIVE_DAYS, ADMIN_ENDPOINTS, ADMIN_MESSAGES, AUDIT_HREF } from "@/constants/admin"
@@ -215,6 +217,16 @@ export default function UsersClient() {
   })
   const summary = list.latest?.summary ?? null
   const hasFilters = Boolean(search || role)
+
+  // The filters are kept on the account, so the list opens the way it was left (hooks/useSavedFilters)
+  useSavedFilters({
+    view: "admin-users",
+    filters: filtersOf({ search, role }),
+    apply: (saved: SavedFilters) => {
+      setSearch(savedText(saved.search))
+      setRole(oneOf(saved.role, USER_ROLES))
+    },
+  })
 
   // The tools for every user, shown beside the button that changes them
   const [isDefaultsOpen, setIsDefaultsOpen] = useState(false)

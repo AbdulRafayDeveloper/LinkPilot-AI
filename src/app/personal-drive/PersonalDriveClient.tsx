@@ -30,6 +30,9 @@ import { EditAssetDialog } from "@/components/important-files/EditAssetDialog"
 import { DeleteAssetDialog } from "@/components/important-files/DeleteAssetDialog"
 import { AssetViewerDialog } from "@/components/important-files/AssetViewerDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { ClearFiltersButton } from "@/components/history/HistoryFilters"
+import { filtersOf, oneOf, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { requestApi, fetchWithRetry } from "@/lib/apiClient"
 import { uploadAsset } from "@/lib/assetUpload"
 import { childFolders, folderPath } from "@/lib/folderTree"
@@ -123,6 +126,24 @@ export default function PersonalDriveClient() {
     return () => clearTimeout(timer)
   }, [typedSearch])
 
+  // The search and the type are kept on the account, so the drive opens the way it was left
+  // (hooks/useSavedFilters). Which folder is open is not a filter and is not kept: a drive opens at
+  // the top of itself
+  useSavedFilters({
+    view: "personal-drive",
+    filters: filtersOf({ search: typedSearch, type: type === "all" ? "" : type }),
+    apply: (saved: SavedFilters) => {
+      setTypedSearch(savedText(saved.search))
+      setType(
+        oneOf<AssetFilterId>(
+          saved.type,
+          ASSET_FILTERS.map((filter) => filter.id)
+        ) || "all"
+      )
+      setIsLoading(true)
+    },
+  })
+
   // What every call about this view carries: the open folder, the search and the type filter
   const viewParams = useCallback(() => {
     const params = new URLSearchParams()
@@ -171,6 +192,11 @@ export default function PersonalDriveClient() {
   const changeType = (next: AssetFilterId) => {
     if (next === type) return
     setType(next)
+    setIsLoading(true)
+  }
+  const clearFilters = () => {
+    setTypedSearch("")
+    setType("all")
     setIsLoading(true)
   }
   const openFolder = (next: string | null) => {
@@ -627,6 +653,7 @@ export default function PersonalDriveClient() {
                     {total.toLocaleString()} {total === 1 ? "file" : "files"}
                     {isFiltering && " match"}
                   </span>
+                  {(typedSearch !== "" || type !== "all") && <ClearFiltersButton onClear={clearFilters} />}
                 </div>
               </div>
 

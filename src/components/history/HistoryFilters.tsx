@@ -4,6 +4,7 @@ import React, { useEffect, useId, useMemo, useRef, useState } from "react"
 import { Check, ChevronDown, Search, X } from "lucide-react"
 import { HISTORY_SEARCH_MAX_LENGTH } from "@/constants/historyFilters"
 import { filterByWords } from "@/lib/nameSearch"
+import { SAVED_FILTERS_MESSAGES } from "@/constants/savedFilters"
 
 /**
  * The filter bar every "view all" page uses: a search box, choice lists and a date range in one
@@ -23,6 +24,22 @@ interface FilterPanelProps {
   children: React.ReactNode
 }
 
+/**
+ * Clear filters, the one control that takes every filter off a list. It is its own component because
+ * three pages hold their filters in a row of their own rather than in `FilterPanel` (the meetings
+ * history, Personal Drive and Reference Content), and every list in the app says this the same way.
+ */
+export const ClearFiltersButton: React.FC<{ onClear: () => void; className?: string }> = ({ onClear, className = "" }) => (
+  <button
+    type="button"
+    onClick={onClear}
+    className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold text-outline transition-colors hover:bg-surface-container hover:text-primary ${className}`}
+  >
+    <X size={13} aria-hidden="true" />
+    {SAVED_FILTERS_MESSAGES.clear}
+  </button>
+)
+
 export const FilterPanel: React.FC<FilterPanelProps> = ({ columnsClassName, summary, canClear, onClear, children }) => (
   <section aria-label="Filters" className="rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
     <div className={`grid grid-cols-2 gap-3 ${columnsClassName}`}>{children}</div>
@@ -30,16 +47,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({ columnsClassName, summ
       <p className="text-[12px] text-on-surface-variant" aria-live="polite">
         {summary}
       </p>
-      {canClear && (
-        <button
-          type="button"
-          onClick={onClear}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold text-outline transition-colors hover:bg-surface-container hover:text-primary"
-        >
-          <X size={13} aria-hidden="true" />
-          Clear filters
-        </button>
-      )}
+      {canClear && <ClearFiltersButton onClear={onClear} />}
     </div>
   </section>
 )

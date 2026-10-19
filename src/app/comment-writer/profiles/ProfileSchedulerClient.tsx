@@ -13,6 +13,8 @@ import { ProfileScheduleFields } from "@/components/comment-writer/ProfileSchedu
 import { ProfileScheduleDialog } from "@/components/comment-writer/ProfileScheduleDialog"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, oneOf, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { requestApi } from "@/lib/apiClient"
 import { EMPTY_PERSON, personInputProblem, personName, typeLabel } from "@/lib/profilePeople"
@@ -21,11 +23,13 @@ import {
   DAY_PARAM,
   DEFAULT_PROFILE_PAGE_SIZE,
   PERSON_TYPES,
+  PERSON_TYPE_IDS,
   PROFILE_PAGE_SIZES,
   PROFILE_PARAM,
   PROFILE_SCHEDULER_MESSAGES,
   PROFILE_SCHEDULES_ENDPOINT,
   WEEK_DAYS,
+  WEEK_DAY_IDS,
   type PersonTypeId,
   type WeekDayId,
 } from "@/constants/profileScheduler"
@@ -34,7 +38,12 @@ import type { ProfileSchedule, ProfileScheduleInput, ProfileSchedulePage } from 
 /**
  * What the page remembers while the app is open: the day and type filters, the search, the page and the add
  * form's draft. It lives in this module rather than in browser storage on purpose, so moving to
- * another page and back keeps it, while a full reload of the browser starts it fresh.
+ * another page and back keeps it, while a full reload of the browser starts the half-written person
+ * and the page number fresh.
+ *
+ * **The filters themselves outlive the reload**, because they are kept on the account like every
+ * other page's (`hooks/useSavedFilters.ts`): this holds them while the app is open, and the account
+ * puts them back when the page is opened again.
  */
 interface Remembered {
   day: WeekDayId | ""
@@ -168,6 +177,21 @@ export default function ProfileSchedulerClient() {
 
   const reload = () => setAttempt((count) => count + 1)
   const hasFilters = Boolean(search || day || type)
+
+  // The filters and how many people a page holds are kept on the account, so the list opens the way
+  // it was left (hooks/useSavedFilters)
+  useSavedFilters({
+    view: "profile-scheduler",
+    filters: filtersOf({ search, day, type, pageSize: rowsPerPage }),
+    apply: (saved: SavedFilters) => {
+      setSearch(savedText(saved.search))
+      setDay(oneOf<WeekDayId>(saved.day, WEEK_DAY_IDS))
+      setType(oneOf<PersonTypeId>(saved.type, PERSON_TYPE_IDS))
+      const size = Number(saved.pageSize)
+      setRowsPerPage(PROFILE_PAGE_SIZES.includes(size as (typeof PROFILE_PAGE_SIZES)[number]) ? size : DEFAULT_PROFILE_PAGE_SIZE)
+      setPage(1)
+    },
+  })
   const selection = useRowSelection((result?.items ?? []).map((schedule) => schedule.id))
   const items = result?.items ?? []
   const total = result?.total ?? 0

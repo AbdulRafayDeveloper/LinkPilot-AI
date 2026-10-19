@@ -13,12 +13,15 @@ import { DateRangeFilters, FilterPanel, SearchFilter, SelectFilter, historyLabel
 import { SavedTopicModal, SavedTopicStatusBadge, searchedOn } from "@/components/trending-topics/SavedTopicModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, oneOf, savedDay, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { requestApi } from "@/lib/apiClient"
 import { appendDayRange, isBackwardsRange } from "@/lib/dayRange"
 import { HISTORY_DEBOUNCE_MS, HISTORY_MESSAGES } from "@/constants/historyFilters"
 import {
   NO_FORMAT_FILTER,
   SAVED_TOPIC_STATUSES,
+  SAVED_TOPIC_STATUS_IDS,
   TRENDING_HISTORY_ENDPOINT,
   TRENDING_HISTORY_MESSAGES,
   TRENDING_POST_FORMATS,
@@ -123,6 +126,35 @@ export default function TrendingHistoryClient() {
 
   const badDateRange = isBackwardsRange(filters.fromDay, filters.toDay)
   const hasFilters = JSON.stringify(filters) !== JSON.stringify(NO_FILTERS)
+
+  // The filters are kept on the account, so the history opens the way it was left
+  // (hooks/useSavedFilters). A category is whatever the searches themselves found, so it is kept as
+  // it is; a format and a status are read as off once they are no longer offered
+  useSavedFilters({
+    view: "trending-history",
+    filters: filtersOf({
+      search: filters.search,
+      category: filters.category,
+      format: filters.format,
+      status: filters.status,
+      from: filters.fromDay,
+      to: filters.toDay,
+    }),
+    apply: (saved: SavedFilters) => {
+      setFilters({
+        search: savedText(saved.search),
+        category: savedText(saved.category),
+        format: oneOf(
+          saved.format,
+          FORMAT_OPTIONS.map((option) => option.id)
+        ),
+        status: oneOf<SavedTopicStatus>(saved.status, SAVED_TOPIC_STATUS_IDS),
+        fromDay: savedDay(saved.from),
+        toDay: savedDay(saved.to),
+      })
+      setPage(1)
+    },
+  })
 
   // Typing settles before the list is asked for again, and an emptied search box counts at once
   const settledSearch = useDebouncedValue(filters.search.trim(), HISTORY_DEBOUNCE_MS)

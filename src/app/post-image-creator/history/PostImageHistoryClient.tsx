@@ -28,7 +28,9 @@ import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { requestApi } from "@/lib/apiClient"
 import { appendDayRange, isBackwardsRange } from "@/lib/dayRange"
 import { HISTORY_DEBOUNCE_MS, HISTORY_MESSAGES } from "@/constants/historyFilters"
-import { IMAGE_SIZES, PHOTO_FILTER_OPTIONS, POST_IMAGES_ENDPOINT, POST_IMAGES_MESSAGES, getPoseLabel } from "@/constants/postImages"
+import { IMAGE_SIZES, IMAGE_SIZE_IDS, PHOTO_FILTER_OPTIONS, POST_IMAGES_ENDPOINT, POST_IMAGES_MESSAGES, getPoseLabel } from "@/constants/postImages"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, oneOf, savedDay, savedText, type SavedFilters } from "@/lib/savedFilters"
 import type { PostImage } from "@/types/postImages"
 
 const madeAt = (iso: string) =>
@@ -88,6 +90,24 @@ export default function PostImageHistoryClient() {
   const images = list.items
   const selection = useRowSelection(images.map((image) => image.id))
   const updateFilter = (key: keyof FilterState, value: string) => setFilters((current) => ({ ...current, [key]: value }))
+
+  // The filters are kept on the account, so the gallery opens the way it was left (hooks/useSavedFilters)
+  useSavedFilters({
+    view: "post-images",
+    filters: filtersOf({ search: filters.search, size: filters.size, photo: filters.photo, from: filters.fromDay, to: filters.toDay }),
+    apply: (saved: SavedFilters) => {
+      setFilters({
+        search: savedText(saved.search),
+        size: oneOf(saved.size, IMAGE_SIZE_IDS),
+        photo: oneOf(
+          saved.photo,
+          PHOTO_FILTER_OPTIONS.map((option) => option.id)
+        ),
+        fromDay: savedDay(saved.from),
+        toDay: savedDay(saved.to),
+      })
+    },
+  })
 
   /**
    * Deletes the ticked images, or every image the filters cover, in one call. Each picture goes from

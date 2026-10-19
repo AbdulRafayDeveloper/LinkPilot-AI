@@ -10,6 +10,8 @@ import { StatCard, dateTime, timeAgo } from "@/components/admin/AdminParts"
 import { formatBytes } from "@/components/important-files/AddAssetDialog"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, oneOf, savedDay, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { requestApi } from "@/lib/apiClient"
 import { appendDayRange, isBackwardsRange } from "@/lib/dayRange"
 import { HISTORY_DEBOUNCE_MS, HISTORY_MESSAGES } from "@/constants/historyFilters"
@@ -19,7 +21,9 @@ import {
   BACKUP_MESSAGES,
   BACKUP_SCHEDULE_LABEL,
   BACKUP_STATUSES,
+  BACKUP_STATUS_IDS,
   BACKUP_TRIGGERS,
+  BACKUP_TRIGGER_IDS,
   backupTriggerLabel,
 } from "@/constants/backups"
 import type { BackupLogEntry, BackupsPage } from "@/types/backups"
@@ -86,6 +90,20 @@ export default function BackupsClient() {
   const settledSearch = useDebouncedValue(search.trim(), HISTORY_DEBOUNCE_MS)
   const badDateRange = isBackwardsRange(fromDay, toDay)
   const hasFilters = Boolean(search || status || trigger || fromDay || toDay)
+
+  // The filters are kept on the account, so the runs open the way they were left (hooks/useSavedFilters)
+  useSavedFilters({
+    view: "admin-backups",
+    filters: filtersOf({ search, status, trigger, from: fromDay, to: toDay }),
+    apply: (saved: SavedFilters) => {
+      setSearch(savedText(saved.search))
+      setStatus(oneOf(saved.status, BACKUP_STATUS_IDS))
+      setTrigger(oneOf(saved.trigger, BACKUP_TRIGGER_IDS))
+      setFromDay(savedDay(saved.from))
+      setToDay(savedDay(saved.to))
+      setPage(1)
+    },
+  })
 
   const params = new URLSearchParams({ page: String(page) })
   if (search.trim() && settledSearch) params.set("search", settledSearch)

@@ -54,6 +54,8 @@ export const FEATURE_DEFAULTS_ENDPOINT = "/api/admin/features"
 
 export const SHARED_API_PATHS = [
   "/api/auth",
+  // Which filters a page is left on: the person's own, for every tool, and never a record of any kind
+  "/api/view-filters",
   "/api/admin",
   "/api/ai-status",
   "/api/dummy-data",
