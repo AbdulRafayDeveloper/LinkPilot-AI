@@ -53,7 +53,8 @@ import { PrioritySelect } from "@/components/ui/PriorityPicker"
 import { DoerSelect } from "@/components/daily-tasks/DoerSelect"
 import { PRIORITIES, PRIORITY_TONE, type Priority } from "@/constants/priorities"
 import { TASK_DOERS, TASK_DOER_TONE, type TaskDoer } from "@/constants/taskDoers"
-import { NOTHING_NARROWED, isNarrowed, narrowDays, type TaskNarrowing, type YesOrNo } from "@/lib/taskFilters"
+import { NOTHING_NARROWED, isNarrowed, narrowDays, type YesOrNo } from "@/lib/taskFilters"
+import { useTaskFilters } from "@/hooks/useTaskFilters"
 import { emptyTaskDetails, hasTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
 
 /** Tasks dropped somewhere new: the day they now belong to, that day's whole order, and every day as it now looks. */
@@ -929,7 +930,8 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
    * hold while the day pages are turned and start again on a reload, which is what a view choice
    * should do.
    */
-  const [narrowing, setNarrowing] = useState<TaskNarrowing>(NOTHING_NARROWED)
+  // Kept on the account, so a filter put on is still on after a reload or a new sign-in
+  const { narrowing, setNarrowing, error: filtersError } = useTaskFilters()
   const isFiltered = isNarrowed(narrowing)
   /**
    * A narrowed list is read, not rearranged. A drag writes the destination day's **whole** order,
@@ -1115,7 +1117,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
           {/* In the heading's own row, so narrowing the list costs the page no height at all */}
           <select
             value={narrowing.priority}
-            onChange={(event) => setNarrowing((current) => ({ ...current, priority: event.target.value as Priority | "" }))}
+            onChange={(event) => setNarrowing({ ...narrowing, priority: event.target.value as Priority | "" })}
             aria-label="Show only tasks of one priority"
             title={narrowing.priority ? DAILY_TASKS_MESSAGES.filterOn : DAILY_TASKS_MESSAGES.filterAll}
             className={`${filterClass} ${narrowing.priority ? `border-transparent ${PRIORITY_TONE[narrowing.priority]}` : plainFilter}`}
@@ -1129,7 +1131,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
           </select>
           <select
             value={narrowing.doer}
-            onChange={(event) => setNarrowing((current) => ({ ...current, doer: event.target.value as TaskDoer | "" }))}
+            onChange={(event) => setNarrowing({ ...narrowing, doer: event.target.value as TaskDoer | "" })}
             aria-label="Show only the tasks one person does"
             title={narrowing.doer ? DAILY_TASKS_MESSAGES.doerOn : DAILY_TASKS_MESSAGES.doerAll}
             className={`${filterClass} ${narrowing.doer ? `border-transparent ${TASK_DOER_TONE[narrowing.doer]}` : plainFilter}`}
@@ -1143,7 +1145,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
           </select>
           <YesOrNoFilter
             value={narrowing.blocked}
-            onChange={(blocked) => setNarrowing((current) => ({ ...current, blocked }))}
+            onChange={(blocked) => setNarrowing({ ...narrowing, blocked })}
             label="Show only blocked tasks, or only the ones that are not"
             words={{
               all: DAILY_TASKS_MESSAGES.blockedAll,
@@ -1155,7 +1157,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
           />
           <YesOrNoFilter
             value={narrowing.done}
-            onChange={(done) => setNarrowing((current) => ({ ...current, done }))}
+            onChange={(done) => setNarrowing({ ...narrowing, done })}
             label="Show only tasks that are done, or only the ones that are not"
             words={{
               all: DAILY_TASKS_MESSAGES.doneAll,
@@ -1189,6 +1191,12 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
               <button type="button" onClick={clearSelection} className="text-primary hover:underline">
                 Clear
               </button>
+            </span>
+          )}
+          {/* A filter stays on the page when it could not be kept, so this says what happened */}
+          {filtersError && (
+            <span role="alert" className="text-[11px] font-semibold text-error">
+              {filtersError}
             </span>
           )}
           {page && (

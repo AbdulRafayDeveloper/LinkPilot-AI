@@ -66,6 +66,9 @@ export const DAILY_TASKS_MESSAGES = {
   notDone: "Not done",
   doneOn: "Showing one state. Choose Done or not to see them all again.",
   clearFilters: "Clear filters",
+  // The filters are kept on the account, so they are still on after a reload or a new sign-in
+  invalidFilters: "That isn't a filter this list has.",
+  filtersSaveFailed: "Filters are on, but couldn't be saved for next time.",
   showAll: "Show all tasks",
   nothingMatches: "No task matches on these days. Try another page, or show them all.",
   // Dragging is off while the list is narrowed, because what is shown is not the whole day's order

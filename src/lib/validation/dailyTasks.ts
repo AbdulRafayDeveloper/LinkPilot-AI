@@ -53,6 +53,21 @@ export const TaskDoerSchema = z.object({ doer: DoerSchema })
 /** Blocking a task or unblocking it, which is its own small update too. */
 export const TaskBlockedSchema = z.object({ isBlocked: z.boolean() })
 
+/** A yes-or-no narrowing, where "" is not narrowing on it at all. */
+const YesOrNo = z.enum(["", "yes", "no"], { message: DAILY_TASKS_MESSAGES.invalidFilters })
+
+/**
+ * What the list is narrowed to, as it is kept on the account. **Every field is optional and "" is
+ * what it means to be off**, so a body that names one filter leaves the rest off rather than being
+ * refused, and a request written before filters were saved reads as nothing narrowed.
+ */
+export const TaskFiltersSchema = z.object({
+  priority: z.union([PrioritySchema, z.literal("")]).optional().default(""),
+  doer: z.union([DoerSchema, z.literal("")]).optional().default(""),
+  blocked: YesOrNo.optional().default(""),
+  done: YesOrNo.optional().default(""),
+})
+
 /**
  * A task dropped onto a day (its own or another), with that day's whole new order. Moving to a
  * later day than today is refused for the same reason adding to one is: it would never show.
