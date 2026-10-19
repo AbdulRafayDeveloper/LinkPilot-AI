@@ -1,5 +1,6 @@
 import { DEFAULT_PRIORITY, type Priority } from "@/constants/priorities"
 import { DEFAULT_TASK_DOER, type TaskDoer } from "@/constants/taskDoers"
+import { NO_REPEAT, type TaskRepeat } from "@/lib/taskRepeat"
 
 /**
  * Everything a daily task carries besides its own words: how urgent it is, who does it, whether
@@ -14,7 +15,7 @@ export interface TaskChoices {
   priority: Priority
   doer: TaskDoer
   isBlocked: boolean
-  repeats: boolean
+  repeat: TaskRepeat
 }
 
 /** What a task starts as: the usual urgency, the user's own, nothing holding it up, once only. */
@@ -22,7 +23,7 @@ export const defaultChoices = (): TaskChoices => ({
   priority: DEFAULT_PRIORITY,
   doer: DEFAULT_TASK_DOER,
   isBlocked: false,
-  repeats: false,
+  repeat: NO_REPEAT,
 })
 
 /**
@@ -30,4 +31,4 @@ export const defaultChoices = (): TaskChoices => ({
  * always was, so every caller from before these existed sends exactly what it used to.
  */
 export const isPlain = (choices: TaskChoices): boolean =>
-  choices.priority === DEFAULT_PRIORITY && choices.doer === DEFAULT_TASK_DOER && !choices.isBlocked && !choices.repeats
+  choices.priority === DEFAULT_PRIORITY && choices.doer === DEFAULT_TASK_DOER && !choices.isBlocked && choices.repeat === NO_REPEAT

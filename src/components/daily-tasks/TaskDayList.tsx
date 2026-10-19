@@ -469,7 +469,7 @@ const choicesOf = (task: DailyTask): TaskChoices => ({
   priority: task.priority,
   doer: task.doer,
   isBlocked: task.isBlocked,
-  repeats: task.repeats,
+  repeat: task.repeat,
 })
 
 /**

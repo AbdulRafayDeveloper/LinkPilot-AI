@@ -1,5 +1,6 @@
 import type { Priority } from "@/constants/priorities"
 import type { TaskDoer } from "@/constants/taskDoers"
+import type { TaskRepeat } from "@/lib/taskRepeat"
 import type { TaskImage, TaskImageView } from "./taskAttachment"
 
 /**
@@ -22,8 +23,8 @@ export interface DailyTask {
   doer: TaskDoer
   // Whether something else is holding it up; a task saved before this reads as unblocked
   isBlocked: boolean
-  // Whether it comes back every day; a task saved before this reads as not repeating
-  repeats: boolean
+  // How often it comes back; a task saved before this reads as happening once
+  repeat: TaskRepeat
   isCompleted: boolean
   completedAt: string | null
   // The task this one is a subtask of, or null for a task of its own
@@ -41,7 +42,7 @@ export interface NewDailyTask {
   doer: TaskDoer
   // Set while the task is written, so a new task can be blocked or repeating from the start
   isBlocked: boolean
-  repeats: boolean
+  repeat: TaskRepeat
 }
 
 /**
@@ -66,8 +67,9 @@ export interface DailyTasksPage {
   windowStart: string
   // Tasks still open on a day before today, however far back
   overdueCount: number
-  // Repeating tasks finished on an earlier day: they are not overdue, but the same button brings
-  // them to today, so the button can say so and can show when nothing is overdue at all
+  // Repeating tasks finished on an earlier day **whose interval is due today**: they are not
+  // overdue, but the same button brings them back, so it can say so and can show on a day when
+  // nothing is overdue at all
   repeatingCount: number
   // Tasks older than the seven-day window: what the cleanup action would delete
   olderTaskCount: number

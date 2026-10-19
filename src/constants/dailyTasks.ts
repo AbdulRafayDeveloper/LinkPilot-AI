@@ -48,14 +48,17 @@ export const DAILY_TASKS_MESSAGES = {
   invalidTask: "That task no longer exists.",
   invalidPriority: "Choose High, Medium or Low.",
   invalidDoer: "Choose Me or Employee.",
+  invalidRepeat: "Choose Once, Daily, Weekly or Monthly.",
   // A task nothing can be done on until something else moves. Every task starts unblocked
   block: "Block this task: nothing can be done on it yet",
   unblock: "Unblock this task",
   blocked: "Blocked",
-  // A task that comes back every day: the overdue button brings it to today and unticks it
-  repeat: "This task repeats: bring it to today every day",
-  stopRepeating: "Stop this task repeating",
-  repeats: "Repeats",
+  // A task that comes back: the overdue button brings it to today, on the days its interval allows,
+  // and unticks it
+  repeat: "This task repeats: bring it back and untick it",
+  stopRepeating: "Once only: stop this task repeating",
+  repeatsEvery: (words: string) => `Repeats ${words}`,
+  once: "Once",
   // Narrowing the list: every control sits in its own heading row, so they cost the page no height
   filterAll: "All priorities",
   filterOn: "Showing one priority. Choose All priorities to see them all again.",

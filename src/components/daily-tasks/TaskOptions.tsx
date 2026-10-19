@@ -6,6 +6,7 @@ import { PrioritySelect } from "@/components/ui/PriorityPicker"
 import { DoerSelect } from "@/components/daily-tasks/DoerSelect"
 import { DAILY_TASKS_MESSAGES } from "@/constants/dailyTasks"
 import { type TaskChoices } from "@/lib/taskChoices"
+import { FIRST_REPEAT, NO_REPEAT, TASK_REPEATS, repeatWords, type TaskRepeat } from "@/lib/taskRepeat"
 
 /**
  * Everything a task carries besides its own words: how urgent it is, who does it, whether anything
@@ -52,6 +53,56 @@ const Toggle: React.FC<ToggleProps> = ({ on, onChange, disabled, label, words, i
   </button>
 )
 
+/**
+ * How often a task comes back. A task that happens once is **the quiet icon**, like the blocked
+ * toggle beside it, because nearly every task happens once and a row has no width to spend saying
+ * so; one press makes it daily. Once it repeats it becomes the interval itself, so changing Daily
+ * to Weekly is one choice rather than a second control that is empty most of the time, and Once is
+ * the way back out of the list.
+ */
+const RepeatControl: React.FC<{ value: TaskRepeat; onChange: (repeat: TaskRepeat) => void; disabled?: boolean; label: string }> = ({
+  value,
+  onChange,
+  disabled,
+  label,
+}) => {
+  const words = repeatWords(value)
+  if (!words) {
+    return (
+      <button
+        type="button"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={() => onChange(FIRST_REPEAT)}
+        disabled={disabled}
+        aria-pressed={false}
+        aria-label={`${DAILY_TASKS_MESSAGES.repeat}: ${label}`}
+        title={DAILY_TASKS_MESSAGES.repeat}
+        className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-bold uppercase tracking-wide text-outline transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <Repeat size={13} aria-hidden="true" />
+      </button>
+    )
+  }
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value as TaskRepeat)}
+      onPointerDown={(event) => event.stopPropagation()}
+      disabled={disabled}
+      aria-label={`${DAILY_TASKS_MESSAGES.repeatsEvery(words.due)}: ${label}`}
+      title={DAILY_TASKS_MESSAGES.repeatsEvery(words.due)}
+      className="h-7 shrink-0 cursor-pointer rounded-full border-0 bg-primary-fixed px-2 text-[10px] font-bold uppercase tracking-wide text-on-primary-fixed-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {TASK_REPEATS.map((kind) => (
+        <option key={kind.id} value={kind.id}>
+          {kind.label}
+        </option>
+      ))}
+      <option value={NO_REPEAT}>{DAILY_TASKS_MESSAGES.once}</option>
+    </select>
+  )
+}
+
 interface TaskOptionsProps {
   value: TaskChoices
   // Only what changed, so a row can send each one as its own small write
@@ -75,14 +126,6 @@ export const TaskOptions: React.FC<TaskOptionsProps> = ({ value, onChange, disab
       icons={{ on: <Lock size={13} aria-hidden="true" />, off: <LockOpen size={13} aria-hidden="true" /> }}
       tone="bg-error-container text-error"
     />
-    <Toggle
-      on={value.repeats}
-      onChange={(repeats) => onChange({ repeats })}
-      disabled={disabled}
-      label={label}
-      words={{ on: DAILY_TASKS_MESSAGES.stopRepeating, off: DAILY_TASKS_MESSAGES.repeat, word: DAILY_TASKS_MESSAGES.repeats }}
-      icons={{ on: <Repeat size={13} aria-hidden="true" />, off: <Repeat size={13} aria-hidden="true" /> }}
-      tone="bg-primary-fixed text-on-primary-fixed-variant"
-    />
+    <RepeatControl value={value.repeat} onChange={(repeat) => onChange({ repeat })} disabled={disabled} label={label} />
   </span>
 )

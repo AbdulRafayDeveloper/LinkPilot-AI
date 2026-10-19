@@ -9,10 +9,10 @@ import {
   setTaskDetails,
   setTaskDoer,
   setTaskPriority,
-  setTaskRepeats,
+  setTaskRepeat,
   taskLineage,
 } from "@/services/dailyTasks/tasks"
-import { TaskBlockedSchema, TaskDoerSchema, TaskPrioritySchema, TaskRepeatsSchema } from "@/lib/validation/dailyTasks"
+import { TaskBlockedSchema, TaskDoerSchema, TaskPrioritySchema, TaskRepeatSchema } from "@/lib/validation/dailyTasks"
 import { writeTaskDetails } from "@/services/dailyTasks/writeDetails"
 import { TaskDetailsEditSchema } from "@/lib/validation/taskAttachment"
 import { requireViewer } from "@/services/auth/viewer"
@@ -31,8 +31,8 @@ const notFound = () => NextResponse.json({ success: false, message: DAILY_TASKS_
  * - `{ priority }` changes how urgent it is, the same way and for the same reason: one field, so a
  *   change made on the list can never carry a stale line or description over another tab's save.
  * - `{ doer }` changes who does it (me or an employee), which is its own one-field write for exactly
- *   the same reason, and `{ isBlocked }` or `{ repeats }` blocks it, or sets it to come back every
- *   day, the same way again.
+ *   the same reason, and `{ isBlocked }` or `{ repeat }` blocks it, or sets how often it comes
+ *   back, the same way again.
  * - `{ description, images, content? }` saves the task from its editor (the editor sends it as it is
  *   typed, so this is also its auto-save). The first version's `{ description, image }` still works.
  *   The description and the images (or image) are always sent, so a body that left them out cannot
@@ -81,13 +81,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ success: true, message: "Task updated", data: task })
     }
 
-    // Repeating or not, on its own, like the rest of the row's own controls
-    if (named("repeats") && !named("isCompleted") && !named("description")) {
-      const parsed = TaskRepeatsSchema.safeParse(body)
+    // How often it repeats, on its own, like the rest of the row's own controls
+    if ((named("repeat") || named("repeats")) && !named("isCompleted") && !named("description")) {
+      const parsed = TaskRepeatSchema.safeParse(body)
       if (!parsed.success) {
         return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || DAILY_TASKS_MESSAGES.updateFailed }, { status: 400 })
       }
-      const task = await setTaskRepeats(auth.viewer, id, parsed.data.repeats)
+      const task = await setTaskRepeat(auth.viewer, id, parsed.data.repeat)
       if (!task) return notFound()
       return NextResponse.json({ success: true, message: "Task updated", data: task })
     }

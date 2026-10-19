@@ -3,7 +3,8 @@ import { z } from "zod"
 import { toUserFacingMessage } from "@/lib/errors"
 import { DAILY_TASKS_MESSAGES, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
 import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
-import { DoerSchema, IsoDate, PrioritySchema, TodaySchema } from "@/lib/validation/dailyTasks"
+import { DoerSchema, IsoDate, PrioritySchema, RepeatSchema, TodaySchema } from "@/lib/validation/dailyTasks"
+import { NO_REPEAT, repeatOf } from "@/lib/taskRepeat"
 import { DEFAULT_PRIORITY, priorityOf } from "@/constants/priorities"
 import { DEFAULT_TASK_DOER, doerOf } from "@/constants/taskDoers"
 import { DailyTaskDetailsSchema } from "@/lib/validation/taskAttachment"
@@ -39,6 +40,8 @@ export const CreateSchema = z
               doer: DoerSchema.optional(),
               // And whether it starts blocked or repeating, both left out on an ordinary new task
               isBlocked: z.boolean().optional(),
+              repeat: RepeatSchema.optional(),
+              // What the first version of this wrote for "every day", still read as Daily
               repeats: z.boolean().optional(),
             })
             .and(DailyTaskDetailsSchema),
@@ -54,7 +57,7 @@ export const CreateSchema = z
 
 type SubmittedRow =
   | string
-  | ({ content: string; priority?: string; doer?: string; isBlocked?: boolean; repeats?: boolean } & {
+  | ({ content: string; priority?: string; doer?: string; isBlocked?: boolean; repeat?: string; repeats?: boolean } & {
       description: string
       image: SubmittedImage | null
       images?: SubmittedImage[]
@@ -82,7 +85,7 @@ function cleanContents(contents: SubmittedRow[]): NewDailyTask[] {
       priority: typeof row === "string" ? DEFAULT_PRIORITY : priorityOf(row.priority).id,
       doer: typeof row === "string" ? DEFAULT_TASK_DOER : doerOf(row.doer).id,
       isBlocked: typeof row === "string" ? false : row.isBlocked === true,
-      repeats: typeof row === "string" ? false : row.repeats === true,
+      repeat: typeof row === "string" ? NO_REPEAT : repeatOf(row.repeat, row.repeats),
     })
   }
   return kept

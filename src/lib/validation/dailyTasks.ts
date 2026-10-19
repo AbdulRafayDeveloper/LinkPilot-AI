@@ -2,6 +2,7 @@ import { z } from "zod"
 import { DAILY_TASKS_MESSAGES, ISO_DATE_PATTERN, MAX_TASKS_PER_DAY_ORDER, MAX_TODAY_DRIFT_DAYS } from "@/constants/dailyTasks"
 import { PRIORITY_IDS } from "@/constants/priorities"
 import { TASK_DOER_IDS } from "@/constants/taskDoers"
+import { NO_REPEAT, TASK_REPEAT_IDS } from "@/lib/taskRepeat"
 import { shiftDate } from "@/lib/taskDates"
 
 /**
@@ -53,8 +54,17 @@ export const TaskDoerSchema = z.object({ doer: DoerSchema })
 /** Blocking a task or unblocking it, which is its own small update too. */
 export const TaskBlockedSchema = z.object({ isBlocked: z.boolean() })
 
-/** Setting a task to repeat every day, or to stop; its own small update like the rest. */
-export const TaskRepeatsSchema = z.object({ repeats: z.boolean() })
+/** How often a task repeats, or that it happens once. Optional everywhere, like the rest. */
+export const RepeatSchema = z.enum(TASK_REPEAT_IDS, { message: DAILY_TASKS_MESSAGES.invalidRepeat })
+
+/**
+ * Setting how often a task repeats, its own small update like the rest. The first version of this
+ * wrote a plain `repeats: true` for "every day", so that is still accepted and read as Daily.
+ */
+export const TaskRepeatSchema = z
+  .object({ repeat: RepeatSchema.optional(), repeats: z.boolean().optional() })
+  .transform((body) => ({ repeat: body.repeat ?? (body.repeats ? "daily" : NO_REPEAT) }))
+  .refine((body) => body.repeat !== undefined, { message: DAILY_TASKS_MESSAGES.invalidRepeat })
 
 /**
  * A task dropped onto a day (its own or another), with that day's whole new order. Moving to a
