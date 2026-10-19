@@ -6,7 +6,9 @@
  *
  * Blocks: # / ## / ### headings (#### and deeper read as the smallest), - * + bullets, 1. numbered
  * items, - [ ] / - [x] checklists (indent two spaces per level to nest), > quotes, ``` code blocks,
- * --- dividers and images, an ![alt](src) on a line of its own.
+ * --- dividers, images (an ![alt](src) on a line of its own) and **tables**, written the way GitHub
+ * writes them: a row of cells between pipes, then a row of dashes saying which way each column
+ * reads, then the rows. A pipe inside a cell is written `\|`, so a cell can hold one.
  * Inline: **bold**, *italic*, ***both***, ~~strikethrough~~, `code`, [text](https://link) and bare
  * links. A backslash keeps the character after it as it is (\* is a star, not italic), which is how
  * the visual editor writes a star or a # the user typed as text.
@@ -31,6 +33,19 @@ export interface RichListItem {
   sublist: RichList | null
 }
 
+/**
+ * A table: the heading row, the rows under it, and which way each column reads. Every row has as
+ * many cells as the dashes row had, so a row that was short is padded and one that was long is cut,
+ * which is what keeps a table rectangular however it was pasted.
+ */
+export interface RichTable {
+  header: Inline[][]
+  rows: Inline[][][]
+  align: TableAlign[]
+}
+
+export type TableAlign = "left" | "center" | "right" | null
+
 export type Block =
   | { kind: "heading"; level: 1 | 2 | 3; children: Inline[] }
   | { kind: "paragraph"; lines: Inline[][] }
@@ -39,6 +54,7 @@ export type Block =
   | { kind: "code"; text: string }
   | { kind: "divider" }
   | { kind: "image"; src: string; alt: string }
+  | { kind: "table"; table: RichTable }
 
 const FENCE = /^\s*```/
 const DIVIDER = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/
@@ -46,6 +62,10 @@ const HEADING = /^(#{1,6})\s+(.*)$/
 const QUOTE = /^\s*>\s?(.*)$/
 const LIST_ITEM = /^(\s*)(?:([-*+])|(\d{1,9})[.)])\s+(?:\[([ xX])\]\s+)?(.*)$/
 const IMAGE = /^\s*!\[([^\]\n]*)\]\(([^\s)]+)\)\s*$/
+// A row of a table: it has to carry a pipe that is not written as text
+const TABLE_ROW = /(?<!\\)\|/
+// The row of dashes under the heading: --- | :---: | ---: , with or without the outer pipes
+const TABLE_RULE = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/
 
 // Only links that open a page or an email; anything else ("javascript:") stays plain text
 const SAFE_HREF = /^(?:https?:\/\/|mailto:)/i
@@ -95,6 +115,60 @@ export const isSafeImageSrc = (src: string) => SAFE_IMAGE_SRC.test(src)
 function readImageLine(line: string): { src: string; alt: string } | null {
   const match = line.match(IMAGE)
   return match && isSafeImageSrc(match[2]) ? { alt: match[1], src: match[2] } : null
+}
+
+/** One row's cells. The outer pipes are optional, and `\|` is a pipe inside a cell, not a divider. */
+function splitRow(line: string): string[] {
+  const trimmed = line.trim().replace(/^\|/, "").replace(/(?<!\\)\|\s*$/, "")
+  const cells: string[] = []
+  let cell = ""
+  for (let index = 0; index < trimmed.length; index++) {
+    const character = trimmed[index]
+    if (character === "\\" && trimmed[index + 1] === "|") {
+      cell += "\\|"
+      index++
+      continue
+    }
+    if (character === "|") {
+      cells.push(cell)
+      cell = ""
+      continue
+    }
+    cell += character
+  }
+  cells.push(cell)
+  return cells.map((text) => text.trim())
+}
+
+const alignOf = (dashes: string): TableAlign => {
+  const text = dashes.trim()
+  const left = text.startsWith(":")
+  const right = text.endsWith(":")
+  if (left && right) return "center"
+  if (right) return "right"
+  if (left) return "left"
+  return null
+}
+
+/** A table when these two lines start one: a row of cells and then the row of dashes under it. */
+function readTable(lines: string[], start: number): { table: RichTable; next: number } | null {
+  const head = lines[start]
+  const rule = lines[start + 1]
+  if (!head || !rule || !TABLE_ROW.test(head) || !TABLE_ROW.test(rule) || !TABLE_RULE.test(rule)) return null
+  const align = splitRow(rule).map(alignOf)
+  if (align.length === 0) return null
+  // Every row is as wide as the dashes row said, so the table is always rectangular
+  const cells = (line: string): Inline[][] => {
+    const row = splitRow(line)
+    return align.map((_, column) => parseInline(row[column] ?? ""))
+  }
+  const table: RichTable = { header: cells(head), rows: [], align }
+  let index = start + 2
+  while (index < lines.length && lines[index].trim() && TABLE_ROW.test(lines[index])) {
+    table.rows.push(cells(lines[index]))
+    index++
+  }
+  return { table, next: index }
 }
 
 interface ListLine {
@@ -180,6 +254,13 @@ export function parseRichText(text: string): Block[] {
       continue
     }
 
+    const table = readTable(lines, index)
+    if (table) {
+      blocks.push({ kind: "table", table: table.table })
+      index = table.next
+      continue
+    }
+
     const heading = line.match(HEADING)
     if (heading) {
       blocks.push({ kind: "heading", level: Math.min(heading[1].length, 3) as 1 | 2 | 3, children: parseInline(heading[2]) })
@@ -219,7 +300,8 @@ export function parseRichText(text: string): Block[] {
       !HEADING.test(lines[index]) &&
       !QUOTE.test(lines[index]) &&
       !readListLine(lines[index]) &&
-      !readImageLine(lines[index])
+      !readImageLine(lines[index]) &&
+      !readTable(lines, index)
     ) {
       paragraph.push(parseInline(lines[index++]))
     }
@@ -257,6 +339,8 @@ export function toPlainText(text: string): string {
           return listText(block.list, 0)
         case "code":
           return [block.text]
+        case "table":
+          return [block.table.header, ...block.table.rows].map((row) => row.map(inlineText).join(" | "))
         case "divider":
         case "image":
           return []

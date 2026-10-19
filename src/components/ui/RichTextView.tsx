@@ -1,7 +1,7 @@
 import React from "react"
 import Image from "next/image"
 import { Check } from "lucide-react"
-import { isSafeHref, parseRichText, type Inline, type RichList } from "@/lib/richText"
+import { isSafeHref, parseRichText, type Inline, type RichList, type RichTable } from "@/lib/richText"
 
 /**
  * Text written with the rich text editor, shown with its formatting. Everything is built from
@@ -107,6 +107,46 @@ const ListView: React.FC<{ list: RichList }> = ({ list }) => {
   )
 }
 
+/**
+ * A table, scrolled inside itself rather than widening the page: a pasted table is often wider than
+ * the column it is read in, and a description must never give the page a sideways scrollbar.
+ */
+const TableView: React.FC<{ table: RichTable }> = ({ table }) => {
+  const align = (column: number) => {
+    const way = table.align[column]
+    return way === "center" ? "text-center" : way === "right" ? "text-right" : "text-left"
+  }
+  return (
+    <div className="custom-scrollbar -mx-1 overflow-x-auto px-1">
+      <table className="w-full min-w-max border-collapse text-[0.95em]">
+        <thead>
+          <tr>
+            {table.header.map((cell, column) => (
+              <th
+                key={column}
+                className={`border border-outline-variant bg-surface-container px-2.5 py-1.5 font-semibold text-on-surface ${align(column)}`}
+              >
+                <InlineNodes nodes={cell} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, index) => (
+            <tr key={index}>
+              {row.map((cell, column) => (
+                <td key={column} className={`border border-outline-variant px-2.5 py-1.5 align-top ${align(column)}`}>
+                  <InlineNodes nodes={cell} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 // In em, so a larger text size (Important Content's A+) makes the headings larger with it
 const HEADING_CLASS = {
   1: "text-[1.3em] font-bold",
@@ -152,6 +192,8 @@ export const RichTextView: React.FC<RichTextViewProps> = ({ text, className = ""
           )
         case "list":
           return <ListView key={index} list={block.list} />
+        case "table":
+          return <TableView key={index} table={block.table} />
         case "code":
           return (
             <pre

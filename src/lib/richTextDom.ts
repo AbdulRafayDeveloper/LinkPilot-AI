@@ -1,4 +1,4 @@
-import { isSafeHref, isSafeImageSrc, parseRichText, type Block, type Inline, type RichList } from "./richText"
+import { isSafeHref, isSafeImageSrc, parseRichText, type Block, type Inline, type RichList, type RichTable, type TableAlign } from "./richText"
 
 /**
  * The bridge between the visual editor (a contenteditable page of formatted text) and the Markdown
@@ -9,6 +9,14 @@ import { isSafeHref, isSafeImageSrc, parseRichText, type Block, type Inline, typ
  * - `toMarkdown` reads whatever the page holds back into that text: what the toolbar made, what the
  *   browser made when Enter was pressed, and what was pasted from another site. Anything it does not
  *   know is kept as its words, so no markup, style or script from a paste can reach a description.
+ *
+ * **A paste keeps its shape, not only its words.** What arrives from a word processor, a web page or
+ * an AI chat is rarely written with the tags the toolbar writes, so three things are read as well as
+ * the plain ones: a **table** (every cell in its column), emphasis carried by **CSS** rather than by
+ * a tag (`font-weight: 700` is what Google Docs and most editors paste bold as, never `<b>`), and
+ * **Word's list paragraphs**, which are ordinary paragraphs carrying `mso-list` with the bullet drawn
+ * in a span of their own. Without those three a pasted document lost its tables, all of its bold and
+ * italic, and every list it had.
  *
  * Both work on `MiniNode`, the few parts of a DOM node they need, so a real page and the plain objects
  * `toTree` builds are read the same way and the round trip can be tested without a browser.
@@ -128,6 +136,18 @@ function listTree(list: RichList): TreeNode {
   return element(list.ordered ? "OL" : "UL", items, attributes)
 }
 
+// Which way a column reads, written as the browser writes it, so a pasted table is read the same way
+const alignStyle = (align: TableAlign): Record<string, string> => (align ? { style: `text-align: ${align}` } : {})
+
+function tableTree(table: RichTable): TreeNode {
+  const row = (cells: Inline[][], tag: "TH" | "TD") =>
+    element(
+      "TR",
+      cells.map((cell, column) => element(tag, inlineTree(cell), alignStyle(table.align[column] ?? null)))
+    )
+  return element("TABLE", [element("THEAD", [row(table.header, "TH")]), element("TBODY", table.rows.map((cells) => row(cells, "TD")))])
+}
+
 function blockTree(block: Block): TreeNode {
   switch (block.kind) {
     case "heading":
@@ -144,6 +164,8 @@ function blockTree(block: Block): TreeNode {
       return element("HR")
     case "image":
       return element("IMG", [], { src: block.src, alt: block.alt })
+    case "table":
+      return tableTree(block.table)
   }
 }
 
@@ -214,6 +236,45 @@ interface InlineContext {
   strike: boolean
 }
 
+/**
+ * The emphasis an element carries in its own `style`, which is how a word processor, a web page and
+ * most AI editors paste it: Google Docs writes every run as a span with `font-weight: 700` rather
+ * than a `<b>`, so without this a pasted document arrives with all of its emphasis gone.
+ *
+ * Only a weight of 600 or more counts, because the same editors write `font-weight: 400` on
+ * **every** span of ordinary text, and that must stay ordinary.
+ *
+ * **A style can also take emphasis off**, and that matters as much as putting it on: Google Docs
+ * wraps a whole copied document in `<b style="font-weight:normal">`, so a reader that trusts the tag
+ * and ignores the style makes every word of it bold. So a mark here is true, false, or not mentioned,
+ * and only what is not mentioned is left to the tag.
+ */
+function styledMarks(node: MiniNode): Partial<InlineContext> {
+  const style = (attribute(node, "style") ?? "").toLowerCase()
+  if (!style) return {}
+  const marks: Partial<InlineContext> = {}
+  const weight = /font-weight\s*:\s*(bold(?:er)?|lighter|normal|\d{3,})/.exec(style)?.[1]
+  if (weight) marks.bold = weight.startsWith("bold") || Number(weight) >= 600
+  const slant = /font-style\s*:\s*(italic|oblique|normal)/.exec(style)?.[1]
+  if (slant) marks.italic = slant !== "normal"
+  const decoration = /text-decoration(?:-line)?\s*:\s*([^;]+)/.exec(style)?.[1]
+  if (decoration) marks.strike = decoration.includes("line-through")
+  return marks
+}
+
+// The emphasis a tag means on its own, which a style on the same element overrules
+const TAG_MARKS: Record<string, keyof InlineContext> = {
+  STRONG: "bold",
+  B: "bold",
+  EM: "italic",
+  I: "italic",
+  S: "strike",
+  STRIKE: "strike",
+  DEL: "strike",
+}
+
+const MARK_TEXT: Record<keyof InlineContext, string> = { bold: "**", italic: "*", strike: "~~" }
+
 function inlineMarkdown(nodes: MiniNode[], options: Options, context: InlineContext): string {
   return nodes.map((node) => inlineNode(node, options, context)).join("")
 }
@@ -226,19 +287,22 @@ function inlineNode(node: MiniNode, options: Options, context: InlineContext): s
   }
   if (!isElement(node) || SKIPPED_TAGS.has(node.nodeName) || attribute(node, CHECKBOX_ATTRIBUTE) !== null) return ""
   const inner = (next: Partial<InlineContext> = {}) => inlineMarkdown(childrenOf(node), options, { ...context, ...next })
+  // What this element says its words are, from its tag and from its style, the style winning
+  if (node.nodeName !== "CODE" && node.nodeName !== "PRE") {
+    const marks = styledMarks(node)
+    const tagMark = TAG_MARKS[node.nodeName]
+    if (tagMark && marks[tagMark] === undefined) marks[tagMark] = true
+    // Only a mark this element adds is written here; one it is already inside is left alone
+    const adding = (Object.keys(marks) as (keyof InlineContext)[]).filter((mark) => marks[mark] === true && !context[mark])
+    if (tagMark || adding.length > 0 || Object.keys(marks).length > 0) {
+      let text = inner({ ...marks })
+      for (const mark of adding) text = wrap(MARK_TEXT[mark], text)
+      return isBlock(node) ? `\n${text}\n` : text
+    }
+  }
   switch (node.nodeName) {
     case "BR":
       return "\n"
-    case "STRONG":
-    case "B":
-      return context.bold ? inner() : wrap("**", inner({ bold: true }))
-    case "EM":
-    case "I":
-      return context.italic ? inner() : wrap("*", inner({ italic: true }))
-    case "S":
-    case "STRIKE":
-    case "DEL":
-      return context.strike ? inner() : wrap("~~", inner({ strike: true }))
     case "CODE": {
       const code = (node.textContent ?? "").replace(/`/g, "'").replace(/\s+/g, " ")
       return code.trim() ? `\`${code}\`` : code
@@ -304,6 +368,69 @@ function listLines(list: MiniNode, depth: number, options: Options): string[] {
   return lines
 }
 
+/** Every row of a table, however it is wrapped (a thead, a tbody, a tfoot, or none of them). */
+function rowsOf(node: MiniNode): MiniNode[] {
+  if (node.nodeName === "TR") return [node]
+  return childrenOf(node).flatMap((child) => (isElement(child) ? rowsOf(child) : []))
+}
+
+const cellsOf = (row: MiniNode) => childrenOf(row).filter((cell) => cell.nodeName === "TD" || cell.nodeName === "TH")
+
+/**
+ * Which way a cell's column reads, from the attribute or the style a page or a paste wrote.
+ *
+ * It looks inside the cell as well, because a word processor writes the alignment on the paragraph
+ * it put in the cell rather than on the cell itself.
+ */
+function cellAlign(cell: MiniNode): TableAlign {
+  const way = (node: MiniNode): TableAlign => {
+    const named = (attribute(node, "align") ?? "").toLowerCase()
+    const styled = /text-align\s*:\s*(left|center|right)/.exec((attribute(node, "style") ?? "").toLowerCase())?.[1]
+    const align = styled ?? named
+    return align === "left" || align === "center" || align === "right" ? align : null
+  }
+  if (way(cell)) return way(cell)
+  for (const child of childrenOf(cell)) {
+    if (isElement(child) && way(child)) return way(child)
+  }
+  return null
+}
+
+/**
+ * A table as the rows of pipes the text keeps.
+ *
+ * Two rules worth knowing. **The first row is the heading**, because a table written as text has to
+ * have one: a table whose first row is ordinary cells still reads as a heading above its rows, which
+ * is what nearly every pasted table means anyway. And **every row is made as wide as the widest**,
+ * so a table stays rectangular; a cell spanning two columns is written once and the columns it
+ * covered are left empty, since a table of text cannot join cells.
+ */
+function tableMarkdown(node: MiniNode, options: Options): string[] {
+  const rows = rowsOf(node).map((row) => cellsOf(row))
+  if (rows.length === 0) return []
+  const width = Math.max(...rows.map((cells) => cells.length))
+  if (width === 0) return []
+  // The first row that says which way this column reads: a short row has no cell there at all, and
+  // a word processor writes the alignment on the cells rather than on the heading
+  const align: TableAlign[] = Array.from({ length: width }, (_, column) => {
+    for (const cells of rows) {
+      const way = cells[column] ? cellAlign(cells[column]) : null
+      if (way) return way
+    }
+    return null
+  })
+  const text = (cells: MiniNode[]) =>
+    `| ${Array.from({ length: width }, (_, column) => {
+      const cell = cells[column]
+      // A pipe inside a cell would read as the next column, so it is written as text
+      return cell ? oneLine(inlineMarkdown(childrenOf(cell), options, { bold: false, italic: false, strike: false })).replace(/\|/g, "\\|") : ""
+    }).join(" | ")} |`
+  const rule = `| ${align.map((way) => (way === "center" ? ":---:" : way === "right" ? "---:" : way === "left" ? ":---" : "---")).join(" | ")} |`
+  const lines = [text(rows[0]), rule, ...rows.slice(1).map(text)]
+  // A table with nothing in it at all is not worth keeping
+  return lines.some((line) => line.replace(/[|\s-]/g, "")) ? [lines.join("\n")] : []
+}
+
 function blockMarkdown(node: MiniNode, options: Options): string[] {
   const inline = () => inlineMarkdown(childrenOf(node), options, { bold: false, italic: false, strike: false })
   switch (node.nodeName) {
@@ -329,6 +456,8 @@ function blockMarkdown(node: MiniNode, options: Options): string[] {
       const code = (node.textContent ?? "").replace(/ /g, " ").replace(/\n+$/, "")
       return code.trim() ? [`\`\`\`\n${code.replace(/```/g, "'''")}\n\`\`\``] : []
     }
+    case "TABLE":
+      return tableMarkdown(node, options)
     case "HR":
       return ["---"]
     case "LI": {
@@ -345,6 +474,45 @@ function blockMarkdown(node: MiniNode, options: Options): string[] {
   }
 }
 
+/**
+ * The bullet or the number a word processor drew itself, at the start of what is otherwise plain
+ * text: Word puts it in a span of its own inside the paragraph, so it arrives as the paragraph's
+ * first words rather than as a list marker.
+ *
+ * Two rules, not one. A **number or a letter** has to carry its dot or bracket (`1.`, `a)`), which
+ * is what tells a marker from the words. A **glyph** needs nothing after it, because no word starts
+ * with one; but the glyphs that are also ordinary characters (`o`, which is Word's second level,
+ * and a dash) have to be followed by a space, or the "o" would be eaten off "office" and the minus
+ * off a negative number.
+ */
+const DRAWN_NUMBER = /^\s*(?:\d{1,9}|[a-z]|[ivxlcdm]{1,6})[.)]\s*/i
+const DRAWN_BULLET = /^\s*(?:[•·▪◦‣⁃○●■□§]\s*|[o*–—-]\s+)/i
+
+/**
+ * One of Word's list paragraphs: an ordinary `<p>` carrying `mso-list` in its style, with the level
+ * it sits at. Without this a pasted Word list arrives as a column of paragraphs each starting with a
+ * bullet character, which is neither a list to read nor one to edit.
+ */
+function wordListItem(node: MiniNode, options: Options): { depth: number; ordered: boolean; text: string } | null {
+  if (node.nodeName !== "P" && node.nodeName !== "DIV") return null
+  const style = (attribute(node, "style") ?? "").toLowerCase()
+  // Word writes `mso-list: none` on the paragraphs that are **not** list items, so the word alone
+  // is not the test: there has to be a list and a level on it
+  const level = /mso-list\s*:\s*[^;]*\blevel(\d)/.exec(style)?.[1]
+  if (!level) return null
+  const words = oneLine(inlineMarkdown(childrenOf(node), options, { bold: false, italic: false, strike: false }))
+  const numbered = DRAWN_NUMBER.exec(words)
+  const marker = numbered ?? DRAWN_BULLET.exec(words)
+  const text = marker ? words.slice(marker[0].length) : words
+  if (!text.trim()) return null
+  return {
+    depth: Math.max(0, Number(level ?? 1) - 1),
+    // A number or a letter with its dot was a numbered list; a glyph was not
+    ordered: Boolean(numbered),
+    text: text.replace(/^\[/, "\\["),
+  }
+}
+
 function blocksMarkdown(nodes: MiniNode[], options: Options): string[] {
   const blocks: string[] = []
   let run: MiniNode[] = []
@@ -353,8 +521,43 @@ function blocksMarkdown(nodes: MiniNode[], options: Options): string[] {
     if (text) blocks.push(text)
     run = []
   }
+  // One run of Word's list paragraphs is one list, so the lines are gathered before they are written
+  let wordList: { depth: number; ordered: boolean; text: string }[] = []
+  const flushWordList = () => {
+    if (wordList.length === 0) return
+    let number = 1
+    blocks.push(
+      wordList
+        .map((item, position) => {
+          const above = wordList[position - 1]
+          if (!above || above.depth !== item.depth) number = 1
+          return `${"  ".repeat(item.depth)}${item.ordered ? `${number++}. ` : "- "}${item.text}`
+        })
+        .join("\n")
+    )
+    wordList = []
+  }
+
   for (const node of nodes) {
     if (isElement(node) && (SKIPPED_TAGS.has(node.nodeName) || attribute(node, CHECKBOX_ATTRIBUTE) !== null)) continue
+    // The newline between two tags in a pasted document is a text node of nothing. It must not end
+    // the run of list items it sits between, or a pasted list becomes one list per item
+    if (node.nodeType === TEXT_NODE && !(node.textContent ?? "").trim() && run.length === 0) continue
+    // A span, a font or even a <b> wrapped around whole blocks is a wrapper, not a run of words:
+    // Google Docs wraps everything it copies in one, and reading it as words flattens the document
+    if (isElement(node) && !isBlock(node) && node.nodeName !== "IMG" && childrenOf(node).some((child) => isBlock(child) || child.nodeName === "IMG")) {
+      flush()
+      flushWordList()
+      blocks.push(...blocksMarkdown(childrenOf(node), options))
+      continue
+    }
+    const listed = isElement(node) ? wordListItem(node, options) : null
+    if (listed) {
+      flush()
+      wordList.push(listed)
+      continue
+    }
+    flushWordList()
     if (node.nodeName === "IMG") {
       flush()
       const image = imageMarkdown(node, options)
@@ -367,6 +570,7 @@ function blocksMarkdown(nodes: MiniNode[], options: Options): string[] {
     }
   }
   flush()
+  flushWordList()
   return blocks
 }
 
