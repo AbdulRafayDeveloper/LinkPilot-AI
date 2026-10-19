@@ -1,14 +1,16 @@
 import { createHash } from "node:crypto"
 import { GROQ_API_KEYS } from "@/config/env"
+import { startKeyFor } from "@/lib/keyRotation"
 import { connectDB } from "@/lib/db"
 import { ProviderKeyStateModel } from "@/models/ProviderKeyState"
 
 /**
  * The one shared answer to "which Groq key do we use now", for every module and every server instance.
  *
- * Every Groq call starts on the active key (the one that answered last) and goes round from there, so
- * once keys 1 to 3 are used up and key 4 is answering, every call goes straight to key 4 instead of
- * asking 1, 2 and 3 again first. The state lives in memory for speed and in MongoDB
+ * Every Groq call starts on the key **after** the one that answered last and goes round from there
+ * (`startKeyFor`), so the work is spread over the accounts a key at a time rather than one account
+ * being drained of its minute's tokens; keys that are resting are still tried last, so keys 1 to 3
+ * being used up never costs a call anything. The state lives in memory for speed and in MongoDB
  * (`provider_key_states`) so that a new or different server instance (Vercel runs many) knows it too:
  * it is read again at most every REFRESH_MS, and written only when something changes (a key is set
  * aside, or a different key starts answering), never on an ordinary call.
@@ -83,9 +85,12 @@ export async function noteGroqKeyAnswered(index: number, wasResting: boolean): P
   await write({ $set: { activeKey: fingerprints[index] }, $unset: { [`rests.${fingerprints[index]}`]: "" } })
 }
 
-/** The number of the key calls start from now (GROQ_API_KEY_<n>), for the status page; null with no keys. */
+/**
+ * The number of the key the next call starts on (GROQ_API_KEY_<n>), for the status page; null with
+ * no keys. It is the key after the one that answered last, which is where a call really begins.
+ */
 export async function activeGroqKeyNumber(): Promise<number | null> {
   if (GROQ_API_KEYS.length === 0) return null
   const { start } = await groqKeyPlan()
-  return GROQ_API_KEYS[start]?.number ?? null
+  return GROQ_API_KEYS[startKeyFor(start, 0, GROQ_API_KEYS.length)]?.number ?? null
 }

@@ -92,6 +92,11 @@ export function retryAfterOf(error: unknown): number | null {
     const seconds = Number(header)
     if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000)
   }
-  const delay = messageOf(error).match(/retry(?:Delay|[ -]after|[ -]in)["':\s]*([\d.]+)\s*s/i)
+  /**
+   * The wait in the provider's own words, when it did not send the header. Groq writes its
+   * per-minute limit as "Please try again in 3.345s", which is the difference between waiting three
+   * seconds for the key that is about to be free and setting it aside for a minute.
+   */
+  const delay = messageOf(error).match(/(?:retry|try again)(?:Delay|[ -]after|[ -]in)?["':\s]*([\d.]+)\s*s/i)
   return delay ? Number(delay[1]) * 1000 : null
 }

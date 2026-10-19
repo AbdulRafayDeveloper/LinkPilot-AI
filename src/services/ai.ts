@@ -124,6 +124,14 @@ function requireModel(model: string | undefined, variable: string): string {
  */
 let groqCallsInFlight = 0
 
+/**
+ * How long a Groq call waits when **every** key is at its per-minute token limit, instead of giving
+ * the work to the next provider. Groq itself says the window clears in about three seconds, and a
+ * generation has 45 seconds (DEFAULT_GENERATION_TIMEOUT_MS) before it times out, so a wait of a few
+ * seconds costs the user a pause and saves the comment being written by the fallback model.
+ */
+const GROQ_KEY_WAIT_MS = 8_000
+
 export async function withGroqKey<T>(call: (apiKey: string, keyNumber: number) => Promise<T>, signal?: AbortSignal): Promise<T> {
   if (GROQ_API_KEYS.length === 0) {
     throw new UserFacingError(`Groq is not configured. Set ${GROQ_KEY_VARIABLES} where the app runs.`)
@@ -153,6 +161,11 @@ function runWithGroqKeys<T>(
       resting,
       start: from,
       signal,
+      maxWaitMs: GROQ_KEY_WAIT_MS,
+      onWait: (index, waitMs) =>
+        console.warn(
+          `🔑 Every Groq key is at its minute's limit; waiting ${(waitMs / 1000).toFixed(1)}s for key ${numberOf(index)} rather than handing the job to the next provider`
+        ),
       onRest: noteGroqKeyResting,
       onAnswer: noteGroqKeyAnswered,
       onSwitch: (from, to, error) =>
