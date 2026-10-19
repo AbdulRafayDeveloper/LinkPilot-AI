@@ -37,6 +37,9 @@ export const CreateSchema = z
               priority: PrioritySchema.optional(),
               // The same for who does it: left out, the task is the user's own
               doer: DoerSchema.optional(),
+              // And whether it starts blocked or repeating, both left out on an ordinary new task
+              isBlocked: z.boolean().optional(),
+              repeats: z.boolean().optional(),
             })
             .and(DailyTaskDetailsSchema),
         ])
@@ -51,7 +54,11 @@ export const CreateSchema = z
 
 type SubmittedRow =
   | string
-  | ({ content: string; priority?: string; doer?: string } & { description: string; image: SubmittedImage | null; images?: SubmittedImage[] })
+  | ({ content: string; priority?: string; doer?: string; isBlocked?: boolean; repeats?: boolean } & {
+      description: string
+      image: SubmittedImage | null
+      images?: SubmittedImage[]
+    })
 
 /**
  * Empty rows are dropped, and the same task written twice in one submission is kept once. A row
@@ -74,6 +81,8 @@ function cleanContents(contents: SubmittedRow[]): NewDailyTask[] {
       images: typeof row === "string" ? [] : (row.images ?? (row.image ? [row.image] : [])),
       priority: typeof row === "string" ? DEFAULT_PRIORITY : priorityOf(row.priority).id,
       doer: typeof row === "string" ? DEFAULT_TASK_DOER : doerOf(row.doer).id,
+      isBlocked: typeof row === "string" ? false : row.isBlocked === true,
+      repeats: typeof row === "string" ? false : row.repeats === true,
     })
   }
   return kept

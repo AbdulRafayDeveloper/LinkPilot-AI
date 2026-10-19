@@ -27,7 +27,7 @@ import { ownedBy, ownedForClearing, visibleById, visibleTo } from "@/services/au
  * deleting a task takes everything under it along.
  */
 // Only what the list draws
-const TASK_FIELDS = "content description image images taskDate priority doer isBlocked isCompleted completedAt parentTaskId"
+const TASK_FIELDS = "content description image images taskDate priority doer isBlocked repeats isCompleted completedAt parentTaskId"
 
 type StoredTask = Pick<IDailyTask, "content" | "taskDate" | "isCompleted" | "completedAt"> & {
   _id: { toString: () => string }
@@ -37,6 +37,8 @@ type StoredTask = Pick<IDailyTask, "content" | "taskDate" | "isCompleted" | "com
   doer?: string | null
   // And for whether something is holding it up: absent reads as unblocked
   isBlocked?: boolean | null
+  // And for whether it comes back every day: absent reads as not repeating
+  repeats?: boolean | null
   description?: string
   image?: TaskImage | null
   images?: TaskImage[]
@@ -57,6 +59,7 @@ const toTask = (record: StoredTask, images: TaskImageView[] = []): DailyTask => 
   priority: priorityOf(record.priority).id,
   doer: doerOf(record.doer).id,
   isBlocked: record.isBlocked === true,
+  repeats: record.repeats === true,
   isCompleted: record.isCompleted,
   completedAt: record.completedAt ? record.completedAt.toISOString() : null,
   parentTaskId: record.parentTaskId ? record.parentTaskId.toString() : null,
@@ -111,7 +114,7 @@ export async function listTasks(viewer: Viewer, today: string, page: number): Pr
   const windowStart = windowStartFor(today)
   const olderThanWindow = { taskDate: { $lt: windowStart }, ...visibleTo(viewer) }
 
-  const [olderDays, olderTaskCount, overdueCount] = await Promise.all([
+  const [olderDays, olderTaskCount, overdueCount, repeatingCount] = await Promise.all([
     DailyTaskModel.aggregate<{ _id: null; days: number }>([
       { $match: olderThanWindow },
       { $group: { _id: "$taskDate" } },
@@ -119,6 +122,8 @@ export async function listTasks(viewer: Viewer, today: string, page: number): Pr
     ]).then((rows) => (rows[0] as unknown as { days: number } | undefined)?.days ?? 0),
     DailyTaskModel.countDocuments(olderThanWindow),
     DailyTaskModel.countDocuments({ isCompleted: false, taskDate: { $lt: today }, ...visibleTo(viewer) }),
+    // Only the finished ones, so a repeating task that is still open is counted once, as overdue
+    DailyTaskModel.countDocuments({ repeats: true, isCompleted: true, taskDate: { $lt: today }, ...visibleTo(viewer) }),
   ])
 
   const pageCount = 1 + Math.ceil(olderDays / HISTORY_DAYS_PER_PAGE)
@@ -146,6 +151,7 @@ export async function listTasks(viewer: Viewer, today: string, page: number): Pr
     pageCount,
     windowStart,
     overdueCount,
+    repeatingCount,
     olderTaskCount,
   }
 }
@@ -212,6 +218,8 @@ export async function createTasks(viewer: Viewer, taskDate: string, tasks: NewDa
       taskDate: day,
       priority: priorityOf(task.priority).id,
       doer: doerOf(task.doer).id,
+      isBlocked: task.isBlocked === true,
+      repeats: task.repeats === true,
       position: start + index,
       isCompleted: false,
       completedAt: null,
@@ -266,6 +274,22 @@ export async function setTaskBlocked(viewer: Viewer, id: string, isBlocked: bool
   const record = await DailyTaskModel.findOneAndUpdate(
     filter,
     { $set: { isBlocked } },
+    { new: true, projection: TASK_FIELDS, lean: true }
+  )
+  return record ? (await toTasks([record as unknown as StoredTask]))[0] : null
+}
+
+/**
+ * Sets a task to repeat every day, or stops it. Its own one-field write, like the tick and the
+ * chips, so changing it on the list can never carry a stale line or description over an edit.
+ */
+export async function setTaskRepeats(viewer: Viewer, id: string, repeats: boolean): Promise<DailyTask | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
+  await connectDatabase()
+  const record = await DailyTaskModel.findOneAndUpdate(
+    filter,
+    { $set: { repeats } },
     { new: true, projection: TASK_FIELDS, lean: true }
   )
   return record ? (await toTasks([record as unknown as StoredTask]))[0] : null
@@ -399,8 +423,8 @@ export async function moveTask(viewer: Viewer, id: string, taskDate: string, ord
  */
 export async function moveOverdueToToday(viewer: Viewer, today: string, ids?: string[]): Promise<{ moved: number }> {
   await connectDatabase()
-  type PastTask = { _id: mongoose.Types.ObjectId; parentTaskId?: mongoose.Types.ObjectId | null; isCompleted: boolean }
-  const past = (await DailyTaskModel.find({ taskDate: { $lt: today }, ...visibleTo(viewer) }, { _id: 1, parentTaskId: 1, isCompleted: 1 })
+  type PastTask = { _id: mongoose.Types.ObjectId; parentTaskId?: mongoose.Types.ObjectId | null; isCompleted: boolean; repeats?: boolean }
+  const past = (await DailyTaskModel.find({ taskDate: { $lt: today }, ...visibleTo(viewer) }, { _id: 1, parentTaskId: 1, isCompleted: 1, repeats: 1 })
     .sort({ taskDate: 1, position: 1, createdAt: 1, _id: 1 })
     .lean()) as unknown as PastTask[]
 
@@ -418,16 +442,39 @@ export async function moveOverdueToToday(viewer: Viewer, today: string, ids?: st
     return current
   }
   const withOpenWork = new Set(past.filter((task) => !task.isCompleted).map((task) => rootOf(String(task._id))))
+  // A repeating task comes to today whether it was finished or not, because it has to be done again
+  const repeating = new Set(past.filter((task) => task.repeats).map((task) => rootOf(String(task._id))))
   const wanted = ids ? new Set(ids) : null
-  const roots = past.filter((task) => !task.parentTaskId && withOpenWork.has(String(task._id)) && (!wanted || wanted.has(String(task._id))))
+  const roots = past.filter(
+    (task) => !task.parentTaskId && (withOpenWork.has(String(task._id)) || repeating.has(String(task._id))) && (!wanted || wanted.has(String(task._id)))
+  )
   if (roots.length === 0) return { moved: 0 }
 
   const rootIds = roots.map((task) => task._id)
   const carried = [...rootIds, ...(await descendantsOf(viewer, rootIds))]
+  /**
+   * What comes back unticked: a repeating task and everything under it, because the whole of it is
+   * being done again today. A task that is simply overdue keeps whatever was ticked on it.
+   */
+  const repeatsAbove = (id: string): boolean => {
+    const seen = new Set<string>()
+    let current: string | null = id
+    while (current && !seen.has(current)) {
+      seen.add(current)
+      if (past.find((task) => String(task._id) === current)?.repeats) return true
+      current = parents.get(current) ?? null
+    }
+    return false
+  }
+  const moving = new Set(carried.map(String))
+  const toUntick = past.filter((task) => moving.has(String(task._id)) && task.isCompleted && repeatsAbove(String(task._id))).map((task) => task._id)
   const start = await nextPosition(viewer, { taskDate: today, ...TOP_LEVEL })
   await DailyTaskModel.bulkWrite(
     [
       { updateMany: { filter: { _id: { $in: carried }, ...visibleTo(viewer) }, update: { $set: { taskDate: today } } } },
+      ...(toUntick.length > 0
+        ? [{ updateMany: { filter: { _id: { $in: toUntick }, ...visibleTo(viewer) }, update: { $set: { isCompleted: false, completedAt: null } } } }]
+        : []),
       ...rootIds.map((entry, index) => ({
         updateOne: { filter: { _id: entry, ...visibleTo(viewer) }, update: { $set: { position: start + index } } },
       })),

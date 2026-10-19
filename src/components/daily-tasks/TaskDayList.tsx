@@ -32,8 +32,6 @@ import {
   CornerDownRight,
   GripVertical,
   ListPlus,
-  Lock,
-  LockOpen,
   Paperclip,
   ListTodo,
   Loader2,
@@ -49,8 +47,8 @@ import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 import { CopyTaskText } from "@/components/tasks/CopyTaskText"
-import { PrioritySelect } from "@/components/ui/PriorityPicker"
-import { DoerSelect } from "@/components/daily-tasks/DoerSelect"
+import { TaskOptions } from "@/components/daily-tasks/TaskOptions"
+import { defaultChoices, type TaskChoices } from "@/lib/taskChoices"
 import { PRIORITIES, PRIORITY_TONE, type Priority } from "@/constants/priorities"
 import { TASK_DOERS, TASK_DOER_TONE, type TaskDoer } from "@/constants/taskDoers"
 import { NOTHING_NARROWED, isNarrowed, narrowDays, type YesOrNo } from "@/lib/taskFilters"
@@ -72,7 +70,7 @@ export interface TaskMove {
 export type SelectMode = "toggle" | "range"
 
 /** Adding one task to a day already on the list, with whatever detail was opened on it. */
-export type AddTaskHandler = (date: string, content: string, details?: TaskDetailsDraft) => Promise<boolean>
+export type AddTaskHandler = (date: string, content: string, details?: TaskDetailsDraft, choices?: TaskChoices) => Promise<boolean>
 
 interface TaskDayListProps {
   page: DailyTasksPage | null
@@ -89,12 +87,8 @@ interface TaskDayListProps {
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   // Brings one overdue task, with its subtasks, onto today
   onMoveToToday: (task: DailyTask) => void
-  // How urgent a task is, changed from the row itself
-  onPriority: (task: DailyTask, priority: Priority) => void
-  // Who does it, changed the same way
-  onDoer: (task: DailyTask, doer: TaskDoer) => void
-  // Blocked or not, from the row's own toggle
-  onBlock: (task: DailyTask, isBlocked: boolean) => void
+  // The four choices a task carries, changed from the row itself
+  onChoose: (task: DailyTask, change: Partial<TaskChoices>) => void
   // Deletes every picked task at once; the page confirms first, since deleting is final
   onDeletePicked: (ids: string[]) => void
   onMove: (move: TaskMove) => void
@@ -141,12 +135,9 @@ interface TaskRowBodyProps {
   // Opens the task's editor (details and subtasks); absent on the dragged copy
   onOpenTask?: (task: DailyTask, focusSubtask?: boolean) => void
   onMoveToToday?: (task: DailyTask) => void
-  // How urgent the task is, changed on the row itself; absent on the copy that follows the pointer
-  onPriority?: (task: DailyTask, priority: Priority) => void
-  // Who does it, the same way: the user, or an employee they get it done by
-  onDoer?: (task: DailyTask, doer: TaskDoer) => void
-  // Blocked or not, the row's own toggle
-  onBlock?: (task: DailyTask, isBlocked: boolean) => void
+  // The four choices a task carries, changed on the row itself and sent one at a time; absent on
+  // the copy that follows the pointer during a drag
+  onChoose?: (task: DailyTask, change: Partial<TaskChoices>) => void
   handle: React.ReactNode
   // Picking tasks to move together: one click on the circle picks a task, Shift picks a run of them
   isSelected?: boolean
@@ -169,9 +160,7 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
   onDelete,
   onOpenTask,
   onMoveToToday,
-  onPriority,
-  onDoer,
-  onBlock,
+  onChoose,
   handle,
   isSelected = false,
   onSelect,
@@ -204,7 +193,7 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
           // The row is the drag area, so a click that only finished a drag must not tick the task
           if (wasDragging?.()) event.preventDefault()
         }}
-        className={`flex min-w-0 flex-1 items-start gap-3 py-3 pr-3 ${onToggle ? "cursor-pointer" : ""}`}
+        className={`flex min-w-[10rem] flex-1 items-start gap-3 py-3 pr-3 ${onToggle ? "cursor-pointer" : ""}`}
       >
         <input
           type="checkbox"
@@ -241,22 +230,10 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
           two chips and four buttons the words had about 60px left. From `sm` the wrapper is
           `display: contents`, so it draws no box at all and the row is exactly what it always was */}
       <span className={ROW_TAIL}>
-        {/* Both changed where they are read. The whole row is the drag area, so the press that opens
-            either list must not pick the task up */}
-        <span onPointerDown={(event) => event.stopPropagation()} className="flex flex-wrap items-center gap-1 md:mt-2 md:shrink-0 md:flex-nowrap">
-          <PrioritySelect
-            value={task.priority}
-            onChange={(priority) => onPriority?.(task, priority)}
-            disabled={isPending || !onPriority}
-            label={task.content}
-          />
-          <DoerSelect
-            value={task.doer}
-            onChange={(doer) => onDoer?.(task, doer)}
-            disabled={isPending || !onDoer}
-            label={task.content}
-          />
-          <BlockButton task={task} isPending={isPending} onBlock={onBlock} />
+        {/* Changed where they are read. The whole row is the drag area, so the press that opens one
+            of them must not pick the task up */}
+        <span onPointerDown={(event) => event.stopPropagation()}>
+          <RowOptions task={task} isPending={isPending} onChoose={onChoose} className="md:mt-2 md:flex-nowrap" />
         </span>
         {/* The task's details and subtasks open in a popup rather than in the row: the whole row is
             the drag area, so typing or picking an image inside it would start a drag */}
@@ -369,20 +346,18 @@ interface SubtaskTreeProps {
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
-  onPriority: (task: DailyTask, priority: Priority) => void
-  onDoer: (task: DailyTask, doer: TaskDoer) => void
-  onBlock: (task: DailyTask, isBlocked: boolean) => void
+  onChoose: (task: DailyTask, change: Partial<TaskChoices>) => void
 }
 
 /** One subtask: its tick box and line, its details, its actions, and its own subtasks under it. */
-const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, depth, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority, onDoer, onBlock }) => {
+const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, depth, today, pendingIds, onToggle, onDelete, onOpenTask, onChoose }) => {
   const [isOpen, setIsOpen] = useState(true)
   const isPending = pendingIds.has(task.id)
   const state = taskState(task, today)
   const done = task.subtasks.filter((entry) => entry.isCompleted).length
   return (
     <li className="flex flex-col">
-      <div className="flex flex-wrap items-start gap-1 md:flex-nowrap">
+      <div className="flex flex-wrap items-start gap-1">
         {task.subtasks.length > 0 ? (
           <button
             type="button"
@@ -396,7 +371,7 @@ const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, d
         ) : (
           <CornerDownRight size={13} className="ml-1.5 mr-1 mt-3 shrink-0 text-outline/70" aria-hidden="true" />
         )}
-        <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 py-2 pr-1">
+        <label className="flex min-w-[10rem] flex-1 cursor-pointer items-start gap-2.5 py-2 pr-1">
           <input
             type="checkbox"
             checked={task.isCompleted}
@@ -427,10 +402,8 @@ const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, d
           </span>
         </label>
         <span className={ROW_TAIL}>
-          <span onPointerDown={(event) => event.stopPropagation()} className="flex flex-wrap items-center gap-1 md:mt-1.5 md:shrink-0 md:flex-nowrap">
-            <PrioritySelect value={task.priority} onChange={(priority) => onPriority(task, priority)} disabled={isPending} label={task.content} />
-            <DoerSelect value={task.doer} onChange={(doer) => onDoer(task, doer)} disabled={isPending} label={task.content} />
-            <BlockButton task={task} isPending={isPending} onBlock={onBlock} />
+          <span onPointerDown={(event) => event.stopPropagation()}>
+            <RowOptions task={task} isPending={isPending} onChoose={onChoose} className="md:mt-1.5 md:flex-nowrap" />
           </span>
           <RowActions task={task} depth={depth} isPending={isPending} onOpenTask={onOpenTask} />
           {isPending ? (
@@ -450,7 +423,7 @@ const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, d
         </span>
       </div>
       {isOpen && task.subtasks.length > 0 && (
-        <SubtaskTree {...{ depth: depth + 1, today, pendingIds, onToggle, onDelete, onOpenTask, onPriority, onDoer, onBlock }} tasks={task.subtasks} />
+        <SubtaskTree {...{ depth: depth + 1, today, pendingIds, onToggle, onDelete, onOpenTask, onChoose }} tasks={task.subtasks} />
       )}
     </li>
   )
@@ -491,38 +464,47 @@ const SubtaskTree: React.FC<SubtaskTreeProps> = (props) => {
   )
 }
 
+/** What a task already carries, for the shared controls that set it. */
+const choicesOf = (task: DailyTask): TaskChoices => ({
+  priority: task.priority,
+  doer: task.doer,
+  isBlocked: task.isBlocked,
+  repeats: task.repeats,
+})
+
 /**
- * Everything to the right of a task's own words: its two chips and its buttons. Below `md` it is one
- * line of its own under the task (`order-last w-full`), because beside all of it the words were cut
- * to about 60px on a 390px phone; from `md` it is `display: contents`, drawing no box at all, so the
- * row is laid out exactly as it was before the second chip existed.
- *
- * `md` rather than `sm`: measured, a 640px window leaves the one-line row about 70px for the task's
- * own words, which is no better than the phone was. 768px leaves about 240px.
+ * The four choices on a row of the list. Each one is its own small write, so the row sends only
+ * what changed and can never carry a stale line over what the task's own editor has saved.
  */
-/**
- * Blocked or not: a toggle rather than a third chip, because it is a yes or no and because three
- * chips on a row left a task's own words no width. Unblocked it is a quiet icon; blocked it says
- * the word, so the state never rests on colour.
- */
-const BlockButton: React.FC<{ task: DailyTask; isPending: boolean; onBlock?: (task: DailyTask, isBlocked: boolean) => void }> = ({ task, isPending, onBlock }) => (
-  <button
-    type="button"
-    onPointerDown={(event) => event.stopPropagation()}
-    onClick={() => onBlock?.(task, !task.isBlocked)}
-    disabled={isPending || !onBlock}
-    aria-pressed={task.isBlocked}
-    aria-label={`${task.isBlocked ? DAILY_TASKS_MESSAGES.unblock : DAILY_TASKS_MESSAGES.block}: ${task.content}`}
-    title={task.isBlocked ? DAILY_TASKS_MESSAGES.unblock : DAILY_TASKS_MESSAGES.block}
-    className={`flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-bold uppercase tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-      task.isBlocked ? "bg-error-container text-error" : "text-outline hover:bg-surface-container-high hover:text-on-surface"
-    }`}
-  >
-    {task.isBlocked ? <Lock size={13} aria-hidden="true" /> : <LockOpen size={13} aria-hidden="true" />}
-    {task.isBlocked && DAILY_TASKS_MESSAGES.blocked}
-  </button>
+const RowOptions: React.FC<{ task: DailyTask; isPending: boolean; onChoose?: (task: DailyTask, change: Partial<TaskChoices>) => void; className?: string }> = ({
+  task,
+  isPending,
+  onChoose,
+  className,
+}) => (
+  <TaskOptions
+    value={choicesOf(task)}
+    onChange={(change) => onChoose?.(task, change)}
+    disabled={isPending || !onChoose}
+    label={task.content}
+    className={className}
+  />
 )
 
+/**
+ * Everything to the right of a task's own words: its four controls and its buttons. Below `md` it is
+ * one line of its own under the task (`order-last w-full`), because beside all of it the words were
+ * cut to about 60px on a 390px phone; from `md` it is `display: contents`, drawing no box at all, so
+ * the row reads as one line.
+ *
+ * `md` rather than `sm`: measured, a 640px window leaves the one-line row about 70px for the task's
+ * own words, which is no better than the phone was.
+ *
+ * **From `md` the row may still wrap**, and a task's words keep a floor of 10rem. A row where both
+ * toggles are on is about 100px wider than one where neither is, and on a 1093px laptop that left
+ * the words 67px; now the controls drop to a line of their own on exactly the rows that need it,
+ * and every other row is laid out as it was.
+ */
 const ROW_TAIL = "order-last mb-2 flex w-full flex-wrap items-center gap-1 pl-1 md:order-none md:contents"
 
 const handleClass =
@@ -573,9 +555,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onOpenTask,
   onMoveToToday,
   onSelect,
-  onPriority,
-  onDoer,
-  onBlock,
+  onChoose,
   wasDragging,
   pendingIds,
   canDrag,
@@ -589,9 +569,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   onMoveToToday: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
-  onPriority: (task: DailyTask, priority: Priority) => void
-  onDoer: (task: DailyTask, doer: TaskDoer) => void
-  onBlock: (task: DailyTask, isBlocked: boolean) => void
+  onChoose: (task: DailyTask, change: Partial<TaskChoices>) => void
   wasDragging: () => boolean
   pendingIds: ReadonlySet<string>
   // Off while the list is narrowed: it is then only part of each day's order
@@ -616,7 +594,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
     >
       {/* On a phone the two chips wrap to a line of their own (they are `order-last w-full`
           below sm), because beside them a task's own words had no width left at all */}
-      <div className="flex flex-wrap items-start gap-1 pr-1 md:flex-nowrap">
+      <div className="flex flex-wrap items-start gap-1 pr-1">
         <TaskRowBody
           task={task}
           today={today}
@@ -627,9 +605,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
           onOpenTask={onOpenTask}
           onMoveToToday={onMoveToToday}
           onSelect={onSelect}
-          onPriority={onPriority}
-          onDoer={onDoer}
-          onBlock={onBlock}
+          onChoose={onChoose}
           wasDragging={wasDragging}
           handle={
             // The whole row drags with a pointer; this is what the keyboard uses, and what says so
@@ -657,9 +633,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
           onToggle={onToggle}
           onDelete={onDelete}
           onOpenTask={onOpenTask}
-          onPriority={onPriority}
-          onDoer={onDoer}
-          onBlock={onBlock}
+          onChoose={onChoose}
         />
       )}
     </li>
@@ -674,17 +648,19 @@ const AddToDayRow: React.FC<{ date: string; onAddTask: AddTaskHandler }> = ({ da
   const [isOpen, setIsOpen] = useState(false)
   const [content, setContent] = useState("")
   const [details, setDetails] = useState<TaskDetailsDraft>(emptyTaskDetails())
+  const [choices, setChoices] = useState<TaskChoices>(defaultChoices())
   const [detailsError, setDetailsError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   const save = async () => {
     if (isSaving || !content.trim()) return
     setIsSaving(true)
-    const added = await onAddTask(date, content.trim(), details)
+    const added = await onAddTask(date, content.trim(), details, choices)
     setIsSaving(false)
     if (added) {
       setContent("")
       setDetails(emptyTaskDetails())
+      // The choices stay for the next task: a day's lines are usually written in runs of the same kind
       setDetailsError(null)
     }
   }
@@ -734,6 +710,13 @@ const AddToDayRow: React.FC<{ date: string; onAddTask: AddTaskHandler }> = ({ da
           placeholder="One more task... (Enter to add)"
           className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[13px] text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
         />
+        <TaskOptions
+          value={choices}
+          onChange={(change) => setChoices((current) => ({ ...current, ...change }))}
+          disabled={isSaving}
+          label={content.trim() || "this new task"}
+          className="shrink-0"
+        />
         <button
           type="button"
           onMouseDown={(event) => event.preventDefault()}
@@ -778,9 +761,7 @@ const DayGroup = memo(function DayGroup({
   onOpenTask,
   onMoveToToday,
   onSelect,
-  onPriority,
-  onDoer,
-  onBlock,
+  onChoose,
   onAddTask,
   wasDragging,
   canDrag,
@@ -797,9 +778,7 @@ const DayGroup = memo(function DayGroup({
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   onMoveToToday: (task: DailyTask) => void
   onSelect: (task: DailyTask, mode: SelectMode) => void
-  onPriority: (task: DailyTask, priority: Priority) => void
-  onDoer: (task: DailyTask, doer: TaskDoer) => void
-  onBlock: (task: DailyTask, isBlocked: boolean) => void
+  onChoose: (task: DailyTask, change: Partial<TaskChoices>) => void
   onAddTask: AddTaskHandler
   wasDragging: () => boolean
   canDrag: boolean
@@ -846,9 +825,7 @@ const DayGroup = memo(function DayGroup({
                 onOpenTask={onOpenTask}
                 onMoveToToday={onMoveToToday}
                 onSelect={onSelect}
-                onPriority={onPriority}
-                onDoer={onDoer}
-                onBlock={onBlock}
+                onChoose={onChoose}
                 wasDragging={wasDragging}
                 pendingIds={pendingIds}
                 canDrag={canDrag}
@@ -893,9 +870,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   onDelete,
   onOpenTask,
   onMoveToToday,
-  onPriority,
-  onDoer,
-  onBlock,
+  onChoose,
   onDeletePicked,
   onMove,
   onAddTask,
@@ -1273,9 +1248,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 onDelete={onDelete}
                 onOpenTask={onOpenTask}
                 onMoveToToday={onMoveToToday}
-                onPriority={onPriority}
-                onDoer={onDoer}
-                onBlock={onBlock}
+                onChoose={onChoose}
                 canDrag={canDrag}
                 onSelect={selectTask}
                 onAddTask={onAddTask}

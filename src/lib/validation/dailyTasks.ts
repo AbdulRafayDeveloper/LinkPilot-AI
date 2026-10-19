@@ -53,6 +53,9 @@ export const TaskDoerSchema = z.object({ doer: DoerSchema })
 /** Blocking a task or unblocking it, which is its own small update too. */
 export const TaskBlockedSchema = z.object({ isBlocked: z.boolean() })
 
+/** Setting a task to repeat every day, or to stop; its own small update like the rest. */
+export const TaskRepeatsSchema = z.object({ repeats: z.boolean() })
+
 /**
  * A task dropped onto a day (its own or another), with that day's whole new order. Moving to a
  * later day than today is refused for the same reason adding to one is: it would never show.

@@ -52,6 +52,10 @@ export const DAILY_TASKS_MESSAGES = {
   block: "Block this task: nothing can be done on it yet",
   unblock: "Unblock this task",
   blocked: "Blocked",
+  // A task that comes back every day: the overdue button brings it to today and unticks it
+  repeat: "This task repeats: bring it to today every day",
+  stopRepeating: "Stop this task repeating",
+  repeats: "Repeats",
   // Narrowing the list: every control sits in its own heading row, so they cost the page no height
   filterAll: "All priorities",
   filterOn: "Showing one priority. Choose All priorities to see them all again.",
@@ -83,8 +87,15 @@ export const DAILY_TASKS_MESSAGES = {
   deleteFailed: "Couldn't delete that task. Please try again.",
   moveFailed: "Couldn't move that task, so it is back where it was. Please try again.",
   // Bringing what was left open on earlier days onto today, from the button rather than a drag
-  moveOverdue: (count: number) => `Move ${count} overdue ${count === 1 ? "task" : "tasks"} to today`,
+  moveOverdue: (overdue: number, repeating = 0) => {
+    const one = (count: number) => (count === 1 ? "task" : "tasks")
+    if (overdue > 0 && repeating > 0) return `Move ${overdue} overdue and ${repeating} repeating ${one(overdue + repeating)} to today`
+    if (repeating > 0) return `Move ${repeating} repeating ${one(repeating)} to today`
+    return `Move ${overdue} overdue ${one(overdue)} to today`
+  },
   moveThisOverdue: "Move this task to today",
+  moveOverdueExplains:
+    "Every task still open on an earlier day moves to the end of today, with its subtasks. A repeating task comes too, finished or not, and starts unticked.",
   movedOverdue: (count: number) =>
     count === 0 ? "Nothing was overdue." : `${count} ${count === 1 ? "task" : "tasks"} moved to today.`,
   moveOverdueFailed: "Couldn't move the overdue tasks. Please try again.",

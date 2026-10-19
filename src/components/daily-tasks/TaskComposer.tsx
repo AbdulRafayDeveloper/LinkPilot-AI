@@ -6,18 +6,15 @@ import { DAILY_TASK_DESCRIPTION_MAX_LENGTH, INITIAL_TASK_ROWS, MAX_TASKS_PER_SUB
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { emptyTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
 import { writeTaskDetails } from "@/lib/taskDetailsAi"
-import { PrioritySelect } from "@/components/ui/PriorityPicker"
-import { DoerSelect } from "@/components/daily-tasks/DoerSelect"
-import { DEFAULT_PRIORITY, type Priority } from "@/constants/priorities"
-import { DEFAULT_TASK_DOER, type TaskDoer } from "@/constants/taskDoers"
+import { TaskOptions } from "@/components/daily-tasks/TaskOptions"
+import { defaultChoices, type TaskChoices } from "@/lib/taskChoices"
 
-/** One row of the composer: the task's line, how urgent it is, who does it, and its optional detail. */
+/** One row of the composer: the task's line, the choices it carries, and its optional detail. */
 export interface TaskRow {
   content: string
-  // Each row has its own, because a list written in one go is rarely all of one urgency
-  priority: Priority
-  // Nor is it all one person's: some of a day's lines are the user's, some are an employee's
-  doer: TaskDoer
+  // Each row has its own, because a list written in one go is rarely all of one urgency, all one
+  // person's, or all of it ready to start
+  choices: TaskChoices
   details: TaskDetailsDraft
 }
 
@@ -35,7 +32,7 @@ interface TaskComposerProps {
   plain?: boolean
 }
 
-export const emptyRow = (content = ""): TaskRow => ({ content, priority: DEFAULT_PRIORITY, doer: DEFAULT_TASK_DOER, details: emptyTaskDetails() })
+export const emptyRow = (content = ""): TaskRow => ({ content, choices: defaultChoices(), details: emptyTaskDetails() })
 
 export const emptyRows = (): TaskRow[] => Array.from({ length: INITIAL_TASK_ROWS }, () => emptyRow())
 
@@ -69,12 +66,8 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
     window.requestAnimationFrame(() => inputsRef.current[index]?.focus())
   }
 
-  const setPriority = (index: number, priority: Priority) => {
-    onRowsChange(rows.map((row, position) => (position === index ? { ...row, priority } : row)))
-  }
-
-  const setDoer = (index: number, doer: TaskDoer) => {
-    onRowsChange(rows.map((row, position) => (position === index ? { ...row, doer } : row)))
+  const choose = (index: number, change: Partial<TaskChoices>) => {
+    onRowsChange(rows.map((row, position) => (position === index ? { ...row, choices: { ...row.choices, ...change } } : row)))
   }
 
   const setRow = (index: number, content: string) => {
@@ -200,21 +193,14 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
                 placeholder={index === 0 ? "What needs doing today?" : "Another task"}
                 className={rowClass}
               />
-              {/* The two chips stack on a phone, where a row has no width for both side by side */}
-              <span className="flex shrink-0 flex-col items-stretch gap-1 sm:flex-row sm:items-center">
-                <PrioritySelect
-                  value={row.priority}
-                  onChange={(priority) => setPriority(index, priority)}
-                  disabled={isSaving}
-                  label={row.content.trim() || `task ${index + 1}`}
-                />
-                <DoerSelect
-                  value={row.doer}
-                  onChange={(doer) => setDoer(index, doer)}
-                  disabled={isSaving}
-                  label={row.content.trim() || `task ${index + 1}`}
-                />
-              </span>
+              {/* Everything the task carries, chosen while it is written rather than afterwards */}
+              <TaskOptions
+                value={row.choices}
+                onChange={(change) => choose(index, change)}
+                disabled={isSaving}
+                label={row.content.trim() || `task ${index + 1}`}
+                className="shrink-0 justify-end"
+              />
               <button
                 type="button"
                 onClick={() => removeRow(index)}

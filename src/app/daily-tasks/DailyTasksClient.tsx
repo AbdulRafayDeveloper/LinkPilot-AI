@@ -1,8 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { DEFAULT_PRIORITY, type Priority } from "@/constants/priorities"
-import { DEFAULT_TASK_DOER, type TaskDoer } from "@/constants/taskDoers"
+import { defaultChoices, isPlain, type TaskChoices } from "@/lib/taskChoices"
 import { AlertTriangle, CalendarArrowUp, ListTodo, Loader2, Plus, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
@@ -41,12 +40,12 @@ const draftStore = createToolStore(
 // A row with details opened on it is sent with them; a plain line is sent as the string it always was
 /**
  * One row as the API takes it. A line with nothing on it is still sent as a plain string, exactly
- * as every version before details, priorities and who does it sent it; anything else is the object
- * form, which always carries all of it, so a row can never be saved with half of what was written.
+ * as every version before details and the four choices sent it; anything else is the object form,
+ * which always carries all of it, so a row can never be saved with half of what was written.
  */
-const rowBody = (content: string, details: TaskDetailsDraft, priority: Priority = DEFAULT_PRIORITY, doer: TaskDoer = DEFAULT_TASK_DOER) =>
-  details.description.trim() || details.images.length > 0 || priority !== DEFAULT_PRIORITY || doer !== DEFAULT_TASK_DOER
-    ? { content, description: details.description.trim(), images: toStoredImages(details.images), priority, doer }
+const rowBody = (content: string, details: TaskDetailsDraft, choices: TaskChoices = defaultChoices()) =>
+  details.description.trim() || details.images.length > 0 || !isPlain(choices)
+    ? { content, description: details.description.trim(), images: toStoredImages(details.images), ...choices }
     : content
 
 // Every day's tasks with one task changed or taken away, wherever it sits
@@ -154,7 +153,7 @@ export default function DailyTasksClient() {
     const contents = rows
       .map((row) => ({ ...row, content: row.content.trim() }))
       .filter((row) => row.content)
-      .map((row) => rowBody(row.content, row.details, row.priority, row.doer))
+      .map((row) => rowBody(row.content, row.details, row.choices))
     if (contents.length === 0) {
       setSaveError(DAILY_TASKS_MESSAGES.missingContent)
       return
@@ -236,80 +235,36 @@ export default function DailyTasksClient() {
   }
 
   /**
-   * How urgent a task is, changed from the row itself. It shows at once and goes back if the write
-   * fails, the way a tick does, and it sends **only** the priority, so it can never carry a stale
+   * One of the four choices a task carries, changed from the row itself: how urgent it is, who does
+   * it, whether it is blocked, whether it repeats. It shows at once and goes back if the write
+   * fails, the way a tick does, and it sends **only what changed**, so it can never carry a stale
    * line or description over what the task's own editor has saved.
    */
-  const setPriority = async (task: DailyTask, priority: Priority) => {
-    if (pendingIds.has(task.id) || priority === task.priority) return
+  const chooseForTask = async (task: DailyTask, change: Partial<TaskChoices>) => {
+    const field = Object.keys(change)[0] as keyof TaskChoices | undefined
+    if (!field || pendingIds.has(task.id) || change[field] === task[field]) return
     setTaskError(null)
-    const show = (value: Priority) =>
-      setPage((current) => (current ? { ...current, days: changeTask(current.days, task.id, (entry) => ({ ...entry, priority: value })) } : current))
-    show(priority)
+    const show = (values: Partial<TaskChoices>) =>
+      setPage((current) => (current ? { ...current, days: changeTask(current.days, task.id, (entry) => ({ ...entry, ...values })) } : current))
+    show(change)
     try {
       const { data } = await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priority }),
+        body: JSON.stringify(change),
       })
-      show(data.priority)
+      show({ [field]: data[field] } as Partial<TaskChoices>)
     } catch (error: unknown) {
-      show(task.priority)
-      setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.updateFailed)
-    }
-  }
-
-  /**
-   * Who does a task, changed from the row itself: the same one-field write as the priority above,
-   * shown at once and put back if it fails.
-   */
-  const setDoer = async (task: DailyTask, doer: TaskDoer) => {
-    if (pendingIds.has(task.id) || doer === task.doer) return
-    setTaskError(null)
-    const show = (value: TaskDoer) =>
-      setPage((current) => (current ? { ...current, days: changeTask(current.days, task.id, (entry) => ({ ...entry, doer: value })) } : current))
-    show(doer)
-    try {
-      const { data } = await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doer }),
-      })
-      show(data.doer)
-    } catch (error: unknown) {
-      show(task.doer)
-      setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.updateFailed)
-    }
-  }
-
-  /**
-   * Blocked or not, from the row's own toggle: the same one-field write as the two chips, shown at
-   * once and put back if it fails.
-   */
-  const setBlocked = async (task: DailyTask, isBlocked: boolean) => {
-    if (pendingIds.has(task.id) || isBlocked === task.isBlocked) return
-    setTaskError(null)
-    const show = (value: boolean) =>
-      setPage((current) => (current ? { ...current, days: changeTask(current.days, task.id, (entry) => ({ ...entry, isBlocked: value })) } : current))
-    show(isBlocked)
-    try {
-      const { data } = await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${task.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isBlocked }),
-      })
-      show(data.isBlocked)
-    } catch (error: unknown) {
-      show(task.isBlocked)
+      show({ [field]: task[field] } as Partial<TaskChoices>)
       setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.updateFailed)
     }
   }
 
   // One more task on a day already on the list: it appears in that day, in the order written
-  const addTaskToDay = async (date: string, content: string, details?: TaskDetailsDraft): Promise<boolean> => {
+  const addTaskToDay = async (date: string, content: string, details?: TaskDetailsDraft, choices?: TaskChoices): Promise<boolean> => {
     setTaskError(null)
     try {
-      const row = details ? rowBody(content, details) : content
+      const row = details || choices ? rowBody(content, details ?? { description: "", images: [], uploading: 0 }, choices) : content
       const { data } = await requestApi<{ tasks: DailyTask[] }>(DAILY_TASKS_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -426,13 +381,14 @@ export default function DailyTasksClient() {
   }, [])
 
   /** A subtask added under a task, from its editor: it appears under that task at once. */
-  const addSubtask = async (parent: DailyTask, content: string): Promise<boolean> => {
+  const addSubtask = async (parent: DailyTask, content: string, choices?: TaskChoices): Promise<boolean> => {
     setTaskError(null)
     try {
+      const row = choices ? rowBody(content, { description: "", images: [], uploading: 0 }, choices) : content
       const { data } = await requestApi<{ tasks: DailyTask[] }>(DAILY_TASKS_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ today, taskDate: parent.taskDate, contents: [content], parentTaskId: parent.id }),
+        body: JSON.stringify({ today, taskDate: parent.taskDate, contents: [row], parentTaskId: parent.id }),
       }, { idempotent: true })
       const added = data.tasks[0]
       if (!added) return false
@@ -539,6 +495,9 @@ export default function DailyTasksClient() {
   const editingPath = editing && page ? page.days.map((day) => pathTo(day.tasks, editing.id)).find((path) => path !== null) ?? null : null
   const olderTaskCount = page?.olderTaskCount ?? 0
   const overdueCount = page?.overdueCount ?? 0
+  // Repeating tasks finished on an earlier day: not overdue, but the same button brings them back,
+  // so it shows even on a day when nothing at all is overdue
+  const repeatingCount = page?.repeatingCount ?? 0
 
   return (
     <div className="font-body-md text-body-md min-h-screen bg-background text-on-surface flex overflow-hidden h-screen">
@@ -578,22 +537,22 @@ export default function DailyTasksClient() {
                   Add task
                 </button>
                 {overdueCount > 0 && (
-                  <>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-error-container px-3 py-1.5 text-xs font-bold text-on-error-container">
-                      <AlertTriangle size={14} aria-hidden="true" />
-                      {overdueCount} overdue
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void moveOverdue()}
-                      disabled={isMovingOverdue}
-                      title="Every task still open on an earlier day moves to the end of today, with its subtasks"
-                      className="inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-primary px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isMovingOverdue ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <CalendarArrowUp size={16} aria-hidden="true" />}
-                      {DAILY_TASKS_MESSAGES.moveOverdue(overdueCount)}
-                    </button>
-                  </>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-error-container px-3 py-1.5 text-xs font-bold text-on-error-container">
+                    <AlertTriangle size={14} aria-hidden="true" />
+                    {overdueCount} overdue
+                  </span>
+                )}
+                {overdueCount + repeatingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void moveOverdue()}
+                    disabled={isMovingOverdue}
+                    title={DAILY_TASKS_MESSAGES.moveOverdueExplains}
+                    className="inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-primary px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isMovingOverdue ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <CalendarArrowUp size={16} aria-hidden="true" />}
+                    {DAILY_TASKS_MESSAGES.moveOverdue(overdueCount, repeatingCount)}
+                  </button>
                 )}
                 <button
                   type="button"
@@ -639,9 +598,7 @@ export default function DailyTasksClient() {
                 onAddTask={addTaskToDay}
                 onOpenTask={(task, focusSubtask = false) => setEditing({ id: task.id, focusSubtask })}
                 onMoveToToday={(task) => void moveOverdue(task)}
-                onPriority={(task, priority) => void setPriority(task, priority)}
-                onDoer={(task, doer) => void setDoer(task, doer)}
-                onBlock={(task, isBlocked) => void setBlocked(task, isBlocked)}
+                onChoose={(task, change) => void chooseForTask(task, change)}
               />
             </div>
           </div>

@@ -34,6 +34,9 @@ export interface IDailyTask {
   // Whether something else is holding it up. Every task starts unblocked, and one saved before this
   // reads as unblocked, so it is never a special case
   isBlocked: boolean
+  // Whether it comes back every day: the overdue button brings a repeating task to today whether it
+  // was finished or not, and unticks it, because it has to be done again
+  repeats: boolean
   // Where the task sits within its day, set by dragging; ties (tasks from before positions) keep the order they were written
   position: number
   isCompleted: boolean
@@ -64,6 +67,7 @@ const DailyTaskSchema = new Schema<IDailyTask>(
     priority: { type: String, enum: PRIORITY_IDS, default: DEFAULT_PRIORITY },
     doer: { type: String, enum: TASK_DOER_IDS, default: DEFAULT_TASK_DOER },
     isBlocked: { type: Boolean, required: true, default: false },
+    repeats: { type: Boolean, required: true, default: false },
     position: { type: Number, required: true, default: 0 },
     isCompleted: { type: Boolean, required: true, default: false },
     completedAt: { type: Date, default: null },
@@ -75,6 +79,8 @@ const DailyTaskSchema = new Schema<IDailyTask>(
 DailyTaskSchema.index({ taskDate: -1, position: 1, createdAt: 1, _id: 1 })
 // Counting what is still open before today (the overdue badge)
 DailyTaskSchema.index({ isCompleted: 1, taskDate: -1 })
+// The repeating tasks waiting on an earlier day, which the same button brings to today
+DailyTaskSchema.index({ repeats: 1, taskDate: -1 })
 // A task's subtasks, for the list, a copy and a delete that takes them with it
 DailyTaskSchema.index({ parentTaskId: 1 })
 

@@ -6,6 +6,8 @@ import { Modal } from "@/components/ui/Modal"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { CopyTaskText } from "@/components/tasks/CopyTaskText"
+import { TaskOptions } from "@/components/daily-tasks/TaskOptions"
+import { defaultChoices, type TaskChoices } from "@/lib/taskChoices"
 import { requestApi } from "@/lib/apiClient"
 import { writeTaskDetails } from "@/lib/taskDetailsAi"
 import {
@@ -34,7 +36,7 @@ interface TaskEditorDialogProps {
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
   // Adds one subtask under a task; resolves true when it was added
-  onAddSubtask: (parent: DailyTask, content: string) => Promise<boolean>
+  onAddSubtask: (parent: DailyTask, content: string, choices?: TaskChoices) => Promise<boolean>
   // Opens another task in this editor (a subtask, or a task above)
   onOpenTask: (id: string, focusSubtask?: boolean) => void
   onClose: () => void
@@ -92,6 +94,8 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
   const [isClosing, setIsClosing] = useState(false)
   const [source, setSource] = useState<AiSource | null>(null)
   const [subtask, setSubtask] = useState("")
+  // What the next subtask will carry; it stays as it is set, since subtasks come in runs of a kind
+  const [subtaskChoices, setSubtaskChoices] = useState<TaskChoices>(defaultChoices())
   const [isAdding, setIsAdding] = useState(false)
   const subtaskRef = useRef<HTMLInputElement>(null)
   const titleRef = useRef<HTMLInputElement>(null)
@@ -179,10 +183,11 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
     const content = subtask.trim()
     if (!content || isAdding || !canNest) return
     setIsAdding(true)
-    const added = await onAddSubtask(task, content)
+    const added = await onAddSubtask(task, content, subtaskChoices)
     setIsAdding(false)
     if (added) {
       setSubtask("")
+      // The choices stay for the next subtask, which is usually of the same kind
       subtaskRef.current?.focus()
     }
   }
@@ -385,7 +390,7 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
             </ul>
           )}
           {canNest ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 ref={subtaskRef}
                 value={subtask}
@@ -401,6 +406,14 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
                 aria-label={depth === 1 ? TASK_ATTACHMENT_MESSAGES.addSubtask : TASK_ATTACHMENT_MESSAGES.addSubSubtask}
                 placeholder={`${TASK_ATTACHMENT_MESSAGES.subtaskPlaceholder} (Enter to add)`}
                 className="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[13px] text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+              />
+              {/* A subtask carries the same four choices a task does, chosen as it is written */}
+              <TaskOptions
+                value={subtaskChoices}
+                onChange={(change) => setSubtaskChoices((current) => ({ ...current, ...change }))}
+                disabled={isAdding}
+                label={subtask.trim() || "this new subtask"}
+                className="shrink-0"
               />
               <button
                 type="button"
