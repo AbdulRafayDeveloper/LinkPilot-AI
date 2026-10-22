@@ -43,6 +43,15 @@ export function cleanDependencyIds(ids: readonly string[], selfId: string): stri
 }
 
 /**
+ * One prompt picked or unpicked while choosing what another waits for, never more than a prompt may
+ * wait for. It takes the list and the one id rather than a finished list, so a caller changes its
+ * own state with an updater and two picks in the same tick are never both worked out from the list
+ * as it was before either of them (the rule Daily Tasks' own picking follows).
+ */
+export const togglePicked = (picked: readonly string[], id: string): string[] =>
+  picked.includes(id) ? picked.filter((chosen) => chosen !== id) : [...picked, id].slice(0, MAX_DEPENDENCIES)
+
+/**
  * Whether making `id` wait for `dependencyIds` would make a loop, which would leave every prompt in
  * it blocked for ever. `waitsFor` is what every other prompt already waits for. It answers the id
  * the loop closes on, so the page can name it, or null when the change is safe.

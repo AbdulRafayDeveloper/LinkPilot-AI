@@ -10,6 +10,13 @@ export interface PromptTargetPrompt extends EditablePrompt {
 export type RequestSource = "text" | "voice"
 
 /**
+ * Where a saved prompt came from: the two ways a task is described, plus `ADDED_BY_HAND` for a
+ * prompt the user already had and added themselves (`constants/promptCreator.ts`). Only a stored
+ * prompt can be that third thing, so the generator and Message Rewriter keep `RequestSource`.
+ */
+export type PromptSource = RequestSource | "added"
+
+/**
  * One prompt another prompt waits for: enough to name it and to say whether it has run, which is
  * what applying it means (constants/promptDependencies.ts).
  */
@@ -30,7 +37,8 @@ export interface CreatedPrompt {
   target: PromptTargetId
   // What the user described, so the saved prompt can be traced back to the request
   request: string
-  requestSource: RequestSource
+  // Typed, spoken, or added by the user themselves, which is a prompt that was never described
+  requestSource: PromptSource
   // The description in clear English, when one was made before the prompt was created; "" otherwise
   englishRequest: string
   // The folder it is filed in, null for a prompt in no folder

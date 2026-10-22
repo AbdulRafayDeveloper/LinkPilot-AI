@@ -40,6 +40,14 @@ export const CREATED_NAME_MAX_LENGTH = 80
 // The finished prompt
 export const CREATED_PROMPT_MAX_LENGTH = 20000
 
+/**
+ * The `requestSource` of a prompt the user **added themselves** rather than had written: they
+ * already had it, so there was no description to type or speak. It is a third value beside the two
+ * ways a description arrives, which is what lets the history say where a prompt came from and filter
+ * on it; `RequestSource` itself stays the two the generator knows (`types/promptCreator.ts`).
+ */
+export const ADDED_BY_HAND = "added"
+
 // Where the description is read back in clear, simple English (it saves nothing of its own)
 export const PROMPT_CREATOR_ENGLISH_PATH = "/english"
 
@@ -88,6 +96,15 @@ export const PROMPT_CREATOR_MESSAGES = {
   emptyPrompt: "The prompt can't be empty.",
   saveFailed: "Couldn't save your changes. Please try again.",
   notFound: "That saved prompt no longer exists.",
+  // Adding a prompt the user already has, rather than having one written (ADDED_BY_HAND)
+  addTitle: "Add a prompt you already have",
+  addHint: "Paste a prompt you wrote somewhere else. It is kept with the ones this tool writes, so it is filed, told what it waits for and marked as applied in exactly the same way.",
+  addButton: "Add a prompt",
+  addSave: "Save prompt",
+  addSaving: "Saving...",
+  addFailed: "Couldn't add that prompt. Please try again.",
+  addedName: "Name it so you can find it again",
+  addedPrompt: "The prompt itself",
 } as const
 
 // The module's sidebar entry: the first tool under Workspace, where the day's own work is kept

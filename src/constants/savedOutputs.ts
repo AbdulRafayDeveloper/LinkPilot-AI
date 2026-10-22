@@ -6,7 +6,7 @@ import { REPLY_CONTEXTS, REPLY_STYLES } from "./postCommentReplies"
 import { FOLLOW_UP_TYPES } from "./followUp"
 import { CONVERSATION_REPLY_TYPES } from "./conversationReply"
 import { MESSAGE_CHANNELS } from "./clientMessaging"
-import { PROMPT_TARGETS } from "./promptCreator"
+import { ADDED_BY_HAND, PROMPT_CREATOR_MESSAGES, PROMPT_TARGETS } from "./promptCreator"
 import { PROMPT_CREATOR_RECORD_ENDPOINT, PROMPT_FOLDERS_ENDPOINT } from "./promptFolders"
 import { PROMPT_DEPENDENCY_MESSAGES } from "./promptDependencies"
 
@@ -37,6 +37,13 @@ const INPUT_SOURCES = [
   { id: "text", label: "Typed" },
   { id: "voice", label: "Spoken" },
 ] as const
+
+/**
+ * Where a saved prompt came from. Prompt Creator alone can hold a prompt the user **added
+ * themselves**, which was described neither way, so it is the one tool whose sources are these three
+ * rather than the two above (`ADDED_BY_HAND` in `constants/promptCreator.ts`).
+ */
+const PROMPT_SOURCES = [...INPUT_SOURCES, { id: ADDED_BY_HAND, label: "Added by you" }] as const
 
 export interface SavedOutputTool {
   // The tool's own route without the slash, which is also the API's [tool] segment
@@ -72,6 +79,13 @@ export interface SavedOutputTool {
   dependencies?: { endpoint: string; label: string }
   // The tool's records can be marked as used, on the same record endpoint the folders use
   canMarkApplied?: boolean
+  /**
+   * Set only for a tool whose records the user may **add themselves**, having made one somewhere
+   * else (today: Prompt Creator). The page then offers Add a prompt, which POSTs to this endpoint
+   * (the same one the folders and the dependencies use) and reads the list again. Every other tool
+   * has no such button and behaves exactly as it did.
+   */
+  addByHand?: { endpoint: string; label: string }
 }
 
 export const SAVED_OUTPUT_TOOLS = [
@@ -202,16 +216,19 @@ export const SAVED_OUTPUT_TOOLS = [
     viewTitle: "View All Prompts",
     viewDescription: "Every prompt created so far",
     heading: "All Created Prompts",
-    intro: "Every prompt created so far, with your edits, the target it was written for and the description it came from.",
+    intro: "Every prompt here, written by this tool or added by you, with your edits, the target it is for and the description it came from.",
     noun: { one: "prompt", many: "prompts" },
-    titleHeading: "Prompt",
+    // The column holds the prompt's name, and the one beside it holds the prompt, so "Prompt" twice
+    // read as the same thing twice (and gave the two columns one key)
+    titleHeading: "Name",
     searchPlaceholder: "Name, prompt or description",
     filters: [
       { key: "option", label: "Target", allLabel: "All targets", options: PROMPT_TARGETS },
-      { key: "context", label: "Described by", allLabel: "Typed or spoken", options: INPUT_SOURCES },
+      { key: "context", label: "Where from", allLabel: "Typed, spoken or added", options: PROMPT_SOURCES },
     ],
     folders: { endpoint: PROMPT_FOLDERS_ENDPOINT, label: "Folder", recordEndpoint: PROMPT_CREATOR_RECORD_ENDPOINT },
     dependencies: { endpoint: PROMPT_CREATOR_RECORD_ENDPOINT, label: PROMPT_DEPENDENCY_MESSAGES.filterLabel },
+    addByHand: { endpoint: PROMPT_CREATOR_RECORD_ENDPOINT, label: PROMPT_CREATOR_MESSAGES.addButton },
     canMarkApplied: true,
   },
   {

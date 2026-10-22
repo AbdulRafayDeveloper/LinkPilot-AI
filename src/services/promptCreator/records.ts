@@ -1,7 +1,7 @@
 import { connectDatabase } from "@/lib/db"
 import { UserFacingError } from "@/lib/errors"
 import { CreatedPromptModel, type ICreatedPrompt } from "@/models/CreatedPrompt"
-import { PROMPT_CREATOR_MESSAGES, type PromptTargetId } from "@/constants/promptCreator"
+import { ADDED_BY_HAND, PROMPT_CREATOR_MESSAGES, type PromptTargetId } from "@/constants/promptCreator"
 import { AI_PROVIDER_LABELS, type AiProviderId } from "@/constants/aiProviders"
 import type { CreatedPrompt, PromptDependency, RequestSource } from "@/types/promptCreator"
 import { assertCanRun, dependenciesOf, dependenciesToSave, namedDependencies } from "@/services/promptCreator/dependencies"
@@ -57,6 +57,38 @@ export async function saveCreatedPrompt(
     provider: created.provider,
   })
   return toCreatedPrompt(record as unknown as StoredCreatedPrompt)
+}
+
+/**
+ * Saves a prompt the user **already had and added themselves**, so a prompt written somewhere else
+ * is kept with the ones this module writes and behaves exactly like them: it is filed in a folder,
+ * told what it waits for, marked as applied, searched and deleted the same way.
+ *
+ * It was written from no description, so `request` is empty and `requestSource` is `ADDED_BY_HAND`,
+ * which is what the history shows and filters on; no model was asked, so it has no provider. What it
+ * waits for is checked before anything is written (`dependenciesToSave`), so a prompt is never saved
+ * pointing at prompts that are not the viewer's.
+ */
+export async function addCreatedPrompt(
+  viewer: Viewer,
+  added: { name: string; prompt: string; target: PromptTargetId; folderId: string | null; dependencyIds: string[] }
+): Promise<CreatedPrompt> {
+  await connectDatabase()
+  const dependencyIds = await dependenciesToSave(viewer, null, added.dependencyIds)
+  const record = await CreatedPromptModel.create({
+    ownerId: viewer.dataOwnerId,
+    name: added.name,
+    prompt: added.prompt,
+    target: added.target,
+    request: "",
+    requestSource: ADDED_BY_HAND,
+    englishRequest: "",
+    projectId: null,
+    folderId: added.folderId,
+    // No provider: nothing was asked to write it, which is what leaves the source pill off the row
+    dependencyIds,
+  })
+  return toCreatedPrompt(record as unknown as StoredCreatedPrompt, await dependenciesFor(viewer, dependencyIds))
 }
 
 /** The prompts a saved one waits for, named, with any that have been deleted left out. */

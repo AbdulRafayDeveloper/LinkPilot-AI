@@ -16,7 +16,7 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core"
-import { AlertTriangle, Check, CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Copy, Eye, EyeOff, FileText, Folder, FolderCog, FolderInput, GitBranch, History, Loader2, Lock, Play, RefreshCw, SquarePlus, Trash2 } from "lucide-react"
+import { AlertTriangle, Check, CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Copy, Eye, EyeOff, FilePlus2, FileText, Folder, FolderCog, FolderInput, GitBranch, History, Loader2, Lock, Play, RefreshCw, SquarePlus, Trash2 } from "lucide-react"
 import { DragPreview, FolderDropBar, RowDragHandle } from "./FolderDrop"
 import { folderFromDropId } from "@/lib/folderDrop"
 import { Sidebar } from "@/components/ui/Sidebar"
@@ -55,6 +55,7 @@ import { filtersOf, oneOf, savedDay, savedText, type SavedFilters } from "@/lib/
 import { MoveToFolderDialog } from "./MoveToFolderDialog"
 import { FoldersDialog } from "./FoldersDialog"
 import { DependenciesDialog } from "./DependenciesDialog"
+import { AddPromptDialog } from "./AddPromptDialog"
 import {
   DEPENDENCY_FILTERS,
   DEPENDENCY_FILTER_IDS,
@@ -473,6 +474,9 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
   // The record being filed in a folder, and the folder manager
   const [moving, setMoving] = useState<SavedOutput | null>(null)
   const [isManagingFolders, setIsManagingFolders] = useState(false)
+  // Adding a prompt the user already has (a tool with addByHand), and the line saying one was added
+  const [isAdding, setIsAdding] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   // The record whose dependencies are being picked
   const [waiting, setWaiting] = useState<SavedOutput | null>(null)
   // What a record was written from is read once per page load, whether it was opened or copied first
@@ -946,13 +950,28 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                 </h1>
                 <p className="mt-1 text-sm text-on-surface-variant">{tool.intro}</p>
               </div>
-              <Link
-                href={tool.toolHref}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant sm:shrink-0"
-              >
-                <SquarePlus size={16} aria-hidden="true" />
-                {tool.createTitle}
-              </Link>
+              <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                {tool.addByHand && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotice(null)
+                      setIsAdding(true)
+                    }}
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  >
+                    <FilePlus2 size={16} aria-hidden="true" />
+                    {tool.addByHand.label}
+                  </button>
+                )}
+                <Link
+                  href={tool.toolHref}
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                >
+                  <SquarePlus size={16} aria-hidden="true" />
+                  {tool.createTitle}
+                </Link>
+              </div>
             </div>
 
             {tool.folders && (
@@ -1036,6 +1055,13 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                 onToChange={(day) => updateFilter("toDay", day)}
               />
             </FilterPanel>
+
+            {notice && (
+              <p role="status" className="flex items-start gap-2 rounded-xl bg-success-container px-3 py-2 text-[13px] text-on-success-container">
+                <CheckCircle2 size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+                {notice}
+              </p>
+            )}
 
             {error && !result ? (
               <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 short:py-5 text-center">
@@ -1161,8 +1187,9 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                     </caption>
                     <thead className="bg-surface-container-lowest">
                       <tr className="border-b border-outline-variant">
-                        {[tool.titleHeading, "Details", capitalize(tool.noun.one), "Written", "Actions"].map((heading) => (
-                          <th key={heading} scope="col" className={`px-3 py-2.5 ${historyLabelClass}`}>
+                        {/* Keyed by the column, not by its words: two columns may say the same thing */}
+                        {[tool.titleHeading, "Details", capitalize(tool.noun.one), "Written", "Actions"].map((heading, column) => (
+                          <th key={`${column}-${heading}`} scope="col" className={`px-3 py-2.5 ${historyLabelClass}`}>
                             {heading}
                           </th>
                         ))}
@@ -1319,6 +1346,22 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
           folderId={waiting.folder?.id ?? null}
           onSave={(ids) => saveDependencies(waiting, ids)}
           onClose={() => setWaiting(null)}
+        />
+      )}
+      {isAdding && tool.addByHand && (
+        <AddPromptDialog
+          endpoint={tool.addByHand.endpoint}
+          folders={folders.folders}
+          folderId={filters.folder}
+          onAdded={(prompt) => {
+            setIsAdding(false)
+            setNotice(`"${prompt.name}" added to your ${tool.noun.many}.`)
+            // Newest first, so the prompt is at the top of the first page; its folder's count follows
+            setPage(1)
+            setReloadAttempt((attempt) => attempt + 1)
+            folders.reload()
+          }}
+          onClose={() => setIsAdding(false)}
         />
       )}
       {isManagingFolders && (

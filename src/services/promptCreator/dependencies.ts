@@ -116,10 +116,14 @@ export async function dependencyChoices(
  * Checks what a prompt is to wait for before it is saved: each one must exist and be the viewer's to
  * see, a prompt can't wait for itself, and the change must not make a loop, which would leave every
  * prompt in it blocked for ever. Answers the ids to save, tidied.
+ *
+ * **`id` is null for a prompt that does not exist yet** (one the user is adding themselves): nothing
+ * can be waiting for it, so it can be in no loop and there is nothing to leave itself out of, which
+ * is why the loop check is skipped rather than run against an id no record has.
  */
-export async function dependenciesToSave(viewer: Viewer, id: string, asked: readonly string[]): Promise<string[]> {
-  const ids = cleanDependencyIds(asked, id)
-  if (asked.some((wanted) => wanted.trim() === id)) throw new UserFacingError(PROMPT_DEPENDENCY_MESSAGES.itself)
+export async function dependenciesToSave(viewer: Viewer, id: string | null, asked: readonly string[]): Promise<string[]> {
+  const ids = cleanDependencyIds(asked, id ?? "")
+  if (id && asked.some((wanted) => wanted.trim() === id)) throw new UserFacingError(PROMPT_DEPENDENCY_MESSAGES.itself)
   if (ids.length === 0) return []
   if (ids.some((wanted) => !isRecordId(wanted))) throw new UserFacingError(PROMPT_DEPENDENCY_MESSAGES.missing)
 
@@ -127,6 +131,7 @@ export async function dependenciesToSave(viewer: Viewer, id: string, asked: read
   const scope = visibleTo(viewer)
   const found = await CreatedPromptModel.countDocuments({ ...scope, _id: { $in: ids.map(asId) } })
   if (found !== ids.length) throw new UserFacingError(PROMPT_DEPENDENCY_MESSAGES.missing)
+  if (!id) return ids
 
   // Every other prompt's own dependencies, so a loop is caught before it is written
   const rows = (await CreatedPromptModel.find(scope, { dependencyIds: 1 }).lean()) as unknown as (IdRow & { dependencyIds?: unknown })[]

@@ -11,8 +11,10 @@ export interface ICreatedPrompt {
   name: string
   prompt: string
   target: string
+  // What the task was described as, empty for a prompt the user added themselves
   request: string
-  requestSource: "text" | "voice"
+  // How it got here: a typed or spoken description, or "added" for one the user added themselves
+  requestSource: "text" | "voice" | "added"
   /**
    * The description read back in clear, simple English, when the user asked for it before creating
    * the prompt. Empty for every prompt written without it, which is how all of them read before
@@ -41,8 +43,9 @@ const CreatedPromptSchema = new Schema<ICreatedPrompt>(
     name: { type: String, required: true, trim: true },
     prompt: { type: String, required: true },
     target: { type: String, required: true, index: true },
-    request: { type: String, required: true },
-    requestSource: { type: String, enum: ["text", "voice"], required: true },
+    // Not required: a prompt the user added themselves was written from no description at all
+    request: { type: String, default: "" },
+    requestSource: { type: String, enum: ["text", "voice", "added"], required: true },
     englishRequest: { type: String, default: "" },
     folderId: { type: String, default: null, index: true },
     projectId: { type: String, default: null, index: true },
