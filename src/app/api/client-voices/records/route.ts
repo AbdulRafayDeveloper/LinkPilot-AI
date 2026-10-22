@@ -17,6 +17,8 @@ const SaveSchema = z.object({
   name: z.string().trim().max(200).default("voice"),
   transcript: z.string().trim().max(TRANSCRIPT_MAX_LENGTH).default(""),
   transcribedBy: z.string().trim().max(40).optional(),
+  // How long the recording runs, as the browser measured it. A page from before sends none
+  seconds: z.coerce.number().min(0).max(24 * 60 * 60).optional().default(0),
 })
 
 const AudioSchema = z
@@ -45,6 +47,7 @@ export async function POST(req: NextRequest) {
       name: form?.get("name") ?? undefined,
       transcript: form?.get("transcript") ?? undefined,
       transcribedBy: form?.get("transcribedBy") ?? undefined,
+      seconds: form?.get("seconds") ?? undefined,
     })
     if (!parsed.success) {
       return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || CLIENT_VOICES_MESSAGES.batchMissing }, { status: 400 })
@@ -62,6 +65,7 @@ export async function POST(req: NextRequest) {
       ...parsed.data,
       ...client,
       transcribedBy: parsed.data.transcribedBy ?? null,
+      durationSeconds: parsed.data.seconds,
       contentType,
       audio: bytes,
     })

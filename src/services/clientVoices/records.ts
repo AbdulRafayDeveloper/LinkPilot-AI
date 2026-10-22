@@ -31,7 +31,9 @@ export const toVoice = (record: StoredVoice): SavedVoice => ({
   size: record.size,
   contentType: record.contentType,
   transcript: record.transcript,
+  clearPoints: record.clearPoints ?? [],
   transcribedBy: record.transcribedBy ?? null,
+  durationSeconds: record.durationSeconds ?? 0,
   createdAt: new Date(record.createdAt).toISOString(),
 })
 
@@ -45,6 +47,8 @@ interface SaveVoiceInput {
   contentType: string
   transcript: string
   transcribedBy: string | null
+  // How long the recording runs, measured by the browser as the voice was added
+  durationSeconds: number
   audio: Buffer
 }
 
@@ -75,6 +79,7 @@ export async function saveVoice(viewer: Viewer, input: SaveVoiceInput): Promise<
     storageKey,
     transcript: input.transcript,
     transcribedBy: input.transcribedBy,
+    durationSeconds: input.durationSeconds,
   })
   if (storageKey) {
     try {
@@ -121,15 +126,48 @@ export async function voiceLink(viewer: Viewer, id: string): Promise<string | nu
 }
 
 /**
- * The user's own wording of one transcript. The recording is never touched: what was said and what
- * the app wrote down are two different things, and this is only the second.
+ * The user's own wording of what one voice said: the transcript, the clear points, or both. **Only
+ * what is named is written**, so rewording one never clears the other. The recording is never
+ * touched either way: what was said and what the app wrote down are two different things.
  */
-export async function editTranscript(viewer: Viewer, id: string, transcript: string): Promise<SavedVoice | null> {
+export async function editVoiceText(
+  viewer: Viewer,
+  id: string,
+  edit: { transcript?: string; clearPoints?: string[] }
+): Promise<SavedVoice | null> {
   const filter = visibleById(viewer, id)
   if (!filter) return null
   await connectDatabase()
-  const record = (await ClientVoiceModel.findOneAndUpdate(filter, { $set: { transcript } }, { new: true, lean: true })) as StoredVoice | null
+  const record = (await ClientVoiceModel.findOneAndUpdate(
+    filter,
+    {
+      $set: {
+        ...(edit.transcript !== undefined ? { transcript: edit.transcript } : {}),
+        ...(edit.clearPoints !== undefined ? { clearPoints: edit.clearPoints } : {}),
+      },
+    },
+    { new: true, lean: true }
+  )) as StoredVoice | null
   return record ? toVoice(record) : null
+}
+
+/**
+ * Writes each voice out in clear words, once the batch's own step has read them. It is one write
+ * per voice, which is a handful at most, and a voice the caller does not own simply matches
+ * nothing. A failure here costs the clear words and nothing else, so it is never thrown.
+ */
+export async function keepClearPoints(viewer: Viewer, points: { id: string; points: string[] }[]): Promise<number> {
+  const named = points.filter((entry) => /^[0-9a-f]{24}$/.test(entry.id) && entry.points.length > 0)
+  if (named.length === 0) return 0
+  await connectDatabase()
+  let kept = 0
+  for (const entry of named) {
+    const filter = visibleById(viewer, entry.id)
+    if (!filter) continue
+    const written = await ClientVoiceModel.updateOne(filter, { $set: { clearPoints: entry.points } })
+    kept += written.modifiedCount
+  }
+  return kept
 }
 
 /** Removes one voice: the recording first, so a failure never leaves a record pointing at nothing. */

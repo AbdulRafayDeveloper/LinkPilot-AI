@@ -58,6 +58,8 @@ export type PromptName =
   | "message-rewriter"
   | "client-voice-tasks-system"
   | "client-voice-tasks"
+  | "client-voice-clear-system"
+  | "client-voice-clear"
   | "task-details-system"
   | "post-image-system"
   | "post-image"

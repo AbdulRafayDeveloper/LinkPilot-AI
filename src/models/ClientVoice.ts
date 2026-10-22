@@ -25,8 +25,12 @@ export interface IClientVoice {
   // Where the recording is in the bucket, "" when there was no file storage to keep it in
   storageKey: string
   transcript: string
+  // The same voice in clear points, written when the batch's lists were
+  clearPoints: string[]
   // Which provider wrote it out
   transcribedBy: string | null
+  // How long the recording runs, measured by the browser; 0 on one kept before it was measured
+  durationSeconds: number
   // The batch this voice arrived in
   taskGroupId: string | null
   createdAt: Date
@@ -44,7 +48,9 @@ const ClientVoiceSchema = new Schema<IClientVoice>(
     contentType: { type: String, required: true },
     storageKey: { type: String, default: "" },
     transcript: { type: String, default: "" },
+    clearPoints: { type: [String], default: [] },
     transcribedBy: { type: String, default: null },
+    durationSeconds: { type: Number, default: 0 },
     taskGroupId: { type: String, default: null },
   },
   { timestamps: true, collection: "client_voices" }

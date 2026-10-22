@@ -13,6 +13,7 @@ import { ClientVoicesPromptModal } from "@/components/client-voices/ClientVoices
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { checkAudioFile, runWithLimit, transcribeVoice } from "@/lib/voiceBatch"
+import { measureDuration } from "@/lib/voiceDuration"
 import {
   BATCH_TITLE_MAX_LENGTH,
   CLIENT_CHOICE_KEY,
@@ -145,6 +146,22 @@ export default function ClientVoicesClient() {
   }, [])
 
   /**
+   * How long a recording runs, measured here because nothing on the server can read it without
+   * decoding the audio, and the browser has already decoded enough to play it. It is kept with the
+   * voice, so a batch's page says how long each one is without its player having to load anything.
+   */
+  const measure = useCallback(
+    (entries: VoiceEntry[]) => {
+      for (const entry of entries) {
+        void measureDuration(entry.file).then((seconds) => {
+          if (seconds > 0) update(entry.id, { seconds })
+        })
+      }
+    },
+    [update]
+  )
+
+  /**
    * Adds what was pasted, dropped or chosen. Files are checked before they join the batch, and
    * the batch stops at VOICE_BATCH_MAX rather than quietly taking a sixteenth.
    */
@@ -177,10 +194,12 @@ export default function ClientVoicesClient() {
           })
         }
         if (problems.length > 0) setNotice([...new Set(problems)].join(" "))
+        // Measured outside the updater: React runs one while it renders, and this is an effect of its own
+        if (accepted.length > 0) queueMicrotask(() => measure(accepted))
         return accepted.length > 0 ? [...current, ...accepted] : current
       })
     },
-    []
+    [measure]
   )
 
   // Removing renumbers what is left, so the positions always read 1, 2, 3 with no gaps
@@ -207,7 +226,12 @@ export default function ClientVoicesClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          voices: done.map((voice) => ({ voice: voice.position, transcript: transcriptsRef.current.get(voice.id) })),
+          // Each transcript carries the kept voice it belongs to, so its clear words are written onto it
+          voices: done.map((voice) => ({
+            voice: voice.position,
+            transcript: transcriptsRef.current.get(voice.id),
+            ...(savedIdsRef.current.get(voice.id) ? { voiceId: savedIdsRef.current.get(voice.id) } : {}),
+          })),
           missingVoices: missing.map((voice) => voice.position),
           // The batch the lists are written onto, and the recordings they were made from
           ...(batchRef.current ? { batchId: batchRef.current } : {}),
@@ -219,6 +243,11 @@ export default function ClientVoicesClient() {
         }),
       }, { retry: true })
       setTasks(data)
+      // Each voice's clear words land on the voice they came from, under its own transcript
+      const clear = new Map((data.clear ?? []).map((entry) => [entry.voice, entry.points]))
+      if (clear.size > 0) {
+        setVoices((current) => current.map((voice) => ({ ...voice, clearPoints: clear.get(voice.position) ?? voice.clearPoints })))
+      }
       // The route starts a batch for a run that somehow had none, so the page can still link to it
       if (data.batchId && !batchRef.current) {
         batchRef.current = data.batchId
@@ -250,7 +279,7 @@ export default function ClientVoicesClient() {
     setTaskError(null)
     for (const voice of toRun) {
       transcriptsRef.current.delete(voice.id)
-      update(voice.id, { status: "queued", transcript: "", error: null })
+      update(voice.id, { status: "queued", transcript: "", clearPoints: [], error: null })
     }
 
     /**
@@ -305,6 +334,7 @@ export default function ClientVoicesClient() {
               form.append("name", voice.name)
               form.append("transcript", transcript)
               if (provider) form.append("transcribedBy", provider)
+              if (voice.seconds) form.append("seconds", String(Math.round(voice.seconds)))
               const { data: saved } = await requestApi<SavedVoice>(`${CLIENT_VOICES_ENDPOINT}/records`, { method: "POST", body: form })
               savedIdsRef.current.set(voice.id, saved.id)
             } catch (error: unknown) {

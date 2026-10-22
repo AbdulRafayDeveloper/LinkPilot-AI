@@ -16,6 +16,7 @@ import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import {
   BATCH_TITLE_MAX_LENGTH,
+  CLEAR_POINTS_MAX,
   CLIENT_VOICES_ENDPOINT,
   CLIENT_VOICES_HISTORY_HREF,
   CLIENT_VOICES_MESSAGES,
@@ -35,12 +36,17 @@ const headerButton =
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
 const panel = "flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
 
-/** What is being reworded: the batch's name, both of its lists, and what each voice said. */
+/**
+ * What is being reworded: the batch's name, both of its lists, and what each voice said, word for
+ * word and in clear points. The points are written as lines, which is how they read and how anyone
+ * would edit them; they become a list again on the way back.
+ */
 interface Draft {
   title: string
   tasks: ListEntry[]
   questions: ListEntry[]
   transcripts: Record<string, string>
+  clear: Record<string, string>
 }
 
 const draftOf = (batch: VoiceBatchDetail): Draft => ({
@@ -48,7 +54,16 @@ const draftOf = (batch: VoiceBatchDetail): Draft => ({
   tasks: batch.tasks.map((task) => ({ text: task.task, voices: task.voices })),
   questions: batch.questions.map((entry) => ({ text: entry.question, voices: entry.voices })),
   transcripts: Object.fromEntries(batch.voices.map((voice) => [voice.id, voice.transcript])),
+  clear: Object.fromEntries(batch.voices.map((voice) => [voice.id, voice.clearPoints.join("\n")])),
 })
+
+// One point per line, and a line with nothing on it is not a point
+const pointsOf = (text: string) =>
+  text
+    .split("\n")
+    .map((line) => line.replace(/^[-*•\s]+/, "").trim())
+    .filter(Boolean)
+    .slice(0, CLEAR_POINTS_MAX)
 
 // A line left empty is one the user meant to take out, so it never reaches the server as a blank
 const written = (entries: ListEntry[]) => entries.filter((entry) => entry.text.trim().length > 0)
@@ -116,12 +131,19 @@ export default function BatchDetailClient({ batchId }: { batchId: string }) {
           questions: written(draft.questions).map((entry) => ({ question: entry.text.trim(), voices: entry.voices })),
         }),
       })
-      const changed = batch.voices.filter((voice) => (draft.transcripts[voice.id] ?? "") !== voice.transcript)
-      for (const voice of changed) {
+      for (const voice of batch.voices) {
+        const transcript = draft.transcripts[voice.id] ?? ""
+        const points = pointsOf(draft.clear[voice.id] ?? "")
+        const changed = {
+          ...(transcript !== voice.transcript ? { transcript } : {}),
+          ...(points.join("\n") !== voice.clearPoints.join("\n") ? { clearPoints: points } : {}),
+        }
+        // Only what the user really changed, so an untouched voice is never written to
+        if (Object.keys(changed).length === 0) continue
         await requestApi(`${CLIENT_VOICES_ENDPOINT}/records/${voice.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: draft.transcripts[voice.id] ?? "" }),
+          body: JSON.stringify(changed),
         })
       }
       setDraft(null)
@@ -333,6 +355,8 @@ export default function BatchDetailClient({ batchId }: { batchId: string }) {
                           ? {
                               transcriptOf: (id) => draft.transcripts[id] ?? "",
                               onTranscript: (id, text) => setDraft({ ...draft, transcripts: { ...draft.transcripts, [id]: text } }),
+                              clearOf: (id) => draft.clear[id] ?? "",
+                              onClear: (id, text) => setDraft({ ...draft, clear: { ...draft.clear, [id]: text } }),
                             }
                           : undefined
                       }

@@ -22,12 +22,27 @@ export interface VoiceEntry {
   source: VoiceSource
   status: VoiceStatus
   transcript: string
+  // The same voice in clear points, which arrive with the batch's lists
+  clearPoints?: string[]
   // Which provider wrote the transcript out
   transcribedBy?: string | null
+  // How long the recording runs, measured by the browser as it was added
+  seconds?: number
   error: string | null
 }
 
 export type VoiceSource = "paste" | "drop" | "file"
+
+/**
+ * One voice said again in clear words, in points. The transcript is what was said, word for word
+ * and often rambling; this is the same thing in a few lines anyone can read at a glance. It never
+ * adds anything the voice did not say.
+ */
+export interface ClearVoice {
+  // Which voice of the batch, 1-based
+  voice: number
+  points: string[]
+}
 
 /** One kept voice: what a page needs to list it, read it and play it. */
 export interface SavedVoice {
@@ -41,7 +56,11 @@ export interface SavedVoice {
   size: number
   contentType: string
   transcript: string
+  // What the voice said, in clear points
+  clearPoints: string[]
   transcribedBy: string | null
+  // How long the recording runs, 0 for one kept before this was measured
+  durationSeconds: number
   createdAt: string
   /**
    * Short-lived signed links, on a batch's own page only: `playUrl` is the recording played where
@@ -113,6 +132,9 @@ export interface ClientQuestion {
 export interface TaskExtraction extends WithAiSource {
   // A short name for the batch, written from the voices. The user's own title wins over it
   title: string
+  // Each voice said again in clear points, put here by the route. Left out when that step could
+  // not run at all, which is why it is optional rather than an empty list the service has to carry
+  clear?: ClearVoice[]
   tasks: ClientTask[]
   questions: ClientQuestion[]
   // Voices that had no transcript to give it, so the page can say the lists are partial

@@ -50,6 +50,14 @@ export const ACCEPTED_AUDIO_TYPES = [
 // Some browsers hand over a voice file with no type at all, so the extension decides instead
 export const ACCEPTED_AUDIO_EXTENSIONS = [".mp3", ".m4a", ".mp4", ".wav", ".webm", ".ogg", ".oga", ".opus", ".flac"]
 
+/**
+ * What one voice says, written out again in clear words: a few short lines rather than one block,
+ * because a voice message wanders and a list of points does not. Six is as many distinct things as
+ * anyone says in one voice message; more than that is the model padding rather than reading.
+ */
+export const CLEAR_POINTS_MAX = 6
+export const CLEAR_POINT_MAX_LENGTH = 400
+
 export const TASK_LIST_MAX = 40
 /**
  * How many questions one batch may come back with. A client asking more than this in a handful of
@@ -142,6 +150,10 @@ export const CLIENT_VOICES_MESSAGES = {
   titleHint: "Left empty, a title is written from the voices themselves.",
   titlePlaceholder: "What this batch is about",
   untitled: "Untitled batch",
+  // What one voice said, in clear words
+  clearHeading: "In clear words",
+  clearHint: "One point per line.",
+  clearEmpty: "This voice has not been written out in clear words yet.",
   // Editing a kept batch
   edit: "Edit",
   save: "Save",

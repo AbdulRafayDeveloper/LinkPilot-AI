@@ -1,5 +1,13 @@
 import { z } from "zod"
-import { BATCH_TITLE_MAX_LENGTH, QUESTION_LIST_MAX, TASK_LIST_MAX, TRANSCRIPT_MAX_LENGTH, VOICE_BATCH_MAX } from "@/constants/clientVoices"
+import {
+  BATCH_TITLE_MAX_LENGTH,
+  CLEAR_POINTS_MAX,
+  CLEAR_POINT_MAX_LENGTH,
+  QUESTION_LIST_MAX,
+  TASK_LIST_MAX,
+  TRANSCRIPT_MAX_LENGTH,
+  VOICE_BATCH_MAX,
+} from "@/constants/clientVoices"
 import { DATE_ORDER_ISSUE, dayBoundParam, inDateOrder, searchParam } from "./listFilters"
 
 /**
@@ -35,6 +43,9 @@ export const TranscriptBatchSchema = z.object({
       z.object({
         voice: z.number().int().min(1).max(VOICE_BATCH_MAX),
         transcript: z.string().trim().min(1).max(TRANSCRIPT_MAX_LENGTH),
+        // The kept voice this transcript belongs to, so its clear words are written onto it. Left
+        // out by a page from before, which simply gets the clear words in the answer and no more
+        voiceId: z.string().regex(ID).optional(),
       })
     )
     .min(1, "There are no transcripts to take tasks from.")
@@ -90,8 +101,16 @@ export const EditTasksSchema = z
   })
   .refine((body) => body.title !== undefined || body.tasks !== undefined || body.questions !== undefined, "There is nothing to change in that.")
 
-/** The user's own wording of one voice's transcript. Emptying it is allowed; the recording stays. */
-export const EditTranscriptSchema = z.object({ transcript: z.string().trim().max(TRANSCRIPT_MAX_LENGTH) })
+/**
+ * The user's own wording of what one voice said: the transcript, the clear points, or both. Each is
+ * written only when it is named, and emptying either is allowed; the recording stays either way.
+ */
+export const EditTranscriptSchema = z
+  .object({
+    transcript: z.string().trim().max(TRANSCRIPT_MAX_LENGTH).optional(),
+    clearPoints: z.array(z.string().trim().max(CLEAR_POINT_MAX_LENGTH)).max(CLEAR_POINTS_MAX).optional(),
+  })
+  .refine((body) => body.transcript !== undefined || body.clearPoints !== undefined, "There is nothing to change in that.")
 
 /**
  * The "view all" page's query: a search over what the client asked for and whose batch it is, one

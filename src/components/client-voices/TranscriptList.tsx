@@ -1,10 +1,12 @@
 "use client"
 
 import React from "react"
-import { AlertTriangle, Loader2, RefreshCw } from "lucide-react"
+import { AlertTriangle, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import type { VoiceEntry } from "@/types/clientVoices"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
+import { CLIENT_VOICES_MESSAGES } from "@/constants/clientVoices"
+import { durationLabel } from "@/lib/voiceDuration"
 
 interface TranscriptListProps {
   voices: VoiceEntry[]
@@ -16,6 +18,10 @@ interface TranscriptListProps {
  * One block per voice, in the order the voices were added, never merged. A voice that failed
  * keeps its place with the reason and a way to try it again, so the batch always shows every
  * voice that went into it rather than only the ones that worked.
+ *
+ * **What the voice said in clear words sits under its transcript**, as soon as the batch's own step
+ * has written it: the transcript is what was said, word for word and often rambling, and this is
+ * the same thing in a few lines anyone can read at a glance.
  */
 export const TranscriptList: React.FC<TranscriptListProps> = ({ voices, isProcessing, onRetry }) => (
   <ul className="flex flex-col gap-3">
@@ -27,6 +33,9 @@ export const TranscriptList: React.FC<TranscriptListProps> = ({ voices, isProces
               {voice.position}
             </span>
             Voice {voice.position}
+            {durationLabel(voice.seconds ?? 0) && (
+              <span className="text-[11px] font-semibold text-on-surface-variant">{durationLabel(voice.seconds ?? 0)}</span>
+            )}
           </h3>
           <div className="flex items-center gap-1">
             {voice.status === "done" && <CopyButton text={voice.transcript} label={`Copy the transcript of voice ${voice.position}`} showLabel />}
@@ -52,6 +61,31 @@ export const TranscriptList: React.FC<TranscriptListProps> = ({ voices, isProces
             <p className="mt-1 text-[11px] text-outline">
               <AiSourceLabel source={{ provider: voice.transcribedBy ?? null }} prefix="" />
             </p>
+            {voice.clearPoints && voice.clearPoints.length > 0 && (
+              <div className="mt-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-outline">
+                    <Sparkles size={12} className="text-primary" aria-hidden="true" />
+                    {CLIENT_VOICES_MESSAGES.clearHeading}
+                  </h4>
+                  <CopyButton
+                    text={voice.clearPoints.map((point) => `- ${point}`).join("\n")}
+                    label={`Copy what voice ${voice.position} said in clear words`}
+                    showLabel
+                  />
+                </div>
+                <ul className="mt-2 flex flex-col gap-1">
+                  {voice.clearPoints.map((point, index) => (
+                    <li key={`${index}-${point.slice(0, 20)}`} className="flex gap-2 text-[13px] leading-relaxed text-on-surface">
+                      <span aria-hidden="true" className="text-primary">
+                        •
+                      </span>
+                      <span className="min-w-0 break-words">{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </>
         )}
 

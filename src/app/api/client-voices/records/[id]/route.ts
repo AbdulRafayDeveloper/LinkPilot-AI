@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { EditTranscriptSchema } from "@/lib/validation/clientVoices"
 import { CLIENT_VOICES_MESSAGES } from "@/constants/clientVoices"
-import { deleteVoice, editTranscript } from "@/services/clientVoices/records"
+import { deleteVoice, editVoiceText } from "@/services/clientVoices/records"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
 /**
- * PUT { transcript }: the user's own wording of what this voice said. The recording is never
- * touched, since what was said and what the app wrote down are two different things.
+ * PUT { transcript?, clearPoints? }: the user's own wording of what this voice said, word for word
+ * or in clear points. Each is written only when it is named, and the recording is never touched,
+ * since what was said and what the app wrote down are two different things.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireViewer()
@@ -19,7 +20,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || CLIENT_VOICES_MESSAGES.editFailed }, { status: 400 })
   }
   try {
-    const saved = await editTranscript(auth.viewer, (await params).id, parsed.data.transcript)
+    const saved = await editVoiceText(auth.viewer, (await params).id, parsed.data)
     if (!saved) return NextResponse.json({ success: false, message: CLIENT_VOICES_MESSAGES.editFailed }, { status: 404 })
     return NextResponse.json({ success: true, message: CLIENT_VOICES_MESSAGES.transcriptSaved, data: saved })
   } catch (error: unknown) {
