@@ -11,12 +11,16 @@ export const dynamic = "force-dynamic"
 export const maxDuration = 120
 
 /**
- * POST: turns the batch's transcripts into one list of the work the client asked for and one list of
- * what they asked about.
+ * POST: turns the batch's transcripts into one list of the work the client asked for, one list of
+ * what they asked about, and a short name for the batch.
  *
- * Only text arrives here, and only the lists go back. They are then written onto the batch the page
+ * Only text arrives here, and only those go back. They are then written onto the batch the page
  * started before the run, so a batch is never left without them. A request that names no batch (a
  * page written before batches existed) gets one started for it, so nothing is lost either way.
+ *
+ * **`temporary` is the one way nothing is written at all**: the lists are answered and no batch is
+ * started, which is what the page's "use these once" choice asks for. The recordings were already
+ * not kept, since the page never offered them to be.
  */
 export async function POST(req: NextRequest) {
   const auth = await requireViewer()
@@ -31,13 +35,20 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { voices, missingVoices, clientId, voiceIds } = parsed.data
+    const { voices, missingVoices, clientId, voiceIds, title, temporary } = parsed.data
     const result = withSource(await runAiRequest(auth.viewer, "client-voices", () => extractTasks({ voices, missingVoices, signal: req.signal })))
+    // The user's own name for the batch wins over the one written from the voices
+    const named = { ...result, title: title || result.title }
+
+    // Nothing is written down at all for a batch the page is running once
+    if (temporary) {
+      return NextResponse.json({ success: true, message: "Tasks ready", data: { ...named, batchId: null } })
+    }
 
     // The batch the page started, or one started now for a caller that named none
     const batchId =
       parsed.data.batchId ??
-      (await startBatch(auth.viewer, { clientId: clientId ?? "", voiceCount: voices.length + missingVoices.length })).id
+      (await startBatch(auth.viewer, { clientId: clientId ?? "", title, voiceCount: voices.length + missingVoices.length })).id
     // Keeping the lists can never cost the user the lists themselves, which are already written
     const saved = await finishBatch(auth.viewer, batchId, {
       tasks: result.tasks,
@@ -46,12 +57,13 @@ export async function POST(req: NextRequest) {
       voiceIds: voiceIds ?? [],
       provider: result.provider ?? null,
       providers: result.providers ?? [],
+      suggestedTitle: result.title,
     }).catch((error: unknown) => {
       console.error("❌ Could not keep a client voice batch's lists:", error instanceof Error ? error.message : error)
       return null
     })
 
-    return NextResponse.json({ success: true, message: "Tasks ready", data: { ...result, batchId: saved ? batchId : null } })
+    return NextResponse.json({ success: true, message: "Tasks ready", data: { ...named, batchId: saved ? batchId : null } })
   } catch (error: unknown) {
     if (req.signal.aborted) {
       return NextResponse.json({ success: false, message: "Request cancelled" }, { status: 499 })

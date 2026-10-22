@@ -29,7 +29,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
-/** PUT { tasks, questions? }: the user's own wording. The voices it was made from stay as they are. */
+/**
+ * PUT { title?, tasks?, questions? }: the user's own wording of a kept batch. **Only what it names
+ * is written**, so a renamed batch never carries a stale list with it, and the voices it was made
+ * from stay as they are either way.
+ */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied

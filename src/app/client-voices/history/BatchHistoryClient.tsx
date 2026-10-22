@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, AudioLines, HelpCircle, ListChecks, Loader2, Mic, RefreshCw, SquarePlus, Users } from "lucide-react"
+import { AlertTriangle, AudioLines, HelpCircle, ListChecks, Loader2, Mic, RefreshCw, SquarePlus, Trash2, Users } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Pagination } from "@/components/ui/Pagination"
@@ -16,13 +16,7 @@ import { filtersOf, savedDay, savedText, type SavedFilters } from "@/lib/savedFi
 import { appendDayRange, isBackwardsRange } from "@/lib/dayRange"
 import { requestApi } from "@/lib/apiClient"
 import { HISTORY_DEBOUNCE_MS, HISTORY_MESSAGES } from "@/constants/historyFilters"
-import {
-  BATCH_PREVIEW_MAX_LENGTH,
-  CLIENT_VOICES_MESSAGES,
-  NO_CLIENT_FILTER,
-  VOICE_BATCHES_ENDPOINT,
-  clientVoicesBatchHref,
-} from "@/constants/clientVoices"
+import { CLIENT_VOICES_MESSAGES, NO_CLIENT_FILTER, VOICE_BATCHES_ENDPOINT, clientVoicesBatchHref } from "@/constants/clientVoices"
 import type { VoiceBatch, VoiceBatchesPage } from "@/types/clientVoices"
 
 const NOUN = { one: "batch", many: "batches" }
@@ -30,12 +24,12 @@ const NOUN = { one: "batch", many: "batches" }
 const runOn = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
-/** What the batch was about, in one line: the first thing the client asked for, cut to fit a row. */
-const preview = (batch: VoiceBatch) => {
-  const first = batch.tasks[0]?.task ?? batch.questions[0]?.question ?? ""
-  const text = first.replace(/\s+/g, " ").trim()
-  return text.length > BATCH_PREVIEW_MAX_LENGTH ? `${text.slice(0, BATCH_PREVIEW_MAX_LENGTH).trimEnd()}...` : text
-}
+/**
+ * What a batch is called, which is what the list is read by: the user's own title, or the one
+ * written from the voices. A batch kept before titles existed falls back to its client's name, so
+ * no row is ever nameless.
+ */
+const titleOf = (batch: VoiceBatch) => batch.title || batch.clientName || CLIENT_VOICES_MESSAGES.untitled
 
 const pagerButton =
   "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
@@ -95,6 +89,9 @@ export default function BatchHistoryClient() {
   const [confirmingMany, setConfirmingMany] = useState<"picked" | "all" | null>(null)
   const [isDeletingMany, setIsDeletingMany] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // The one batch waiting to be confirmed, and whether it is on its way out
+  const [deletingOne, setDeletingOne] = useState<VoiceBatch | null>(null)
+  const [isDeletingOne, setIsDeletingOne] = useState(false)
 
   const settledSearch = useDebouncedValue(search.trim(), HISTORY_DEBOUNCE_MS)
   const backwards = isBackwardsRange(fromDay, toDay)
@@ -189,14 +186,48 @@ export default function BatchHistoryClient() {
     }
   }
 
-  const openLink = (batch: VoiceBatch) => (
-    <Link
-      href={clientVoicesBatchHref(batch.id)}
-      className="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-    >
-      <AudioLines size={13} aria-hidden="true" />
-      Open
-    </Link>
+  /**
+   * One batch, with its recordings and transcripts. It is confirmed first, like every delete in the
+   * app that takes more than a line of text with it.
+   */
+  const deleteOne = async (batch: VoiceBatch) => {
+    if (isDeletingOne) return
+    setIsDeletingOne(true)
+    setDeleteError(null)
+    try {
+      await requestApi<{ deleted: number; failed: number }>(`${VOICE_BATCHES_ENDPOINT}/${batch.id}`, { method: "DELETE" })
+      setDeletingOne(null)
+      reload()
+    } catch (reason: unknown) {
+      setDeleteError(reason instanceof Error ? reason.message : CLIENT_VOICES_MESSAGES.deleteBatchFailed)
+      setDeletingOne(null)
+    } finally {
+      setIsDeletingOne(false)
+    }
+  }
+
+  const actions = (batch: VoiceBatch) => (
+    <div className="flex flex-wrap items-center justify-end gap-1">
+      <Link
+        href={clientVoicesBatchHref(batch.id)}
+        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      >
+        <AudioLines size={13} aria-hidden="true" />
+        Open
+      </Link>
+      <button
+        type="button"
+        onClick={() => {
+          setDeleteError(null)
+          setDeletingOne(batch)
+        }}
+        aria-label={`Delete ${titleOf(batch)}`}
+        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-outline transition-colors hover:bg-surface-container hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      >
+        <Trash2 size={13} aria-hidden="true" />
+        Delete
+      </button>
+    </div>
   )
 
   return (
@@ -328,7 +359,7 @@ export default function BatchHistoryClient() {
                         <th scope="col" className="w-[36px] px-2 py-2.5">
                           <span className="sr-only">Picked</span>
                         </th>
-                        {["When", "Client", "What came out of it", "What the client asked for", "Actions"].map((heading) => (
+                        {["Title", "When", "Client", "What came out of it", "Actions"].map((heading) => (
                           <th key={heading} scope="col" className={`px-3 py-2.5 ${historyLabelClass} ${heading === "Actions" ? "text-right" : ""}`}>
                             {heading}
                           </th>
@@ -344,14 +375,20 @@ export default function BatchHistoryClient() {
                               checked={selection.isPicked(batch.id)}
                               disabled={isDeletingMany}
                               onChange={(event) => selection.pick(batch.id, (event.nativeEvent as MouseEvent).shiftKey)}
-                              aria-label={`Pick the batch run on ${runOn(batch.createdAt)}`}
+                              aria-label={`Pick ${titleOf(batch)}`}
                               className="h-4 w-4 accent-primary"
                             />
                           </td>
-                          <td className="max-w-[170px] px-3 py-2.5">
-                            <Link href={clientVoicesBatchHref(batch.id)} className="break-words text-[13px] font-semibold text-on-surface hover:text-primary hover:underline">
-                              {runOn(batch.createdAt)}
+                          <td className="max-w-[320px] px-3 py-2.5">
+                            <Link
+                              href={clientVoicesBatchHref(batch.id)}
+                              className="break-words text-[13px] font-semibold text-on-surface hover:text-primary hover:underline"
+                            >
+                              {titleOf(batch)}
                             </Link>
+                          </td>
+                          <td className="max-w-[170px] px-3 py-2.5">
+                            <p className="text-[12px] text-on-surface-variant">{runOn(batch.createdAt)}</p>
                           </td>
                           <td className="max-w-[160px] px-3 py-2.5">
                             <ClientTag batch={batch} />
@@ -359,14 +396,7 @@ export default function BatchHistoryClient() {
                           <td className="max-w-[210px] px-3 py-2.5">
                             <Counts batch={batch} />
                           </td>
-                          <td className="max-w-[380px] px-3 py-2.5">
-                            {preview(batch) ? (
-                              <p className="line-clamp-3 break-words text-[13px] leading-relaxed text-on-surface-variant">{preview(batch)}</p>
-                            ) : (
-                              <span className="text-[12px] text-outline">Nothing was asked for</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-right">{openLink(batch)}</td>
+                          <td className="px-3 py-2">{actions(batch)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -382,19 +412,22 @@ export default function BatchHistoryClient() {
                           checked={selection.isPicked(batch.id)}
                           disabled={isDeletingMany}
                           onChange={(event) => selection.pick(batch.id, (event.nativeEvent as MouseEvent).shiftKey)}
-                          aria-label={`Pick the batch run on ${runOn(batch.createdAt)}`}
+                          aria-label={`Pick ${titleOf(batch)}`}
                           className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
                         />
-                        <Link href={clientVoicesBatchHref(batch.id)} className="min-w-0 flex-1 break-words text-[14px] font-semibold text-on-surface hover:text-primary">
-                          {runOn(batch.createdAt)}
+                        <Link
+                          href={clientVoicesBatchHref(batch.id)}
+                          className="min-w-0 flex-1 break-words text-[14px] font-semibold text-on-surface hover:text-primary"
+                        >
+                          {titleOf(batch)}
                         </Link>
                         <ClientTag batch={batch} />
                       </div>
                       <Counts batch={batch} />
-                      {preview(batch) && (
-                        <p className="line-clamp-4 break-words text-[13px] leading-relaxed text-on-surface-variant">{preview(batch)}</p>
-                      )}
-                      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 border-t border-outline-variant/70 pt-2">{openLink(batch)}</div>
+                      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant/70 pt-2">
+                        <span className="whitespace-nowrap text-[11px] text-outline">{runOn(batch.createdAt)}</span>
+                        {actions(batch)}
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -405,6 +438,17 @@ export default function BatchHistoryClient() {
           </div>
         </main>
       </div>
+
+      {deletingOne && (
+        <ConfirmBulkDelete
+          count={1}
+          noun={NOUN}
+          alsoGoes={CLIENT_VOICES_MESSAGES.confirmDeleteBatch}
+          isDeleting={isDeletingOne}
+          onConfirm={() => void deleteOne(deletingOne)}
+          onClose={() => setDeletingOne(null)}
+        />
+      )}
 
       {confirmingMany && (
         <ConfirmBulkDelete

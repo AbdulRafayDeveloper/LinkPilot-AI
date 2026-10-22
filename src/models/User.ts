@@ -21,6 +21,8 @@ export interface IUser {
   enabledTools: string[]
   // The client last chosen on Client Voices, so the page opens on it again on any browser; null for none
   clientVoicesClientId: string | null
+  // Client Voices: run a batch without writing anything down
+  clientVoicesTemporary: boolean
   /**
    * What each page is filtered on, one entry per page (`constants/savedFilters.ts`), so every list
    * opens the way its user left it: after a reload, after signing out and in, and on any machine.
@@ -54,6 +56,8 @@ const UserSchema = new Schema<IUser>(
     disabledTools: { type: [String], default: [] },
     enabledTools: { type: [String], default: [] },
     clientVoicesClientId: { type: String, default: null },
+    // Whether Client Voices runs a batch without keeping it; a choice, so it stays until it is changed
+    clientVoicesTemporary: { type: Boolean, default: false },
     // One entry per page; what may be in each is decided by lib/savedFilters.ts, not by the schema
     viewFilters: { type: Schema.Types.Mixed, default: {} },
     failedLogins: { type: Number, required: true, default: 0 },

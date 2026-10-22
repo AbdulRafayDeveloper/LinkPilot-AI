@@ -120,6 +120,18 @@ export async function voiceLink(viewer: Viewer, id: string): Promise<string | nu
   return presignDownload(record.storageKey, record.contentType, record.name)
 }
 
+/**
+ * The user's own wording of one transcript. The recording is never touched: what was said and what
+ * the app wrote down are two different things, and this is only the second.
+ */
+export async function editTranscript(viewer: Viewer, id: string, transcript: string): Promise<SavedVoice | null> {
+  const filter = visibleById(viewer, id)
+  if (!filter) return null
+  await connectDatabase()
+  const record = (await ClientVoiceModel.findOneAndUpdate(filter, { $set: { transcript } }, { new: true, lean: true })) as StoredVoice | null
+  return record ? toVoice(record) : null
+}
+
 /** Removes one voice: the recording first, so a failure never leaves a record pointing at nothing. */
 export async function deleteVoice(viewer: Viewer, id: string): Promise<boolean> {
   const filter = visibleById(viewer, id)

@@ -73,20 +73,25 @@ export const CLIENT_VOICES_HISTORY_HREF = "/client-voices/history"
 export const clientVoicesBatchHref = (id: string) => `/client-voices/${id}`
 
 /**
- * How much of the first task stands for a batch in the list, so a row says what the client wanted
- * without carrying the whole list.
+ * A batch's own name, which is what the list is read by. The user may give it one as they run the
+ * batch; when they do not, the model writes one from the voices themselves, so a row never reads as
+ * a date and nothing else.
  */
-export const BATCH_PREVIEW_MAX_LENGTH = 180
+export const BATCH_TITLE_MAX_LENGTH = 120
 
 /**
  * What the client filter sends for the batches kept under no client. It can never be mistaken for a
  * client, whose id is 24 hex characters, the way the folder filters' own two values cannot.
  */
 export const NO_CLIENT_FILTER = "none"
-// Where the chosen client is remembered: on the account (so it follows it to any browser), and in this
-// browser as well, so the page shows it at once before the account has answered
-export const CLIENT_CHOICE_ENDPOINT = "/api/client-voices/client"
+/**
+ * The page's own two choices, kept **on the account** so they follow it to any browser and stay put
+ * until the user changes them: the client a batch is kept under, and whether a batch is kept at all.
+ * This browser keeps a copy as well, only so the page can show them before the account has answered.
+ */
+export const VOICE_CHOICES_ENDPOINT = `${CLIENT_VOICES_ENDPOINT}/choices`
 export const CLIENT_CHOICE_KEY = "clientVoices:client"
+export const TEMPORARY_CHOICE_KEY = "clientVoices:temporary"
 // Every voice is transcribed on its own, through the app's shared transcription endpoint
 export const TRANSCRIBE_ENDPOINT = "/api/transcribe"
 
@@ -127,6 +132,27 @@ export const CLIENT_VOICES_MESSAGES = {
   playFailed: "Couldn't play this recording. Open the page again for a fresh link.",
   questionsEmpty: "The client did not ask anything in these voices.",
   copiedQuestions: "Questions copied.",
+  // Running a batch without keeping it, and the choice that says so
+  temporary: "Use these voices once, don't save them",
+  temporaryHint: "Nothing is written down: no recordings, no transcripts, no lists. Closing the page is the end of it.",
+  notSaved: "This batch was not saved. Copy what you need before you leave the page.",
+  temporaryChoiceFailed: "Couldn't remember that for next time. It still holds on this page.",
+  // The batch's own name
+  title: "Title (optional)",
+  titleHint: "Left empty, a title is written from the voices themselves.",
+  titlePlaceholder: "What this batch is about",
+  untitled: "Untitled batch",
+  // Editing a kept batch
+  edit: "Edit",
+  save: "Save",
+  cancel: "Cancel",
+  editFailed: "Couldn't save those changes. Please try again.",
+  addTask: "Add a task",
+  addQuestion: "Add a question",
+  removeTask: "Remove this task",
+  removeQuestion: "Remove this question",
+  transcriptSaved: "Transcript saved.",
+  confirmDeleteBatch: "Its recordings, transcripts, tasks and questions all go with it.",
 } as const
 
 // The module's sidebar entry, with the other work done for clients

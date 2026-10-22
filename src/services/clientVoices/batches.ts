@@ -28,6 +28,7 @@ type StoredBatch = IClientVoiceTasks & { _id: { toString: () => string } }
 
 const toBatch = (record: StoredBatch): VoiceBatch => ({
   id: record._id.toString(),
+  title: record.title ?? "",
   clientId: record.clientId ?? "",
   clientName: record.clientName ?? "",
   voiceCount: record.voiceCount ?? record.voiceIds?.length ?? 0,
@@ -55,12 +56,13 @@ async function clientFor(viewer: Viewer, clientId: string): Promise<{ clientId: 
  * Starts a batch, before a single voice is written out, so nothing that follows can be left with
  * nowhere to belong. The lists arrive later through `finishBatch`.
  */
-export async function startBatch(viewer: Viewer, input: { clientId: string; voiceCount: number }): Promise<VoiceBatch> {
+export async function startBatch(viewer: Viewer, input: { clientId: string; title?: string; voiceCount: number }): Promise<VoiceBatch> {
   const client = await clientFor(viewer, input.clientId)
   await connectDatabase()
   const record = await ClientVoiceTasksModel.create({
     ownerId: viewer.dataOwnerId,
     ...client,
+    title: input.title?.trim() ?? "",
     voiceCount: input.voiceCount,
   })
   return toBatch(record.toObject() as StoredBatch)
@@ -90,26 +92,38 @@ interface FinishInput {
   voiceIds: string[]
   provider: string | null
   providers: string[]
+  // A title written from the voices, used only where the user gave the batch none of their own
+  suggestedTitle: string
 }
 
-/** Writes what the batch produced onto it. Another account's batch reads as not found. */
+/**
+ * Writes what the batch produced onto it. Another account's batch reads as not found.
+ *
+ * **The title the model wrote is only ever a fallback**: it is put on in the same atomic update,
+ * and only where the batch has none, so a name the user typed as the run started can never be
+ * replaced by one written from the voices.
+ */
 export async function finishBatch(viewer: Viewer, batchId: string, input: FinishInput): Promise<VoiceBatch | null> {
   const filter = visibleById(viewer, batchId)
   if (!filter) return null
   await connectDatabase()
   const record = (await ClientVoiceTasksModel.findOneAndUpdate(
     filter,
-    {
-      $set: {
-        tasks: input.tasks,
-        questions: input.questions,
-        missingVoices: input.missingVoices,
-        voiceIds: input.voiceIds,
-        provider: input.provider,
-        providers: input.providers,
+    [
+      {
+        $set: {
+          tasks: input.tasks,
+          questions: input.questions,
+          missingVoices: input.missingVoices,
+          voiceIds: input.voiceIds,
+          provider: input.provider,
+          providers: input.providers,
+          title: { $cond: [{ $eq: [{ $ifNull: ["$title", ""] }, ""] }, input.suggestedTitle, "$title"] },
+        },
       },
-    },
-    { new: true, lean: true }
+    ],
+    // Mongoose refuses an array of stages without this, and the refusal would be swallowed here
+    { new: true, lean: true, updatePipeline: true }
   )) as StoredBatch | null
   return record ? toBatch(record) : null
 }
@@ -131,7 +145,7 @@ function searchCondition(search: string): Record<string, unknown> | null {
   const term = search.trim()
   if (!term) return null
   const pattern = new RegExp(escapeForSearch(term), "i")
-  return { $or: [{ clientName: pattern }, { "tasks.task": pattern }, { "questions.question": pattern }] }
+  return { $or: [{ title: pattern }, { clientName: pattern }, { "tasks.task": pattern }, { "questions.question": pattern }] }
 }
 
 // "No client" is every batch that names none, whether it was stored as "" or never set at all
@@ -191,18 +205,29 @@ export async function batchDetail(viewer: Viewer, id: string): Promise<VoiceBatc
   return { ...toBatch(record), voices }
 }
 
-/** The user's own wording of a batch's lists. The voices it was made from are untouched. */
+/**
+ * The user's own wording of a kept batch. **Only what is named is written**, so renaming a batch
+ * never carries a stale list over what another tab saved, and the voices it was made from are
+ * untouched either way.
+ */
 export async function editBatchLists(
   viewer: Viewer,
   id: string,
-  lists: { tasks: ClientTask[]; questions?: ClientQuestion[] }
+  edit: { title?: string; tasks?: ClientTask[]; questions?: ClientQuestion[] }
 ): Promise<VoiceBatch | null> {
   const filter = visibleById(viewer, id)
   if (!filter) return null
   await connectDatabase()
   const record = (await ClientVoiceTasksModel.findOneAndUpdate(
     filter,
-    { $set: { tasks: lists.tasks, ...(lists.questions ? { questions: lists.questions } : {}), editedAt: new Date() } },
+    {
+      $set: {
+        ...(edit.title !== undefined ? { title: edit.title } : {}),
+        ...(edit.tasks ? { tasks: edit.tasks } : {}),
+        ...(edit.questions ? { questions: edit.questions } : {}),
+        editedAt: new Date(),
+      },
+    },
     { new: true, lean: true }
   )) as StoredBatch | null
   return record ? toBatch(record) : null

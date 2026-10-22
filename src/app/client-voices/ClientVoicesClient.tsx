@@ -14,42 +14,49 @@ import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { checkAudioFile, runWithLimit, transcribeVoice } from "@/lib/voiceBatch"
 import {
-  CLIENT_CHOICE_ENDPOINT,
+  BATCH_TITLE_MAX_LENGTH,
   CLIENT_CHOICE_KEY,
   CLIENT_VOICES_ENDPOINT,
   CLIENT_VOICES_HISTORY_HREF,
   CLIENT_VOICES_MESSAGES,
+  TEMPORARY_CHOICE_KEY,
   VOICE_BATCHES_ENDPOINT,
   VOICE_BATCH_MAX,
+  VOICE_CHOICES_ENDPOINT,
   clientVoicesBatchHref,
 } from "@/constants/clientVoices"
 import { CLIENT_MESSAGING_ENDPOINT } from "@/constants/clientMessaging"
 import type { Client } from "@/types/clientMessaging"
-import type { SavedVoice, TaskExtraction, VoiceBatch, VoiceEntry, VoiceSource } from "@/types/clientVoices"
+import type { SavedVoice, TaskExtraction, VoiceBatch, VoiceChoices, VoiceEntry, VoiceSource } from "@/types/clientVoices"
 
-// This browser's copy of the client chosen last time, so the page shows it before the account answers
-const readChosenClient = () => {
+/**
+ * The page's two choices: the client a batch is kept under, and whether it is kept at all. Both are
+ * **choices, not work**, so they stay exactly as they were left until the user changes them: the
+ * account is where they live, and this browser keeps a copy only so the page can show them before
+ * the account has answered.
+ */
+const readInBrowser = (key: string) => {
   try {
-    return window.localStorage.getItem(CLIENT_CHOICE_KEY) ?? ""
+    return window.localStorage.getItem(key) ?? ""
   } catch {
     return ""
   }
 }
 
-const rememberInBrowser = (id: string) => {
+const rememberInBrowser = (key: string, value: string) => {
   try {
-    window.localStorage.setItem(CLIENT_CHOICE_KEY, id)
+    window.localStorage.setItem(key, value)
   } catch {
     // The account still remembers it; this browser just won't show it before the account answers
   }
 }
 
-// Keeps the choice on the account, so it follows it to any browser
-const rememberOnAccount = (id: string) =>
-  requestApi<{ clientId: string }>(CLIENT_CHOICE_ENDPOINT, {
+// Either choice may be sent on its own, so changing one says nothing about the other
+const rememberOnAccount = (choice: Partial<VoiceChoices>) =>
+  requestApi<VoiceChoices>(VOICE_CHOICES_ENDPOINT, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ clientId: id }),
+    body: JSON.stringify(choice),
   })
 
 const newId = () =>
@@ -67,6 +74,10 @@ export default function ClientVoicesClient() {
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const [clients, setClients] = useState<Client[]>([])
   const [clientId, setClientId] = useState("")
+  // The batch's own name, left empty for one written from the voices themselves
+  const [title, setTitle] = useState("")
+  // Run the batch and keep nothing at all. A choice, so it is still on at the next visit
+  const [isTemporary, setIsTemporary] = useState(false)
   const runRef = useRef<AbortController | null>(null)
   // The batch this run is kept under, started before the first voice is written out
   const batchRef = useRef<string | null>(null)
@@ -89,28 +100,41 @@ export default function ClientVoicesClient() {
     const controller = new AbortController()
     Promise.all([
       requestApi<Client[]>(`${CLIENT_MESSAGING_ENDPOINT}/clients`, { signal: controller.signal }),
-      requestApi<{ clientId: string }>(CLIENT_CHOICE_ENDPOINT, { signal: controller.signal }).catch(() => null),
+      requestApi<VoiceChoices>(VOICE_CHOICES_ENDPOINT, { signal: controller.signal }).catch(() => null),
     ])
       .then(([{ data }, account]) => {
         setClients(data)
         const exists = (id: string) => Boolean(id) && data.some((client) => client.id === id)
         const onAccount = account?.data.clientId ?? ""
-        const inBrowser = readChosenClient()
+        const inBrowser = readInBrowser(CLIENT_CHOICE_KEY)
         const chosen = exists(onAccount) ? onAccount : exists(inBrowser) ? inBrowser : ""
         setClientId(chosen)
-        rememberInBrowser(chosen)
-        if (account && chosen && chosen !== onAccount) void rememberOnAccount(chosen).catch(() => undefined)
+        rememberInBrowser(CLIENT_CHOICE_KEY, chosen)
+        if (account && chosen && chosen !== onAccount) void rememberOnAccount({ clientId: chosen }).catch(() => undefined)
+        // The account's choice wins; what this browser last saw is only for when it cannot be asked
+        const temporary = account ? account.data.isTemporary : readInBrowser(TEMPORARY_CHOICE_KEY) === "true"
+        setIsTemporary(temporary)
+        rememberInBrowser(TEMPORARY_CHOICE_KEY, String(temporary))
       })
-      .catch(() => undefined)
+      .catch(() => setIsTemporary(readInBrowser(TEMPORARY_CHOICE_KEY) === "true"))
     return () => controller.abort()
   }, [])
 
   // The page changes at once; the account is told in the background, and says so if it couldn't be
   const chooseClient = (id: string) => {
     setClientId(id)
-    rememberInBrowser(id)
-    rememberOnAccount(id).catch((error: unknown) =>
+    rememberInBrowser(CLIENT_CHOICE_KEY, id)
+    rememberOnAccount({ clientId: id }).catch((error: unknown) =>
       setNotice(error instanceof Error && error.message ? error.message : CLIENT_VOICES_MESSAGES.clientChoiceFailed)
+    )
+  }
+
+  /** Whether a batch is kept at all. Nothing but this changes it, so it holds for every later visit. */
+  const chooseTemporary = (temporary: boolean) => {
+    setIsTemporary(temporary)
+    rememberInBrowser(TEMPORARY_CHOICE_KEY, String(temporary))
+    rememberOnAccount({ isTemporary: temporary }).catch((error: unknown) =>
+      setNotice(error instanceof Error && error.message ? error.message : CLIENT_VOICES_MESSAGES.temporaryChoiceFailed)
     )
   }
 
@@ -189,6 +213,9 @@ export default function ClientVoicesClient() {
           ...(batchRef.current ? { batchId: batchRef.current } : {}),
           ...(clientId ? { clientId } : {}),
           voiceIds: done.map((voice) => savedIdsRef.current.get(voice.id)).filter(Boolean),
+          // The user's own name for it, and whether this batch is kept at all
+          title: title.trim(),
+          temporary: isTemporary,
         }),
       }, { retry: true })
       setTasks(data)
@@ -202,7 +229,7 @@ export default function ClientVoicesClient() {
     } finally {
       setIsExtracting(false)
     }
-  }, [clientId])
+  }, [clientId, title, isTemporary])
 
   /**
    * Runs the batch. Every voice is transcribed on its own, a few at a time, so one failure is
@@ -227,16 +254,23 @@ export default function ClientVoicesClient() {
     }
 
     /**
-     * Every batch is kept, so one is started before a single voice is written out: a run whose task
-     * step never finishes still leaves its recordings and transcripts saved and openable. A batch
-     * that cannot be started says so and the run carries on, since the transcripts are worth having
+     * A batch that is kept is started before a single voice is written out, so a run whose task step
+     * never finishes still leaves its recordings and transcripts saved and openable. A batch that
+     * cannot be started says so and the run carries on, since the transcripts are worth having
      * either way; it is wrapped in `withIdempotency`, so a retried request starts only one.
+     *
+     * **"Use these once" starts none at all**, which is the whole of that choice: with no batch,
+     * nothing below keeps a recording and the task step is told to write nothing down either.
      */
-    if (!batchRef.current) {
+    if (!batchRef.current && !isTemporary) {
       try {
         const { data: started } = await requestApi<VoiceBatch>(
           VOICE_BATCHES_ENDPOINT,
-          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, voiceCount: batch.length }) },
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clientId, title: title.trim(), voiceCount: batch.length }),
+          },
           { idempotent: true }
         )
         batchRef.current = started.id
@@ -304,6 +338,7 @@ export default function ClientVoicesClient() {
     savedIdsRef.current.clear()
     batchRef.current = null
     setBatchId(null)
+    setTitle("")
     setVoices([])
     setTasks(null)
     setTaskError(null)
@@ -405,14 +440,44 @@ export default function ClientVoicesClient() {
                 below about 1300px, where a 30% column wrapped the drop zone's words into so many
                 lines that the page gained 138px of scrolling (measured at 1093x540). */}
             <div className="grid grid-cols-1 gap-5 short:gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(260px,30fr)_minmax(0,70fr)]">
-              <VoiceInputPanel
-                voices={voices}
-                isProcessing={isProcessing}
-                onAdd={addVoices}
-                onRemove={removeVoice}
-                onProcess={() => void process()}
-                onReject={setNotice}
-              />
+              <div className="flex min-w-0 flex-col gap-4">
+                {/* What this batch is called, and whether it is kept: both belong with what goes in */}
+                <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-outline">{CLIENT_VOICES_MESSAGES.title}</span>
+                    <input
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      maxLength={BATCH_TITLE_MAX_LENGTH}
+                      placeholder={CLIENT_VOICES_MESSAGES.titlePlaceholder}
+                      className="w-full rounded-xl border border-outline-variant bg-white px-3 py-2 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+                    />
+                    <span className="text-[11px] text-outline">{CLIENT_VOICES_MESSAGES.titleHint}</span>
+                  </label>
+
+                  <label className="flex cursor-pointer items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isTemporary}
+                      onChange={(event) => chooseTemporary(event.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-semibold text-on-surface">{CLIENT_VOICES_MESSAGES.temporary}</span>
+                      <span className="block text-[11px] text-outline">{CLIENT_VOICES_MESSAGES.temporaryHint}</span>
+                    </span>
+                  </label>
+                </section>
+
+                <VoiceInputPanel
+                  voices={voices}
+                  isProcessing={isProcessing}
+                  onAdd={addVoices}
+                  onRemove={removeVoice}
+                  onProcess={() => void process()}
+                  onReject={setNotice}
+                />
+              </div>
 
               <div className="custom-scrollbar flex min-h-0 flex-col gap-4 lg:overflow-y-auto lg:pr-1">
                 {isProcessing && (
@@ -449,6 +514,13 @@ export default function ClientVoicesClient() {
                       Open it
                     </Link>
                     .
+                  </p>
+                )}
+
+                {/* Nothing was written down, so the page says so rather than leaving it to be assumed */}
+                {isTemporary && tasks && (
+                  <p className="rounded-xl bg-secondary-container px-3 py-2 text-[12px] text-on-secondary-container">
+                    {CLIENT_VOICES_MESSAGES.notSaved}
                   </p>
                 )}
 

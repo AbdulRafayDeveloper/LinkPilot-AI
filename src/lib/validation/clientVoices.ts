@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { QUESTION_LIST_MAX, TASK_LIST_MAX, TRANSCRIPT_MAX_LENGTH, VOICE_BATCH_MAX } from "@/constants/clientVoices"
+import { BATCH_TITLE_MAX_LENGTH, QUESTION_LIST_MAX, TASK_LIST_MAX, TRANSCRIPT_MAX_LENGTH, VOICE_BATCH_MAX } from "@/constants/clientVoices"
 import { DATE_ORDER_ISSUE, dayBoundParam, inDateOrder, searchParam } from "./listFilters"
 
 /**
@@ -14,10 +14,13 @@ const ID = /^[0-9a-f]{24}$/
 const batchId = z.string().regex(ID)
 /** A client's id, or "" for a batch kept under no client. */
 const clientId = z.union([z.literal(""), z.string().regex(ID)])
+/** The batch's own name. Empty is ordinary: a title is then written from the voices. */
+const title = z.string().trim().max(BATCH_TITLE_MAX_LENGTH)
 
-/** Starting a batch: how many voices went in, and whose batch it is. */
+/** Starting a batch: how many voices went in, whose batch it is, and what it is called. */
 export const StartBatchSchema = z.object({
   clientId: clientId.optional().default(""),
+  title: title.optional().default(""),
   voiceCount: z.coerce.number().int().min(1).max(VOICE_BATCH_MAX),
 })
 
@@ -44,31 +47,51 @@ export const TranscriptBatchSchema = z.object({
   clientId: clientId.optional(),
   // The voices already kept, so the batch points back at the recordings its lists were made from
   voiceIds: z.array(z.string().trim().max(60)).max(VOICE_BATCH_MAX).optional().default([]),
+  // The user's own name for the batch, which wins over the one written from the voices
+  title: title.optional().default(""),
+  // True runs the batch without writing anything down: no batch, no recordings, no lists
+  temporary: z.boolean().optional().default(false),
 })
 
-/** The client chosen on the page: one of the viewer's clients by id, or "" for none. */
-export const ClientChoiceSchema = z.object({ clientId })
+/**
+ * The page's own choices: the client a batch is kept under ("" for none), and whether a batch is
+ * kept at all. Either may be sent on its own, so changing one never says anything about the other.
+ */
+export const VoiceChoicesSchema = z
+  .object({ clientId: clientId.optional(), isTemporary: z.boolean().optional() })
+  .refine((body) => body.clientId !== undefined || body.isTemporary !== undefined, "There is no choice in that.")
 
-/** The user's own wording of a batch's task list. */
-export const EditTasksSchema = z.object({
-  tasks: z
-    .array(
-      z.object({
-        task: z.string().trim().min(1, "A task can not be empty.").max(TRANSCRIPT_MAX_LENGTH),
-        voices: z.array(z.number().int().min(1).max(VOICE_BATCH_MAX)).max(VOICE_BATCH_MAX).optional().default([]),
-      })
-    )
-    .max(TASK_LIST_MAX),
-  questions: z
-    .array(
-      z.object({
-        question: z.string().trim().min(1, "A question can not be empty.").max(TRANSCRIPT_MAX_LENGTH),
-        voices: z.array(z.number().int().min(1).max(VOICE_BATCH_MAX)).max(VOICE_BATCH_MAX).optional().default([]),
-      })
-    )
-    .max(QUESTION_LIST_MAX)
-    .optional(),
-})
+/**
+ * The user's own wording of a kept batch: its name, its tasks, its questions. **Each is written only
+ * when it is named**, so renaming a batch can never carry a stale list over what another tab saved,
+ * the rule a client project's items follow.
+ */
+export const EditTasksSchema = z
+  .object({
+    title: title.optional(),
+    tasks: z
+      .array(
+        z.object({
+          task: z.string().trim().min(1, "A task can not be empty.").max(TRANSCRIPT_MAX_LENGTH),
+          voices: z.array(z.number().int().min(1).max(VOICE_BATCH_MAX)).max(VOICE_BATCH_MAX).optional().default([]),
+        })
+      )
+      .max(TASK_LIST_MAX)
+      .optional(),
+    questions: z
+      .array(
+        z.object({
+          question: z.string().trim().min(1, "A question can not be empty.").max(TRANSCRIPT_MAX_LENGTH),
+          voices: z.array(z.number().int().min(1).max(VOICE_BATCH_MAX)).max(VOICE_BATCH_MAX).optional().default([]),
+        })
+      )
+      .max(QUESTION_LIST_MAX)
+      .optional(),
+  })
+  .refine((body) => body.title !== undefined || body.tasks !== undefined || body.questions !== undefined, "There is nothing to change in that.")
+
+/** The user's own wording of one voice's transcript. Emptying it is allowed; the recording stays. */
+export const EditTranscriptSchema = z.object({ transcript: z.string().trim().max(TRANSCRIPT_MAX_LENGTH) })
 
 /**
  * The "view all" page's query: a search over what the client asked for and whose batch it is, one

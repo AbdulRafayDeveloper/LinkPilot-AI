@@ -58,6 +58,8 @@ export interface SavedVoice {
  */
 export interface VoiceBatch {
   id: string
+  // What the batch is called: the user's own words, or a title written from the voices
+  title: string
   clientId: string
   clientName: string
   // How many voices were put in, however many could be written out
@@ -109,6 +111,8 @@ export interface ClientQuestion {
 
 /** What the task step returns: both lists, and whether it had every voice to work from. */
 export interface TaskExtraction extends WithAiSource {
+  // A short name for the batch, written from the voices. The user's own title wins over it
+  title: string
   tasks: ClientTask[]
   questions: ClientQuestion[]
   // Voices that had no transcript to give it, so the page can say the lists are partial
@@ -121,6 +125,16 @@ export interface TaskExtraction extends WithAiSource {
 export interface TranscriptInput {
   voice: number
   transcript: string
+}
+
+/**
+ * The page's own choices, kept on the account: the client a batch is kept under, and whether a
+ * batch is kept at all. Both stay as they were left until the user changes them.
+ */
+export interface VoiceChoices {
+  clientId: string
+  // True runs a batch without writing anything down at all
+  isTemporary: boolean
 }
 
 export type ClientVoicesPrompt = EditablePrompt

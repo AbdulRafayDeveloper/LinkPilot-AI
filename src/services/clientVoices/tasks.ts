@@ -5,7 +5,7 @@ import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
 import { UserFacingError, asUserFacingError } from "@/lib/errors"
 import { cleanGeneratedText, stripMarkdownMarks } from "@/lib/generatedText"
-import { CLIENT_VOICES_MESSAGES, QUESTION_LIST_MAX, TASK_LIST_MAX, VOICE_BATCH_MAX } from "@/constants/clientVoices"
+import { BATCH_TITLE_MAX_LENGTH, CLIENT_VOICES_MESSAGES, QUESTION_LIST_MAX, TASK_LIST_MAX, VOICE_BATCH_MAX } from "@/constants/clientVoices"
 import type { ClientQuestion, ClientTask, TaskExtraction, TranscriptInput } from "@/types/clientVoices"
 import { getClientVoicesPrompt } from "./prompts"
 
@@ -27,6 +27,11 @@ const EXTRACTION_TEMPERATURE = 0.2
 const MIN_TASK_LENGTH = 8
 
 const TaskListSchema = z.object({
+  title: z
+    .string()
+    .describe(
+      "A short name for this batch, four to eight words, naming what the client's messages were about. Written from what they actually said, never a date and never a greeting"
+    ),
   tasks: z
     .array(
       z.object({
@@ -131,6 +136,8 @@ export async function extractTasks({ voices, missingVoices, signal }: ExtractOpt
     throw asUserFacingError(error, CLIENT_VOICES_MESSAGES.tasksFailed)
   })
 
+  // A title the model wrote is only a fallback, so an unusable one costs nothing: it is simply dropped
+  const title = clean(data.title ?? "").slice(0, BATCH_TITLE_MAX_LENGTH)
   const available = new Set(voices.map((entry) => entry.voice))
   const tasks: ClientTask[] = data.tasks
     .map((entry) => ({ task: clean(entry.task), voices: knownVoices(entry.voices, available) }))
@@ -149,9 +156,10 @@ export async function extractTasks({ voices, missingVoices, signal }: ExtractOpt
       missing: missingVoices.length,
       tasks: tasks.length,
       questions: questions.length,
+      titled: title.length > 0,
       characters: voices.reduce((total, entry) => total + entry.transcript.length, 0),
     })
   )
 
-  return { tasks, questions, missingVoices: [...new Set(missingVoices)].sort((a, b) => a - b) }
+  return { title, tasks, questions, missingVoices: [...new Set(missingVoices)].sort((a, b) => a - b) }
 }

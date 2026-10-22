@@ -1,10 +1,32 @@
 import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
+import { EditTranscriptSchema } from "@/lib/validation/clientVoices"
 import { CLIENT_VOICES_MESSAGES } from "@/constants/clientVoices"
-import { deleteVoice } from "@/services/clientVoices/records"
+import { deleteVoice, editTranscript } from "@/services/clientVoices/records"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
+
+/**
+ * PUT { transcript }: the user's own wording of what this voice said. The recording is never
+ * touched, since what was said and what the app wrote down are two different things.
+ */
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireViewer()
+  if (auth.denied) return auth.denied
+  const parsed = EditTranscriptSchema.safeParse(await req.json().catch(() => null))
+  if (!parsed.success) {
+    return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || CLIENT_VOICES_MESSAGES.editFailed }, { status: 400 })
+  }
+  try {
+    const saved = await editTranscript(auth.viewer, (await params).id, parsed.data.transcript)
+    if (!saved) return NextResponse.json({ success: false, message: CLIENT_VOICES_MESSAGES.editFailed }, { status: 404 })
+    return NextResponse.json({ success: true, message: CLIENT_VOICES_MESSAGES.transcriptSaved, data: saved })
+  } catch (error: unknown) {
+    console.error("PUT Client Voice Transcript Exception:", error instanceof Error ? error.message : error)
+    return NextResponse.json({ success: false, message: toUserFacingMessage(error, CLIENT_VOICES_MESSAGES.editFailed) }, { status: 500 })
+  }
+}
 
 /** DELETE: removes one kept voice, recording and record. Another account's voice reads as not found. */
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -25,6 +25,8 @@ export interface IClientVoiceQuestion {
 
 export interface IClientVoiceTasks {
   ownerId: string | null
+  // What the batch is called: the user's own words, or a title written from the voices
+  title: string
   // The client the batch was run under, "" for none
   clientId: string
   clientName: string
@@ -57,6 +59,7 @@ const QuestionSchema = new Schema<IClientVoiceQuestion>(
 const ClientVoiceTasksSchema = new Schema<IClientVoiceTasks>(
   {
     ownerId: OWNER_ID,
+    title: { type: String, default: "" },
     clientId: { type: String, default: "" },
     clientName: { type: String, default: "" },
     tasks: { type: [TaskSchema], default: [] },
