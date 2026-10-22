@@ -1,12 +1,14 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { AudioLines, FilePenLine, RotateCcw, Users } from "lucide-react"
+import Link from "next/link"
+import { AudioLines, FilePenLine, History, RotateCcw, Users } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { VoiceInputPanel } from "@/components/client-voices/VoiceInputPanel"
 import { TranscriptList } from "@/components/client-voices/TranscriptList"
 import { TaskListPanel } from "@/components/client-voices/TaskListPanel"
+import { QuestionListPanel } from "@/components/client-voices/QuestionListPanel"
 import { ClientVoicesPromptModal } from "@/components/client-voices/ClientVoicesPromptModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
@@ -15,12 +17,15 @@ import {
   CLIENT_CHOICE_ENDPOINT,
   CLIENT_CHOICE_KEY,
   CLIENT_VOICES_ENDPOINT,
+  CLIENT_VOICES_HISTORY_HREF,
   CLIENT_VOICES_MESSAGES,
+  VOICE_BATCHES_ENDPOINT,
   VOICE_BATCH_MAX,
+  clientVoicesBatchHref,
 } from "@/constants/clientVoices"
 import { CLIENT_MESSAGING_ENDPOINT } from "@/constants/clientMessaging"
 import type { Client } from "@/types/clientMessaging"
-import type { SavedVoice, TaskExtraction, VoiceEntry, VoiceSource } from "@/types/clientVoices"
+import type { SavedVoice, TaskExtraction, VoiceBatch, VoiceEntry, VoiceSource } from "@/types/clientVoices"
 
 // This browser's copy of the client chosen last time, so the page shows it before the account answers
 const readChosenClient = () => {
@@ -63,7 +68,10 @@ export default function ClientVoicesClient() {
   const [clients, setClients] = useState<Client[]>([])
   const [clientId, setClientId] = useState("")
   const runRef = useRef<AbortController | null>(null)
-  // The ids of the voices kept in this run, so the task list can point back at the recordings
+  // The batch this run is kept under, started before the first voice is written out
+  const batchRef = useRef<string | null>(null)
+  const [batchId, setBatchId] = useState<string | null>(null)
+  // The ids of the voices kept in this run, so the lists can point back at the recordings
   const savedIdsRef = useRef(new Map<string, string>())
   // The transcripts as they land, so the task step never reads a half-updated render
   const transcriptsRef = useRef(new Map<string, string>())
@@ -177,10 +185,18 @@ export default function ClientVoicesClient() {
         body: JSON.stringify({
           voices: done.map((voice) => ({ voice: voice.position, transcript: transcriptsRef.current.get(voice.id) })),
           missingVoices: missing.map((voice) => voice.position),
-          ...(clientId ? { clientId, voiceIds: done.map((voice) => savedIdsRef.current.get(voice.id)).filter(Boolean) } : {}),
+          // The batch the lists are written onto, and the recordings they were made from
+          ...(batchRef.current ? { batchId: batchRef.current } : {}),
+          ...(clientId ? { clientId } : {}),
+          voiceIds: done.map((voice) => savedIdsRef.current.get(voice.id)).filter(Boolean),
         }),
       }, { retry: true })
       setTasks(data)
+      // The route starts a batch for a run that somehow had none, so the page can still link to it
+      if (data.batchId && !batchRef.current) {
+        batchRef.current = data.batchId
+        setBatchId(data.batchId)
+      }
     } catch (error: unknown) {
       setTaskError(error instanceof Error ? error.message : CLIENT_VOICES_MESSAGES.tasksFailed)
     } finally {
@@ -210,6 +226,27 @@ export default function ClientVoicesClient() {
       update(voice.id, { status: "queued", transcript: "", error: null })
     }
 
+    /**
+     * Every batch is kept, so one is started before a single voice is written out: a run whose task
+     * step never finishes still leaves its recordings and transcripts saved and openable. A batch
+     * that cannot be started says so and the run carries on, since the transcripts are worth having
+     * either way; it is wrapped in `withIdempotency`, so a retried request starts only one.
+     */
+    if (!batchRef.current) {
+      try {
+        const { data: started } = await requestApi<VoiceBatch>(
+          VOICE_BATCHES_ENDPOINT,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, voiceCount: batch.length }) },
+          { idempotent: true }
+        )
+        batchRef.current = started.id
+        setBatchId(started.id)
+      } catch (error: unknown) {
+        setNotice(error instanceof Error && error.message ? error.message : CLIENT_VOICES_MESSAGES.batchFailed)
+      }
+    }
+    const keptUnder = batchRef.current
+
     await runWithLimit({
       items: toRun,
       signal: controller.signal,
@@ -220,13 +257,16 @@ export default function ClientVoicesClient() {
           const { text: transcript, provider } = await transcribeVoice(voice.file, controller.signal)
           transcriptsRef.current.set(voice.id, transcript)
           update(voice.id, { status: "done", transcript, transcribedBy: provider, error: null })
-          // With a client chosen, the recording and its transcript are kept with that client. A
-          // failure here costs the transcript nothing: it is already on the page
-          if (clientId) {
+          /**
+           * The recording and its transcript are kept with the batch, whether or not a client was
+           * chosen: the client only says whose batch it is. A failure here costs the transcript
+           * nothing, since it is already on the page, and a voice already kept is never kept twice.
+           */
+          if (keptUnder && !savedIdsRef.current.has(voice.id)) {
             try {
               const form = new FormData()
               form.append("audio", voice.file, voice.name)
-              form.append("clientId", clientId)
+              form.append("batchId", keptUnder)
               form.append("position", String(voice.position))
               form.append("name", voice.name)
               form.append("transcript", transcript)
@@ -257,10 +297,13 @@ export default function ClientVoicesClient() {
     await process([voice])
   }
 
+  // The batch already run is kept and stays openable from the list; this only clears the page
   const startAgain = () => {
     runRef.current?.abort()
     transcriptsRef.current.clear()
     savedIdsRef.current.clear()
+    batchRef.current = null
+    setBatchId(null)
     setVoices([])
     setTasks(null)
     setTaskError(null)
@@ -324,6 +367,13 @@ export default function ClientVoicesClient() {
                     {chosenClient ? CLIENT_VOICES_MESSAGES.keptWith(chosenClient.name) : CLIENT_VOICES_MESSAGES.noClient}
                   </span>
                 </label>
+                <Link
+                  href={CLIENT_VOICES_HISTORY_HREF}
+                  className="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
+                >
+                  <History size={16} aria-hidden="true" />
+                  Saved Batches
+                </Link>
                 <button
                   type="button"
                   onClick={startAgain}
@@ -383,6 +433,24 @@ export default function ClientVoicesClient() {
                   error={taskError}
                   onRetry={() => void extractTasks(voices)}
                 />
+
+                {/* What they asked, beside what they asked for and never folded into it */}
+                <QuestionListPanel
+                  questions={tasks?.questions ?? null}
+                  isWorking={isExtracting}
+                  waitingLabel="Anything the client asked lands here, apart from the work."
+                />
+
+                {/* Everything above is already kept, so this is a way in rather than a save button */}
+                {batchId && (
+                  <p className="rounded-xl bg-surface-container-high px-3 py-2 text-[12px] text-on-surface-variant">
+                    This batch is kept with its recordings and transcripts.{" "}
+                    <Link href={clientVoicesBatchHref(batchId)} className="font-semibold text-primary hover:underline">
+                      Open it
+                    </Link>
+                    .
+                  </p>
+                )}
 
                 {voices.length > 0 && (
                   <div className="flex flex-col gap-2">

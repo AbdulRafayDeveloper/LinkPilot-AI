@@ -5,16 +5,21 @@ import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
 import { UserFacingError, asUserFacingError } from "@/lib/errors"
 import { cleanGeneratedText, stripMarkdownMarks } from "@/lib/generatedText"
-import { CLIENT_VOICES_MESSAGES, TASK_LIST_MAX, VOICE_BATCH_MAX } from "@/constants/clientVoices"
-import type { ClientTask, TaskExtraction, TranscriptInput } from "@/types/clientVoices"
+import { CLIENT_VOICES_MESSAGES, QUESTION_LIST_MAX, TASK_LIST_MAX, VOICE_BATCH_MAX } from "@/constants/clientVoices"
+import type { ClientQuestion, ClientTask, TaskExtraction, TranscriptInput } from "@/types/clientVoices"
 import { getClientVoicesPrompt } from "./prompts"
 
 /**
- * Reads the client's transcripts and writes down the work they asked for.
+ * Reads the client's transcripts and writes down **two** things: the work they asked for, and the
+ * questions they asked.
  *
- * Only text reaches this step. The transcripts arrive in the request, the list goes back in the
- * answer, and nothing is written to the database, which is the whole point of the module: the
- * client's voice never becomes a stored record anywhere.
+ * They are kept apart on purpose, at the owner's request. A task is something to do and a question
+ * is something to answer, so folding a question into the task list either loses it or turns it into
+ * work nobody asked for. The same rules apply to both: one entry per distinct thing, the same thing
+ * asked in three voices becomes one entry carrying all three numbers, and nothing is invented.
+ *
+ * Only text reaches this step: the transcripts arrive in the request and the lists go back in the
+ * answer. Saving them against the batch is the route's own job (`services/clientVoices/batches.ts`).
  */
 
 // Taking down what someone asked for leaves no room for invention
@@ -34,6 +39,20 @@ const TaskListSchema = z.object({
       })
     )
     .describe("Every distinct thing the client asked for, in the order they first asked for it"),
+  questions: z
+    .array(
+      z.object({
+        question: z
+          .string()
+          .describe("One thing the client asked about and wants an answer to, written as a clear question in English"),
+        voices: z
+          .array(z.number().int())
+          .describe("The voice numbers it was asked in, 1-based. More than one when the same thing was asked twice"),
+      })
+    )
+    .describe(
+      "Every question the client asked that is waiting for an answer, in the order they first asked it. A question is never also a task"
+    ),
 })
 
 type TaskListOutput = z.infer<typeof TaskListSchema>
@@ -50,6 +69,10 @@ function findUnusableReason(output: TaskListOutput): string | null {
   if (output.tasks.length > TASK_LIST_MAX) return `more than ${TASK_LIST_MAX} tasks, which is not a task list any more`
   const empty = output.tasks.filter((entry) => clean(entry.task).length < MIN_TASK_LENGTH)
   if (empty.length > 0) return `${empty.length} task(s) are empty or too short to act on`
+  // A batch with no questions in it is ordinary, so only an absurdly long list is a problem
+  if ((output.questions ?? []).length > QUESTION_LIST_MAX) {
+    return `more than ${QUESTION_LIST_MAX} questions, which is not a list of what the client asked`
+  }
   return null
 }
 
@@ -60,11 +83,11 @@ interface ExtractOptions {
 }
 
 /**
- * One list for the whole batch, not one per voice. The same request made in three voices
- * becomes one task carrying all three numbers, and anything the client only mentioned in
- * passing stays out of it.
+ * Two lists for the whole batch, not one per voice. The same request made in three voices becomes
+ * one task carrying all three numbers, and anything the client only mentioned in passing stays out
+ * of it; a question they asked lands in the questions list instead of being lost or turned into work.
  *
- * A batch where some voices failed still produces a list from the ones that worked, and the
+ * A batch where some voices failed still produces both lists from the ones that worked, and the
  * answer names the voices it could not read, so the page never presents a partial list as the
  * whole picture.
  */
@@ -112,6 +135,10 @@ export async function extractTasks({ voices, missingVoices, signal }: ExtractOpt
   const tasks: ClientTask[] = data.tasks
     .map((entry) => ({ task: clean(entry.task), voices: knownVoices(entry.voices, available) }))
     .filter((entry) => entry.task.length >= MIN_TASK_LENGTH)
+  const questions: ClientQuestion[] = (data.questions ?? [])
+    .map((entry) => ({ question: clean(entry.question), voices: knownVoices(entry.voices, available) }))
+    .filter((entry) => entry.question.length >= MIN_TASK_LENGTH)
+    .slice(0, QUESTION_LIST_MAX)
 
   // Lengths only: what a client said is theirs, so none of it goes to the log
   console.info(
@@ -121,9 +148,10 @@ export async function extractTasks({ voices, missingVoices, signal }: ExtractOpt
       transcripts: voices.length,
       missing: missingVoices.length,
       tasks: tasks.length,
+      questions: questions.length,
       characters: voices.reduce((total, entry) => total + entry.transcript.length, 0),
     })
   )
 
-  return { tasks, missingVoices: [...new Set(missingVoices)].sort((a, b) => a - b) }
+  return { tasks, questions, missingVoices: [...new Set(missingVoices)].sort((a, b) => a - b) }
 }

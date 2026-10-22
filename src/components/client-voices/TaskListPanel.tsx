@@ -3,15 +3,28 @@
 import React from "react"
 import { AlertTriangle, ListChecks, Loader2 } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
-import type { TaskExtraction } from "@/types/clientVoices"
+import type { ClientTask } from "@/types/clientVoices"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 import { describeSource } from "@/constants/aiProviders"
 
+/**
+ * What the panel needs, so it serves both a list just written and a kept batch read back. A saved
+ * record keeps its provider as a plain string (`types/savedOutputs.ts`), because a provider the app
+ * no longer has must still read back, and `describeSource` already judges one.
+ */
+export interface TaskListResult {
+  tasks: ClientTask[]
+  missingVoices: number[]
+  provider?: string | null
+  providers?: readonly string[]
+}
+
 interface TaskListPanelProps {
-  result: TaskExtraction | null
+  result: TaskListResult | null
   isWorking: boolean
   error: string | null
-  onRetry: () => void
+  // Only where there is something to run again: a kept batch is read, not re-run
+  onRetry?: () => void
 }
 
 /**
@@ -46,9 +59,11 @@ export const TaskListPanel: React.FC<TaskListPanelProps> = ({ result, isWorking,
         <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl border border-error/40 bg-error-container px-3 py-2 text-[12px] text-error">
           <AlertTriangle size={14} aria-hidden="true" />
           {error}
-          <button type="button" onClick={onRetry} className="font-semibold underline hover:no-underline">
-            Try again
-          </button>
+          {onRetry && (
+            <button type="button" onClick={onRetry} className="font-semibold underline hover:no-underline">
+              Try again
+            </button>
+          )}
         </div>
       )}
 

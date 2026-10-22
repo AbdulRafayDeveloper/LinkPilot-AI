@@ -25,6 +25,8 @@ import { ImportantContentModel } from "@/models/ImportantContent"
 import { ContentFolderModel } from "@/models/ContentFolder"
 import { PromptFolderModel } from "@/models/PromptFolder"
 import { ClientProjectTaskModel } from "@/models/ClientProjectTask"
+import { ClientVoiceModel } from "@/models/ClientVoice"
+import { ClientVoiceTasksModel } from "@/models/ClientVoiceTasks"
 import { ProfileScheduleModel } from "@/models/ProfileSchedule"
 import { TrendingSearch } from "@/models/TrendingSearch"
 import { APP_TOOLS } from "@/constants/linkedinTools"
@@ -65,6 +67,10 @@ export const SOURCES: ActivitySource[] = [
   { href: "/client-messaging", label: "messages", collection: () => ClientMessageRecord.collection },
   { href: "/client-messaging", label: "clients", collection: () => Client.collection },
   { href: "/client-projects", label: "tasks", collection: () => ClientProjectTaskModel.collection },
+  // Client Voices keeps every batch and every voice in it, so both are counted and both go with
+  // the account; without this an account's recordings would outlive it in the bucket
+  { href: "/client-voices", label: "batches", collection: () => ClientVoiceTasksModel.collection },
+  { href: "/client-voices", label: "voices", collection: () => ClientVoiceModel.collection },
   { href: "/meeting-planner", collection: () => MeetingPlan.collection },
   { href: "/meetings", collection: () => Meeting.collection },
   { href: "/prompt-creator", collection: () => CreatedPromptModel.collection },

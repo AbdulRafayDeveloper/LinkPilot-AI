@@ -4,6 +4,7 @@ import { AssetFile } from "@/models/AssetFile"
 import { Meeting } from "@/models/Meeting"
 import { MeetingChunk } from "@/models/MeetingChunk"
 import { PostImageModel } from "@/models/PostImage"
+import { ClientVoiceModel } from "@/models/ClientVoice"
 import { UserModel } from "@/models/User"
 import { ADMIN_MESSAGES } from "@/constants/admin"
 import { abortMultipartUpload, deleteObject, isStorageConfigured } from "@/services/storage/s3"
@@ -66,11 +67,13 @@ export async function deleteAccount(admin: Viewer, id: string, confirmEmail: str
   }
 
   const owner = { ownerId: id }
-  const [assetFiles, postImages] = await Promise.all([
+  const [assetFiles, postImages, clientVoices] = await Promise.all([
     AssetFile.find(owner, { storageKey: 1, uploadId: 1 }).lean(),
     PostImageModel.find(owner, { storageKey: 1 }).lean(),
+    // Every batch of client voices is kept, so its recordings are the account's stored files too
+    ClientVoiceModel.find(owner, { storageKey: 1 }).lean(),
   ])
-  const files: StoredFile[] = [...assetFiles, ...postImages].filter((file) => Boolean(file.storageKey))
+  const files: StoredFile[] = [...assetFiles, ...postImages, ...clientVoices].filter((file) => Boolean(file.storageKey))
   if (files.length > 0 && !isStorageConfigured()) throw new UserFacingError(ADMIN_MESSAGES.storageUnavailable)
 
   // 1. Stored files. If storage fails here, no record has been touched yet

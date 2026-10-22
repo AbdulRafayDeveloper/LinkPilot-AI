@@ -2,12 +2,18 @@ import mongoose, { Schema, type Model } from "mongoose"
 import { OWNER_ID } from "./owner"
 
 /**
- * One voice message kept for a client: the recording itself lives in S3 (`storageKey`), and this is
- * what the app knows about it, including the transcript it was written out as. A voice is only kept
- * when a client was chosen for the batch; without a client nothing is stored, as before.
+ * One kept voice message: the recording itself lives in S3 (`storageKey`), and this is what the app
+ * knows about it, including the transcript it was written out as. **Every voice of every batch is
+ * kept**, with or without a client, so a recording is never lost; `clientId` is simply empty when
+ * the batch was not run under a client.
+ *
+ * `taskGroupId` is the **batch** it arrived in, and is read as `batchId` everywhere above this file.
+ * The stored name is kept because every voice already saved carries it, the way Personal Drive kept
+ * `important_files`: renaming the field would cost a migration and buy nothing.
  */
 export interface IClientVoice {
   ownerId: string | null
+  // The client the batch was run under, "" when it was run under none
   clientId: string
   // The client's name as it was when the voice was saved, so a renamed client still reads sensibly
   clientName: string
@@ -16,11 +22,12 @@ export interface IClientVoice {
   name: string
   size: number
   contentType: string
+  // Where the recording is in the bucket, "" when there was no file storage to keep it in
   storageKey: string
   transcript: string
   // Which provider wrote it out
   transcribedBy: string | null
-  // The task list this voice was part of, when one was made
+  // The batch this voice arrived in
   taskGroupId: string | null
   createdAt: Date
   updatedAt: Date
@@ -29,13 +36,13 @@ export interface IClientVoice {
 const ClientVoiceSchema = new Schema<IClientVoice>(
   {
     ownerId: OWNER_ID,
-    clientId: { type: String, required: true },
+    clientId: { type: String, default: "" },
     clientName: { type: String, default: "" },
     position: { type: Number, default: 1 },
     name: { type: String, required: true },
     size: { type: Number, default: 0 },
     contentType: { type: String, required: true },
-    storageKey: { type: String, required: true },
+    storageKey: { type: String, default: "" },
     transcript: { type: String, default: "" },
     transcribedBy: { type: String, default: null },
     taskGroupId: { type: String, default: null },
@@ -45,6 +52,8 @@ const ClientVoiceSchema = new Schema<IClientVoice>(
 // The list is one client's voices, or everyone's, newest first
 ClientVoiceSchema.index({ clientId: 1, createdAt: -1, _id: -1 })
 ClientVoiceSchema.index({ createdAt: -1, _id: -1 })
+// One batch's own voices, in the order they arrived, which is what its page reads
+ClientVoiceSchema.index({ taskGroupId: 1, position: 1 })
 
 export const ClientVoiceModel =
   (mongoose.models.ClientVoice as Model<IClientVoice> | undefined) ?? mongoose.model<IClientVoice>("ClientVoice", ClientVoiceSchema)

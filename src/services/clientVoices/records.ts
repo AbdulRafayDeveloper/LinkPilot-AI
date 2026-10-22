@@ -1,64 +1,45 @@
 import { Types } from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { deleteObject, isStorageConfigured, presignDownload, putObject } from "@/services/storage/s3"
-import { getClient } from "@/services/clientMessaging/clients"
-import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
+import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { ClientVoiceModel, type IClientVoice } from "@/models/ClientVoice"
-import { ClientVoiceTasksModel, type IClientVoiceTasks } from "@/models/ClientVoiceTasks"
-import { CLIENT_VOICES_MESSAGES, SAVED_VOICES_PAGE_SIZE, VOICE_STORAGE_PREFIX } from "@/constants/clientVoices"
-import { UserFacingError } from "@/lib/errors"
+import { VOICE_STORAGE_PREFIX } from "@/constants/clientVoices"
 import type { Viewer } from "@/types/auth"
-import type { ClientTask, SavedVoice, SavedVoiceTasks, SavedVoicesPage } from "@/types/clientVoices"
+import type { SavedVoice } from "@/types/clientVoices"
 
 /**
- * A client's voices, kept.
+ * One kept voice message: the recording in S3, and the record that says what it is.
  *
- * A batch with a client chosen for it is saved: the recording goes to S3 and this writes what the
- * app knows about it, so it can be played, read and deleted later, and the task list made from it is
- * kept with it and can be edited. A batch with no client still stores nothing, exactly as before.
- * Everything is scoped to the account, and a recording is only ever reached through a signed link
- * that expires, so the bucket stays private.
+ * **Every voice of every batch is kept**, at the owner's request that no voice is ever lost, so
+ * nothing here asks whether a client was chosen: the batch says that, and the voice simply joins
+ * the batch. A recording is only ever reached through a signed link that expires, so the bucket
+ * stays private, and everything is scoped to the account.
  */
 
 type StoredVoice = IClientVoice & { _id: { toString: () => string } }
-type StoredTasks = IClientVoiceTasks & { _id: { toString: () => string } }
 
 const cleanName = (name: string) => name.replace(/[^\w.\- ]+/g, "_").slice(0, 80) || "voice"
 
-const toVoice = (record: StoredVoice): SavedVoice => ({
+export const toVoice = (record: StoredVoice): SavedVoice => ({
   id: record._id.toString(),
-  clientId: record.clientId,
-  clientName: record.clientName,
+  // Stored as `taskGroupId`, read as the batch it belongs to (models/ClientVoice.ts)
+  batchId: record.taskGroupId ?? null,
+  clientId: record.clientId ?? "",
+  clientName: record.clientName ?? "",
   position: record.position,
   name: record.name,
   size: record.size,
   contentType: record.contentType,
   transcript: record.transcript,
   transcribedBy: record.transcribedBy ?? null,
-  taskGroupId: record.taskGroupId ?? null,
   createdAt: new Date(record.createdAt).toISOString(),
 })
-
-const toTasks = (record: StoredTasks): SavedVoiceTasks => ({
-  id: record._id.toString(),
-  clientId: record.clientId,
-  clientName: record.clientName,
-  tasks: record.tasks.map((task) => ({ task: task.task, voices: task.voices ?? [] })),
-  voiceIds: record.voiceIds ?? [],
-  missingVoices: record.missingVoices ?? [],
-  editedAt: record.editedAt ? new Date(record.editedAt).toISOString() : null,
-  createdAt: new Date(record.createdAt).toISOString(),
-})
-
-/** The client a batch belongs to, checked against the account before anything is written. */
-async function requireClientName(viewer: Viewer, clientId: string): Promise<string> {
-  const client = await getClient(viewer, clientId)
-  if (!client) throw new UserFacingError(CLIENT_VOICES_MESSAGES.clientMissing)
-  return client.name
-}
 
 interface SaveVoiceInput {
+  // The batch it arrived in, which is also where its client comes from
+  batchId: string
   clientId: string
+  clientName: string
   position: number
   name: string
   contentType: string
@@ -67,20 +48,26 @@ interface SaveVoiceInput {
   audio: Buffer
 }
 
-/** Keeps one voice of a client: the recording in S3 first, the record only once it is really there. */
+/**
+ * Keeps one voice of a batch: the recording in S3, then the record only once it is really there.
+ *
+ * **Without file storage the record is still written**, with no `storageKey`, because the transcript
+ * is what most of the value is and losing it as well would be the worse half of the same failure.
+ * Such a voice says plainly on its batch's page that the recording was not kept.
+ */
 export async function saveVoice(viewer: Viewer, input: SaveVoiceInput): Promise<SavedVoice> {
-  if (!isStorageConfigured()) throw new UserFacingError(CLIENT_VOICES_MESSAGES.storageUnavailable)
-  const clientName = await requireClientName(viewer, input.clientId)
   await connectDatabase()
   // The id is settled before anything is written, so the key is built on the server and holds it:
   // two voices with the same name never land on each other, and the record is never half made
   const id = new Types.ObjectId()
-  const storageKey = `${VOICE_STORAGE_PREFIX}/${id.toString()}-${cleanName(input.name)}`
+  const canStore = isStorageConfigured()
+  const storageKey = canStore ? `${VOICE_STORAGE_PREFIX}/${id.toString()}-${cleanName(input.name)}` : ""
   const record = await ClientVoiceModel.create({
     _id: id,
     ownerId: viewer.dataOwnerId,
+    taskGroupId: input.batchId,
     clientId: input.clientId,
-    clientName,
+    clientName: input.clientName,
     position: input.position,
     name: cleanName(input.name),
     size: input.audio.byteLength,
@@ -89,41 +76,41 @@ export async function saveVoice(viewer: Viewer, input: SaveVoiceInput): Promise<
     transcript: input.transcript,
     transcribedBy: input.transcribedBy,
   })
-  try {
-    await putObject(storageKey, input.audio, input.contentType)
-  } catch (error: unknown) {
-    // Nothing points at a recording that was never stored
-    await ClientVoiceModel.deleteOne({ _id: id })
-    throw error
+  if (storageKey) {
+    try {
+      await putObject(storageKey, input.audio, input.contentType)
+    } catch (error: unknown) {
+      // Nothing points at a recording that was never stored
+      await ClientVoiceModel.deleteOne({ _id: id })
+      throw error
+    }
   }
   return toVoice(record.toObject() as StoredVoice)
 }
 
-/** One client's saved voices, or every client's, newest first. */
-export async function listVoices(viewer: Viewer, clientId: string | null, page: number): Promise<SavedVoicesPage> {
+/** The voices of these batches, in the order they arrived. */
+export async function voicesIn(viewer: Viewer, batchIds: string[]): Promise<StoredVoice[]> {
+  if (batchIds.length === 0) return []
   await connectDatabase()
-  const filter = { ...visibleTo(viewer), ...(clientId ? { clientId } : {}) }
-  const current = Math.max(1, page)
-  const [records, total] = await Promise.all([
-    ClientVoiceModel.find(filter)
-      .sort({ createdAt: -1, _id: -1 })
-      .skip((current - 1) * SAVED_VOICES_PAGE_SIZE)
-      .limit(SAVED_VOICES_PAGE_SIZE)
-      .lean() as Promise<StoredVoice[]>,
-    ClientVoiceModel.countDocuments(filter),
-  ])
-  const groupIds = [...new Set(records.map((record) => record.taskGroupId).filter((id): id is string => Boolean(id)))]
-  const groups = groupIds.length > 0 ? ((await ClientVoiceTasksModel.find({ ...visibleTo(viewer), _id: { $in: groupIds } }).lean()) as StoredTasks[]) : []
-  return {
-    voices: records.map(toVoice),
-    taskGroups: groups.map(toTasks),
-    total,
-    page: current,
-    totalPages: Math.max(1, Math.ceil(total / SAVED_VOICES_PAGE_SIZE)),
-  }
+  return (await ClientVoiceModel.find({ ...visibleTo(viewer), taskGroupId: { $in: batchIds } })
+    .sort({ position: 1, createdAt: 1 })
+    .lean()) as StoredVoice[]
 }
 
-/** A short-lived link to play or download one recording; the bucket itself stays private. */
+/**
+ * The links one voice is played and saved by. Played inline, so the browser's own player takes it;
+ * saved as an attachment, so it keeps its name. Both are null for a recording that was never stored.
+ */
+export async function voiceLinks(record: { storageKey: string; contentType: string; name: string }) {
+  if (!record.storageKey || !isStorageConfigured()) return { playUrl: null, downloadUrl: null }
+  const [playUrl, downloadUrl] = await Promise.all([
+    presignDownload(record.storageKey, record.contentType),
+    presignDownload(record.storageKey, record.contentType, record.name),
+  ])
+  return { playUrl, downloadUrl }
+}
+
+/** A short-lived link to download one recording; the bucket itself stays private. */
 export async function voiceLink(viewer: Viewer, id: string): Promise<string | null> {
   const filter = visibleById(viewer, id)
   if (!filter) return null
@@ -143,39 +130,4 @@ export async function deleteVoice(viewer: Viewer, id: string): Promise<boolean> 
   if (record.storageKey) await deleteObject(record.storageKey)
   await ClientVoiceModel.deleteOne({ _id: record._id })
   return true
-}
-
-/** Keeps the task list a batch produced, and points its voices at it. */
-export async function saveTaskGroup(
-  viewer: Viewer,
-  input: { clientId: string; tasks: ClientTask[]; voiceIds: string[]; missingVoices: number[] }
-): Promise<SavedVoiceTasks> {
-  const clientName = await requireClientName(viewer, input.clientId)
-  await connectDatabase()
-  const record = await ClientVoiceTasksModel.create({
-    ownerId: viewer.dataOwnerId,
-    clientId: input.clientId,
-    clientName,
-    tasks: input.tasks,
-    voiceIds: input.voiceIds,
-    missingVoices: input.missingVoices,
-  })
-  const groupId = record._id.toString()
-  if (input.voiceIds.length > 0) {
-    await ClientVoiceModel.updateMany({ ...ownedBy(viewer), _id: { $in: input.voiceIds } }, { $set: { taskGroupId: groupId } })
-  }
-  return toTasks(record.toObject() as StoredTasks)
-}
-
-/** The user's own wording of a saved task list. The voices it was made from are untouched. */
-export async function editTaskGroup(viewer: Viewer, id: string, tasks: ClientTask[]): Promise<SavedVoiceTasks | null> {
-  const filter = visibleById(viewer, id)
-  if (!filter) return null
-  await connectDatabase()
-  const record = (await ClientVoiceTasksModel.findOneAndUpdate(
-    filter,
-    { $set: { tasks, editedAt: new Date() } },
-    { new: true, lean: true }
-  )) as StoredTasks | null
-  return record ? toTasks(record) : null
 }

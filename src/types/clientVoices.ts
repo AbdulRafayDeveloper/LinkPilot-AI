@@ -29,9 +29,11 @@ export interface VoiceEntry {
 
 export type VoiceSource = "paste" | "drop" | "file"
 
-/** One voice kept with a client: what the page needs to list, play and read it. */
+/** One kept voice: what a page needs to list it, read it and play it. */
 export interface SavedVoice {
   id: string
+  // The batch it arrived in (stored as `taskGroupId`, see models/ClientVoice.ts)
+  batchId: string | null
   clientId: string
   clientName: string
   position: number
@@ -40,30 +42,50 @@ export interface SavedVoice {
   contentType: string
   transcript: string
   transcribedBy: string | null
-  // The saved task list this voice was part of, when there is one
-  taskGroupId: string | null
   createdAt: string
+  /**
+   * Short-lived signed links, on a batch's own page only: `playUrl` is the recording played where
+   * it is, `downloadUrl` the same bytes saved under their own name. Both are null for a voice whose
+   * recording was never stored, which is what a batch run with no file storage leaves behind.
+   */
+  playUrl?: string | null
+  downloadUrl?: string | null
 }
 
-/** A saved task list, as it was written and as the user edited it. */
-export interface SavedVoiceTasks {
+/**
+ * One batch as the list shows it: when it was run, whose it was, and how much came out of it.
+ * The counts are the batch's own facts, so a row needs nothing joined to it.
+ */
+export interface VoiceBatch {
   id: string
   clientId: string
   clientName: string
+  // How many voices were put in, however many could be written out
+  voiceCount: number
   tasks: ClientTask[]
-  voiceIds: string[]
+  questions: ClientQuestion[]
+  // The voices that had no transcript to give, so the lists were made without them
   missingVoices: number[]
+  provider: string | null
+  providers: string[]
+  // When the user last reworded the task list
   editedAt: string | null
   createdAt: string
 }
 
-export interface SavedVoicesPage {
+/** One batch opened: everything that came out of it, with its recordings to play. */
+export interface VoiceBatchDetail extends VoiceBatch {
   voices: SavedVoice[]
-  // The task lists those voices belong to
-  taskGroups: SavedVoiceTasks[]
+}
+
+export interface VoiceBatchesPage {
+  items: VoiceBatch[]
   total: number
   page: number
+  pageSize: number
   totalPages: number
+  // The clients these batches were kept under, for the filter: only the records can say which exist
+  clients: { id: string; name: string }[]
 }
 
 /** One thing the client asked for, in the app's own words, taken from the transcripts. */
@@ -74,11 +96,25 @@ export interface ClientTask {
   voices: number[]
 }
 
-/** What the task step returns: the list, and whether it had every voice to work from. */
+/**
+ * One thing the client asked **about**, rather than asked for. A question is not a task: nothing
+ * is done about it, it is answered, so the two are kept apart and never folded together.
+ */
+export interface ClientQuestion {
+  // The client's question, in clear English
+  question: string
+  // The voices it was asked in, 1-based
+  voices: number[]
+}
+
+/** What the task step returns: both lists, and whether it had every voice to work from. */
 export interface TaskExtraction extends WithAiSource {
   tasks: ClientTask[]
-  // Voices that had no transcript to give it, so the page can say the list is partial
+  questions: ClientQuestion[]
+  // Voices that had no transcript to give it, so the page can say the lists are partial
   missingVoices: number[]
+  // The batch all of this is kept under, when the page started one
+  batchId?: string | null
 }
 
 /** One transcript on its way to the task step. Only text is sent; the audio never is. */

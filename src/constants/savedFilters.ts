@@ -24,6 +24,7 @@ export const FILTER_VIEWS: Record<string, readonly string[]> = {
   "reference-content": ["search"],
   "important-content": ["search", "type", "folder"],
   "client-projects": ["search", "client", "status"],
+  "client-voices-history": ["search", "client", "from", "to"],
   clients: ["search"],
   employees: ["search", "status"],
   "profile-scheduler": ["search", "day", "type", "pageSize"],

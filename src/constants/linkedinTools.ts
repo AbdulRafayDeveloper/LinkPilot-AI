@@ -18,7 +18,7 @@ import { LinkedInIcon } from "@/components/ui/LinkedInIcon"
 import { CLIENTS_TOOL } from "./clients"
 import { CLIENT_PROJECTS_TOOL } from "./clientProjectTasks"
 import { CLIENT_MESSAGING_TOOL } from "./clientMessaging"
-import { CLIENT_VOICES_TOOL } from "./clientVoices"
+import { CLIENT_VOICES_HISTORY_HREF, CLIENT_VOICES_TOOL } from "./clientVoices"
 import { POST_IMAGES_HISTORY_HREF, POST_IMAGES_TOOL } from "./postImages"
 import { DAILY_TASKS_TOOL } from "./dailyTasks"
 import { MESSAGE_REWRITER_TOOL } from "./messageRewriter"
@@ -181,7 +181,20 @@ export const APP_TOOLS: LinkedInTool[] = [
   // Client Work: the meetings and what the clients send, then what is written back to them, then
   // the clients themselves and what their prompts are written for
   MEETING_PLANNER_TOOL,
-  CLIENT_VOICES_TOOL,
+  // A batch is run on its own page and every batch ever run is kept on the other
+  {
+    ...CLIENT_VOICES_TOOL,
+    links: toolPages(
+      CLIENT_VOICES_TOOL.href,
+      { title: "Run New Voices", description: "Turn a batch of voices into tasks" },
+      {
+        title: "View All Batches",
+        description: "Every batch of client voices kept",
+        href: CLIENT_VOICES_HISTORY_HREF,
+        pageTitle: "Saved Client Voice Batches",
+      }
+    ),
+  },
   MEETINGS_TOOL,
   { ...CLIENT_MESSAGING_TOOL, links: savedOutputPages("client-messaging") },
   REFERENCE_CONTENT_TOOL,

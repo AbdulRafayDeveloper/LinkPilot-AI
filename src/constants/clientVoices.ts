@@ -2,12 +2,14 @@ import { AudioLines, type LucideIcon } from "lucide-react"
 
 /**
  * Client Voices: the voice messages a client sends on WhatsApp or Slack, turned into English
- * transcripts and one list of the work they actually asked for.
+ * transcripts, one list of the work they asked for, and one list of what they asked about.
  *
- * A batch with no client chosen stores nothing, as it always has: the audio goes from the browser to
- * the transcription provider, the transcripts live in the page, and the page is closed and it is gone.
- * Choosing a client keeps that batch instead: each recording goes to S3 and its transcript and task
- * list are saved with the client, so they can be played, read, edited and deleted later.
+ * **Every batch is kept**, at the owner's request that no voice is ever lost: the batch record is
+ * written as the run starts, each recording goes to S3 with its transcript, and the tasks and the
+ * questions are saved onto it when they are written. Choosing a client only says whose batch it is;
+ * a batch with no client is kept exactly the same way. The create page runs one batch, and the
+ * "view all" page lists every batch ever run, each opening on its own page with its recordings to
+ * play, its transcripts, its tasks and its questions.
  */
 
 // One batch. More than this in one go is a different conversation, not one client update
@@ -49,16 +51,38 @@ export const ACCEPTED_AUDIO_TYPES = [
 export const ACCEPTED_AUDIO_EXTENSIONS = [".mp3", ".m4a", ".mp4", ".wav", ".webm", ".ogg", ".oga", ".opus", ".flac"]
 
 export const TASK_LIST_MAX = 40
+/**
+ * How many questions one batch may come back with. A client asking more than this in a handful of
+ * voice messages is not asking questions any more, so a longer list is read as the model drifting.
+ */
+export const QUESTION_LIST_MAX = 30
 export const TRANSCRIPT_MAX_LENGTH = 20000
 
 export const CLIENT_VOICES_PROMPT_ID = "client-voice-tasks"
 export const CLIENT_VOICES_PROMPT_TABS = [{ id: CLIENT_VOICES_PROMPT_ID, label: "Task extraction" }]
 
 export const CLIENT_VOICES_ENDPOINT = "/api/client-voices"
+// Every batch ever run: started, added to as it goes, listed and opened through this one path
+export const VOICE_BATCHES_ENDPOINT = `${CLIENT_VOICES_ENDPOINT}/batches`
 // Where a kept recording lives in the bucket, beside the other modules' prefixes
 export const VOICE_STORAGE_PREFIX = "LinkPilot/client-voices"
-// The saved voices list, a page at a time
-export const SAVED_VOICES_PAGE_SIZE = 20
+
+/** The tool's two pages: the batch being run, and every batch kept. */
+export const CLIENT_VOICES_HISTORY_HREF = "/client-voices/history"
+/** One kept batch, on its own page. */
+export const clientVoicesBatchHref = (id: string) => `/client-voices/${id}`
+
+/**
+ * How much of the first task stands for a batch in the list, so a row says what the client wanted
+ * without carrying the whole list.
+ */
+export const BATCH_PREVIEW_MAX_LENGTH = 180
+
+/**
+ * What the client filter sends for the batches kept under no client. It can never be mistaken for a
+ * client, whose id is 24 hex characters, the way the folder filters' own two values cannot.
+ */
+export const NO_CLIENT_FILTER = "none"
 // Where the chosen client is remembered: on the account (so it follows it to any browser), and in this
 // browser as well, so the page shows it at once before the account has answered
 export const CLIENT_CHOICE_ENDPOINT = "/api/client-voices/client"
@@ -80,8 +104,8 @@ export const CLIENT_VOICES_MESSAGES = {
   copied: "Tasks copied.",
   clientMissing: "That client no longer exists. Choose another one.",
   storageUnavailable: "Keeping a client's voices needs file storage. Set the AWS variables where the app runs, or work without choosing a client.",
-  noClient: "Choose a client to keep these voices with, or leave it on none and nothing is saved.",
-  keptWith: (name: string) => `Every voice in this batch is kept with ${name}, with its transcript and its tasks.`,
+  noClient: "Every batch is kept. Choose a client to keep this one under their name.",
+  keptWith: (name: string) => `This batch is kept under ${name}, with its recordings, transcripts, tasks and questions.`,
   clientChoiceFailed: "Couldn't remember that client for next time. It is still chosen on this page.",
   notYourClient: "That client no longer exists.",
   savedVoicesFailed: "Couldn't load the saved voices. Please try again.",
@@ -89,6 +113,20 @@ export const CLIENT_VOICES_MESSAGES = {
   deleteFailed: "Couldn't delete that voice. Please try again.",
   deleted: "Voice deleted.",
   taskEditFailed: "Couldn't save your changes to the tasks.",
+  // Keeping the batch itself. The transcripts are on the page either way, so this is never fatal
+  batchFailed: "Couldn't start keeping this batch, so these voices will not be saved. The transcripts still work.",
+  // The "view all" page and one batch's own page
+  historyFailed: "Couldn't load the batches. Please try again.",
+  batchMissing: "That batch no longer exists.",
+  emptyHistory: "No voice messages have been run through yet. Open Client Voices and add the first batch.",
+  noMatches: "No batch matches those filters.",
+  deleteBatchFailed: "Couldn't delete that batch. Please try again.",
+  batchDeleted: "Batch deleted.",
+  // A recording that was never stored, because the app had no file storage when the batch ran
+  noRecording: "The recording was not kept for this voice.",
+  playFailed: "Couldn't play this recording. Open the page again for a fresh link.",
+  questionsEmpty: "The client did not ask anything in these voices.",
+  copiedQuestions: "Questions copied.",
 } as const
 
 // The module's sidebar entry, with the other work done for clients
