@@ -49,19 +49,30 @@ const railHintHandlers = (isCollapsed: boolean, title: string, detail: string, o
 }
 
 /**
- * A row is comfortable to read and to hit (about 40px, a 28px icon tile, 14px text), because the
- * rail cut one list of nineteen tools into four of five to nine: the room is there now. In a
- * **short window** (`tight:`, at most 740px high, whatever the width) it goes back to the old tight
- * row, so an area with a dropdown open still fits without scrolling. That is the window's height
- * alone rather than the app's `short:`, because a 640px phone has as little room as a 540px laptop.
+ * A row is comfortable to read and to hit (48px, a 32px icon tile, 15px text on a 24px line, an
+ * 18px icon), because the rail cut one list of nineteen tools into four of five to nine: the room
+ * is there now. In a **short window** (`tight:`, at most 740px high, whatever the width) it goes
+ * back to the tight row, so an area with a dropdown open still fits without scrolling. That is the
+ * window's height alone rather than the app's `short:`, because a 640px phone has as little room
+ * as a 540px laptop.
+ *
+ * **The text was made bigger without the row growing** (the owner asked for it: 14px read too
+ * small). A row's height is set by its icon tile, 32px against a 24px line (24px against 20px for
+ * a page inside a dropdown), so the extra pixel of text costs nothing and every area still fits
+ * the windows it fitted before. Only the 2px between rows is new, and a short window gives those
+ * back, along with 2px of side padding, which is what keeps the longest name from being cut.
  */
 const rowClass = (isCollapsed: boolean, isActive: boolean, compact = false) =>
-  `group flex w-full items-center gap-3 rounded-xl px-2.5 ${
+  `group flex w-full items-center gap-3 tight:gap-2.5 rounded-xl px-2.5 tight:px-2 ${
     compact ? "py-1.5 tight:py-px" : "py-2 tight:py-[3px]"
   } text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${whenCollapsed(
     isCollapsed,
     "lg:justify-center lg:px-0"
   )} ${isActive ? "bg-primary-fixed/45" : "hover:bg-surface-container-low"}`
+
+// A little air between the rows, so the names read as a list rather than a block; a short window
+// gives those pixels back, where every one of them is needed to fit the area without scrolling
+const listClass = "space-y-0.5 tight:space-y-0"
 
 const tileClass = (isActive: boolean, compact = false) =>
   `relative flex ${
@@ -72,13 +83,17 @@ const tileClass = (isActive: boolean, compact = false) =>
       : "bg-surface-container-low text-on-surface-variant group-hover:bg-surface-container-lowest group-hover:text-primary group-hover:shadow-sm"
   }`
 
-// The icon is sized in CSS, not by lucide's `size`, so it can shrink with the row on a short window
-const iconClass = (compact = false) => (compact ? "h-3.5 w-3.5 tight:h-3 tight:w-3" : "h-4 w-4 tight:h-3.5 tight:w-3.5")
+// The icon is sized in CSS, not by lucide's `size`, so it grows with the name and shrinks with the
+// row on a short window; it stays well inside its tile, which is what keeps the row's height fixed
+const iconClass = (compact = false) => (compact ? "h-4 w-4 tight:h-3 tight:w-3" : "h-[18px] w-[18px] tight:h-3.5 tight:w-3.5")
 
 const titleClass = (isCollapsed: boolean, isActive: boolean, compact = false) =>
-  `min-w-0 flex-1 truncate ${compact ? "text-[13px] tight:text-[12px]" : "text-[14px] tight:text-[13px]"} leading-5 ${
-    isActive ? "font-semibold text-on-surface" : "font-medium text-on-surface-variant group-hover:text-on-surface"
-  } ${whenCollapsed(isCollapsed, "lg:sr-only")}`
+  `min-w-0 flex-1 truncate ${
+    compact ? "text-[14px] tight:text-[13px] leading-5" : "text-[15px] tight:text-[14px] leading-6 tight:leading-5"
+  } ${isActive ? "font-semibold text-on-surface" : "font-medium text-on-surface-variant group-hover:text-on-surface"} ${whenCollapsed(
+    isCollapsed,
+    "lg:sr-only"
+  )}`
 
 // Every page draws its own sidebar, so how far the list was scrolled is kept for this browser tab
 // and put back on the next page, instead of the list jumping to the top on every click
@@ -228,7 +243,7 @@ const SidebarDropdown: React.FC<SidebarDropdownProps> = ({
         id={listId}
         hidden={!isOpen}
         aria-label={`${title} pages`}
-        className={`ml-[26px] tight:ml-[18px] border-l border-outline-variant/80 pl-2 ${whenCollapsed(
+        className={`ml-[26px] tight:ml-[18px] border-l border-outline-variant/80 pl-2 ${listClass} ${whenCollapsed(
           isCollapsed,
           "lg:ml-0 lg:border-l-0 lg:pl-0"
         )}`}
@@ -416,8 +431,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
         />
       )}
 
+      {/* The drawer is 92vw rather than 86vw: with the bigger names a 328px drawer cut four of the
+          seven Client Work names, and at 352px not one name is cut at any size */}
       <aside
-        className={`fixed inset-y-0 left-0 z-[45] flex h-screen w-[min(86vw,328px)] flex-shrink-0 border-r border-outline-variant/80 bg-white transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-[45] flex h-screen w-[min(92vw,352px)] flex-shrink-0 border-r border-outline-variant/80 bg-white transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
           isOpen ? "translate-x-0 shadow-xl lg:shadow-none" : "-translate-x-full"
         } ${isCollapsed ? "lg:w-[72px]" : "lg:w-[320px] xl:w-[352px]"}`}
       >
@@ -498,7 +515,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
           {/* Collapsed on desktop: the chosen area's tools as icons, where the panel would be */}
           {isCollapsed && (
             <nav aria-label={area ? `${area.group.label} tools` : "Tools"} className="custom-scrollbar hidden min-h-0 w-full flex-1 overflow-y-auto border-t border-outline-variant/80 px-2 py-2 lg:block">
-              <ul>{renderArea(area?.tools ?? [])}</ul>
+              <ul className={listClass}>{renderArea(area?.tools ?? [])}</ul>
             </nav>
           )}
 
@@ -527,9 +544,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
           {/* Which area is on screen, so the rail's icon is never the only thing that says it */}
           {area && !isSearching && (
             <div className="shrink-0 px-4 pt-3 tight:pt-2">
-              <h2 className="truncate text-[11px] font-bold uppercase leading-4 tracking-[0.11em] text-primary">{area.group.label}</h2>
+              <h2 className="truncate text-[12px] tight:text-[11px] font-bold uppercase leading-[18px] tight:leading-4 tracking-[0.11em] text-primary">
+                {area.group.label}
+              </h2>
               {/* One line, always: the hints are short enough to fit the narrowest panel, and `truncate` is the guard */}
-              <p className="mt-0.5 truncate text-[11px] leading-4 text-outline" title={area.group.hint}>
+              <p className="mt-0.5 truncate text-[12px] tight:text-[11px] leading-[18px] tight:leading-4 text-outline" title={area.group.hint}>
                 {area.group.hint}
               </p>
             </div>
@@ -562,7 +581,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
                 autoComplete="off"
                 spellCheck={false}
                 aria-controls={panelId}
-                className="h-9 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-8 pr-7 text-[13px] text-on-surface placeholder:text-outline transition-colors focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 [&::-webkit-search-cancel-button]:hidden"
+                className="h-10 tight:h-9 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-8 pr-7 text-[14px] text-on-surface placeholder:text-outline transition-colors focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 [&::-webkit-search-cancel-button]:hidden"
               />
               {query && (
                 <button
@@ -586,16 +605,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
             role="tabpanel"
             aria-label={area ? `${area.group.label} tools` : "Tools"}
             onScroll={handleNavScroll}
-            className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-2.5 py-1.5"
+            className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-2.5 tight:px-2 py-1.5"
           >
-            {isSearching && matchCount === 0 && <p className="px-2 py-3 text-[12px] text-outline">No tool matches &ldquo;{query.trim()}&rdquo;.</p>}
+            {isSearching && matchCount === 0 && <p className="px-2 py-3 text-[13px] text-outline">No tool matches &ldquo;{query.trim()}&rdquo;.</p>}
             {shownAreas.map(({ group, tools: areaTools }, index) => (
               <section key={group.id} aria-label={group.label} className={index > 0 ? "mt-2" : ""}>
                 {/* While searching the matches come from every area, so each one says where it is */}
                 {isSearching && (
-                  <p className="mb-0.5 px-2 text-[10px] font-bold uppercase leading-4 tracking-[0.11em] text-outline">{group.label}</p>
+                  <p className="mb-0.5 px-2 text-[11px] tight:text-[10px] font-bold uppercase leading-4 tracking-[0.11em] text-outline">{group.label}</p>
                 )}
-                <ul>{renderArea(areaTools)}</ul>
+                <ul className={listClass}>{renderArea(areaTools)}</ul>
               </section>
             ))}
           </nav>
