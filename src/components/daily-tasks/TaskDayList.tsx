@@ -23,16 +23,12 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
 import { CSS } from "@dnd-kit/utilities"
 import {
   AlertTriangle,
-  CalendarArrowUp,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Copy,
   CornerDownRight,
   GripVertical,
-  ListPlus,
-  Paperclip,
   ListTodo,
   Loader2,
   Plus,
@@ -41,13 +37,12 @@ import {
   XCircle,
 } from "lucide-react"
 import { DAILY_TASKS_MESSAGES, DAILY_TASK_DESCRIPTION_MAX_LENGTH, TASK_MAX_LENGTH, VISIBLE_DAYS } from "@/constants/dailyTasks"
-import { TASK_ATTACHMENT_MESSAGES, TASK_MAX_DEPTH } from "@/constants/taskAttachments"
 import { dayLabel } from "@/lib/taskDates"
 import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
-import { CopyTaskText } from "@/components/tasks/CopyTaskText"
-import { TaskOptions } from "@/components/daily-tasks/TaskOptions"
+import { TaskChips, TaskFlagBadges, TaskOptions } from "@/components/daily-tasks/TaskOptions"
+import { TaskRowMenu } from "@/components/daily-tasks/TaskRowMenu"
 import { defaultChoices, type TaskChoices } from "@/lib/taskChoices"
 import { PRIORITIES, PRIORITY_TONE, type Priority } from "@/constants/priorities"
 import { TASK_DOERS, TASK_DOER_TONE, type TaskDoer } from "@/constants/taskDoers"
@@ -225,9 +220,11 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
             Overdue
           </span>
         )}
+        {/* Blocked and repeating are read off the row as words; the controls for both are in the menu */}
+        <TaskFlagBadges value={choicesOf(task)} />
       </label>
       {/* On a phone everything to the right of the task's words moves to a line of its own: beside
-          two chips and four buttons the words had about 60px left. From `sm` the wrapper is
+          two chips and the menu the words had about 60px left. From `md` the wrapper is
           `display: contents`, so it draws no box at all and the row is exactly what it always was */}
       <span className={ROW_TAIL}>
         {/* Changed where they are read. The whole row is the drag area, so the press that opens one
@@ -235,104 +232,10 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
         <span onPointerDown={(event) => event.stopPropagation()}>
           <RowOptions task={task} isPending={isPending} onChoose={onChoose} className="md:mt-2 md:flex-nowrap" />
         </span>
-        {/* The task's details and subtasks open in a popup rather than in the row: the whole row is
-            the drag area, so typing or picking an image inside it would start a drag */}
-        <RowActions task={task} depth={1} isPending={isPending} isOverdue={state === "overdue"} onOpenTask={onOpenTask} onMoveToToday={onMoveToToday} />
-        {isPending ? (
-          <span className="p-2.5" aria-hidden="true">
-            <Loader2 size={15} className="animate-spin text-outline" />
-          </span>
-        ) : onDelete ? (
-          <button
-            type="button"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={() => onDelete(task)}
-            aria-label={`Delete task: ${task.content}`}
-            className="mt-1 shrink-0 rounded-lg p-2 text-outline transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
-          >
-            <Trash2 size={15} aria-hidden="true" />
-          </button>
-        ) : (
-          <span className="mt-1 shrink-0 p-2 text-outline" aria-hidden="true">
-            <Trash2 size={15} />
-          </span>
-        )}
+        {/* Everything else a row can do is one menu, each action with its word: the details and
+            subtasks open in a popup rather than in the row, because the whole row is the drag area */}
+        <TaskRowMenu task={task} depth={1} isPending={isPending} isOverdue={state === "overdue"} onOpenTask={onOpenTask} onMoveToToday={onMoveToToday} onChoose={onChoose} onDelete={onDelete} />
       </span>
-    </>
-  )
-}
-
-const actionClass =
-  "mt-1 shrink-0 rounded-lg p-2 transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
-
-/**
- * What can be done to a task besides ticking and deleting it: open its details, add a subtask (the
- * third level has none, so its button says why instead), **copy its line** to the clipboard, and,
- * while it is overdue, bring it onto today. Every button stops the press from reaching the row, which
- * is the drag area. Without handlers (the copy under the pointer, or a task still saving) the same
- * space is kept, so nothing shifts.
- */
-const RowActions: React.FC<{
-  task: DailyTask
-  depth: number
-  isPending: boolean
-  // Only a task of an earlier day that still has open work, so the button says what it will do
-  isOverdue?: boolean
-  onOpenTask?: (task: DailyTask, focusSubtask?: boolean) => void
-  onMoveToToday?: (task: DailyTask) => void
-}> = ({ task, depth, isPending, isOverdue = false, onOpenTask, onMoveToToday }) => {
-  const hasDetails = Boolean(task.description || task.images.length > 0)
-  if (!onOpenTask || isPending) {
-    return (
-      <span className="mt-1 flex shrink-0 text-outline" aria-hidden="true">
-        <span className="p-2"><Paperclip size={15} /></span>
-        <span className="p-2"><ListPlus size={15} /></span>
-        <span className="p-2"><Copy size={15} /></span>
-      </span>
-    )
-  }
-  const canNest = depth < TASK_MAX_DEPTH
-  const addLabel = depth === 1 ? TASK_ATTACHMENT_MESSAGES.addSubtask : TASK_ATTACHMENT_MESSAGES.addSubSubtask
-  const stop = (event: React.SyntheticEvent) => event.stopPropagation()
-  return (
-    <>
-      <button
-        type="button"
-        onPointerDown={stop}
-        onMouseDown={stop}
-        onClick={() => onOpenTask(task)}
-        aria-label={`${hasDetails ? "Edit" : "Add"} details: ${task.content}`}
-        title={hasDetails ? "Open the details and subtasks" : "Add a description, images or subtasks"}
-        className={`${actionClass} ${hasDetails ? "text-primary" : "text-outline"}`}
-      >
-        <Paperclip size={15} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        onPointerDown={stop}
-        onMouseDown={stop}
-        onClick={() => onOpenTask(task, true)}
-        disabled={!canNest}
-        aria-label={canNest ? `${addLabel}: ${task.content}` : TASK_ATTACHMENT_MESSAGES.depthReached}
-        title={canNest ? addLabel : TASK_ATTACHMENT_MESSAGES.depthReached}
-        className={`${actionClass} text-outline`}
-      >
-        <ListPlus size={15} aria-hidden="true" />
-      </button>
-      <CopyTaskText text={task.content} label={`${TASK_ATTACHMENT_MESSAGES.copyText}: ${task.content}`} className={`${actionClass} text-outline`} />
-      {isOverdue && onMoveToToday && (
-        <button
-          type="button"
-          onPointerDown={stop}
-          onMouseDown={stop}
-          onClick={() => onMoveToToday(task)}
-          aria-label={`${DAILY_TASKS_MESSAGES.moveThisOverdue}: ${task.content}`}
-          title={DAILY_TASKS_MESSAGES.moveThisOverdue}
-          className={`${actionClass} text-error`}
-        >
-          <CalendarArrowUp size={15} aria-hidden="true" />
-        </button>
-      )}
     </>
   )
 }
@@ -400,26 +303,14 @@ const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, d
             </span>
             <TaskDetailsView description={task.description} images={task.images} label={task.content} />
           </span>
+          <TaskFlagBadges value={choicesOf(task)} />
         </label>
         <span className={ROW_TAIL}>
           <span onPointerDown={(event) => event.stopPropagation()}>
             <RowOptions task={task} isPending={isPending} onChoose={onChoose} className="md:mt-1.5 md:flex-nowrap" />
           </span>
-          <RowActions task={task} depth={depth} isPending={isPending} onOpenTask={onOpenTask} />
-          {isPending ? (
-            <span className="p-2.5" aria-hidden="true">
-              <Loader2 size={15} className="animate-spin text-outline" />
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onDelete(task)}
-              aria-label={`Delete: ${task.content}`}
-              className="mt-1 shrink-0 rounded-lg p-2 text-outline transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
-            >
-              <Trash2 size={15} aria-hidden="true" />
-            </button>
-          )}
+          {/* The same menu a task has, so a subtask and a sub-subtask are worked on the same way */}
+          <TaskRowMenu task={task} depth={depth} isPending={isPending} onOpenTask={onOpenTask} onChoose={onChoose} onDelete={onDelete} />
         </span>
       </div>
       {isOpen && task.subtasks.length > 0 && (
@@ -482,7 +373,7 @@ const RowOptions: React.FC<{ task: DailyTask; isPending: boolean; onChoose?: (ta
   onChoose,
   className,
 }) => (
-  <TaskOptions
+  <TaskChips
     value={choicesOf(task)}
     onChange={(change) => onChoose?.(task, change)}
     disabled={isPending || !onChoose}
@@ -492,7 +383,7 @@ const RowOptions: React.FC<{ task: DailyTask; isPending: boolean; onChoose?: (ta
 )
 
 /**
- * Everything to the right of a task's own words: its four controls and its buttons. Below `md` it is
+ * Everything to the right of a task's own words: its two chips and its menu. Below `md` it is
  * one line of its own under the task (`order-last w-full`), because beside all of it the words were
  * cut to about 60px on a 390px phone; from `md` it is `display: contents`, drawing no box at all, so
  * the row reads as one line.

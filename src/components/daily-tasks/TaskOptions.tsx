@@ -113,6 +113,44 @@ interface TaskOptionsProps {
   className?: string
 }
 
+/**
+ * The two chips alone: how urgent a task is and who does it. The list's rows show these beside the
+ * task and keep blocking and repeating behind the row's menu (`TaskRowMenu`), at the owner's
+ * request; everywhere a task is **written** the full `TaskOptions` still offers all four.
+ */
+export const TaskChips: React.FC<TaskOptionsProps> = ({ value, onChange, disabled, label, className = "" }) => (
+  <span className={`flex flex-wrap items-center gap-1 ${className}`}>
+    <PrioritySelect value={value.priority} onChange={(priority) => onChange({ priority })} disabled={disabled} label={label} />
+    <DoerSelect value={value.doer} onChange={(doer) => onChange({ doer })} disabled={disabled} label={label} />
+  </span>
+)
+
+/**
+ * What a row says about a task that is blocked or repeating, now that the controls for both live in
+ * the row's menu: a word in the state's colour, never a bare icon, so the state is still read off
+ * the row at a glance and never rests on colour alone. Nothing for a task that is neither.
+ */
+export const TaskFlagBadges: React.FC<{ value: TaskChoices }> = ({ value }) => {
+  const repeat = repeatWords(value.repeat)
+  if (!value.isBlocked && !repeat) return null
+  return (
+    <>
+      {value.isBlocked && (
+        <span title={DAILY_TASKS_MESSAGES.block} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-error-container px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-error">
+          <Lock size={11} aria-hidden="true" />
+          {DAILY_TASKS_MESSAGES.blocked}
+        </span>
+      )}
+      {repeat && (
+        <span title={DAILY_TASKS_MESSAGES.repeatsEvery(repeat.due)} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-fixed px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-on-primary-fixed-variant">
+          <Repeat size={11} aria-hidden="true" />
+          {repeat.label}
+        </span>
+      )}
+    </>
+  )
+}
+
 export const TaskOptions: React.FC<TaskOptionsProps> = ({ value, onChange, disabled, label, className = "" }) => (
   <span className={`flex flex-wrap items-center gap-1 ${className}`}>
     <PrioritySelect value={value.priority} onChange={(priority) => onChange({ priority })} disabled={disabled} label={label} />

@@ -53,6 +53,11 @@ export const DAILY_TASKS_MESSAGES = {
   block: "Block this task: nothing can be done on it yet",
   unblock: "Unblock this task",
   blocked: "Blocked",
+  // The row's menu, where each action is a word beside its icon
+  blockTask: "Block task",
+  unblockTask: "Unblock task",
+  repeatHeading: "Repeats",
+  deleteTask: "Delete task",
   // A task that comes back: the overdue button brings it to today, on the days its interval allows,
   // and unticks it
   repeat: "This task repeats: bring it back and untick it",
