@@ -15,6 +15,8 @@ export const HOME_PATH = "/connection-note"
 // Somewhere every signed-in account can always open, for an account with every tool turned off
 export const ALWAYS_OPEN_PATH = "/global-prompts"
 export const SIGNUP_PATH = "/signup"
+// Where the person changes their own name, photo and password (constants/account.ts)
+export const ACCOUNT_SETTINGS_PATH = "/account"
 export const AUTH_ENDPOINTS = {
   login: "/api/auth/login",
   signup: "/api/auth/signup",
@@ -26,6 +28,16 @@ export const AUTH_ENDPOINTS = {
 // reset, ends it sooner. A year is under the 400 days browsers allow a cookie to live, so it is kept
 // whole rather than cut short by the browser
 export const SESSION_DAYS = 365
+
+/**
+ * **The year starts again every time the app is used.** A session that only counted down from the
+ * sign-in would end a year later in the middle of someone's work, however much they had used it, and
+ * a browser carrying a cookie issued when a session was shorter would still end on that older date.
+ * So the cookie is signed again whenever it is more than a day old (`refreshSession`, called by
+ * `/api/auth/me`, which every page load asks), and anyone who opens the app at all keeps a full year
+ * ahead of them. A day is the rhythm because one write per browser per day costs nothing.
+ */
+export const SESSION_REFRESH_DAYS = 1
 
 export const NAME_MAX_LENGTH = 80
 export const EMAIL_MAX_LENGTH = 254

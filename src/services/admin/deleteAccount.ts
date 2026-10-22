@@ -9,6 +9,7 @@ import { UserModel } from "@/models/User"
 import { ADMIN_MESSAGES } from "@/constants/admin"
 import { abortMultipartUpload, deleteObject, isStorageConfigured } from "@/services/storage/s3"
 import { removeRecordingFiles } from "@/services/meetings/recording"
+import { forgetAccountPhoto } from "@/services/account/photo"
 import { removeUnusedImages } from "@/services/importantContent/images"
 import { NAMES_AN_IMAGE, removeUnusedNoteImages } from "@/services/quickNotes/images"
 import { QuickNote } from "@/models/QuickNote"
@@ -56,7 +57,7 @@ async function removeStoredFiles(files: StoredFile[]): Promise<void> {
 export async function deleteAccount(admin: Viewer, id: string, confirmEmail: string, client: ClientInfo): Promise<AccountDeletion | null> {
   if (!/^[0-9a-f]{24}$/.test(id)) return null
   await connectDatabase()
-  const account = await UserModel.findById(id, { name: 1, email: 1, role: 1 }).lean()
+  const account = await UserModel.findById(id, { name: 1, email: 1, role: 1, photoFile: 1 }).lean()
   if (!account) return null
 
   // Every check before anything is removed
@@ -81,6 +82,13 @@ export async function deleteAccount(admin: Viewer, id: string, confirmEmail: str
   // Meeting recordings are attachments of their meetings: removed here too, and a failure is only logged
   const recorded = (await Meeting.find({ ...owner, recording: { $ne: null } }, { _id: 1, recording: 1 }).lean()) as unknown as { _id: unknown; recording: unknown }[]
   await Promise.all(recorded.map((meeting) => removeRecordingFiles(String(meeting._id), meeting.recording)))
+  // So are the profile photos: this account's own and those of the accounts it made for other
+  // people, which go with it below. A failure leaves an image nothing names, never a half-deleted account
+  const childAccounts = await UserModel.find({ parentId: id }, { photoFile: 1 }).lean()
+  await Promise.all([
+    forgetAccountPhoto(id, account.photoFile),
+    ...childAccounts.map((child) => forgetAccountPhoto(String(child._id), child.photoFile)),
+  ])
 
   // 2. What hangs off a record without an owner of its own
   const meetingIds = (await Meeting.find(owner, { _id: 1 }).lean()).map((meeting) => meeting._id)

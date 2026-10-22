@@ -4,7 +4,7 @@ import { UserFacingError, toUserFacingMessage } from "@/lib/errors"
 import { SignupSchema } from "@/lib/validation/auth"
 import { AUTH_MESSAGES } from "@/constants/auth"
 import { signUp } from "@/services/auth/accounts"
-import { startSession } from "@/services/auth/viewer"
+import { isSecureRequest, startSession } from "@/services/auth/viewer"
 import { clientInfo } from "@/services/auth/audit"
 
 export const dynamic = "force-dynamic"
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { viewer, sessionVersion } = await signUp(parsed.data, clientInfo(req))
-    await startSession({ id: viewer.id, sessionVersion }, req.nextUrl.protocol === "https:")
+    await startSession({ id: viewer.id, sessionVersion }, isSecureRequest(req))
     return NextResponse.json({ success: true, message: `Welcome, ${viewer.name}.`, data: viewer }, { status: 201 })
   } catch (error: unknown) {
     if (error instanceof UserFacingError) {

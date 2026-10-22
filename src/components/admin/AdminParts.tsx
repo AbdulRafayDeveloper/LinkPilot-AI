@@ -48,6 +48,8 @@ const EVENT_STYLE: Record<LoginEventType, string> = {
   "sign-up": "bg-primary-fixed text-on-primary-fixed-variant",
   "sign-out": "bg-surface-container-high text-on-surface-variant",
   failed: "bg-secondary-fixed text-on-surface",
+  // The account changed its own password, which signed its other browsers out: a fact, not a refusal
+  "password-changed": "bg-primary-fixed text-on-primary-fixed-variant",
   locked: "bg-error-container text-error",
   "account-deleted": "bg-error text-white",
 }

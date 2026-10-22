@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { env } from "@/config/env"
 import { connectDatabase } from "@/lib/db"
 import { NotAllowedError, toUserFacingMessage } from "@/lib/errors"
-import { SESSION_COOKIE, SESSION_MS, readSession, signSession } from "@/lib/sessionToken"
+import { SESSION_COOKIE, SESSION_MS, isWorthRefreshing, readSession, signSession } from "@/lib/sessionToken"
 import { UserModel } from "@/models/User"
 import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, REQUEST_PATH_HEADER, type UserRole } from "@/constants/auth"
 import { FEATURE_ACCESS_MESSAGES } from "@/constants/featureAccess"
@@ -81,6 +81,41 @@ async function isDeniedFeature(viewer: Viewer, options: { feature?: string | nul
 export async function startSession(user: { id: string; sessionVersion: number }, isSecure: boolean): Promise<void> {
   const exp = Date.now() + SESSION_MS
   ;(await cookies()).set(SESSION_COOKIE, signSession({ uid: user.id, ver: user.sessionVersion, exp }, env.AUTH_SECRET), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: isSecure,
+    path: "/",
+    expires: new Date(exp),
+  })
+}
+
+/**
+ * Whether the request reached us over HTTPS, which is whether the session cookie may be marked
+ * `Secure`. The host's own `x-forwarded-proto` is read as well as the URL, because a request that
+ * arrived at the edge over HTTPS can reach the function as plain http: reading the URL alone there
+ * would drop `Secure` from a cookie that had it.
+ */
+export function isSecureRequest(req: { nextUrl: { protocol: string }; headers: Headers }): boolean {
+  const forwarded = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase()
+  return req.nextUrl.protocol === "https:" || forwarded === "https"
+}
+
+/**
+ * Signs the session cookie again, so **using the app is what keeps you signed in**: a browser that
+ * opens any page has a full year ahead of it again, rather than counting down from the day it signed
+ * in. It is called by `/api/auth/me`, which every page load asks, and it does nothing at all while
+ * the cookie is less than a day old, so an ordinary click costs no write.
+ *
+ * Only a route handler may set a cookie, which is why this is not in `getViewer` (also called while
+ * a page is rendered). The session is read from the cookie rather than taken as an argument, so a
+ * caller can never extend a session other than the one in front of it.
+ */
+export async function refreshSession(isSecure: boolean): Promise<void> {
+  const jar = await cookies()
+  const session = readSession(jar.get(SESSION_COOKIE)?.value, env.AUTH_SECRET)
+  if (!session || !isWorthRefreshing(session)) return
+  const exp = Date.now() + SESSION_MS
+  jar.set(SESSION_COOKIE, signSession({ ...session, exp }, env.AUTH_SECRET), {
     httpOnly: true,
     sameSite: "lax",
     secure: isSecure,

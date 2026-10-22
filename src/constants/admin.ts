@@ -25,6 +25,8 @@ export const LOGIN_EVENTS = [
   { id: "sign-up", label: "Signed up" },
   { id: "sign-out", label: "Signed out" },
   { id: "failed", label: "Wrong password" },
+  // The account changed its own password from Account Settings, which ends its other sessions
+  { id: "password-changed", label: "Password changed" },
   { id: "locked", label: "Locked out" },
   // An admin deleted the account and everything it made; the event names the admin who did
   { id: "account-deleted", label: "Account deleted" },

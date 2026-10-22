@@ -1,24 +1,18 @@
 "use client"
 
 import React, { useEffect, useId, useRef, useState } from "react"
-import { ChevronDown, Loader2, LogOut, ShieldCheck } from "lucide-react"
+import Link from "next/link"
+import { ChevronDown, Loader2, LogOut, ShieldCheck, UserCog } from "lucide-react"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { requestApi } from "@/lib/apiClient"
 import { clearAllToolState } from "@/lib/toolStore"
-import { AUTH_ENDPOINTS, LOGIN_PATH, ROLE_LABELS } from "@/constants/auth"
-
-const initialsOf = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("") || "?"
+import { ACCOUNT_SETTINGS_PATH, AUTH_ENDPOINTS, LOGIN_PATH, ROLE_LABELS } from "@/constants/auth"
+import { AccountAvatar } from "./AccountAvatar"
 
 /**
- * The signed-in account in the header: initials, and a menu with the name, email, role and Sign
- * out. Signing out also clears the tools' saved drafts from this browser, so the next account
- * starts clean.
+ * The signed-in account in the header: their photo (or their initials until they have one), and a
+ * menu with the name, email, role, the way through to Account Settings and Sign out. Signing out
+ * also clears the tools' saved drafts from this browser, so the next account starts clean.
  */
 export const UserMenu: React.FC = () => {
   const { status, user } = useCurrentUser()
@@ -70,13 +64,7 @@ export const UserMenu: React.FC = () => {
         aria-label={`Account: ${user.name}`}
         className="flex h-9 items-center gap-1 rounded-full py-0.5 pl-0.5 pr-1.5 transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
-        <span
-          className={`flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-bold ${
-            isAdmin ? "bg-primary text-white" : "bg-primary-fixed text-on-primary-fixed-variant"
-          }`}
-        >
-          {initialsOf(user.name)}
-        </span>
+        <AccountAvatar name={user.name} photo={user.photo} isAdmin={isAdmin} />
         <ChevronDown size={14} className={`hidden text-outline transition-transform sm:block ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
 
@@ -86,8 +74,13 @@ export const UserMenu: React.FC = () => {
           className="absolute right-0 top-11 z-50 w-64 overflow-hidden rounded-2xl border border-outline-variant bg-white shadow-xl"
         >
           <div className="border-b border-outline-variant/70 px-4 py-3">
-            <p className="truncate text-[14px] font-semibold text-on-surface">{user.name}</p>
-            <p className="truncate text-[12px] text-on-surface-variant">{user.email}</p>
+            <div className="flex items-center gap-3">
+              <AccountAvatar name={user.name} photo={user.photo} size="md" isAdmin={isAdmin} />
+              <div className="min-w-0">
+                <p className="truncate text-[14px] font-semibold text-on-surface">{user.name}</p>
+                <p className="truncate text-[12px] text-on-surface-variant">{user.email}</p>
+              </div>
+            </div>
             <span
               className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                 isAdmin ? "bg-primary text-white" : "bg-surface-container-high text-on-surface-variant"
@@ -100,6 +93,14 @@ export const UserMenu: React.FC = () => {
               {isAdmin ? "You see every account's records and the admin tools." : "You see the records you created."}
             </p>
           </div>
+          <Link
+            href={ACCOUNT_SETTINGS_PATH}
+            onClick={() => setIsOpen(false)}
+            className="flex w-full items-center gap-2 border-b border-outline-variant/70 px-4 py-2.5 text-left text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
+          >
+            <UserCog size={15} aria-hidden="true" />
+            Account settings
+          </Link>
           <button
             type="button"
             onClick={signOut}

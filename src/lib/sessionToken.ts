@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 import { z } from "zod"
-import { SESSION_DAYS } from "@/constants/auth"
+import { SESSION_DAYS, SESSION_REFRESH_DAYS } from "@/constants/auth"
 
 /**
  * The signed session cookie. It holds only the account id, the account's session version and
@@ -11,6 +11,7 @@ import { SESSION_DAYS } from "@/constants/auth"
 
 export const SESSION_COOKIE = "lp_session"
 export const SESSION_MS = SESSION_DAYS * 24 * 60 * 60 * 1000
+const REFRESH_AFTER_MS = SESSION_REFRESH_DAYS * 24 * 60 * 60 * 1000
 
 const PayloadSchema = z.object({ uid: z.string().regex(/^[0-9a-f]{24}$/), ver: z.number().int().positive(), exp: z.number() })
 export type SessionPayload = z.infer<typeof PayloadSchema>
@@ -35,3 +36,10 @@ export function readSession(token: string | undefined, secret: string): SessionP
     return null
   }
 }
+
+/**
+ * Whether this session is worth signing again: it is more than `SESSION_REFRESH_DAYS` old, measured
+ * from what the session itself says rather than from anything stored, so a cookie issued while a
+ * session was shorter is renewed to a full year the first time it is used.
+ */
+export const isWorthRefreshing = (session: SessionPayload, now = Date.now()): boolean => session.exp - now < SESSION_MS - REFRESH_AFTER_MS

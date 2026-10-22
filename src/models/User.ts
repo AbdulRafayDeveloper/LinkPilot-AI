@@ -11,6 +11,9 @@ export interface IUser {
   parentId: string | null
   email: string
   name: string
+  // The person's own profile photo, the file's name under their folder in storage (lib/accountPhoto.ts);
+  // null when they have none, which is every account until it sets one, and then it shows its initials
+  photoFile: string | null
   passwordHash: string
   role: UserRole
   sessionVersion: number
@@ -50,6 +53,7 @@ const UserSchema = new Schema<IUser>(
     parentId: { type: String, default: null, index: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, required: true, trim: true },
+    photoFile: { type: String, default: null },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: USER_ROLES, required: true, default: "user" },
     sessionVersion: { type: Number, required: true, default: 1 },

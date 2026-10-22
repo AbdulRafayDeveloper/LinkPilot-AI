@@ -36,6 +36,18 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener)
 }
 
+/**
+ * The account has changed something about itself (its name or its photo, from Account Settings), so
+ * everything showing it follows at once rather than at the next page load. It is a change to what is
+ * already loaded, so it does nothing while the account is still loading or signed out; the server is
+ * what saved it, and this only keeps the copy in this tab in step.
+ */
+export function updateCurrentUser(change: Partial<Viewer>): void {
+  if (current.status !== "ready") return
+  current = { status: "ready", user: { ...current.user, ...change } }
+  listeners.forEach((listener) => listener())
+}
+
 export function useCurrentUser(): CurrentUser {
   return useSyncExternalStore(subscribe, () => current, () => LOADING)
 }

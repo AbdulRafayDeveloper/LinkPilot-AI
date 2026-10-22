@@ -1,3 +1,4 @@
+import { accountPhotoPath } from "@/lib/accountPhoto"
 import { UserModel, type IUser } from "@/models/User"
 import { manageableFeatures, primaryOnlyFeatures } from "@/constants/featureAccess"
 import { childDisabledTools, effectiveDisabledTools } from "@/lib/featureAccess"
@@ -16,6 +17,7 @@ import type { Viewer } from "@/types/auth"
 export const ACCOUNT_FIELDS = {
   email: 1,
   name: 1,
+  photoFile: 1,
   role: 1,
   sessionVersion: 1,
   disabledTools: 1,
@@ -24,7 +26,7 @@ export const ACCOUNT_FIELDS = {
 } as const
 
 export type Account = Pick<IUser, "email" | "name" | "role"> &
-  Partial<Pick<IUser, "disabledTools" | "enabledTools" | "parentId">> & { _id: unknown }
+  Partial<Pick<IUser, "disabledTools" | "enabledTools" | "parentId" | "photoFile">> & { _id: unknown }
 
 /** Every tool a child can be granted. The admin area is not one of them, so it can never be. */
 const grantableTools = () => manageableFeatures().map((tool) => tool.id)
@@ -32,11 +34,14 @@ const grantableTools = () => manageableFeatures().map((tool) => tool.id)
 export async function viewerOf(user: Account, defaults: readonly string[]): Promise<Viewer> {
   const id = String(user._id)
   const parentId = user.parentId ?? null
+  // The photo is the person's, so it is read from this account whether or not it has a parent
+  const photo = user.photoFile ? accountPhotoPath({ ownerId: id, file: user.photoFile }) : null
   if (!parentId) {
     return {
       id,
       email: user.email,
       name: user.name,
+      photo,
       role: user.role,
       // What is off for everyone, with this account's own choices on top; an admin keeps every tool
       disabledTools: effectiveDisabledTools(user.role, defaults, user),
@@ -59,6 +64,7 @@ export async function viewerOf(user: Account, defaults: readonly string[]): Prom
     id,
     email: user.email,
     name: user.name,
+    photo,
     role: "user",
     disabledTools: [...disabledTools],
     parentId,

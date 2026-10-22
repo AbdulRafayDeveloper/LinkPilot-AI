@@ -221,6 +221,16 @@ export const SEO_PAGES: SeoPage[] = [
     indexable: false,
   },
   {
+    slug: "account",
+    path: "/account",
+    title: "Account Settings",
+    description: "Your name, your profile photo and the password you sign in to LinkPilot AI with.",
+    keywords: [],
+    heading: "Account settings",
+    subheading: "Your name, photo and password",
+    indexable: false,
+  },
+  {
     slug: "global-prompts",
     path: "/global-prompts",
     title: "Global AI Prompts",

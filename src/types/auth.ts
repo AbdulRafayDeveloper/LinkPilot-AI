@@ -5,6 +5,9 @@ export interface Viewer {
   id: string
   email: string
   name: string
+  // Where to show this person's profile photo (`/api/account/photo/<account>/<file>`), or null when
+  // they have none. It is the person's own, so a child account has its own rather than its parent's
+  photo: string | null
   role: UserRole
   // The tools this account may not use. Always empty for an admin, who keeps every tool
   disabledTools: string[]
