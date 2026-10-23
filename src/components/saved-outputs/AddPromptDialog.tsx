@@ -114,7 +114,13 @@ export const AddPromptDialog: React.FC<AddPromptDialogProps> = ({ endpoint, fold
         </div>
       }
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {/*
+        Below lg everything keeps its own height and the panel's body scrolls, which is what makes
+        this usable on a phone: filling the panel (min-h-0 + flex-1) squeezed the stacked halves
+        instead, so the prompt box and the picker were each a few pixels tall. From lg, where the two
+        halves sit side by side, it fills the panel as before and each side scrolls on its own.
+      */}
+      <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1">
         <p className="shrink-0 text-[12px] leading-relaxed text-on-surface-variant">{PROMPT_CREATOR_MESSAGES.addHint}</p>
 
         {error && (
@@ -125,8 +131,8 @@ export const AddPromptDialog: React.FC<AddPromptDialogProps> = ({ endpoint, fold
         )}
 
         {/* The prompt itself takes the wider side; its choices sit beside it on a wide screen */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <div className="flex min-h-0 flex-col gap-4">
+        <div className="grid grid-cols-1 gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <div className="flex flex-col gap-4 lg:min-h-0">
             <label className="flex shrink-0 flex-col gap-1.5">
               <span className={labelClass}>{PROMPT_CREATOR_MESSAGES.addedName}</span>
               <input
@@ -142,7 +148,7 @@ export const AddPromptDialog: React.FC<AddPromptDialogProps> = ({ endpoint, fold
               />
             </label>
 
-            <label className="flex min-h-0 flex-1 flex-col gap-1.5">
+            <label className="flex flex-col gap-1.5 lg:min-h-0 lg:flex-1">
               <span className={labelClass}>{PROMPT_CREATOR_MESSAGES.addedPrompt}</span>
               <textarea
                 name="prompt"
@@ -151,13 +157,15 @@ export const AddPromptDialog: React.FC<AddPromptDialogProps> = ({ endpoint, fold
                 onChange={(event) => setPrompt(event.target.value)}
                 disabled={isSaving}
                 placeholder="Paste the prompt here, exactly as you use it."
-                className={`${fieldClass} custom-scrollbar min-h-[180px] flex-1 resize-none py-2.5 font-mono text-[13px] leading-relaxed disabled:opacity-60`}
+                className={`${fieldClass} custom-scrollbar min-h-[180px] resize-none py-2.5 font-mono text-[13px] leading-relaxed disabled:opacity-60 lg:flex-1`}
                 required
               />
             </label>
           </div>
 
-          <div className="custom-scrollbar flex min-h-0 flex-col gap-4 overflow-y-auto lg:pl-1">
+          {/* pr-2 because the chosen card's tick sits 6px outside it, and a column that scrolls one
+              way scrolls both: without the room it drew a sideways scrollbar and clipped the tick */}
+          <div className="custom-scrollbar flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pl-1 lg:pr-2">
             <RadioCardGroup
               name="added-prompt-target"
               legend="This prompt is for"

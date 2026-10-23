@@ -105,6 +105,14 @@ export const PROMPT_CREATOR_MESSAGES = {
   addFailed: "Couldn't add that prompt. Please try again.",
   addedName: "Name it so you can find it again",
   addedPrompt: "The prompt itself",
+  // Rewriting a saved prompt from the history page, where it is read rather than from the create page
+  editTitle: "Edit this prompt",
+  editHint:
+    "Change the name you find it by, or the prompt itself. Everything else stays as it is: the folder it is filed in, what it waits for, and whether it has been applied.",
+  editButton: "Edit prompt",
+  editSave: "Save changes",
+  editUnchanged: "Nothing has been changed yet.",
+  editFailed: "Couldn't save that prompt. It is back as it was.",
 } as const
 
 // The module's sidebar entry: the first tool under Workspace, where the day's own work is kept

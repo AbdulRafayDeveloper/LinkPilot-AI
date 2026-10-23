@@ -16,7 +16,7 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core"
-import { AlertTriangle, Check, CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Copy, Eye, EyeOff, FilePlus2, FileText, Folder, FolderCog, FolderInput, GitBranch, History, Loader2, Lock, Play, RefreshCw, SquarePlus, Trash2 } from "lucide-react"
+import { AlertTriangle, Check, CheckCircle2, ChevronsDownUp, ChevronsUpDown, Copy, Eye, EyeOff, FilePlus2, Folder, FolderCog, GitBranch, History, Loader2, Lock, Play, RefreshCw, SquarePlus, Trash2 } from "lucide-react"
 import { DragPreview, FolderDropBar, RowDragHandle } from "./FolderDrop"
 import { folderFromDropId } from "@/lib/folderDrop"
 import { Sidebar } from "@/components/ui/Sidebar"
@@ -56,6 +56,8 @@ import { MoveToFolderDialog } from "./MoveToFolderDialog"
 import { FoldersDialog } from "./FoldersDialog"
 import { DependenciesDialog } from "./DependenciesDialog"
 import { AddPromptDialog } from "./AddPromptDialog"
+import { EditPromptDialog } from "./EditPromptDialog"
+import { RecordRowMenu } from "./RecordRowMenu"
 import {
   DEPENDENCY_FILTERS,
   DEPENDENCY_FILTER_IDS,
@@ -120,6 +122,9 @@ const filedLabel = (folders: PromptFolder[] | null): string => {
 
 const isLong = (item: SavedOutput) =>
   item.texts.some((part) => part.text.length > SAVED_OUTPUT_TEXT_PREVIEW_CHARS || part.text.split("\n").length > 3)
+
+// How long the line saying what was copied stays on screen, since the menu closes as it is chosen
+const FLASH_MS = 2000
 
 // Tall enough to tap comfortably until the table takes over on a wide screen
 const actionButton =
@@ -251,72 +256,32 @@ const CopyIconButton: React.FC<{ text: string; label: string }> = ({ text, label
   )
 }
 
-type SourceCopyState = "idle" | "copying" | "copied" | "failed"
-
 /**
- * Copies what a record was written from, which the list leaves out. The request is handed to the
- * clipboard rather than awaited first, because the permission a click grants can run out while a
- * slow request is on its way; a browser without that falls back to reading it, then writing it.
+ * Copies something that still has to be read from the server, which is how what a record was
+ * written from is copied: the list never carries it. The **request** is handed to the clipboard
+ * rather than awaited first, because the permission a click grants can run out while a slow request
+ * is on its way; a browser without `ClipboardItem` falls back to reading it, then writing it.
+ *
+ * It takes the loader rather than the text, so it can be called straight from a menu item while the
+ * click is still the gesture the browser is judging.
  */
-const SourceCopyButton: React.FC<{ item: SavedOutput; sourceLabel: string; loadSource: (id: string) => Promise<string> }> = ({
-  item,
-  sourceLabel,
-  loadSource,
-}) => {
-  const [state, setState] = useState<SourceCopyState>("idle")
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  useEffect(() => () => clearTimeout(timer.current), [])
-  const what = sourceLabel.toLowerCase()
-
-  const settle = (next: SourceCopyState) => {
-    setState(next)
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => setState("idle"), 1500)
-  }
-
-  const copy = async () => {
-    setState("copying")
+const copyWhenReady = async (load: () => Promise<string>): Promise<boolean> => {
+  try {
+    if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+      const blob = load().then((text) => new Blob([text], { type: "text/plain" }))
+      await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })])
+      return true
+    }
+    await navigator.clipboard.writeText(await load())
+    return true
+  } catch {
     try {
-      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
-        const blob = loadSource(item.id).then((source) => new Blob([source], { type: "text/plain" }))
-        await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })])
-      } else {
-        await navigator.clipboard.writeText(await loadSource(item.id))
-      }
-      settle("copied")
+      await navigator.clipboard.writeText(await load())
+      return true
     } catch {
-      try {
-        await navigator.clipboard.writeText(await loadSource(item.id))
-        settle("copied")
-      } catch {
-        settle("failed")
-      }
+      return false
     }
   }
-
-  return (
-    <button
-      type="button"
-      onClick={copy}
-      disabled={state === "copying"}
-      aria-label={`Copy the ${what} for ${item.title}`}
-      className={`${actionButton} ${state === "copied" ? "text-primary" : state === "failed" ? "text-error" : "hover:text-primary"}`}
-    >
-      {state === "copying" ? (
-        <Loader2 size={13} className="animate-spin" aria-hidden="true" />
-      ) : state === "copied" ? (
-        <Check size={13} aria-hidden="true" />
-      ) : state === "failed" ? (
-        <AlertTriangle size={13} aria-hidden="true" />
-      ) : (
-        <Copy size={13} aria-hidden="true" />
-      )}
-      {state === "copied" ? "Copied" : state === "failed" ? "Couldn't copy" : `Copy ${what}`}
-      <span className="sr-only" aria-live="polite">
-        {state === "copied" ? `${sourceLabel} copied to clipboard` : state === "failed" ? SAVED_OUTPUT_MESSAGES.sourceFailed : ""}
-      </span>
-    </button>
-  )
 }
 
 /**
@@ -477,12 +442,23 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
   // Adding a prompt the user already has (a tool with addByHand), and the line saying one was added
   const [isAdding, setIsAdding] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  // The record being rewritten (a tool with editable)
+  const [editing, setEditing] = useState<SavedOutput | null>(null)
+  // What a copy chosen from the row's menu put on the clipboard, said for a moment and then gone.
+  // It carries when it was said, so copying the same thing twice says so twice
+  const [flash, setFlash] = useState<{ text: string; at: number } | null>(null)
   // The record whose dependencies are being picked
   const [waiting, setWaiting] = useState<SavedOutput | null>(null)
   // What a record was written from is read once per page load, whether it was opened or copied first
   const details = useRef(new Map<string, Promise<SavedOutputDetail>>())
   // Only a tool with folders loads any of this; for the others the hook does nothing
   const folders = usePromptFolders(tool?.folders?.endpoint)
+
+  useEffect(() => {
+    if (!flash) return
+    const timer = setTimeout(() => setFlash(null), FLASH_MS)
+    return () => clearTimeout(timer)
+  }, [flash])
 
   const endpoint = `${SAVED_OUTPUTS_ENDPOINT}/${toolId}`
   const badDateRange = isBackwardsRange(filters.fromDay, filters.toDay)
@@ -784,6 +760,8 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
   }
   // Records can be filed by dragging only where there are folders to drop them on
   const canDragToFolders = Boolean(tool?.folders)
+  // Only a tool whose records may be rewritten offers Edit; for the others this stays undefined
+  const editable = tool.editable
 
   const titleOf = (id: string) => visibleItems.find((item) => item.id === id)?.title ?? tool?.noun.one ?? "record"
   const movingLabel = () => (movingIds.current.length > 1 ? `${movingIds.current.length} ${tool?.noun.many ?? "records"}` : titleOf(movingIds.current[0] ?? ""))
@@ -842,87 +820,58 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
   const isOpen = (id: string) => allOpen !== flipped.has(id)
   const canOpenAny = tool.hideTexts || visibleItems.some(isLong)
 
-  // In the table: View details and Delete always first, then every copy the tool offers (what was written,
-  // then what it was written from), so rows line up however many there are. One column on a laptop, where
-  // the table has about 936px beside the sidebar, and two by two from 2xl. One row on a card
-  const actions = (item: SavedOutput, layout: "grid" | "row") => (
-    <div
-      className={
-        layout === "grid"
-          ? "grid grid-cols-1 justify-items-start gap-y-0.5 2xl:grid-cols-2 2xl:gap-x-2"
-          : "flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5"
-      }
-    >
-      <button type="button" onClick={() => setViewing(item)} aria-label={`View details for ${item.title}`} className={`${actionButton} hover:text-primary`}>
-        <FileText size={13} aria-hidden="true" />
-        View details
-      </button>
-      <button type="button" onClick={() => deleteRecord(item)} aria-label={`Delete the ${tool.noun.one} for ${item.title}`} className={`${actionButton} hover:text-error`}>
-        <Trash2 size={13} aria-hidden="true" />
-        Delete
-      </button>
-      {tool.canMarkApplied &&
-        (() => {
-          // A record is run by applying it, so a record still waiting cannot be marked. Taking the
-          // mark off always stays possible: it says what happened, not what may happen next
-          const { pending } = waitingState(item)
-          const isBlocked = !item.appliedAt && pending.length > 0
-          return (
-            <button
-              type="button"
-              onClick={() => void markApplied(item)}
-              disabled={appliedBusy === item.id || isBlocked}
-              aria-pressed={Boolean(item.appliedAt)}
-              title={isBlocked ? describePending(pending.map((entry) => entry.name || "Untitled prompt")) : undefined}
-              aria-label={
-                isBlocked
-                  ? `${item.title} is blocked. ${describePending(pending.map((entry) => entry.name || "Untitled prompt"))}`
-                  : item.appliedAt
-                    ? `Mark ${item.title} as not used`
-                    : `Mark ${item.title} as used`
-              }
-              className={`${actionButton} ${item.appliedAt ? "border-success/50 text-on-success-container hover:bg-success/25" : isBlocked ? "" : "hover:text-success"}`}
-            >
-              {appliedBusy === item.id ? (
-                <Loader2 size={13} className="animate-spin" aria-hidden="true" />
-              ) : isBlocked ? (
-                <Lock size={13} aria-hidden="true" />
-              ) : item.appliedAt ? (
-                <CheckCircle2 size={13} aria-hidden="true" />
-              ) : (
-                <Circle size={13} aria-hidden="true" />
-              )}
-              {isBlocked ? "Blocked" : item.appliedAt ? "Applied" : "Mark applied"}
-            </button>
-          )
-        })()}
-      {tool.dependencies && (
-        <button
-          type="button"
-          onClick={() => setWaiting(item)}
-          aria-label={`Choose what ${item.title} waits for`}
-          className={`${actionButton} hover:text-primary`}
-        >
-          <GitBranch size={13} aria-hidden="true" />
-          {(item.dependencies?.length ?? 0) > 0 ? `${PROMPT_DEPENDENCY_MESSAGES.edit} ${item.dependencies?.length}` : PROMPT_DEPENDENCY_MESSAGES.edit}
-        </button>
-      )}
-      {tool.folders && (
-        <button
-          type="button"
-          onClick={() => setMoving(item)}
-          aria-label={`Move ${item.title} to a folder`}
-          className={`${actionButton} hover:text-primary`}
-        >
-          <FolderInput size={13} aria-hidden="true" />
-          {item.folder ? "Move" : "Add to folder"}
-        </button>
-      )}
-      {item.texts.map((part) => (
-        <CopyTextButton key={part.label} text={part.text} buttonText={`Copy ${part.label.toLowerCase()}`} label={`Copy the ${part.label.toLowerCase()} for ${item.title}`} />
-      ))}
-      {item.sourceLabel && <SourceCopyButton item={item} sourceLabel={item.sourceLabel} loadSource={loadSource} />}
-    </div>
+  /**
+   * Shows a rewritten record at once, so the row says what was just saved rather than what it held.
+   * The page is then read again, which is what brings the "Edited by hand" tag the server adds and
+   * takes the record off the page when the filters on screen no longer match it.
+   */
+  const applyEdit = (item: SavedOutput, saved: { name: string; text: string }) => {
+    setResult((current) =>
+      current
+        ? {
+            ...current,
+            items: current.items.map((row) =>
+              row.id === item.id
+                ? {
+                    ...row,
+                    title: saved.name,
+                    texts: row.texts.map((part) => (part.label === editable?.textLabel ? { ...part, text: saved.text } : part)),
+                  }
+                : row
+            ),
+          }
+        : current
+    )
+    setEditing(null)
+    setReloadAttempt((attempt) => attempt + 1)
+  }
+
+  /** Puts something on the clipboard from the row's menu, then says for a moment what landed there. */
+  const copyFromMenu = async (what: string, load: () => Promise<string>) => {
+    const done = await copyWhenReady(load)
+    if (!done) {
+      setActionError(SAVED_OUTPUT_MESSAGES.copyFailed)
+      return
+    }
+    setActionError(null)
+    setFlash({ text: SAVED_OUTPUT_MESSAGES.copied(what), at: Date.now() })
+  }
+
+  /** The three-dot menu of one row, given everything it can do (components/RecordRowMenu). */
+  const rowMenu = (item: SavedOutput) => (
+    <RecordRowMenu
+      tool={tool}
+      item={item}
+      isBusy={appliedBusy === item.id}
+      onView={setViewing}
+      onEdit={setEditing}
+      onMarkApplied={(row) => void markApplied(row)}
+      onWaitsFor={setWaiting}
+      onMove={setMoving}
+      onCopy={(what, load) => void copyFromMenu(what, load)}
+      loadSource={loadSource}
+      onDelete={(row) => void deleteRecord(row)}
+    />
   )
 
   const filterOptions = (filter: SavedOutputTool["filters"][number]) => {
@@ -1063,6 +1012,14 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
               </p>
             )}
 
+            {/* A copy chosen from a row's menu closes the menu, so this is where it is confirmed */}
+            {flash && (
+              <p role="status" className="flex items-start gap-2 rounded-xl bg-primary/5 px-3 py-2 text-[13px] text-on-surface">
+                <Check size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
+                {flash.text}
+              </p>
+            )}
+
             {error && !result ? (
               <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 short:py-5 text-center">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-error-container text-error">
@@ -1188,8 +1145,8 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                     <thead className="bg-surface-container-lowest">
                       <tr className="border-b border-outline-variant">
                         {/* Keyed by the column, not by its words: two columns may say the same thing */}
-                        {[tool.titleHeading, "Details", capitalize(tool.noun.one), "Written", "Actions"].map((heading, column) => (
-                          <th key={`${column}-${heading}`} scope="col" className={`px-3 py-2.5 ${historyLabelClass}`}>
+                        {[tool.titleHeading, "Details", capitalize(tool.noun.one), ...(tool.hideWrittenOn ? [] : ["Written"]), "Actions"].map((heading, column) => (
+                          <th key={`${column}-${heading}`} scope="col" className={`whitespace-nowrap px-3 py-2.5 ${historyLabelClass}`}>
                             {heading}
                           </th>
                         ))}
@@ -1224,8 +1181,12 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                           <td className="min-w-[220px] px-3 py-2 2xl:min-w-[260px]">
                             <TextsCell tool={tool} item={item} isOpen={isOpen(item.id)} onToggle={() => toggleRow(item.id)} />
                           </td>
-                          <td className="w-[104px] px-3 py-2.5 text-[12px] text-on-surface-variant 2xl:w-auto 2xl:whitespace-nowrap">{writtenOn(item.createdAt)}</td>
-                          <td className="w-[190px] px-3 py-2 2xl:w-[270px]">{actions(item, "grid")}</td>
+                          {!tool.hideWrittenOn && (
+                            <td className="w-[104px] px-3 py-2.5 text-[12px] text-on-surface-variant 2xl:w-auto 2xl:whitespace-nowrap">{writtenOn(item.createdAt)}</td>
+                          )}
+                          {/* One button, so the room a row's seven buttons took goes to what was written.
+                              Wide enough for the column's own heading, which is the widest thing in it */}
+                          <td className="w-[84px] px-3 py-2">{rowMenu(item)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1253,9 +1214,11 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                         {canDragToFolders && (
                           <>
                             <RowDragHandle id={item.id} label={item.title} isPicked={pickedIds.has(item.id)} />
-                            <span className="text-[11px] text-outline">Hold, then drag onto a folder</span>
+                            <span className="min-w-0 truncate text-[11px] text-outline">Hold, then drag onto a folder</span>
                           </>
                         )}
+                        {/* The menu sits in the card's own corner, the way a daily task's row carries it */}
+                        <span className="ml-auto shrink-0">{rowMenu(item)}</span>
                       </div>
                       <div className="min-w-0">
                         <p className="break-words text-[14px] font-semibold text-on-surface">{item.title}</p>
@@ -1263,11 +1226,8 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                       </div>
                       {item.choices.length + item.details.length > 0 && <RecordTags item={item} />}
                       <TextsCell tool={tool} item={item} isOpen={isOpen(item.id)} onToggle={() => toggleRow(item.id)} />
-                      <div className="flex flex-col gap-1 border-t border-outline-variant/70 pt-2">
-                        <span className="text-[11px] text-outline">{writtenOn(item.createdAt)}</span>
-                        {/* Pulled left only, so a long action never hangs over the right edge of the card */}
-                        <div className="-ml-2">{actions(item, "row")}</div>
-                      </div>
+                      {/* A card has no columns, so it keeps the time even where the table's column is off */}
+                      <span className="border-t border-outline-variant/70 pt-2 text-[11px] text-outline">{writtenOn(item.createdAt)}</span>
                     </li>
                   ))}
                 </ul>
@@ -1346,6 +1306,17 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
           folderId={waiting.folder?.id ?? null}
           onSave={(ids) => saveDependencies(waiting, ids)}
           onClose={() => setWaiting(null)}
+        />
+      )}
+      {editing && editable && (
+        <EditPromptDialog
+          endpoint={editable.endpoint}
+          recordId={editing.id}
+          name={editing.title}
+          text={editing.texts.find((part) => part.label === editable.textLabel)?.text ?? ""}
+          textLabel={editable.textLabel}
+          onSaved={(saved) => applyEdit(editing, saved)}
+          onClose={() => setEditing(null)}
         />
       )}
       {isAdding && tool.addByHand && (

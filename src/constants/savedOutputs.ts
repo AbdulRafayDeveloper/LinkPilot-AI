@@ -62,6 +62,13 @@ export interface SavedOutputTool {
   titleHeading: string
   // Starts every written text hidden, with Show to open it (Connection Note)
   hideTexts?: boolean
+  /**
+   * Leaves the Written column (when each record was written) off the table, at the owner's request
+   * for Prompt Creator, the same way Important Content dropped its "Last changed" column. **Nothing
+   * else changes**: the list is still ordered newest first, and the phone card and View details
+   * still say when it was written.
+   */
+  hideWrittenOn?: boolean
   searchPlaceholder: string
   filters: readonly SavedOutputFilter[]
   /**
@@ -86,6 +93,14 @@ export interface SavedOutputTool {
    * has no such button and behaves exactly as it did.
    */
   addByHand?: { endpoint: string; label: string }
+  /**
+   * Set only for a tool whose records the user may **rewrite** once they are saved (today: Prompt
+   * Creator, whose record route already takes a new `name` and a new `prompt` and marks the record
+   * as edited by hand). The page then offers Edit on each row, which PUTs `<endpoint>/<id>`;
+   * `textLabel` names which of the record's texts is the one being edited, since a record may carry
+   * several (an InMail has a subject and a message). Every other tool has no Edit and is unchanged.
+   */
+  editable?: { endpoint: string; label: string; textLabel: string }
 }
 
 export const SAVED_OUTPUT_TOOLS = [
@@ -221,6 +236,8 @@ export const SAVED_OUTPUT_TOOLS = [
     // The column holds the prompt's name, and the one beside it holds the prompt, so "Prompt" twice
     // read as the same thing twice (and gave the two columns one key)
     titleHeading: "Name",
+    // The date column was taken off at the owner's request; the list is still newest first
+    hideWrittenOn: true,
     searchPlaceholder: "Name, prompt or description",
     filters: [
       { key: "option", label: "Target", allLabel: "All targets", options: PROMPT_TARGETS },
@@ -229,6 +246,7 @@ export const SAVED_OUTPUT_TOOLS = [
     folders: { endpoint: PROMPT_FOLDERS_ENDPOINT, label: "Folder", recordEndpoint: PROMPT_CREATOR_RECORD_ENDPOINT },
     dependencies: { endpoint: PROMPT_CREATOR_RECORD_ENDPOINT, label: PROMPT_DEPENDENCY_MESSAGES.filterLabel },
     addByHand: { endpoint: PROMPT_CREATOR_RECORD_ENDPOINT, label: PROMPT_CREATOR_MESSAGES.addButton },
+    editable: { endpoint: PROMPT_CREATOR_RECORD_ENDPOINT, label: PROMPT_CREATOR_MESSAGES.editButton, textLabel: "Prompt" },
     canMarkApplied: true,
   },
   {
@@ -266,4 +284,7 @@ export const SAVED_OUTPUT_MESSAGES = {
   appliedFailed: "Couldn't save that mark. The row is back as it was.",
   notFound: "That record no longer exists.",
   deleted: "Deleted",
+  // A copy chosen from the row's menu closes the menu, so the page says what landed on the clipboard
+  copied: (what: string) => `${what} copied to the clipboard.`,
+  copyFailed: "Couldn't copy that. Please try again.",
 } as const
