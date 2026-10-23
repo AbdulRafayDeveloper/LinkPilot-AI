@@ -2,12 +2,15 @@
   "name": "linkpilot-ai",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=24.22.1"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/",
+    "test": "node --test tests/*.test.mjs",
     "brand:icons": "node scripts/generate-brand-icons.mjs"
   },
   "dependencies": {
@@ -25,7 +28,7 @@
     "groq-sdk": "^1.6.0",
     "lucide-react": "^1.24.0",
     "mongoose": "^9.7.4",
-    "next": "16.2.10",
+    "next": "^16.4.3",
     "openai": "^6.46.0",
     "postcss": "^8.5.16",
     "react": "19.2.4",
@@ -34,12 +37,12 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
-    "sharp": "0.34.5",
+    "sharp": "^0.35.5",
     "typescript": "^5"
   }
 }
