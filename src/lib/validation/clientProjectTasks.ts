@@ -3,7 +3,8 @@ import {
   ASSET_MAX_BYTES,
   DEFAULT_PROJECT_ITEM_KIND,
   PROJECT_URL_MAX_LENGTH,
-  PUBLIC_ITEM_KIND_IDS,
+  PUBLIC_WRITABLE_KIND_IDS,
+  ROADMAP_STAGE_IDS,
   PROJECT_FILE_CHUNK_BYTES,
   PROJECT_FILE_MAX_CHUNKS,
   PROJECT_FILE_NAME_MAX_LENGTH,
@@ -75,6 +76,15 @@ const FileSchema = z.object({
 const files = z.array(FileSchema).max(PROJECT_MAX_FILES, PROJECT_TASK_MESSAGES.tooManyFiles).optional()
 const voiceNote = VoiceNoteSchema.nullable().optional()
 const status = z.enum(PROJECT_TASK_STATUS_IDS, { error: PROJECT_TASK_MESSAGES.badStatus }).optional()
+// Where a roadmap item has got to, and whether the client may read one note
+const stage = z.enum(ROADMAP_STAGE_IDS, { error: PROJECT_TASK_MESSAGES.badStage }).optional()
+const isClientVisible = z.boolean().optional()
+/**
+ * Signing the work off, or taking the mark off: its own field, like ticking an item, so it never
+ * carries the item's words back. **Who signed is not asked for and not stored**, at the owner's
+ * request, so there is nothing here but yes or no.
+ */
+const signed = z.boolean().optional()
 const priority = z.enum(PROJECT_PRIORITY_IDS, { error: PROJECT_TASK_MESSAGES.badPriority }).optional()
 
 /**
@@ -94,7 +104,7 @@ const estimate = z
 /** An item's own id, as a path or a body names it. */
 const taskId = z.string().regex(/^[0-9a-f]{24}$/, PROJECT_TASK_MESSAGES.taskNotFound)
 
-const itemFields = { content: content.optional(), description, url, images, files, voiceNote, status, priority, estimate }
+const itemFields = { content: content.optional(), description, url, images, files, voiceNote, status, priority, estimate, stage, isClientVisible }
 
 /**
  * A new item, on the tabs the surface allows. The owner's page may write any tab; a shared link may
@@ -145,6 +155,9 @@ const editFields = {
   status,
   priority,
   estimate,
+  stage,
+  isClientVisible,
+  signed,
   // Where it is filed. Left out, the item is not moved; null moves it to the top of the tree
   folderId: z.union([z.string().regex(/^[0-9a-f]{24}$/), z.null()]).optional(),
 }
@@ -164,7 +177,7 @@ export const ProjectTaskEditSchema = z
  * rule**: only a public tab may be named, so credentials and backups cannot be written from a link
  * even by a caller writing the body by hand.
  */
-export const PublicProjectTaskSchema = newItemSchema(PUBLIC_ITEM_KIND_IDS)
+export const PublicProjectTaskSchema = newItemSchema(PUBLIC_WRITABLE_KIND_IDS)
 export const PublicTaskEditSchema = z
   .object({ taskId, ...editFields, kind: z.enum(PUBLIC_MOVABLE_KIND_IDS, { error: PROJECT_TASK_MESSAGES.cannotMoveKind }).optional() })
   .refine(saysSomething, PROJECT_TASK_MESSAGES.saveFailed)
@@ -182,7 +195,7 @@ export const ProjectOrderSchema = z.object({
 
 /** The same from a shared link, which may only put a tab it is allowed to see in order. */
 export const PublicProjectOrderSchema = z.object({
-  kind: z.enum(PUBLIC_ITEM_KIND_IDS, { error: PROJECT_TASK_MESSAGES.badKind }),
+  kind: z.enum(PUBLIC_WRITABLE_KIND_IDS, { error: PROJECT_TASK_MESSAGES.badKind }),
   orderedIds: z.array(taskId).min(1, PROJECT_TASK_MESSAGES.reorderFailed).max(MAX_PROJECT_TASKS, PROJECT_TASK_MESSAGES.reorderFailed),
 })
 

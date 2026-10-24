@@ -59,21 +59,55 @@ export interface ProjectItemShape {
   nameFromFile: boolean
   // How long the work is expected to take, which only the backlog asks for
   estimate: boolean
+  /**
+   * Whether an item here can be **signed off** as agreed: the four tabs of work the owner asked for
+   * (changes, product ideas, the backlog, marketing ideas). **Who signed is not stored**, at the
+   * owner's request, so it is one mark and the day it was made: signed, or not signed.
+   */
+  signOff: boolean
+  // Where it has got to on the roadmap (planned, in progress, done), which only the roadmap has
+  stage: boolean
+  // Whether each item says for itself if the client may see it, which only the notes tab does
+  shareable: boolean
+  /**
+   * The number down the side is **counted off the list** rather than kept with the item, so it
+   * always matches what is on screen. The tabs that were here first keep their stored number, where
+   * "Change 12" is that item's name for good however the list is dragged (see `shownItems`).
+   */
+  numberByOrder: boolean
 }
 
-// A change, an idea and a message all carry the same pieces, so they share one shape
-const TALK: ProjectItemShape = {
-  text: { label: "Description", hint: "Anything worth saying about it", required: false },
+/**
+ * Everything a tab does not have. A kind names only the pieces it carries, so a new piece is one
+ * line here and one line on the tabs that want it, rather than a `false` on every tab in the list.
+ */
+const NOTHING: ProjectItemShape = {
+  text: null,
   url: false,
-  talk: true,
-  files: "optional",
-  tick: true,
+  talk: false,
+  files: "none",
+  tick: false,
   numbered: false,
   nameFromFile: false,
   estimate: false,
+  signOff: false,
+  stage: false,
+  shareable: false,
+  numberByOrder: false,
 }
-// The backlog is a change with one thing more: how long it is expected to take
-const BACKLOG: ProjectItemShape = { ...TALK, estimate: true }
+const shapeOf = (parts: Partial<ProjectItemShape>): ProjectItemShape => ({ ...NOTHING, ...parts })
+
+// A change, an idea and a message all carry the same pieces, so they share one shape
+const TALK: ProjectItemShape = shapeOf({
+  text: { label: "Description", hint: "Anything worth saying about it", required: false },
+  talk: true,
+  files: "optional",
+  tick: true,
+})
+// The work the client agrees to: a change that can be signed off as settled
+const SIGNABLE: ProjectItemShape = shapeOf({ ...TALK, signOff: true })
+// The backlog is signable work with one thing more: how long it is expected to take
+const BACKLOG: ProjectItemShape = shapeOf({ ...SIGNABLE, estimate: true })
 // A note beside a link, a document or a backup: never needed, always allowed
 const NOTE = { label: "Note", hint: "Anything worth saying about it", required: false }
 
@@ -109,7 +143,7 @@ export const PROJECT_ITEM_KINDS = [
     doneLabel: "done",
     empty: "No changes on this project yet. Add the first one above.",
     isPublic: true,
-    shape: TALK,
+    shape: SIGNABLE,
   },
   {
     // The project's own ideas. It was "Ideas" until the owner asked for the three kinds of idea to
@@ -124,7 +158,7 @@ export const PROJECT_ITEM_KINDS = [
     doneLabel: "picked up",
     empty: "No product ideas yet. Add the first one above.",
     isPublic: true,
-    shape: TALK,
+    shape: SIGNABLE,
   },
   {
     // The work that is agreed but not started: a change with how long it is expected to take
@@ -165,16 +199,9 @@ export const PROJECT_ITEM_KINDS = [
     doneLabel: "done",
     empty: "No credentials kept on this project yet. Add the first one above.",
     isPublic: false,
-    shape: {
+    shape: shapeOf({
       text: { label: "Credentials", hint: "The address, the user name, the password, whatever is needed to sign in", required: true },
-      url: false,
-      talk: false,
-      files: "none",
-      tick: false,
-      numbered: false,
-      nameFromFile: false,
-      estimate: false,
-    },
+    }),
   },
   {
     id: "link",
@@ -187,7 +214,7 @@ export const PROJECT_ITEM_KINDS = [
     doneLabel: "done",
     empty: "No links on this project yet. Add the first one above.",
     isPublic: true,
-    shape: { text: NOTE, url: true, talk: false, files: "none", tick: false, numbered: false, nameFromFile: false, estimate: false },
+    shape: shapeOf({ text: NOTE, url: true }),
   },
   {
     id: "document",
@@ -200,7 +227,7 @@ export const PROJECT_ITEM_KINDS = [
     doneLabel: "done",
     empty: "No documents on this project yet. Add the first one above.",
     isPublic: true,
-    shape: { text: NOTE, url: false, talk: false, files: "required", tick: false, numbered: false, nameFromFile: true, estimate: false },
+    shape: shapeOf({ text: NOTE, files: "required", nameFromFile: true }),
   },
   {
     // A file kept with the day it was taken and its number, so a backup is never lost among the rest
@@ -214,7 +241,7 @@ export const PROJECT_ITEM_KINDS = [
     doneLabel: "done",
     empty: "No backups kept on this project yet. Upload the first one above.",
     isPublic: false,
-    shape: { text: NOTE, url: false, talk: false, files: "required", tick: false, numbered: true, nameFromFile: true, estimate: false },
+    shape: shapeOf({ text: NOTE, files: "required", numbered: true, nameFromFile: true }),
   },
   {
     // How the work is sold and talked about, kept apart from the product's own ideas
@@ -228,7 +255,7 @@ export const PROJECT_ITEM_KINDS = [
     doneLabel: "picked up",
     empty: "No marketing ideas yet. Add the first one above.",
     isPublic: true,
-    shape: TALK,
+    shape: SIGNABLE,
   },
   {
     id: "sales-idea",
@@ -242,6 +269,64 @@ export const PROJECT_ITEM_KINDS = [
     empty: "No sales ideas yet. Add the first one above.",
     isPublic: true,
     shape: TALK,
+  },
+  {
+    // Where the work is going: what is planned, what is being built and what has shipped. The
+    // client reads it on the shared link and never writes on it, because the plan is the owner's
+    id: "roadmap",
+    label: "Roadmap",
+    one: "roadmap item",
+    tag: "Roadmap",
+    movable: false,
+    addLabel: "Add to the roadmap",
+    placeholder: "What is coming, in one line",
+    doneLabel: "shipped",
+    empty: "Nothing on the roadmap yet. Add the first one above.",
+    isPublic: true,
+    shape: shapeOf({
+      text: { label: "Description", hint: "What it covers, and anything worth knowing about it", required: false },
+      stage: true,
+      numberByOrder: true,
+    }),
+  },
+  {
+    /**
+     * Notes about the project. **Each note says for itself whether the client may see it**
+     * (`shareable`), which is what makes one tab serve both the internal notes and the ones meant
+     * to be read: a note is internal until it is shared, so nothing reaches the link by accident.
+     */
+    id: "note",
+    label: "Notes",
+    one: "note",
+    tag: "Note",
+    movable: false,
+    addLabel: "Add a note",
+    placeholder: "What the note is about",
+    doneLabel: "done",
+    empty: "No notes on this project yet. Add the first one above.",
+    isPublic: true,
+    shape: shapeOf({
+      text: { label: "The note", hint: "Write the note itself", required: true },
+      shareable: true,
+      numberByOrder: true,
+    }),
+  },
+  {
+    // The people on this project. Private to the owner, like credentials and backups
+    id: "member",
+    label: "Team Members",
+    one: "team member",
+    tag: "Member",
+    movable: false,
+    addLabel: "Add a team member",
+    placeholder: "Their name",
+    doneLabel: "done",
+    empty: "Nobody on the team yet. Add the first person above.",
+    isPublic: false,
+    shape: shapeOf({
+      text: { label: "Role", hint: "What they do on this project, and anything worth keeping about them", required: false },
+      numberByOrder: true,
+    }),
   },
 ] as const
 
@@ -261,7 +346,22 @@ export const projectItemShape = (id: string | null | undefined): ProjectItemShap
  * are not among them. A page lists these, `readPublicProject` reads these, and every public write
  * is held to these, so leaving one out of any single place could not open it on its own.
  */
+/**
+ * The tabs a shared link may **read but never write**: the roadmap, which is the owner's plan for
+ * the work, and the notes, which are the owner's own. Everything else the link shows it may also
+ * add to, change and put in order, which is what the link is for.
+ *
+ * It is a list of ids rather than a flag on each kind, so the tabs that were here first are
+ * untouched and a tab that is read-only says so in one place.
+ */
+const CLIENT_READS_ONLY: readonly string[] = ["roadmap", "note"]
+
 export const PUBLIC_ITEM_KINDS = PROJECT_ITEM_KINDS.filter((kind) => kind.isPublic)
+/** The tabs a shared link may write on: the public ones, less the two it only reads. */
+export const PUBLIC_WRITABLE_KINDS = PUBLIC_ITEM_KINDS.filter((kind) => !CLIENT_READS_ONLY.includes(kind.id))
+export const PUBLIC_WRITABLE_KIND_IDS = PUBLIC_WRITABLE_KINDS.map((kind) => kind.id) as [ProjectItemKind, ...ProjectItemKind[]]
+/** Whether someone holding the link may add to, change or reorder that tab. */
+export const canClientWrite = (id: string | null | undefined): boolean => PUBLIC_WRITABLE_KINDS.some((kind) => kind.id === projectItemKind(id).id)
 export const PUBLIC_ITEM_KIND_IDS = PUBLIC_ITEM_KINDS.map((kind) => kind.id) as [ProjectItemKind, ...ProjectItemKind[]]
 export const DEFAULT_PUBLIC_ITEM_KIND: ProjectItemKind = PUBLIC_ITEM_KINDS[0].id
 /** Whether a shared link may ever show an item of that kind. An unknown kind reads as a change. */
@@ -290,6 +390,28 @@ export const PUBLIC_MOVABLE_KIND_IDS = MOVABLE_ITEM_KINDS.filter((kind) => kind.
  * since Daily Tasks wanted the same ones; these are the names this module has always used, so every
  * caller here is untouched and there is no second list to drift.
  */
+/**
+ * Where a roadmap item has got to. Three words rather than a scale, because a roadmap is read at a
+ * glance: what is planned, what is being built, and what has shipped. An item saved with none of
+ * them, and every item on every other tab, reads as Planned.
+ */
+export const ROADMAP_STAGES = [
+  { id: "planned", label: "Planned" },
+  { id: "in-progress", label: "In progress" },
+  { id: "done", label: "Shipped" },
+] as const
+export type RoadmapStage = (typeof ROADMAP_STAGES)[number]["id"]
+export const ROADMAP_STAGE_IDS = ROADMAP_STAGES.map((stage) => stage.id) as [RoadmapStage, ...RoadmapStage[]]
+export const DEFAULT_ROADMAP_STAGE: RoadmapStage = "planned"
+/** One stage by its id, falling back to Planned, which is what an item without one reads as. */
+export const roadmapStage = (id: string | null | undefined) => ROADMAP_STAGES.find((stage) => stage.id === id) ?? ROADMAP_STAGES[0]
+
+/** The tabs whose items can be signed off, and whether this is one of them. */
+export const SIGN_OFF_KINDS = PROJECT_ITEM_KINDS.filter((kind) => kind.shape.signOff)
+export const canSignOff = (id: string | null | undefined): boolean => projectItemShape(id).signOff
+/** The tabs whose items each say whether the client may see them (the notes). */
+export const SHAREABLE_KIND_IDS = PROJECT_ITEM_KINDS.filter((kind) => kind.shape.shareable).map((kind) => kind.id) as ProjectItemKind[]
+
 export const PROJECT_PRIORITIES = PRIORITIES
 export type ProjectPriority = Priority
 export const PROJECT_PRIORITY_IDS = PRIORITY_IDS
@@ -410,6 +532,39 @@ export const VOICE_NOTE_BITS_A_SECOND = 24_000
 // The last stretch of the clock, shown in red, so a long recording does not end without warning
 export const VOICE_NOTE_WARN_SECONDS = 60
 
+/**
+ * Narrowing one tab down to what is being looked for. Every tab has the same bar, and it offers
+ * only what that tab really carries: a tick box tab can be narrowed to what is still open, a
+ * signable tab to what is still unsigned, the roadmap to one stage, the notes to the shared ones.
+ *
+ * **On the owner's page the choices are kept** like every other list in the app (`FILTER_VIEWS`,
+ * "Filters stay on"); **on a shared link they are not**, at the owner's request: that page belongs
+ * to whoever opens it and nothing of theirs is stored.
+ */
+export const PROJECT_FILTER_MESSAGES = {
+  search: "Search this tab",
+  searchHint: "The line, the description and the address",
+  priority: "Priority",
+  allPriorities: "Any priority",
+  status: "State",
+  allStatuses: "Done or not",
+  open: "Still to do",
+  done: "Done",
+  signed: "Sign-off",
+  allSignings: "Signed or not",
+  isSigned: "Signed",
+  isNotSigned: "Not signed",
+  stage: "Stage",
+  allStages: "Any stage",
+  shared: "Who can see it",
+  allSharing: "Internal and shared",
+  isShared: "Shared with the client",
+  isInternal: "Internal only",
+  clear: "Clear filters",
+  noMatch: "Nothing on this tab matches the filters.",
+  matching: (shown: number, total: number) => `Showing ${shown} of ${total}`,
+} as const
+
 export const PROJECT_TASK_MESSAGES = {
   loadFailed: "Couldn't load the projects. Please try again.",
   projectNotFound: "That project no longer exists.",
@@ -455,7 +610,27 @@ export const PROJECT_TASK_MESSAGES = {
   missingText: (label: string) => `Write the ${label.toLowerCase()} under the name.`,
   missingFile: "Attach the file first.",
   // What a shared link may never carry, said where the link is made
-  privateTabs: "Credentials and backups are never shared: they stay on your side of this project.",
+  privateTabs: "Credentials, backups and the team are never shared: they stay on your side of this project.",
+  // Signing a piece of work off as agreed. Who signed is never stored, so this is a mark and a day
+  signOff: "Sign off",
+  signOffOf: (name: string) => `Sign off ${name}`,
+  signed: "Signed",
+  notSigned: "Not signed",
+  signedOn: (day: string) => `Signed ${day}`,
+  unsign: "Take the sign-off off",
+  signFailed: "Couldn't save that sign-off. It is back as it was.",
+  // Where a roadmap item has got to
+  stage: "Stage",
+  stageOf: (name: string) => `Where ${name} has got to`,
+  badStage: "Choose Planned, In progress or Shipped.",
+  // Whether the client may read one note. A note is internal until it is shared
+  visibility: "Who can see it",
+  shareWithClient: "Shared with the client",
+  internalNote: "Internal",
+  shareHint: "Internal until you share it. A shared note is the only kind the project link shows.",
+  shareOf: (name: string) => `Whether the client may read ${name}`,
+  // The tabs a shared link shows but never writes on
+  readOnlyTab: "This is kept by the team. You can read it here.",
   saveFailed: "Couldn't save it. Please try again.",
   deleteFailed: "Couldn't remove it. Please try again.",
   created: "Added.",

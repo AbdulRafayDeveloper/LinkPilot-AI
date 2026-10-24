@@ -9,6 +9,10 @@ import { Modal } from "@/components/ui/Modal"
 import { ProjectTasks, deleteItemTitle } from "@/components/client-projects/ProjectTasks"
 import { ProjectTabs } from "@/components/client-projects/ProjectTabs"
 import { countsOf, reorderItems } from "@/lib/projectItems"
+import { NO_PROJECT_FILTERS, filterProjectItems, type ProjectFilterValues } from "@/lib/projectFilters"
+import { ProjectFilters } from "@/components/client-projects/ProjectFilters"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, oneOf, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { TaskComposer } from "@/components/client-projects/TaskComposer"
 import { ProjectLinkPanel } from "@/components/client-projects/ProjectLinkPanel"
 import { ProjectFolderTree, folderBranch, folderPath } from "@/components/client-projects/ProjectFolderTree"
@@ -24,8 +28,13 @@ import {
   PROJECT_TASK_MESSAGES,
   hasFolders,
   isMovableItemKind,
+  PROJECT_FILTER_MESSAGES,
+  PROJECT_PRIORITY_IDS,
+  PROJECT_TASK_STATUS_IDS,
+  ROADMAP_STAGE_IDS,
   type ProjectItemKind,
   type ProjectPriority,
+  type RoadmapStage,
 } from "@/constants/clientProjectTasks"
 import type { ProjectFolder, ProjectTask, ProjectTaskInput, ProjectWithTasks } from "@/types/clientProjectTasks"
 
@@ -53,6 +62,12 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
   // Which tab is open, starting on the first one as both surfaces do
   const [tab, setTab] = useState<ProjectItemKind>(DEFAULT_PROJECT_ITEM_KIND)
   /**
+   * What the open tab is narrowed to. **It is kept on the account**, like every other list in the
+   * app ("Filters stay on"), so a filter put on here is still on after a reload and on another
+   * machine; the shared link keeps nothing, because that page belongs to whoever opens it.
+   */
+  const [filters, setFilters] = useState<ProjectFilterValues>(NO_PROJECT_FILTERS)
+  /**
    * The folders of this project, and which one is open. The Documents and Links tabs are filed in
    * folders (`hasFolders`); every other tab is a flat list, so neither the tree nor the folder
    * search is drawn on it.
@@ -74,6 +89,28 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
   const [editing, setEditing] = useState<ProjectTask | null>(null)
   const [deleting, setDeleting] = useState<ProjectTask | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  useSavedFilters({
+    view: "client-project",
+    filters: filtersOf({
+      search: filters.search,
+      priority: filters.priority,
+      status: filters.status,
+      signed: filters.signed,
+      stage: filters.stage,
+      shared: filters.shared,
+    }),
+    // A choice this page can no longer offer reads as off, so a filter can never hide everything
+    apply: (saved: SavedFilters) =>
+      setFilters({
+        search: savedText(saved.search),
+        priority: oneOf(saved.priority, [...PROJECT_PRIORITY_IDS]),
+        status: oneOf(saved.status, [...PROJECT_TASK_STATUS_IDS]),
+        signed: oneOf(saved.signed, ["signed", "unsigned"]),
+        stage: oneOf(saved.stage, [...ROADMAP_STAGE_IDS]),
+        shared: oneOf(saved.shared, ["shared", "internal"]),
+      }),
+  })
 
   // The project with everything on it: its items and its folders come in the one answer
   useEffect(() => {
@@ -145,6 +182,56 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
       setTaskError(null)
     } catch (reason: unknown) {
       setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, priority: task.priority } : row)))
+      setTaskError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.saveFailed)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  /**
+   * Signing a piece of work off as agreed, and taking the mark off again. **Who signed is not
+   * stored**, at the owner's request, so this is one small write like ticking an item: the mark
+   * moves at once and goes back if it fails.
+   */
+  const signOff = async (task: ProjectTask, signed: boolean) => {
+    const signedAt = signed ? new Date().toISOString() : null
+    setBusyId(task.id)
+    setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, signedAt } : row)))
+    try {
+      await saveTask(task, { signed })
+      setTaskError(null)
+    } catch (reason: unknown) {
+      setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, signedAt: task.signedAt } : row)))
+      setTaskError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.signFailed)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  /** Where a roadmap item has got to: the chip changes at once and goes back if the write fails. */
+  const changeStage = async (task: ProjectTask, stage: RoadmapStage) => {
+    setBusyId(task.id)
+    setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, stage } : row)))
+    try {
+      await saveTask(task, { stage })
+      setTaskError(null)
+    } catch (reason: unknown) {
+      setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, stage: task.stage } : row)))
+      setTaskError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.saveFailed)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  /** Whether the client may read one note. Sharing it is what puts it on the project link. */
+  const changeShared = async (task: ProjectTask, isClientVisible: boolean) => {
+    setBusyId(task.id)
+    setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, isClientVisible } : row)))
+    try {
+      await saveTask(task, { isClientVisible })
+      setTaskError(null)
+    } catch (reason: unknown) {
+      setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, isClientVisible: task.isClientVisible } : row)))
       setTaskError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.saveFailed)
     } finally {
       setBusyId(null)
@@ -393,27 +480,49 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                     </p>
                   ) : !hasFolders(tab) ? (
                     /* The tabs that are a conversation about the work stay a flat list */
-                    <ProjectTasks
-                      tasks={tasks.filter((task) => task.kind === tab)}
-                      kind={tab}
-                      busyId={busyId}
-                      onTick={tick}
-                      onEdit={setEditing}
-                      onDelete={setDeleting}
-                      onMoveTab={isMovableItemKind(tab) ? setMovingTab : undefined}
-                      onPriority={changePriority}
-                      onReorder={reorder}
-                      clientTag={PROJECT_TASK_MESSAGES.fromClient}
-                    />
+                    (() => {
+                      const ofTab = tasks.filter((task) => task.kind === tab)
+                      const narrowed = filterProjectItems(tab, ofTab, filters)
+                      return (
+                        <>
+                          <ProjectFilters kind={tab} values={filters} onChange={setFilters} shown={narrowed.length} total={ofTab.length} />
+                          {ofTab.length > 0 && narrowed.length === 0 ? (
+                            <p className="rounded-xl border border-dashed border-outline-variant px-3 py-6 text-center text-[13px] text-outline">
+                              {PROJECT_FILTER_MESSAGES.noMatch}
+                            </p>
+                          ) : (
+                            <ProjectTasks
+                              tasks={narrowed}
+                              kind={tab}
+                              busyId={busyId}
+                              onTick={tick}
+                              onEdit={setEditing}
+                              onDelete={setDeleting}
+                              onMoveTab={isMovableItemKind(tab) ? setMovingTab : undefined}
+                              onPriority={changePriority}
+                              onSign={signOff}
+                              onStage={changeStage}
+                              onShare={changeShared}
+                              onReorder={reorder}
+                              clientTag={PROJECT_TASK_MESSAGES.fromClient}
+                            />
+                          )}
+                        </>
+                      )
+                    })()
                   ) : (
                     (() => {
                       const tabFolders = folders.filter((folder) => folder.kind === tab)
                       const branch = folderBranch(tabFolders, folderId)
                       const ofTab = tasks.filter((task) => task.kind === tab)
                       const inHere = ofTab.filter((task) => branch.has(task.folderId ?? null))
-                      const searched = folderSearch.trim()
-                        ? filterByWords(inHere, folderSearch, (task) => `${task.content} ${task.url} ${task.files.map((file) => file.name).join(" ")}`)
-                        : inHere
+                      const searched = filterProjectItems(
+                        tab,
+                        folderSearch.trim()
+                          ? filterByWords(inHere, folderSearch, (task) => `${task.content} ${task.url} ${task.files.map((file) => file.name).join(" ")}`)
+                          : inHere,
+                        filters
+                      )
                       const path = folderPath(tabFolders, folderId)
                       return (
                         <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
@@ -486,6 +595,8 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                               <p className="mt-1 text-[11px] text-outline">{PROJECT_FOLDER_MESSAGES.searchScope}</p>
                             </div>
 
+                            <ProjectFilters kind={tab} values={filters} onChange={setFilters} shown={searched.length} total={inHere.length} />
+
                             {folderError && (
                               <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
                                 {folderError}
@@ -509,6 +620,9 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                                   setMovingTask(task)
                                 }}
                                 onPriority={changePriority}
+                                onSign={signOff}
+                                onStage={changeStage}
+                                onShare={changeShared}
                                 // A search or a folder shows part of the tab, and the order written is
                                 // of exactly what is on screen, which is what the server expects
                                 onReorder={reorder}

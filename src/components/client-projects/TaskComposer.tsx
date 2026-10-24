@@ -17,9 +17,10 @@ import {
   type ProjectItemKind,
   type ProjectPriority,
 } from "@/constants/clientProjectTasks"
-import { EstimateField, PrioritySelect } from "./ItemFields"
+import { EstimateField, PrioritySelect, ShareToggle, StageField, defaultStage } from "./ItemFields"
 import { emptyTaskDetails, toStoredImages, type TaskDetailsDraft } from "@/types/taskAttachment"
 import type { ProjectEstimate, ProjectFileView, ProjectTask, ProjectTaskInput, VoiceNoteView } from "@/types/clientProjectTasks"
+import type { RoadmapStage } from "@/constants/clientProjectTasks"
 
 interface TaskComposerProps {
   // The item being changed, or null when one is being added
@@ -74,6 +75,9 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   // How urgent it is, on every tab, and how long it takes, on the one tab that asks
   const [priority, setPriority] = useState<ProjectPriority>(task?.priority ?? DEFAULT_PROJECT_PRIORITY)
   const [estimate, setEstimate] = useState<ProjectEstimate | null>(task?.estimate ?? null)
+  // Where a roadmap item has got to, and whether the client may read a note
+  const [stage, setStage] = useState<RoadmapStage>(task?.stage ?? defaultStage())
+  const [isShared, setIsShared] = useState(task?.isClientVisible ?? false)
   // Files still going up, so the item is never saved without one of them
   const [sending, setSending] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -108,6 +112,9 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         kind,
         priority,
         estimate: shape.estimate ? estimate : null,
+        // Only the tab that has one sends it, so nothing carries a field its tab never shows
+        ...(shape.stage ? { stage } : {}),
+        ...(shape.shareable ? { isClientVisible: isShared } : {}),
       })
       if (!isEdit) {
         // Adding leaves the form ready for the next one; editing closes itself
@@ -118,6 +125,8 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         setFiles([])
         setPriority(DEFAULT_PROJECT_PRIORITY)
         setEstimate(null)
+        setStage(defaultStage())
+        setIsShared(false)
       }
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.saveFailed)
@@ -187,6 +196,14 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         </div>
         {shape.estimate && (
           <EstimateField estimate={estimate} onChange={setEstimate} disabled={disabled || isSaving} idPrefix={fieldId} />
+        )}
+        {shape.stage && <StageField stage={stage} onChange={setStage} disabled={disabled || isSaving} />}
+        {shape.shareable && (
+          <div>
+            <span className={labelClass}>{PROJECT_TASK_MESSAGES.visibility}</span>
+            <ShareToggle isShared={isShared} onChange={setIsShared} disabled={disabled || isSaving} label={content.trim() || words.one} />
+            <p className="mt-1 text-[11px] text-outline">{PROJECT_TASK_MESSAGES.shareHint}</p>
+          </div>
         )}
       </div>
 

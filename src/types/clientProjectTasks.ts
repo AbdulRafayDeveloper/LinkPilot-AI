@@ -5,6 +5,7 @@ import type {
   ProjectItemKind,
   ProjectPriority,
   ProjectTaskStatus,
+  RoadmapStage,
 } from "@/constants/clientProjectTasks"
 import type { TaskImage, TaskImageView } from "./taskAttachment"
 import type { ClientProjectStatus } from "@/constants/clients"
@@ -94,6 +95,8 @@ export interface ProjectTaskRecord {
   addedBy: ProjectItemAuthor
   priority: ProjectPriority
   estimate: ProjectEstimate | null
+  stage: RoadmapStage | null
+  isClientVisible: boolean
 }
 
 /** One item as a page receives it: its links are signed and short-lived. */
@@ -125,6 +128,16 @@ export interface ProjectTask {
    * before numbering has 0, which reads as no number rather than as the first one.
    */
   number: number
+  /**
+   * When the work was signed off as agreed, on the tabs that can be. **Who signed is not stored**,
+   * at the owner's request, so an item reads as signed or not signed and nothing more. Null on
+   * everything nobody has signed, which is how every item saved before sign-off reads.
+   */
+  signedAt: string | null
+  // Where a roadmap item has got to; null on every other tab, which reads as Planned
+  stage: RoadmapStage | null
+  // Whether the client may read this note. False everywhere else, so nothing is shared by accident
+  isClientVisible: boolean
   createdAt: string
   updatedAt: string
 }
@@ -179,6 +192,15 @@ export interface ProjectTaskInput {
   priority?: ProjectPriority
   // The estimate, on the backlog. Null clears it; left out, it is not touched
   estimate?: ProjectEstimate | null
+  // Where a roadmap item has got to. Left out, it is not touched
+  stage?: RoadmapStage
+  // Whether the client may read this note. Left out, it is not touched
+  isClientVisible?: boolean
+  /**
+   * Signing the work off, or taking the mark off again: true records the day, false clears it.
+   * It is its own small write, like ticking an item, so it never carries the item's words back.
+   */
+  signed?: boolean
 }
 
 /** How one tab of a project stands: how many items it holds and how many are ticked off. */

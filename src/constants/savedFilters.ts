@@ -24,6 +24,8 @@ export const FILTER_VIEWS: Record<string, readonly string[]> = {
   "reference-content": ["search"],
   "important-content": ["search", "type", "folder"],
   "client-projects": ["search", "client", "status"],
+  // One project's own page: what the open tab is narrowed to. The shared link keeps none of this
+  "client-project": ["search", "priority", "status", "signed", "stage", "shared"],
   "client-voices-history": ["search", "client", "from", "to"],
   clients: ["search"],
   employees: ["search", "status"],

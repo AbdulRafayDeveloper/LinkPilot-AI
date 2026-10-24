@@ -7,6 +7,8 @@ import { Modal } from "@/components/ui/Modal"
 import { ProjectTasks, deleteItemTitle } from "@/components/client-projects/ProjectTasks"
 import { ProjectTabs } from "@/components/client-projects/ProjectTabs"
 import { countsOf, reorderItems } from "@/lib/projectItems"
+import { NO_PROJECT_FILTERS, filterProjectItems, type ProjectFilterValues } from "@/lib/projectFilters"
+import { ProjectFilters } from "@/components/client-projects/ProjectFilters"
 import { TaskComposer } from "@/components/client-projects/TaskComposer"
 import { MoveToTabDialog } from "@/components/client-projects/MoveToTabDialog"
 import { requestApi } from "@/lib/apiClient"
@@ -19,7 +21,9 @@ import {
   PUBLIC_PROJECT_ENDPOINT,
   PUBLIC_PROJECT_MESSAGES,
   PUBLIC_UPLOAD_PATHS,
+  canClientWrite,
   isMovableItemKind,
+  PROJECT_FILTER_MESSAGES,
   type ProjectItemKind,
   type ProjectPriority,
 } from "@/constants/clientProjectTasks"
@@ -55,6 +59,12 @@ export default function PublicProjectClient({ token }: { token: string }) {
   const [movingTab, setMovingTab] = useState<ProjectTask | null>(null)
   const [deleting, setDeleting] = useState<ProjectTask | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  /**
+   * What the open tab is narrowed to. **Nothing of this is kept**, at the owner's request: this
+   * page belongs to whoever opens it and there is no account to keep it against, so the filters
+   * clear on a reload, which is the opposite of the owner's own page.
+   */
+  const [filters, setFilters] = useState<ProjectFilterValues>(NO_PROJECT_FILTERS)
 
   const endpoint = `${PUBLIC_PROJECT_ENDPOINT}/${token}`
 
@@ -121,6 +131,25 @@ export default function PublicProjectClient({ token }: { token: string }) {
     } catch (reason: unknown) {
       setTasks((current) => current.map((row) => (row.id === task.id ? { ...row, priority: task.priority } : row)))
       setWriteError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.saveFailed)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  /**
+   * Signing a piece of work off as agreed. **Who signed is not stored**, so anyone reading the
+   * project may sign, which is what makes this the client's own mark on the work.
+   */
+  const signOff = async (task: ProjectTask, signed: boolean) => {
+    const signedAt = signed ? new Date().toISOString() : null
+    setBusyId(task.id)
+    setTasks((current) => current.map((row) => (row.id === task.id ? { ...row, signedAt } : row)))
+    try {
+      await saveTask(task, { signed })
+      setWriteError(null)
+    } catch (reason: unknown) {
+      setTasks((current) => current.map((row) => (row.id === task.id ? { ...row, signedAt: task.signedAt } : row)))
+      setWriteError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.signFailed)
     } finally {
       setBusyId(null)
     }
@@ -218,36 +247,61 @@ export default function PublicProjectClient({ token }: { token: string }) {
 
             <ProjectTabs chosen={tab} onChoose={setTab} counts={countsOf(project.tasks)} kinds={PUBLIC_ITEM_KINDS} />
 
-            <section id={`project-panel-${tab}`} role="tabpanel" aria-labelledby={`project-tab-${tab}`} className="flex min-w-0 flex-col gap-3">
-              <TaskComposer
-                key={tab}
-                task={null}
-                kind={tab}
-                onSave={addTask}
-                imageEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.images}`}
-                voiceEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.voice}`}
-                fileEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.files}`}
-              />
+            {(() => {
+              // The roadmap and the notes are the team's own: shown here, never written on
+              const canWrite = canClientWrite(tab)
+              const ofTab = project.tasks.filter((task) => task.kind === tab)
+              const narrowed = filterProjectItems(tab, ofTab, filters)
+              return (
+                <section id={`project-panel-${tab}`} role="tabpanel" aria-labelledby={`project-tab-${tab}`} className="flex min-w-0 flex-col gap-3">
+                  {canWrite ? (
+                    <TaskComposer
+                      key={tab}
+                      task={null}
+                      kind={tab}
+                      onSave={addTask}
+                      imageEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.images}`}
+                      voiceEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.voice}`}
+                      fileEndpoint={`${endpoint}/${PUBLIC_UPLOAD_PATHS.files}`}
+                    />
+                  ) : (
+                    <p className="rounded-xl border border-dashed border-outline-variant px-3 py-2 text-center text-[12px] text-outline">
+                      {PROJECT_TASK_MESSAGES.readOnlyTab}
+                    </p>
+                  )}
 
-              {writeError && (
-                <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
-                  {writeError}
-                </p>
-              )}
+                  {writeError && (
+                    <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
+                      {writeError}
+                    </p>
+                  )}
 
-              <ProjectTasks
-                tasks={project.tasks.filter((task) => task.kind === tab)}
-                kind={tab}
-                busyId={busyId}
-                onTick={tick}
-                onEdit={setEditing}
-                onDelete={setDeleting}
-                onMoveTab={isMovableItemKind(tab) ? setMovingTab : undefined}
-                onPriority={changePriority}
-                onReorder={reorder}
-                detailsOpen
-              />
-            </section>
+                  {/* Every note the client can see was shared with them, so there is nothing to narrow there */}
+                  <ProjectFilters kind={tab} values={filters} onChange={setFilters} shown={narrowed.length} total={ofTab.length} omit={["shared"]} />
+
+                  {ofTab.length > 0 && narrowed.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-outline-variant px-3 py-6 text-center text-[13px] text-outline">
+                      {PROJECT_FILTER_MESSAGES.noMatch}
+                    </p>
+                  ) : (
+                    <ProjectTasks
+                      tasks={narrowed}
+                      kind={tab}
+                      busyId={busyId}
+                      onTick={tick}
+                      onEdit={setEditing}
+                      onDelete={setDeleting}
+                      onMoveTab={isMovableItemKind(tab) && canWrite ? setMovingTab : undefined}
+                      onPriority={changePriority}
+                      onSign={signOff}
+                      onReorder={reorder}
+                      readOnly={!canWrite}
+                      detailsOpen
+                    />
+                  )}
+                </section>
+              )
+            })()}
           </>
         )}
       </main>

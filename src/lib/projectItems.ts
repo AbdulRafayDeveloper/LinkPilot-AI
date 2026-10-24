@@ -128,9 +128,19 @@ export const shownItems = <T extends { number?: number; status?: ProjectTaskStat
   const shape = projectItemKind(kind).shape
   // The number is the item's own, given when it was added, so dragging the list never renumbers it
   const numbered = items.map((item, index) => ({ item, number: item.number || index + 1 }))
-  if (shape.numbered) return [...numbered].reverse()
   // A stable sort: only ticked and unticked change places
-  return shape.tick ? [...numbered].sort((first, second) => Number(first.item.status === "done") - Number(second.item.status === "done")) : numbered
+  const ordered = shape.numbered
+    ? [...numbered].reverse()
+    : shape.tick
+      ? [...numbered].sort((first, second) => Number(first.item.status === "done") - Number(second.item.status === "done"))
+      : numbered
+  /**
+   * The tabs added later (the roadmap, the notes, the team) are **counted off the list instead**,
+   * at the owner's request, so the number beside a row always matches where that row is: a drag
+   * renumbers them and nothing is stored for it. It is done after the order is settled, which is
+   * what makes the two agree.
+   */
+  return shape.numberByOrder ? ordered.map((row, index) => ({ item: row.item, number: index + 1 })) : ordered
 }
 
 /**

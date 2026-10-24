@@ -8,6 +8,7 @@ import {
   PROJECT_ITEM_KIND_IDS,
   PROJECT_PRIORITY_IDS,
   PROJECT_TASK_STATUS_IDS,
+  ROADMAP_STAGE_IDS,
 } from "@/constants/clientProjectTasks"
 
 /**
@@ -62,6 +63,16 @@ export interface IClientProjectTask {
    * row saved before numbering, which reads as having no number at all.
    */
   number: number
+  /**
+   * When the work was signed off as agreed, on the tabs that can be (`shape.signOff`). **Who signed
+   * is deliberately not stored**, at the owner's request: it is one mark and the day it was made,
+   * so an item reads as signed or not signed. Null on everything nobody has signed.
+   */
+  signedAt: Date | null
+  // Where a roadmap item has got to; null on every other tab and on one nobody has placed yet
+  stage: string | null
+  // Whether the client may read this note. False on every other tab, so nothing leaks by default
+  isClientVisible: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -107,6 +118,9 @@ const ClientProjectTaskSchema = new Schema<IClientProjectTask>(
     estimateValue: { type: Number, default: null },
     estimateUnit: { type: String, enum: [...ESTIMATE_UNIT_IDS, null], default: null },
     number: { type: Number, default: 0 },
+    signedAt: { type: Date, default: null },
+    stage: { type: String, enum: [...ROADMAP_STAGE_IDS, null], default: null },
+    isClientVisible: { type: Boolean, default: false },
   },
   { timestamps: true, collection: "client_project_tasks" }
 )

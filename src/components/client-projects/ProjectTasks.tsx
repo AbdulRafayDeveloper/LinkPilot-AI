@@ -11,8 +11,9 @@ import {
   projectItemKind,
   type ProjectItemKind,
   type ProjectPriority,
+  type RoadmapStage,
 } from "@/constants/clientProjectTasks"
-import { EstimateChip, PriorityChip, PrioritySelect } from "./ItemFields"
+import { EstimateChip, PriorityChip, PrioritySelect, ShareToggle, SignOffButton, StageChip, StageSelect } from "./ItemFields"
 import { shownItems } from "@/lib/projectItems"
 import { clock } from "./VoiceNoteField"
 import { FileKindIcon, fileSize } from "./ProjectFilesField"
@@ -39,6 +40,21 @@ interface ProjectTasksProps {
   onMoveTab?: (task: ProjectTask) => void
   /** Changing how urgent it is, where it is read. Left out, the chip is shown and cannot be changed. */
   onPriority?: (task: ProjectTask, priority: ProjectPriority) => void
+  /**
+   * Signing a piece of work off as agreed, on the tabs that can be. **Who signed is not stored**, so
+   * this says only yes or no. Left out, the mark is shown and cannot be changed, which is what a
+   * surface that may read a tab but not write on it passes.
+   */
+  onSign?: (task: ProjectTask, signed: boolean) => void
+  /** Where a roadmap item has got to. Left out, the stage is a tag rather than a picker. */
+  onStage?: (task: ProjectTask, stage: RoadmapStage) => void
+  /** Whether the client may read one note. Left out, it says which it is and cannot be changed. */
+  onShare?: (task: ProjectTask, isShared: boolean) => void
+  /**
+   * A tab this surface may read and never write on (the roadmap and the notes, on a shared link):
+   * the row keeps its words and loses Edit, Delete and every control that would write.
+   */
+  readOnly?: boolean
   /**
    * The order a drag left the tab in, as ids. Left out, the list cannot be dragged, which is what a
    * numbered tab does: a backup's place in the list **is** its number.
@@ -186,6 +202,10 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
   onReorder,
   clientTag,
   detailsOpen,
+  onSign,
+  onStage,
+  onShare,
+  readOnly,
 }) => {
   const words = projectItemKind(kind)
   const shape = words.shape
@@ -201,7 +221,7 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
    * A numbered tab is never dragged: a backup's place in the list **is** its number, newest first,
    * so there is no order of your own to put it in. Everything else is dragged by its handle.
    */
-  const canDrag = Boolean(onReorder) && !shape.numbered
+  const canDrag = Boolean(onReorder) && !shape.numbered && !readOnly
 
   const row = (task: ProjectTask, number: number, handle: React.ReactNode) => {
     const isDone = task.status === "done"
@@ -216,7 +236,7 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
           {/* The row's own number, down the side of the list: 1. 2. 3. It is the item's own, kept in
               the database, so dragging the list never renumbers anything */}
           <span className="mt-1 w-7 shrink-0 text-right text-[12px] font-semibold tabular-nums text-outline">{number}.</span>
-          {shape.tick && (
+          {shape.tick && !readOnly && (
             <input
               type="checkbox"
               checked={isDone}
@@ -229,7 +249,7 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
           <div className="min-w-0 flex-1">
             {/* How urgent it is and how long it takes, above the words themselves */}
             <div className="mb-1 flex flex-wrap items-center gap-1.5">
-              {onPriority ? (
+              {onPriority && !readOnly ? (
                 <PrioritySelect
                   value={task.priority}
                   onChange={(priority) => onPriority(task, priority)}
@@ -240,6 +260,33 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
                 <PriorityChip priority={task.priority} />
               )}
               {shape.estimate && <EstimateChip estimate={task.estimate} />}
+              {/* Where it has got to on the roadmap: a picker where it can be changed, a tag where not */}
+              {shape.stage &&
+                (onStage && !readOnly ? (
+                  <StageSelect value={task.stage} onChange={(stage) => onStage(task, stage)} disabled={busyId === task.id} label={task.content} />
+                ) : (
+                  <StageChip stage={task.stage} />
+                ))}
+              {/* Signed off as agreed, or not signed, which is the point of showing it at all */}
+              {shape.signOff && (
+                <SignOffButton
+                  signedAt={task.signedAt}
+                  onSign={(signed) => onSign?.(task, signed)}
+                  busy={busyId === task.id}
+                  disabled={!onSign || readOnly}
+                  label={task.content}
+                />
+              )}
+              {/* Whether the client may read this note. Internal until it is shared */}
+              {shape.shareable && (
+                <ShareToggle
+                  isShared={task.isClientVisible}
+                  onChange={(isShared) => onShare?.(task, isShared)}
+                  busy={busyId === task.id}
+                  disabled={!onShare || readOnly}
+                  label={task.content}
+                />
+              )}
               {shape.numbered && <span className="text-[11px] text-outline">{savedOn(task.createdAt)}</span>}
               {clientTag && task.addedBy === "client" && (
                 <span className="inline-block rounded-full bg-primary-fixed px-2 py-0.5 text-[10px] font-semibold text-on-primary-fixed-variant">
@@ -263,7 +310,7 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
           {busyId === task.id && <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-primary" aria-hidden="true" />}
           {/* The actions wrap onto their own line on a phone rather than squeezing the words */}
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-0.5">
-            {onMoveTab && (
+            {onMoveTab && !readOnly && (
               <button
                 type="button"
                 onClick={() => onMoveTab(task)}
@@ -275,7 +322,7 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
                 Tab
               </button>
             )}
-            {onMove && (
+            {onMove && !readOnly && (
               <button
                 type="button"
                 onClick={() => onMove(task)}
@@ -286,14 +333,18 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
                 Move
               </button>
             )}
-            <button type="button" onClick={() => onEdit(task)} aria-label={`Edit ${task.content}`} className={`${actionButton} hover:text-primary`}>
-              <Pencil size={13} aria-hidden="true" />
-              Edit
-            </button>
-            <button type="button" onClick={() => onDelete(task)} aria-label={`Delete ${task.content}`} className={`${actionButton} hover:text-error`}>
-              <Trash2 size={13} aria-hidden="true" />
-              Delete
-            </button>
+            {!readOnly && (
+              <>
+                <button type="button" onClick={() => onEdit(task)} aria-label={`Edit ${task.content}`} className={`${actionButton} hover:text-primary`}>
+                  <Pencil size={13} aria-hidden="true" />
+                  Edit
+                </button>
+                <button type="button" onClick={() => onDelete(task)} aria-label={`Delete ${task.content}`} className={`${actionButton} hover:text-error`}>
+                  <Trash2 size={13} aria-hidden="true" />
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         </div>
 

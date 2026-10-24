@@ -11,10 +11,13 @@ import {
   PROJECT_ITEM_KINDS,
   PROJECT_TASK_MESSAGES,
   PUBLIC_ITEM_KIND_IDS,
+  PUBLIC_WRITABLE_KIND_IDS,
+  SHAREABLE_KIND_IDS,
   isMovableItemKind,
   projectItemKind,
   projectPriority,
   projectItemShape,
+  roadmapStage,
   type ProjectItemAuthor,
   type ProjectItemKind,
   hasFolders,
@@ -61,11 +64,34 @@ export const taskById = (taskId: string): Record<string, unknown> | null => (ID_
  * nothing, so a client holding the link cannot read, change or delete a credential or a backup even
  * if they somehow learned its id.
  */
-export const PUBLIC_KINDS_ONLY = { kind: { $in: [...PUBLIC_ITEM_KIND_IDS, null] } } as const
+export const PUBLIC_KINDS_ONLY = {
+  $or: [
+    // The tabs whose items are the client's to read, every one of them
+    { kind: { $in: [...PUBLIC_ITEM_KIND_IDS.filter((id) => !SHAREABLE_KIND_IDS.includes(id)), null] } },
+    /**
+     * A note, and **only one that has been shared**. It is the one tab whose items each decide for
+     * themselves, so the rule is part of the filter rather than something the page remembers to do:
+     * an internal note is not in the answer at all, and its id matches nothing a link may change.
+     */
+    { kind: { $in: SHAREABLE_KIND_IDS }, isClientVisible: true },
+  ],
+} as const
 
 /** One item by its id, held to the tabs a shared link may reach. */
 export const publicTaskById = (taskId: string): Record<string, unknown> | null =>
   ID_PATTERN.test(taskId) ? { _id: taskId, ...PUBLIC_KINDS_ONLY } : null
+
+/**
+ * The kinds a shared link may **write on**, which is fewer than it may read: the roadmap and the
+ * notes are the owner's own, so a client reads them and changes nothing. Held in the same three
+ * places the public kinds are: the schema takes only these, this filter makes another tab's id
+ * match nothing, and the reorder is held to them too.
+ */
+export const PUBLIC_WRITABLE_KINDS_ONLY = { kind: { $in: [...PUBLIC_WRITABLE_KIND_IDS, null] } } as const
+
+/** One item by its id, held to the tabs a shared link may write on. */
+export const publicWritableTaskById = (taskId: string): Record<string, unknown> | null =>
+  ID_PATTERN.test(taskId) ? { _id: taskId, ...PUBLIC_WRITABLE_KINDS_ONLY } : null
 
 /** The project, or null when it is gone or belongs to another account. */
 export async function projectOrNull(viewer: Viewer, projectId: string): Promise<StoredProject | null> {
@@ -127,6 +153,11 @@ async function toTask(record: StoredTask): Promise<ProjectTask> {
     estimate: storedEstimate(record),
     // 0 on an item saved before numbering, which reads as having no number rather than as the first
     number: record.number ?? 0,
+    // Signed off as agreed, and when. Null on everything nobody has signed; who signed is not stored
+    signedAt: record.signedAt ? new Date(record.signedAt).toISOString() : null,
+    // Where a roadmap item has got to, and whether the client may read a note
+    stage: projectItemShape(record.kind).stage ? roadmapStage(record.stage).id : null,
+    isClientVisible: record.isClientVisible === true,
     createdAt: new Date(record.createdAt).toISOString(),
     updatedAt: new Date(record.updatedAt).toISOString(),
   }
@@ -174,6 +205,10 @@ const cleanInput = (input: ProjectTaskInput, kind: ProjectItemKind) => ({
   // estimate and one carried back out of it does not keep a number nothing shows
   estimateValue: projectItemShape(kind).estimate ? (input.estimate?.value ?? null) : null,
   estimateUnit: projectItemShape(kind).estimate && input.estimate?.value ? input.estimate.unit : null,
+  // Only the tab that has one keeps it, the rule the estimate follows: a note carried elsewhere
+  // would otherwise stay shared, and an item that is not on the roadmap would carry a stage
+  stage: projectItemShape(kind).stage ? roadmapStage(input.stage).id : null,
+  isClientVisible: projectItemShape(kind).shareable ? input.isClientVisible === true : false,
 })
 
 interface CreateOptions {
@@ -259,6 +294,8 @@ export async function changeProjectTask(
     status: input.status,
     priority: input.priority ?? projectPriority(current.priority).id,
     estimate: input.estimate !== undefined ? input.estimate : storedEstimate(current),
+    stage: input.stage ?? (current.stage ? roadmapStage(current.stage).id : undefined),
+    isClientVisible: input.isClientVisible ?? current.isClientVisible === true,
   }
   const problem = itemProblem(kind, merged)
   if (problem) throw new UserFacingError(problem)
@@ -274,6 +311,18 @@ export async function changeProjectTask(
   if (input.voiceNote !== undefined) changes.voiceNote = cleaned.voiceNote
   if (input.status !== undefined) changes.status = cleaned.status
   if (input.priority !== undefined) changes.priority = cleaned.priority
+  // Where a roadmap item has got to, and whether the client may read a note: each its own small write
+  if (input.stage !== undefined || moving) changes.stage = cleaned.stage
+  if (input.isClientVisible !== undefined || moving) changes.isClientVisible = cleaned.isClientVisible
+  /**
+   * Signing the work off, or taking the mark off again. It records **when** and nothing else: who
+   * signed is not stored, at the owner's request, so an item reads as signed or not signed. A tab
+   * that cannot be signed off refuses it rather than storing a mark nothing would ever show.
+   */
+  if (input.signed !== undefined) {
+    if (!projectItemShape(kind).signOff) throw new UserFacingError(PROJECT_TASK_MESSAGES.signFailed)
+    changes.signedAt = input.signed ? new Date() : null
+  }
   // The estimate is written when it is sent, and whenever the item changes tab, since the tab it
   // lands on decides whether it keeps one at all
   if (input.estimate !== undefined || moving) {
