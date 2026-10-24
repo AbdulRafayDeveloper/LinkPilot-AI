@@ -16,17 +16,28 @@ export const HELP_PATH = "/help"
 
 export const HELP_MESSAGES = {
   title: "Help & Documentation",
-  subtitle: "What each part of the app does, and how to use it.",
+  subtitle: "Every part of LinkPilot AI, what it is for and how to use it.",
+  lede: "Short, plain articles for each module: what it does, the steps to use it, and what is worth knowing before you start.",
   startHeading: "Start here",
   topicsHeading: "Topics",
   allTopics: "All topics",
+  openApp: "Open the app",
   openTool: "Open",
-  summaryHeading: "What it does",
   stepsHeading: "How to use it",
   notesHeading: "Worth knowing",
+  adminOnly: "Admins only",
   todo: "This article is still to be written.",
   nothingToRead: "There is nothing to document here yet.",
-  onlyYourTools: "This page describes the tools your account can open. Ask the workspace owner if something is missing.",
+  // The page is read without signing in, so it says what it is rather than whose account it is
+  isPublic: "Anyone with this link can read these pages. Nothing here is your own data, and nothing on this page needs an account.",
+  search: "Search the documentation",
+  searchShort: "Search",
+  clearSearch: "Clear",
+  noMatch: "Nothing matches that. Try a tool's name, or a word like image, voice, meeting or prompt.",
+  matches: (found: number) => `${found} ${found === 1 ? "article" : "articles"}`,
+  countOf: (tools: number) => `${tools} ${tools === 1 ? "module" : "modules"}`,
+  backToTop: "Back to top",
+  footer: "These pages describe the app as it works today. Open a tool to try what you have just read.",
 } as const
 
 /** Shown for a tool nobody has written an article for yet, so the page never renders an empty section. */

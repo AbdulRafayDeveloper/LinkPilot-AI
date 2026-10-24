@@ -23,6 +23,10 @@ export interface HelpTopic {
   title: string
   // The page this article is about, so the reader can open it; absent for an article about no one page
   href?: string
+  // The one line the sidebar shows for this tool, under its name in the topic list
+  summary?: string
+  // Said on the article where something must be known before reading it ("Admins only")
+  badge?: string
   doc: HelpDoc
 }
 
@@ -30,5 +34,7 @@ export interface HelpTopic {
 export interface HelpSection {
   id: ToolGroupId | "start"
   label: string
+  // What the area is for, in the sidebar's own words; absent on the opening section
+  hint?: string
   topics: HelpTopic[]
 }

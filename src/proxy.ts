@@ -6,6 +6,7 @@ import { PUBLIC_PLAN_ENDPOINT, PUBLIC_PLAN_PATH } from "@/constants/employees"
 import { PUBLIC_PROJECT_ENDPOINT, PUBLIC_PROJECT_PATH } from "@/constants/clientProjectTasks"
 import { PUBLIC_MEETING_ENDPOINT, PUBLIC_MEETING_PATH } from "@/constants/meetings"
 import { CRON_BACKUP_PATH } from "@/constants/backups"
+import { HELP_PATH } from "@/constants/helpDocs"
 
 /**
  * The sign-in gate in front of every page and API route. It checks only that the session cookie is
@@ -16,6 +17,12 @@ import { CRON_BACKUP_PATH } from "@/constants/backups"
 
 // Reachable signed out: the two account pages and the calls they make
 const PUBLIC_PAGES = new Set([LOGIN_PATH, SIGNUP_PATH])
+/**
+ * Pages anyone may read, signed in **or** out, and which are never redirected away from: the help
+ * page is documentation of the app rather than part of it, so a signed-in reader stays on it instead
+ * of being sent into the workspace the way /login is.
+ */
+const OPEN_PAGES = new Set([HELP_PATH])
 const PUBLIC_API = new Set(["/api/auth/login", "/api/auth/signup", "/api/auth/logout"])
 // A link whose signed token in the address is the key, checked by the route it opens: an employee's
 // own daily plan, a client project the client writes on, and a meeting shared read only to watch
@@ -42,6 +49,8 @@ function withPath(request: NextRequest, pathname: string) {
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl
   const signedIn = readSession(request.cookies.get(SESSION_COOKIE)?.value, env.AUTH_SECRET) !== null
+
+  if (OPEN_PAGES.has(pathname)) return withPath(request, pathname)
 
   if (PUBLIC_PAGES.has(pathname)) {
     // Someone already signed in has nothing to do on the sign-in page
