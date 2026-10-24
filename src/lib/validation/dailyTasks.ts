@@ -76,6 +76,20 @@ export const MoveOverdueSchema = z.object({
   ids: z.array(TaskId).min(1, DAILY_TASKS_MESSAGES.invalidTask).max(MAX_TASKS_PER_DAY_ORDER, DAILY_TASKS_MESSAGES.invalidOrder).optional(),
 })
 
+/**
+ * The subtasks of one task, in the order they are to be worked in. It names no day, because
+ * reordering inside a task never moves it off the day it is on, which is the one thing `today`
+ * is here to bound.
+ */
+export const SubtaskOrderSchema = z
+  .object({
+    orderedIds: z.array(TaskId).min(1, DAILY_TASKS_MESSAGES.invalidSubtaskOrder).max(MAX_TASKS_PER_DAY_ORDER, DAILY_TASKS_MESSAGES.invalidSubtaskOrder),
+  })
+  .refine((body) => new Set(body.orderedIds).size === body.orderedIds.length, {
+    message: DAILY_TASKS_MESSAGES.invalidSubtaskOrder,
+    path: ["orderedIds"],
+  })
+
 export const MoveTaskSchema = z
   .object({
     today: TodaySchema,

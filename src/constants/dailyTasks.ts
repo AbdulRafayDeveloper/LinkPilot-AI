@@ -108,6 +108,7 @@ export const DAILY_TASKS_MESSAGES = {
     count === 0 ? "Nothing was overdue." : `${count} ${count === 1 ? "task" : "tasks"} moved to today.`,
   moveOverdueFailed: "Couldn't move the overdue tasks. Please try again.",
   invalidOrder: "That new order doesn't match the tasks on that day. Reload and try again.",
+  invalidSubtaskOrder: "That new order doesn't match the subtasks of that task. Reload and try again.",
   addToDayFailed: "Couldn't add that task. Please try again.",
   cleanupFailed: "Couldn't delete the older tasks. Please try again.",
   cleaned: "Older tasks deleted.",

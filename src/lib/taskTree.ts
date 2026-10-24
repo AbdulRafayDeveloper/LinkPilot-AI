@@ -164,6 +164,24 @@ export function removeNested<T extends Nested<T>>(tasks: readonly T[], id: strin
   return tasks.filter((task) => task.id !== id).map((task) => (task.subtasks.length > 0 ? { ...task, subtasks: removeNested(task.subtasks, id) } : task))
 }
 
+/**
+ * The same tasks with the subtasks of one of them put in the order given, wherever that task sits.
+ *
+ * It is what a drag inside a subtask list does on the page, before the server is told. Only the
+ * children of `parentId` move: a child the order does not name keeps its place after the ones it
+ * does, so a partial order (a narrowed list, a tab that has fallen behind) can never lose a subtask.
+ */
+export function reorderChildren<T extends Nested<T>>(tasks: readonly T[], parentId: string, orderedIds: readonly string[]): T[] {
+  return tasks.map((task) => {
+    if (task.subtasks.length === 0) return task
+    if (task.id !== parentId) return { ...task, subtasks: reorderChildren(task.subtasks, parentId, orderedIds) }
+    const byId = new Map(task.subtasks.map((child) => [child.id, child]))
+    const named = orderedIds.map((id) => byId.get(id)).filter((child): child is T => child !== undefined)
+    const rest = task.subtasks.filter((child) => !orderedIds.includes(child.id))
+    return { ...task, subtasks: [...named, ...rest] }
+  })
+}
+
 /** The tasks from the top down to the one asked for, it included; null when it isn't there. */
 export function pathTo<T extends Nested<T>>(tasks: readonly T[], id: string): T[] | null {
   for (const task of tasks) {

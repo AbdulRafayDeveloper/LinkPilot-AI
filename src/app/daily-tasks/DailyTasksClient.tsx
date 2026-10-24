@@ -15,7 +15,7 @@ import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import { requestApi } from "@/lib/apiClient"
 import { todayIso } from "@/lib/taskDates"
-import { completedLastNested, pathTo, removeNested, updateNested } from "@/lib/taskTree"
+import { completedLastNested, pathTo, removeNested, reorderChildren, updateNested } from "@/lib/taskTree"
 import { DAILY_TASKS_ENDPOINT, DAILY_TASKS_MESSAGES, VISIBLE_DAYS } from "@/constants/dailyTasks"
 import type { DailyTask, DailyTaskDay, DailyTasksPage } from "@/types/dailyTasks"
 import { toStoredImages, type TaskDetailsDraft } from "@/types/taskAttachment"
@@ -347,6 +347,37 @@ export default function DailyTasksClient() {
     })
   }
 
+  /**
+   * One task's subtasks dragged into a new order, at either level. The page shows the new order at
+   * once and saves it behind the same queue a day's move uses, so two quick drags land in the order
+   * they were made rather than racing; a failure puts the list back and reads it again, so the page
+   * never shows an order the database does not have.
+   *
+   * It is a separate handler from `moveTask` because nothing here crosses a day or a parent: there
+   * is no arrival to work out, no overdue count to change and no day to send, only the places inside
+   * one list. The whole list is sent, which is what lets the server refuse an order that has fallen
+   * behind instead of writing one child's position over another's.
+   */
+  const reorderSubtasks = (parentId: string, orderedIds: string[]) => {
+    setTaskError(null)
+    const snapshot = page
+    setPage((current) => (current ? { ...current, days: current.days.map((day) => ({ ...day, tasks: reorderChildren(day.tasks, parentId, orderedIds) })) } : current))
+
+    moveQueue.current = moveQueue.current.then(async () => {
+      try {
+        await requestApi(`${DAILY_TASKS_ENDPOINT}/${parentId}/subtasks`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderedIds }),
+        })
+      } catch (error: unknown) {
+        setPage(snapshot)
+        setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.moveFailed)
+        reload()
+      }
+    })
+  }
+
   // A task is one line, so it goes on one click and comes back if the delete fails
   /**
    * Deletes every picked task in one call, whatever day each is on. Deleting is final, so it only
@@ -595,6 +626,7 @@ export default function DailyTasksClient() {
                 onDelete={removeTask}
                 onDeletePicked={(ids) => setConfirmingPicked(ids)}
                 onMove={moveTask}
+                onReorderSubtasks={reorderSubtasks}
                 onAddTask={addTaskToDay}
                 onOpenTask={(task, focusSubtask = false) => setEditing({ id: task.id, focusSubtask })}
                 onMoveToToday={(task) => void moveOverdue(task)}

@@ -43,6 +43,7 @@ import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 import { TaskChips, TaskFlagBadges, TaskOptions } from "@/components/daily-tasks/TaskOptions"
 import { TaskRowMenu } from "@/components/daily-tasks/TaskRowMenu"
+import { SortableList } from "@/components/ui/SortableList"
 import { defaultChoices, type TaskChoices } from "@/lib/taskChoices"
 import { PRIORITIES, PRIORITY_TONE, type Priority } from "@/constants/priorities"
 import { TASK_DOERS, TASK_DOER_TONE, type TaskDoer } from "@/constants/taskDoers"
@@ -87,6 +88,11 @@ interface TaskDayListProps {
   // Deletes every picked task at once; the page confirms first, since deleting is final
   onDeletePicked: (ids: string[]) => void
   onMove: (move: TaskMove) => void
+  /**
+   * One task's subtasks in a new order, among themselves. It is its own handler rather than part of
+   * `onMove`, because a subtask never changes day or parent: only the places inside one list change.
+   */
+  onReorderSubtasks: (parentId: string, orderedIds: string[]) => void
   // Resolves true when the task was added, so the row can clear itself and stay open for the next
   onAddTask: AddTaskHandler
 }
@@ -242,9 +248,14 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
 
 interface SubtaskTreeProps {
   tasks: DailyTask[]
+  // The task these are the subtasks of, which is what an order is saved against
+  parentId: string
   // 2 for a task's subtasks, 3 for theirs
   depth: number
   today: string
+  // Off while the list is narrowed, for the reason a day's own order is: what is shown is only part of it
+  canDrag: boolean
+  onReorderSubtasks: (parentId: string, orderedIds: string[]) => void
   pendingIds: ReadonlySet<string>
   onToggle: (task: DailyTask, isCompleted: boolean) => void
   onDelete: (task: DailyTask) => void
@@ -252,15 +263,32 @@ interface SubtaskTreeProps {
   onChoose: (task: DailyTask, change: Partial<TaskChoices>) => void
 }
 
-/** One subtask: its tick box and line, its details, its actions, and its own subtasks under it. */
-const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, depth, today, pendingIds, onToggle, onDelete, onOpenTask, onChoose }) => {
+/**
+ * One subtask: its handle, its tick box and line, its details, its actions, and its own subtasks
+ * under it. The handle is the list's own (`SortableList`), so a subtask is moved among its siblings
+ * at either level; nothing here can move it to another task or another day.
+ */
+const SubtaskItem: React.FC<Omit<SubtaskTreeProps, "parentId"> & { task: DailyTask; handle: React.ReactNode }> = ({
+  task,
+  handle,
+  depth,
+  today,
+  canDrag,
+  pendingIds,
+  onToggle,
+  onDelete,
+  onOpenTask,
+  onChoose,
+  onReorderSubtasks,
+}) => {
   const [isOpen, setIsOpen] = useState(true)
   const isPending = pendingIds.has(task.id)
   const state = taskState(task, today)
   const done = task.subtasks.filter((entry) => entry.isCompleted).length
   return (
-    <li className="flex flex-col">
+    <div className="flex flex-col">
       <div className="flex flex-wrap items-start gap-1">
+        {handle}
         {task.subtasks.length > 0 ? (
           <button
             type="button"
@@ -314,9 +342,13 @@ const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, d
         </span>
       </div>
       {isOpen && task.subtasks.length > 0 && (
-        <SubtaskTree {...{ depth: depth + 1, today, pendingIds, onToggle, onDelete, onOpenTask, onChoose }} tasks={task.subtasks} />
+        <SubtaskTree
+          {...{ depth: depth + 1, today, canDrag, pendingIds, onToggle, onDelete, onOpenTask, onChoose, onReorderSubtasks }}
+          parentId={task.id}
+          tasks={task.subtasks}
+        />
       )}
-    </li>
+    </div>
   )
 }
 
@@ -328,7 +360,7 @@ const SubtaskItem: React.FC<SubtaskTreeProps & { task: DailyTask }> = ({ task, d
  */
 const SubtaskTree: React.FC<SubtaskTreeProps> = (props) => {
   const [isOpen, setIsOpen] = useState(true)
-  const { tasks, depth } = props
+  const { tasks, parentId, depth, canDrag, onReorderSubtasks } = props
   const done = tasks.filter((task) => task.isCompleted).length
   const stop = (event: React.SyntheticEvent) => event.stopPropagation()
   return (
@@ -345,11 +377,17 @@ const SubtaskTree: React.FC<SubtaskTreeProps> = (props) => {
         </button>
       )}
       {isOpen && (
-        <ul className="flex flex-col border-l-2 border-outline-variant/70 pl-1.5" aria-label={depth === 2 ? "Subtasks" : "Sub-subtasks"}>
-          {tasks.map((task) => (
-            <SubtaskItem key={task.id} {...props} task={task} />
-          ))}
-        </ul>
+        <SortableList
+          items={tasks}
+          getId={(task) => task.id}
+          getLabel={(task) => task.content}
+          onReorder={(ids) => onReorderSubtasks(parentId, ids)}
+          disabled={!canDrag}
+          label={depth === 2 ? "Subtasks" : "Sub-subtasks"}
+          itemNoun={depth === 2 ? "subtasks" : "sub-subtasks"}
+          className="flex flex-col border-l-2 border-outline-variant/70 pl-1.5"
+          renderItem={(task, handle) => <SubtaskItem {...props} task={task} handle={handle} />}
+        />
       )}
     </div>
   )
@@ -450,6 +488,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   wasDragging,
   pendingIds,
   canDrag,
+  onReorderSubtasks,
 }: {
   task: DailyTask
   today: string
@@ -465,6 +504,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
   pendingIds: ReadonlySet<string>
   // Off while the list is narrowed: it is then only part of each day's order
   canDrag: boolean
+  onReorderSubtasks: (parentId: string, orderedIds: string[]) => void
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -518,13 +558,16 @@ const SortableTaskRow = memo(function SortableTaskRow({
       {task.subtasks.length > 0 && (
         <SubtaskTree
           tasks={task.subtasks}
+          parentId={task.id}
           depth={2}
           today={today}
+          canDrag={canDrag}
           pendingIds={pendingIds}
           onToggle={onToggle}
           onDelete={onDelete}
           onOpenTask={onOpenTask}
           onChoose={onChoose}
+          onReorderSubtasks={onReorderSubtasks}
         />
       )}
     </li>
@@ -656,6 +699,7 @@ const DayGroup = memo(function DayGroup({
   onAddTask,
   wasDragging,
   canDrag,
+  onReorderSubtasks,
 }: {
   day: DailyTaskDay
   today: string
@@ -673,6 +717,7 @@ const DayGroup = memo(function DayGroup({
   onAddTask: AddTaskHandler
   wasDragging: () => boolean
   canDrag: boolean
+  onReorderSubtasks: (parentId: string, orderedIds: string[]) => void
 }) {
   const { title, detail } = dayLabel(day.date, today)
   const done = day.tasks.filter((task) => task.isCompleted).length
@@ -720,6 +765,7 @@ const DayGroup = memo(function DayGroup({
                 wasDragging={wasDragging}
                 pendingIds={pendingIds}
                 canDrag={canDrag}
+                onReorderSubtasks={onReorderSubtasks}
               />
             ))
           )}
@@ -764,6 +810,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   onChoose,
   onDeletePicked,
   onMove,
+  onReorderSubtasks,
   onAddTask,
 }) => {
   const current = page?.page ?? 1
@@ -1144,6 +1191,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 onSelect={selectTask}
                 onAddTask={onAddTask}
                 wasDragging={wasDragging}
+                onReorderSubtasks={onReorderSubtasks}
               />
             ))}
           </ul>

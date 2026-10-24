@@ -424,6 +424,47 @@ export async function moveTask(viewer: Viewer, id: string, taskDate: string, ord
   return record ? { task: (await toTasks([record as unknown as StoredTask]))[0] } : { error: "missing" }
 }
 
+export type ReorderResult = { ok: true } | { error: "missing" | "stale-order" }
+
+/**
+ * Puts the subtasks of one task in a new order, among themselves. `orderedIds` is that task's whole
+ * new list of children, exactly as the page shows it after the drop, and `parentId` is the task they
+ * belong to.
+ *
+ * It is the subtask side of `moveTask`, and deliberately narrower: a subtask always sits on its
+ * task's day and under its own parent, so **reordering here moves nothing between days and nothing
+ * between parents**. That is why it needs no `taskDate` and why the filter names `parentTaskId`
+ * everywhere: an id belonging to another task, to another account, or to a top-level task matches
+ * nothing and the order is refused rather than written somewhere it does not belong.
+ *
+ * The order is checked against the database first, the same way a day's is: every id must be a child
+ * of this parent that the viewer may see, and none of its children may be missing from the order. A
+ * page that has fallen behind (a subtask added or deleted in another tab, or a list narrowed by a
+ * filter) is refused with `stale-order` rather than guessed at, which is what stops a partial order
+ * from writing one child's position over another's. The positions then go in one ordered bulk write,
+ * so a repeat of the same drop lands on the same order.
+ */
+export async function reorderSubtasks(viewer: Viewer, parentId: string, orderedIds: string[]): Promise<ReorderResult> {
+  const filter = visibleById(viewer, parentId)
+  if (!filter) return { error: "missing" }
+  await connectDatabase()
+  if (!(await DailyTaskModel.exists(filter))) return { error: "missing" }
+
+  // Every id named, as a child of this very task; anything else is missing here and refuses the order
+  const siblings = { parentTaskId: parentId, ...visibleTo(viewer) }
+  const named = (await DailyTaskModel.find({ _id: { $in: orderedIds }, ...siblings }, { _id: 1 }).lean()) as unknown as { _id: mongoose.Types.ObjectId }[]
+  if (named.length !== orderedIds.length) return { error: "stale-order" }
+  const namedIds = new Set(orderedIds)
+  const childrenNow = await DailyTaskModel.find(siblings, { _id: 1 }).lean()
+  if (childrenNow.some((record) => !namedIds.has(String(record._id)))) return { error: "stale-order" }
+
+  await DailyTaskModel.bulkWrite(
+    orderedIds.map((entry, position) => ({ updateOne: { filter: { _id: entry, ...siblings }, update: { $set: { position } } } })),
+    { ordered: true }
+  )
+  return { ok: true }
+}
+
 /**
  * Brings what is overdue onto today: every task on a day before today that still has open work,
  * with everything under it, added to the end of today in the order the days had them. It is the
