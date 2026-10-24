@@ -2,11 +2,12 @@
 
 import React, { useEffect, useId, useRef, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, Loader2, LogOut, ShieldCheck, UserCog } from "lucide-react"
+import { BookOpen, ChevronDown, Loader2, LogOut, ShieldCheck, UserCog } from "lucide-react"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { requestApi } from "@/lib/apiClient"
 import { clearAllToolState } from "@/lib/toolStore"
 import { ACCOUNT_SETTINGS_PATH, AUTH_ENDPOINTS, LOGIN_PATH, ROLE_LABELS } from "@/constants/auth"
+import { HELP_MESSAGES, HELP_PATH } from "@/constants/helpDocs"
 import { AccountAvatar } from "./AccountAvatar"
 
 /**
@@ -100,6 +101,14 @@ export const UserMenu: React.FC = () => {
           >
             <UserCog size={15} aria-hidden="true" />
             Account settings
+          </Link>
+          <Link
+            href={HELP_PATH}
+            onClick={() => setIsOpen(false)}
+            className="flex w-full items-center gap-2 border-b border-outline-variant/70 px-4 py-2.5 text-left text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
+          >
+            <BookOpen size={15} aria-hidden="true" />
+            {HELP_MESSAGES.title}
           </Link>
           <button
             type="button"

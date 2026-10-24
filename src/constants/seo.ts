@@ -221,6 +221,16 @@ export const SEO_PAGES: SeoPage[] = [
     indexable: false,
   },
   {
+    slug: "help",
+    path: "/help",
+    title: "Help & Documentation",
+    description: "What each part of LinkPilot AI does and how to use it, one short article per module.",
+    keywords: [],
+    heading: "Help & Documentation",
+    subheading: "What each module does, and how to use it",
+    indexable: false,
+  },
+  {
     slug: "account",
     path: "/account",
     title: "Account Settings",
