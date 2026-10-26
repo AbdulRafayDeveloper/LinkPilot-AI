@@ -682,6 +682,7 @@ export default function DailyTasksClient() {
           onDelete={removeTask}
           onAddSubtask={addSubtask}
           onOpenTask={(id, focusSubtask = false) => setEditing({ id, focusSubtask })}
+          onReorderSubtasks={reorderSubtasks}
           onClose={() => setEditing(null)}
         />
       )}

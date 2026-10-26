@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { AlertCircle, Check, CheckCircle2, ChevronRight, CornerDownRight, Loader2, Plus, Trash2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
+import { SortableList } from "@/components/ui/SortableList"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 import { TaskDetailsFields } from "@/components/tasks/TaskDetailsFields"
 import { CopyTaskText } from "@/components/tasks/CopyTaskText"
@@ -40,6 +41,8 @@ interface TaskEditorDialogProps {
   onAddSubtask: (parent: DailyTask, content: string, choices?: TaskChoices) => Promise<boolean>
   // Opens another task in this editor (a subtask, or a task above)
   onOpenTask: (id: string, focusSubtask?: boolean) => void
+  // This task's subtasks in a new order, dragged here exactly as they are on the page
+  onReorderSubtasks: (parentId: string, orderedIds: string[]) => void
   onClose: () => void
 }
 
@@ -76,6 +79,10 @@ const levelName = (depth: number) => (depth === 1 ? "Task" : depth === 2 ? "Subt
  * **Subtasks go three levels deep** (TASK_MAX_DEPTH): a task, its subtasks and theirs. Each is opened
  * here in turn, ticked, copied or deleted from the list below the details; on a sub-subtask the field
  * that would add a fourth level is replaced by a line saying so.
+ *
+ * **The subtasks are dragged into order here too**, with the handle on each row (mouse, touch or the
+ * arrow keys), through the same shared `SortableList` and the same save the page's own list uses, so
+ * putting a run of subtasks in order never means closing the popup to do it.
  */
 export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
   task,
@@ -87,6 +94,7 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
   onDelete,
   onAddSubtask,
   onOpenTask,
+  onReorderSubtasks,
   onClose,
 }) => {
   const [draft, setDraft] = useState<Draft>(() => draftOf(task))
@@ -331,11 +339,23 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
             )}
           </h3>
           {task.subtasks.length > 0 && (
-            <ul className="flex flex-col gap-1">
-              {task.subtasks.map((entry) => {
+            <SortableList
+              items={task.subtasks}
+              getId={(entry) => entry.id}
+              getLabel={(entry) => entry.content}
+              onReorder={(ids) => onReorderSubtasks(task.id, ids)}
+              label={depth === 1 ? "Subtasks" : "Sub-subtasks"}
+              itemNoun={depth === 1 ? "subtasks" : "sub-subtasks"}
+              className="flex flex-col gap-1"
+              renderItem={(entry, handle, isDragging) => {
                 const isPending = pendingIds.has(entry.id)
                 return (
-                  <li key={entry.id} className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-2 py-1.5">
+                  <div
+                    className={`flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-2 py-1.5 ${
+                      isDragging ? "shadow-lg ring-2 ring-primary/30" : ""
+                    }`}
+                  >
+                    {handle}
                     <input
                       type="checkbox"
                       checked={entry.isCompleted}
@@ -385,10 +405,10 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
                     >
                       {isPending ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Trash2 size={14} aria-hidden="true" />}
                     </button>
-                  </li>
+                  </div>
                 )
-              })}
-            </ul>
+              }}
+            />
           )}
           {canNest ? (
             <div className="flex flex-wrap items-center gap-2">
