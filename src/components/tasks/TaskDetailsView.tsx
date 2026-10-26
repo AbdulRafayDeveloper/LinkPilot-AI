@@ -3,6 +3,7 @@
 import React, { useState } from "react"
 import { ChevronDown, ChevronRight, ImageOff, X } from "lucide-react"
 import { RichTextView } from "@/components/ui/RichTextView"
+import { CopyFileButton } from "@/components/ui/CopyFileButton"
 import { TASK_DETAILS_SCROLL_CHARS } from "@/constants/taskAttachments"
 import type { TaskImageView } from "@/types/taskAttachment"
 
@@ -13,10 +14,15 @@ interface TaskDetailsViewProps {
   label: string
   // Starts open where the details are the point of the view rather than an extra (nowhere today)
   defaultOpen?: boolean
+  /**
+   * A copy icon on each image and in the full-size view, which puts the picture itself on the
+   * clipboard. Client Projects passes it; the other lists are unchanged without it.
+   */
+  canCopyImages?: boolean
 }
 
 /** One image as a thumbnail, opening full size; a link that fails says so rather than showing a broken image. */
-const ImageThumbnail: React.FC<{ image: TaskImageView; alt: string; onOpen: () => void }> = ({ image, alt, onOpen }) => {
+const ImageThumbnail: React.FC<{ image: TaskImageView; alt: string; onOpen: () => void; canCopy: boolean }> = ({ image, alt, onOpen, canCopy }) => {
   const [hasFailed, setHasFailed] = useState(false)
   if (hasFailed) {
     return (
@@ -27,7 +33,7 @@ const ImageThumbnail: React.FC<{ image: TaskImageView; alt: string; onOpen: () =
     )
   }
   return (
-    <li>
+    <li className="relative">
       <button
         type="button"
         onPointerDown={(event) => event.stopPropagation()}
@@ -43,6 +49,15 @@ const ImageThumbnail: React.FC<{ image: TaskImageView; alt: string; onOpen: () =
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={image.url} alt={alt} loading="lazy" onError={() => setHasFailed(true)} className="h-full w-full object-cover" />
       </button>
+      {canCopy && (
+        <CopyFileButton
+          url={image.url}
+          kind="image"
+          name={alt}
+          iconOnly
+          className="absolute -bottom-1.5 -right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border border-outline-variant bg-white text-on-surface-variant shadow-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        />
+      )}
     </li>
   )
 }
@@ -61,7 +76,7 @@ const ImageThumbnail: React.FC<{ image: TaskImageView; alt: string; onOpen: () =
  * Creator), because each link is a short-lived signed one on the storage host rather than something
  * next/image can be pointed at.
  */
-export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({ description, images, label, defaultOpen = false }) => {
+export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({ description, images, label, defaultOpen = false, canCopyImages = false }) => {
   const [open, setOpen] = useState<TaskImageView | null>(null)
   const [isShown, setIsShown] = useState(defaultOpen)
   if (!description && images.length === 0) return null
@@ -83,7 +98,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({ description, i
         }}
         aria-expanded={isShown}
         aria-label={`${isShown ? "Hide" : "Show"} the details of ${label}`}
-        className="inline-flex w-fit items-center gap-1 rounded-md py-0.5 pr-1.5 text-[11px] font-semibold text-outline transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="inline-flex min-h-6 w-fit items-center gap-1 rounded-md py-0.5 pr-1.5 text-[11px] font-semibold text-outline md:min-h-0 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         {isShown ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
         {isShown ? "Hide details" : `Details (${what})`}
@@ -105,7 +120,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({ description, i
       {isShown && images.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label={`Images on ${label}`}>
           {images.map((image, index) => (
-            <ImageThumbnail key={image.assetId} image={image} alt={`image ${index + 1} on ${label}`} onOpen={() => setOpen(image)} />
+            <ImageThumbnail key={image.assetId} image={image} alt={`image ${index + 1} on ${label}`} onOpen={() => setOpen(image)} canCopy={canCopyImages} />
           ))}
         </ul>
       )}
@@ -134,6 +149,14 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({ description, i
           >
             <X size={18} aria-hidden="true" />
           </button>
+          {canCopyImages && (
+            <CopyFileButton
+              url={open.url}
+              kind="image"
+              name={`Image on ${label}`}
+              className="absolute right-16 top-4 inline-flex items-center gap-1.5 rounded-lg bg-white/90 px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-white"
+            />
+          )}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={open.url} alt={`Image on ${label}`} className="max-h-full max-w-full rounded-xl object-contain" />
         </div>

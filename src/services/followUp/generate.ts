@@ -99,8 +99,8 @@ export async function generateFollowUp({
 }: GenerateOptions): Promise<GeneratedFollowUp> {
   const { typePrompt, signalsPrompt, senderProfile } = await getGenerationInputs(type)
   const conversationBlocks: PromptDataBlock[] = [
-    { variable: "conversation", tag: "conversation_history", label: "Previous conversation", content: conversation },
-    { variable: "profile_data", tag: "profile_data", label: "Profile information about them", content: profileData },
+    { variable: "conversation", tag: "conversation_history", label: "Previous conversation", content: conversation, pasted: true },
+    { variable: "profile_data", tag: "profile_data", label: "Profile information about them", content: profileData, pasted: true },
   ]
   const signalsPromise = assessLeadSignalsSafely({
     signalsPrompt,

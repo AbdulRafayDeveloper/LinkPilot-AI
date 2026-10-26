@@ -32,9 +32,10 @@ import { IMAGE_SIZES, IMAGE_SIZE_IDS, PHOTO_FILTER_OPTIONS, POST_IMAGES_ENDPOINT
 import { useSavedFilters } from "@/hooks/useSavedFilters"
 import { filtersOf, oneOf, savedDay, savedText, type SavedFilters } from "@/lib/savedFilters"
 import type { PostImage } from "@/types/postImages"
+import { formatInstant } from "@/lib/timeZone"
 
 const madeAt = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+  formatInstant(iso, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 const actionButton =
   "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"

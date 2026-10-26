@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, Loader2, RefreshCw, Video } from "lucide-react"
+import { AlertTriangle, FileText, Loader2, RefreshCw, Video } from "lucide-react"
 import { requestApi } from "@/lib/apiClient"
 import { RecordingVideo } from "@/components/meetings/RecordingVideo"
 import { useRecordingRun } from "@/hooks/useRecordingRun"
@@ -39,8 +39,12 @@ const Bar: React.FC<{ label: string; done: number; total: number }> = ({ label, 
 }
 
 /**
- * The recording on the meeting page: where it is while it is joined and written out (and the calls
- * that move it on), then the video to play and download, with the camera in a corner when there is one.
+ * The recording on the meeting page: where it is while it is joined (and the calls that move it on),
+ * then the video to play and download, with the camera in a corner when there is one.
+ *
+ * A joined recording **waits at `ready`** with a Transcribe and analyse button: nothing is written out
+ * or analysed until that is pressed, so a recording costs nothing until it is wanted. Once pressed, the
+ * writing out runs here and the page's own analysis takes over when the transcript lands.
  */
 export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recording, onTranscribed, onProgress }) => {
   const recorder = useMeetingRecorder()
@@ -61,10 +65,13 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
   )
 
   const isProcessing = recording.stage === "consolidating" || recording.stage === "transcribing"
+  // The joined video exists from `ready` on, so it can be watched before anything is written out
+  const isJoined = recording.stage === "ready" || recording.stage === "transcribing" || recording.stage === "done"
   // This tab is still recording it, or still sending its last chunks
   const isRecordingHere = recorder.meetingId === meetingId && ["recording", "paused", "stopping", "finishing"].includes(recorder.status)
 
-  // Joining and writing out start by themselves once, and carry on from wherever they were
+  // Joining starts by itself once, and so does writing out that was already asked for (left mid-way);
+  // a ready recording is never written out from here without the click
   useEffect(() => {
     if (!isProcessing || startedRef.current || isRunning) return
     startedRef.current = true
@@ -73,7 +80,7 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
 
   // The links are read once there is a joined video to play
   useEffect(() => {
-    if (recording.stage !== "done") return
+    if (!isJoined) return
     const controller = new AbortController()
     requestApi<MeetingRecordingLinks>(recordingEndpoint(meetingId), { signal: controller.signal })
       .then(({ data }) => setLinks(data))
@@ -81,7 +88,12 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
         if (!controller.signal.aborted) setLinksError(error instanceof Error ? error.message : RECORDING_MESSAGES.processFailed)
       })
     return () => controller.abort()
-  }, [meetingId, recording.stage])
+  }, [meetingId, isJoined])
+
+  const transcribe = () => {
+    startedRef.current = true
+    void run(meetingId, { transcribe: true })
+  }
 
   const finishPartial = async () => {
     setIsFinishing(true)
@@ -149,8 +161,30 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
             {recording.stage === "consolidating" ? "Joining the recording into one video..." : "Writing out what was said (Groq)..."}
             <span className="font-normal text-on-surface-variant">You can leave this page; it carries on when you come back.</span>
           </p>
-          <Bar label="Chunks joined" done={recording.joined.done} total={recording.joined.total} />
-          <Bar label="Audio pieces written out" done={recording.transcribed.done} total={recording.transcribed.total} />
+          {/* One bar for the step running now: a zero "written out" bar while joining read as if
+              writing out had been queued by itself, which it never is */}
+          {recording.stage === "consolidating" ? (
+            <Bar label="Chunks joined" done={recording.joined.done} total={recording.joined.total} />
+          ) : (
+            <Bar label="Audio pieces written out" done={recording.transcribed.done} total={recording.transcribed.total} />
+          )}
+        </div>
+      )}
+
+      {recording.stage === "ready" && (
+        <div className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[12px] text-on-surface-variant">
+            {RECORDING_MESSAGES.readyToTranscribe} <span className="text-outline">{RECORDING_MESSAGES.transcribeHint}</span>
+          </p>
+          <button
+            type="button"
+            onClick={transcribe}
+            disabled={isRunning}
+            className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+          >
+            {isRunning ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <FileText size={15} aria-hidden="true" />}
+            {RECORDING_MESSAGES.transcribe}
+          </button>
         </div>
       )}
 
@@ -163,7 +197,9 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
           {recording.stage !== "recording" && (
             <button
               type="button"
-              onClick={() => void run(meetingId)}
+              // A failure while joining carries on joining and stops at ready again; one after joining
+              // can only have been in the writing out that was already asked for, so that carries on
+              onClick={() => void run(meetingId, { transcribe: recording.joined.done >= recording.joined.total })}
               disabled={isRunning}
               className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-error/40 bg-white px-3 py-1.5 font-semibold text-error hover:bg-error/5 disabled:opacity-60"
             >
@@ -174,7 +210,7 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
         </div>
       )}
 
-      {recording.stage === "done" &&
+      {isJoined &&
         (links?.screen ? (
           <RecordingVideo screen={links.screen} camera={links.camera} />
         ) : linksError ? (

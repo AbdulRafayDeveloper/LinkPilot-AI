@@ -13,12 +13,22 @@ import type { Viewer } from "@/types/auth"
  * changes its own name and its own password and never its parent's.
  */
 
-/** The account's own name, which is what the header and the account menu show. */
-export async function updateAccountName(viewer: Viewer, name: string): Promise<string> {
+/**
+ * The account's own name (what the header and the account menu show), its timezone, or both, **each written only when it is sent**, so saving the
+ * timezone never carries a stale name over one saved from another tab. A null timezone goes back to
+ * following the browser. Answers both as they are now.
+ */
+export async function updateAccountProfile(
+  viewer: Viewer,
+  change: { name?: string; timeZone?: string | null }
+): Promise<{ name: string; timeZone: string | null }> {
   await connectDatabase()
-  const saved = await UserModel.updateOne({ _id: viewer.id }, { $set: { name } })
-  if (saved.matchedCount === 0) throw new UserFacingError(ACCOUNT_MESSAGES.gone)
-  return name
+  const set: Record<string, unknown> = {}
+  if (change.name !== undefined) set.name = change.name
+  if (change.timeZone !== undefined) set.timeZone = change.timeZone
+  const saved = await UserModel.findOneAndUpdate({ _id: viewer.id }, { $set: set }, { new: true, projection: { name: 1, timeZone: 1 } }).lean()
+  if (!saved) throw new UserFacingError(ACCOUNT_MESSAGES.gone)
+  return { name: saved.name, timeZone: saved.timeZone ?? null }
 }
 
 /**

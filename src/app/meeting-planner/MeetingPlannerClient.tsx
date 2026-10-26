@@ -420,7 +420,9 @@ export default function MeetingPlannerClient() {
             </div>
 
 
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+            {/* Side by side from xl: at lg the calendar got about 450px, its meetings read "4:..." and
+                today's controls ran off the page, so below xl the calendar has the whole width */}
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
               {month && (
                 <MonthCalendar
                   month={month}
@@ -445,6 +447,7 @@ export default function MeetingPlannerClient() {
                 onChangeStatus={changeStatus}
                 onNotes={(meeting) => void openNotes(meeting)}
                 onEditDetails={(meeting) => void openEdit(meeting)}
+                onLinked={setLinkedFor}
               />
               <DayMeetingsPanel
                 date={selectedDate}

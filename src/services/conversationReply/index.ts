@@ -37,8 +37,8 @@ export async function analyzeAndReply({
   ])
 
   const dataBlocks: PromptDataBlock[] = [
-    { variable: "conversation", tag: "conversation_history", label: "Previous conversation", content: conversation },
-    { variable: "profile_data", tag: "profile_data", label: "Their profile", content: profileData },
+    { variable: "conversation", tag: "conversation_history", label: "Previous conversation", content: conversation, pasted: true },
+    { variable: "profile_data", tag: "profile_data", label: "Their profile", content: profileData, pasted: true },
     {
       variable: "sender_profile",
       tag: "sender_profile",

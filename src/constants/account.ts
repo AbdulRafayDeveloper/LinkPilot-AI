@@ -29,18 +29,45 @@ export const ACCOUNT_PHOTO_MAX_MB = Math.round(ACCOUNT_PHOTO_MAX_BYTES / (1024 *
 // What the browser's file picker offers; the type is read from the bytes either way
 export const ACCOUNT_PHOTO_ACCEPT = "image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
 
+/**
+ * The page's three tabs, in order. The open one is kept in the address (`/account#tab=preferences`),
+ * so a tab can be linked to and a reload stays on it.
+ */
+export const ACCOUNT_TABS = [
+  { id: "profile", label: "Profile", hint: "Name, photo and account" },
+  { id: "preferences", label: "Preferences", hint: "Time zone" },
+  { id: "security", label: "Security", hint: "Password and sign-in" },
+] as const
+export type AccountTabId = (typeof ACCOUNT_TABS)[number]["id"]
+
 export const ACCOUNT_MESSAGES = {
   // The page
   title: "Account Settings",
-  subtitle: "Your name, your photo and your password.",
+  subtitle: "Your profile, your time zone and how you sign in.",
   profileTitle: "Your profile",
   profileHint: "The name and photo shown in the header and in the account menu.",
   passwordTitle: "Change password",
   passwordHint: "Type the password you sign in with now, then the new one twice.",
   signedInTitle: "Signed in as",
+  detailsTitle: "Account details",
+  detailsHint: "Who this account is. The email and the role are set by an admin.",
+  signInTitle: "Sign-in",
+  signInHint: "How long this browser stays signed in.",
   // Whose records this account works with, for a child account
   childWorkspace: "You work in the workspace of the account that made yours, so what you save is saved there too.",
   staysSignedIn: "This browser stays signed in for a year, and the year starts again every time you use the app.",
+
+  // The timezone every time in the app is shown in
+  timeZoneTitle: "Time zone",
+  timeZoneHint: "Every time in the app (when something was saved, a meeting, a task ticked off) is shown in this zone.",
+  timeZoneBrowser: (zone: string) => `Use this browser's time zone (${zone})`,
+  timeZoneSearch: "Search a city, country or zone",
+  timeZoneNoMatch: "No time zone matches that search.",
+  timeZoneSaved: "Your time zone is saved. Every time in the app now follows it.",
+  timeZoneFailed: "Couldn't save your time zone. Please try again.",
+  timeZoneUnknown: "That isn't a time zone this app knows.",
+  timeZoneNow: (zone: string) => `Every time across the app is shown in ${zone}.`,
+  nothingToSave: "There is nothing to save.",
 
   // Saving
   nameSaved: "Your name is saved.",

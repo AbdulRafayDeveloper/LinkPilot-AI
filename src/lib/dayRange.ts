@@ -1,9 +1,13 @@
+import { displayTimeZone, startOfDayIn } from "@/lib/timeZone"
+import { shiftDate } from "@/lib/taskDates"
+
 /**
  * The date filters hold days as the date input gives them (YYYY-MM-DD). A request sends the start
- * and end of those days where the viewer is, so "today" means the viewer's today, not the server's.
+ * and end of those days in the viewer's chosen timezone, so "today" means the viewer's today, not
+ * the server's or the browser's.
  */
-const startOfDay = (day: string) => new Date(`${day}T00:00:00`).toISOString()
-const endOfDay = (day: string) => new Date(`${day}T23:59:59.999`).toISOString()
+const startOfDay = (day: string) => startOfDayIn(day, displayTimeZone()).toISOString()
+const endOfDay = (day: string) => new Date(startOfDayIn(shiftDate(day, 1), displayTimeZone()).getTime() - 1).toISOString()
 
 export function appendDayRange(params: URLSearchParams, fromDay: string, toDay: string): URLSearchParams {
   if (fromDay) params.set("from", startOfDay(fromDay))

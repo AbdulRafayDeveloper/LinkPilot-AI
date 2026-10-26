@@ -16,6 +16,7 @@ import {
 } from "@/constants/meetingPlanner"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan, MeetingPlanDetail } from "@/types/meetingPlanner"
+import { formatInstant } from "@/lib/timeZone"
 
 interface MeetingNotesModalProps {
   meeting: MeetingPlan
@@ -28,7 +29,7 @@ interface MeetingNotesModalProps {
 // Where auto-save has got to, shown in the footer
 type AutoSave = { state: "idle" } | { state: "saving" } | { state: "saved"; at: string } | { state: "failed"; message: string }
 
-const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+const clock = () => formatInstant(Date.now(), { hour: "2-digit", minute: "2-digit" })
 
 /**
  * The meeting's notes, in the same large panel the prompt editors open in, because notes on a call

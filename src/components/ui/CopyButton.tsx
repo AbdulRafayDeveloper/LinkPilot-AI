@@ -30,7 +30,8 @@ export const CopyButton: React.FC<CopyButtonProps> = ({
     ? `gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${
         copied ? "border-primary bg-primary text-white" : "border-primary text-primary hover:bg-primary/5"
       }`
-    : `gap-1 rounded-md p-1 text-[11px] ${copied ? "text-primary" : "text-outline hover:text-primary hover:bg-surface-container"}`
+    : // 24px to tap on a phone (an icon with p-1 is 22px); its own size from md
+      `min-h-6 min-w-6 justify-center gap-1 rounded-md p-1 text-[11px] md:min-h-0 md:min-w-0 ${copied ? "text-primary" : "text-outline hover:text-primary hover:bg-surface-container"}`
 
   return (
     <button

@@ -69,6 +69,7 @@ import { dependencyState, pendingDependencies } from "@/lib/promptDependencies"
 import type { PromptDependency } from "@/types/promptCreator"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
 import { describeSource } from "@/constants/aiProviders"
+import { formatInstant } from "@/lib/timeZone"
 
 interface FilterState {
   search: string
@@ -88,16 +89,17 @@ const NO_FILTERS: FilterState = { search: "", option: "", context: "", folder: "
 const EMPTY_FILTERS: SavedOutputTool["filters"] = []
 
 const writtenOn = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+  formatInstant(iso, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 
-// Search + the choice lists + two dates, laid out on one row on a wide screen
+// Search + the choice lists + two dates, on one row only once the page is wide enough for every one
+// of them: seven filters on one row at lg gave each about 70px, and "All folders" read "All..."
 const COLUMNS: Record<number, string> = {
   1: "lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_repeat(2,minmax(0,0.9fr))]",
-  2: "lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]",
-  3: "lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]",
-  4: "lg:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]",
+  2: "lg:grid-cols-3 xl:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]",
+  3: "lg:grid-cols-3 2xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]",
+  4: "lg:grid-cols-4 2xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))_repeat(2,minmax(0,0.9fr))]",
 }
 
 // The folder and dependency filters are choice lists of their own, so they count towards the columns

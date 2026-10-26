@@ -20,6 +20,7 @@ import { TASK_ATTACHMENT_MESSAGES, TASK_MAX_DEPTH } from "@/constants/taskAttach
 import type { DailyTask } from "@/types/dailyTasks"
 import { toStoredImages, type TaskDetailsDraft } from "@/types/taskAttachment"
 import type { AiSource } from "@/types/ai"
+import { formatInstant } from "@/lib/timeZone"
 
 // How long after the last change the task saves itself
 const AUTOSAVE_DELAY_MS = 1000
@@ -58,7 +59,7 @@ const bodyOf = (draft: Draft) =>
 const isSaveable = (draft: Draft) =>
   Boolean(draft.content.trim()) && draft.details.uploading === 0 && draft.details.description.length <= DAILY_TASK_DESCRIPTION_MAX_LENGTH
 
-const clock = () => new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+const clock = () => formatInstant(Date.now(), { hour: "2-digit", minute: "2-digit" })
 
 const levelName = (depth: number) => (depth === 1 ? "Task" : depth === 2 ? "Subtask" : "Sub-subtask")
 

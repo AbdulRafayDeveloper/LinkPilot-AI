@@ -39,7 +39,7 @@ export function EnglishDescriptionPanel({ english, sourceLanguage, stale, onUse,
       </div>
       {/* A long description would otherwise push the targets and the buttons off the screen, so it
           scrolls inside the panel, and gives back more of that room on a short laptop window */}
-      <p className="max-h-40 short:max-h-20 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-on-surface">{english}</p>
+      <p className="max-h-40 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-on-surface">{english}</p>
       {stale && (
         <p role="status" className="text-[12px] text-on-surface-variant">
           {PROMPT_CREATOR_MESSAGES.englishStale}

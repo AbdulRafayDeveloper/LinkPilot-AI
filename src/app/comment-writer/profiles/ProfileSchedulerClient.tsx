@@ -34,6 +34,7 @@ import {
   type WeekDayId,
 } from "@/constants/profileScheduler"
 import type { ProfileSchedule, ProfileScheduleInput, ProfileSchedulePage } from "@/types/profileScheduler"
+import { formatInstant } from "@/lib/timeZone"
 
 /**
  * What the page remembers while the app is open: the day and type filters, the search, the page and the add
@@ -70,7 +71,7 @@ function useRemembered<K extends keyof Remembered>(key: K) {
 
 const NOUN = { one: "person", many: "people" }
 
-const addedOn = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+const addedOn = (iso: string) => formatInstant(iso, { day: "numeric", month: "short", year: "numeric" })
 
 // Comment Writer, told which profile (and which day, when one is chosen here) is being commented on
 const openHref = (profileUrl: string, day: WeekDayId | "") => {
@@ -402,7 +403,7 @@ export default function ProfileSchedulerClient() {
               {/* The eleven fields are the tallest thing on this page. On a short laptop window they
                   scroll inside the form, so the heading, the Add person button and the list of people
                   below all stay where they are instead of being pushed off the screen. */}
-              <div className="contents short:block short:max-h-[150px] short:overflow-y-auto short:pr-1">
+              <div className="contents">
               <ProfileScheduleFields
                 idPrefix="add-profile"
                 isUrlRequired
@@ -531,7 +532,7 @@ export default function ProfileSchedulerClient() {
                 )}
 
                 {/* The table from xl, where it fits beside the open sidebar; cards below, two to a row on a tablet */}
-                <div className="hidden overflow-x-auto short:max-h-[46vh] short:overflow-y-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
                   <table className="w-full min-w-[880px] border-collapse text-left">
                     <caption className="sr-only">Scheduled profiles, page {page} of {totalPages}</caption>
                     <thead className="bg-surface-container-lowest">
@@ -565,7 +566,7 @@ export default function ProfileSchedulerClient() {
                   </table>
                 </div>
 
-                <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 short:max-h-[44vh] short:overflow-y-auto short:pr-1 xl:hidden">
+                <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {items.map((schedule) => (
                     <li key={schedule.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
                       <div className="flex items-start gap-2">

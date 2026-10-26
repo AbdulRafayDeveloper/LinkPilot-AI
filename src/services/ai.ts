@@ -3,11 +3,24 @@ import Groq, { toFile as toGroqFile } from "groq-sdk"
 import { ChatOpenAI } from "@langchain/openai"
 import { ChatGroq } from "@langchain/groq"
 import { Embeddings } from "@langchain/core/embeddings"
-import type { BaseMessage } from "@langchain/core/messages"
+import { HumanMessage, type BaseMessage } from "@langchain/core/messages"
+import { shrinkPastedBlocks } from "@/lib/pastedText"
 import type { InteropZodType } from "@langchain/core/utils/types"
 import { env, GROQ_API_KEYS, GROQ_KEY_VARIABLES } from "@/config/env"
 import { UserFacingError } from "@/lib/errors"
-import { describeProviderFailure, isDailyLimit, isKeyLimitError, keyRestMs, redactSecrets, type ProviderNames } from "@/lib/providerErrors"
+import {
+  describeProviderFailure,
+  fitAnswerTokens,
+  isDailyLimit,
+  isKeyLimitError,
+  keyRestMs,
+  redactSecrets,
+  refusedReasoningSetting,
+  RequestTooLargeError,
+  tokenCeilingOf,
+  wroteNoJson,
+  type ProviderNames,
+} from "@/lib/providerErrors"
 import { startKeyFor, withKeyRotation } from "@/lib/keyRotation"
 import { currentModelOrder } from "@/lib/modelOrder"
 import { withRetry } from "@/lib/retry"
@@ -33,6 +46,8 @@ export interface ModelOptions {
   temperature?: number
   timeout?: number
   maxRetries?: number
+  // The room the answer may take; left out, the provider's own default applies
+  maxTokens?: number
 }
 
 const DEFAULT_TEMPERATURE = 0.1
@@ -177,7 +192,11 @@ function runWithGroqKeys<T>(
 }
 
 /** The Groq chat model (GROQ_MODEL, or GROQ_VISION_MODEL for a screenshot) on one key. */
-export function createGroqModel(apiKey: string, options: Omit<ModelOptions, "timeout"> = {}, input: ModelInput = "text"): ChatGroq {
+export function createGroqModel(
+  apiKey: string,
+  options: Omit<ModelOptions, "timeout"> & { reasoningEffort?: "low" } = {},
+  input: ModelInput = "text"
+): ChatGroq {
   const model = input === "image" ? requireModel(env.GROQ_VISION_MODEL, "GROQ_VISION_MODEL") : requireModel(env.GROQ_MODEL, "GROQ_MODEL")
   return new ChatGroq({ apiKey, model, temperature: DEFAULT_TEMPERATURE, ...options })
 }
@@ -420,10 +439,10 @@ export interface StructuredGenerationOptions<T extends Record<string, unknown>> 
   // Returns a reason when the output is unusable, which triggers the fallback provider
   validate?: (output: T) => string | null
   /**
-   * How much room the answer needs, for a schema big enough that the provider's own default cuts it
-   * off mid-JSON (a meeting part). Left out, the provider decides, which is right for every tool
-   * that writes a short piece: Groq counts what is **requested** against the per-minute allowance,
-   * so reserving thousands of tokens a tool will never use would rate limit it for nothing.
+   * How much room the answer needs, for a schema big enough that the usual room cuts it off mid-JSON
+   * (a meeting part). Left out, OpenAI decides, and Groq gets `GROQ_ANSWER_TOKENS`: Groq counts what
+   * is **requested** against the per-minute allowance, so reserving thousands of tokens a tool will
+   * never use would rate limit it for nothing.
    */
   maxTokens?: number
 }
@@ -448,27 +467,126 @@ function parsedOf<T>(answer: RawStructured<T>): T {
   return answer.parsed
 }
 
+/**
+ * The room a Groq answer gets when the caller names none. It is the ceiling Groq applied before the
+ * room was named (no recorded answer has been longer), so naming it changes nothing for an ordinary
+ * call. What it does change is the reservation: Groq counts a request as its input plus the room for
+ * the answer, and with no room named it reserved what it liked, about 1,000 tokens on one account
+ * and 3,000 on another. The same request then passed on one key and was refused on the next.
+ */
+const GROQ_ANSWER_TOKENS = 3_072
+// The least room worth asking for: a reasoning model needs this much to think and still close its JSON
+const GROQ_MIN_ANSWER_TOKENS = 1_024
+// Kept back when the room is fitted, because Groq's count of the input is its own estimate
+const GROQ_FIT_MARGIN_TOKENS = 128
+// A fitted room that is still refused is fitted once more from the new numbers, and then given up
+const GROQ_MAX_FITS = 2
+// The room aimed for when the pasted text has to be shortened, so it is cut once rather than bit by bit
+const GROQ_SHORTENED_ANSWER_TOKENS = 1_536
+// Shortening pasted text is tried this many times before the request is called too large
+const GROQ_MAX_SHORTENINGS = 2
+// Cut a little more than the numbers say, since characters per token differ between parts of a prompt
+const SHORTEN_SLACK = 1.15
+
+// One Groq request as it is asked again: what is sent, the room asked for, and what has been tried
+interface GroqAttempt {
+  messages: BaseMessage[]
+  answerTokens: number
+  fits: number
+  shortenings: number
+}
+
+const lengthOf = (messages: BaseMessage[]) => messages.reduce((sum, message) => sum + (typeof message.content === "string" ? message.content.length : 0), 0)
+
+/**
+ * The same messages with about `removeChars` fewer characters of the text the user pasted (a profile,
+ * a conversation, a post), and nothing else touched: never the user's own profile, the tone's prompt
+ * or the rules. Null when there is no pasted text left to shorten.
+ */
+function withShorterPastedText(messages: BaseMessage[], removeChars: number): BaseMessage[] | null {
+  let changed = false
+  const shorter = messages.map((message) => {
+    if (!(message instanceof HumanMessage) || typeof message.content !== "string") return message
+    const content = shrinkPastedBlocks(message.content, removeChars)
+    if (content === null) return message
+    changed = true
+    return new HumanMessage(content)
+  })
+  return changed ? shorter : null
+}
+
+/**
+ * What to ask a Groq key next after it refused a request as too large for its per-minute ceiling (a
+ * long pasted profile together with the sender's own profile, say). First the answer room is cut to
+ * what fits, which Groq's own numbers say exactly. When even the least room would not fit, the text
+ * the user pasted is shortened by what is over and the room fitted again. Any other failure is thrown
+ * on as it was, and a request that still cannot fit is a `RequestTooLargeError`: no key's fault, so the
+ * next provider takes the work, with everything that was pasted.
+ */
+function nextGroqAttempt(error: unknown, attempt: GroqAttempt): GroqAttempt {
+  const ceiling = tokenCeilingOf(error)
+  if (!ceiling) throw error
+  const inputTokens = ceiling.requested - attempt.answerTokens
+  const room = attempt.fits < GROQ_MAX_FITS ? fitAnswerTokens(ceiling, attempt.answerTokens, { min: GROQ_MIN_ANSWER_TOKENS, margin: GROQ_FIT_MARGIN_TOKENS }) : null
+  if (room !== null) {
+    console.warn(`📏 Groq counted ${ceiling.requested} tokens against its limit of ${ceiling.limit}; asking again with room for ${room} in the answer instead of ${attempt.answerTokens}`)
+    return { ...attempt, answerTokens: room, fits: attempt.fits + 1 }
+  }
+  const overTokens = inputTokens - (ceiling.limit - GROQ_SHORTENED_ANSWER_TOKENS - GROQ_FIT_MARGIN_TOKENS)
+  const removeChars = Math.ceil(overTokens * (lengthOf(attempt.messages) / inputTokens) * SHORTEN_SLACK)
+  const messages = attempt.shortenings < GROQ_MAX_SHORTENINGS ? withShorterPastedText(attempt.messages, removeChars) : null
+  if (!messages) throw new RequestTooLargeError(inputTokens, ceiling.limit)
+  console.warn(`✂️ ${inputTokens} tokens of input leave Groq no room to answer under its limit of ${ceiling.limit}; shortening the pasted text by about ${removeChars} characters for Groq`)
+  return { messages, answerTokens: GROQ_SHORTENED_ANSWER_TOKENS, fits: 0, shortenings: attempt.shortenings + 1 }
+}
+
 async function invokeStructured<T extends Record<string, unknown>>(
   provider: ModelProvider,
   { schema, name, messages, temperature = DEFAULT_TEMPERATURE, input = "text", maxTokens }: StructuredGenerationOptions<T>,
   signal: AbortSignal
 ): Promise<T> {
   /**
-   * How much the model may write, **only where the caller asks for room**. It is left to the
-   * provider's own default everywhere else on purpose: Groq counts what is requested against the
-   * per-minute allowance, so a tool that writes 300 characters must not reserve thousands of tokens
-   * it will never use.
+   * How much the model may write, **only where the caller asks for room**, for OpenAI and the
+   * open-source model. Groq always gets a number of its own (below), because what it reserves when
+   * none is given differs from one account to the next.
    */
   const modelOptions = { temperature, maxRetries: 0, ...(maxTokens ? { maxTokens } : {}) }
   const kind = input === "image" ? "screenshot" : "text"
   const model = modelNameOf(provider, input)
   if (provider === "groq") {
+    // Shared by every key this call goes round, so what was fitted on one key is what the next is asked for
+    let attempt: GroqAttempt = { messages, answerTokens: maxTokens ?? GROQ_ANSWER_TOKENS, fits: 0, shortenings: 0 }
+    /**
+     * Set once the model has failed to hand back its JSON, by thinking through all of its room or by
+     * leaving the answer empty. The room can't grow past the per-minute ceiling, so the same request is
+     * asked again with less thinking, which is plenty for a short piece. A model with no such setting
+     * says so, and is then simply asked again as it was.
+     */
+    let thinkLess = false
+    let canThinkLess = true
     return withGroqKey(async (apiKey, keyNumber) => {
-      const answer = (await createGroqModel(apiKey, modelOptions, input)
-        .withStructuredOutput(schema, { name, includeRaw: true })
-        .invoke(messages, { signal })) as RawStructured<T>
-      await recordAiUsage({ provider, model, kind, usage: answer.raw.usage_metadata, keyNumber })
-      return parsedOf(answer)
+      for (;;) {
+        try {
+          const options = { ...modelOptions, maxTokens: attempt.answerTokens, ...(thinkLess ? { reasoningEffort: "low" as const } : {}) }
+          const answer = (await createGroqModel(apiKey, options, input)
+            .withStructuredOutput(schema, { name, includeRaw: true })
+            .invoke(attempt.messages, { signal })) as RawStructured<T>
+          await recordAiUsage({ provider, model, kind, usage: answer.raw.usage_metadata, keyNumber })
+          return parsedOf(answer)
+        } catch (error: unknown) {
+          if (thinkLess && refusedReasoningSetting(error)) {
+            thinkLess = false
+            canThinkLess = false
+            continue
+          }
+          if (!thinkLess && canThinkLess && wroteNoJson(error)) {
+            thinkLess = true
+            console.warn(`🧠 Groq handed back no usable JSON within ${attempt.answerTokens} tokens; asking again with less reasoning`)
+            continue
+          }
+          attempt = nextGroqAttempt(error, attempt)
+        }
+      }
     }, signal)
   }
   const answer = (
@@ -510,6 +628,14 @@ export function missingConfiguration(providers: readonly ModelProvider[] = curre
  */
 export class ProviderBusyError extends UserFacingError {}
 
+/**
+ * How many times a provider whose answer failed the tool's own check (`validate`: a placeholder, an
+ * empty field) is asked again before the next provider takes over. Models answer differently each
+ * time, so a second ask usually lands, and without it one unlucky draft failed the request outright
+ * whenever the next provider could not help (a key it rejects, say).
+ */
+const UNUSABLE_OUTPUT_RETRIES = 1
+
 export async function generateStructuredWithFallback<T extends Record<string, unknown>>(
   options: StructuredGenerationOptions<T>
 ): Promise<StructuredGeneration<T>> {
@@ -531,10 +657,13 @@ export async function generateStructuredWithFallback<T extends Record<string, un
     const timeout = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_GENERATION_TIMEOUT_MS)
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
     try {
-      const data = await withProviderRetry(provider, () => invokeStructured(provider, options, signal), signal)
-      const problem = options.validate?.(data) ?? null
-      if (problem) throw new Error(`UnusableOutputException: ${problem}`)
-      return { data, provider }
+      for (let attempt = 0; ; attempt++) {
+        const data = await withProviderRetry(provider, () => invokeStructured(provider, options, signal), signal)
+        const problem = options.validate?.(data) ?? null
+        if (!problem) return { data, provider }
+        if (attempt >= UNUSABLE_OUTPUT_RETRIES) throw new Error(`UnusableOutputException: ${problem}`)
+        console.warn(`↻ ${provider} wrote something the tool could not use (${problem}); asking it once more`)
+      }
     } catch (error: unknown) {
       if (options.signal?.aborted) throw error
       lastError = error

@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Loader2, Pencil, Play, RefreshCw, Trash2 } from "lucide-react"
+import { AlertTriangle, ArrowLeft, CalendarCheck, ChevronDown, ChevronUp, Loader2, Pencil, Play, RefreshCw, Trash2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { CopyButton } from "@/components/ui/CopyButton"
@@ -21,9 +21,11 @@ import { requestApi } from "@/lib/apiClient"
 import { MEETINGS_ENDPOINT, MEETING_MESSAGES, TRANSCRIPT_PREVIEW_CHARS } from "@/constants/meetings"
 import type { Meeting, MeetingInput } from "@/types/meetings"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
+import { dayLabel, formatTime } from "@/lib/meetingDates"
+import { formatInstant } from "@/lib/timeZone"
 
 const when = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+  formatInstant(iso, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 export default function MeetingDetailClient({ id }: { id: string }) {
   const router = useRouter()
@@ -149,7 +151,7 @@ export default function MeetingDetailClient({ id }: { id: string }) {
           <div className="max-w-[1400px] mx-auto flex flex-col gap-4 p-4 md:p-6 lg:p-8">
             <Link
               href="/meetings"
-              className="inline-flex w-fit items-center gap-1.5 text-[12px] font-semibold text-outline transition-colors hover:text-primary"
+              className="inline-flex min-h-6 w-fit items-center gap-1.5 text-[12px] font-semibold text-outline transition-colors hover:text-primary"
             >
               <ArrowLeft size={14} aria-hidden="true" />
               All meetings
@@ -194,6 +196,20 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                       {meeting.isTitleGenerated && " · name written by the analysis"}
                       {meeting.analysis && <AiSourceLabel source={meeting.analysisSource} />}
                     </p>
+                    {/* The planned meeting this is the record of: a recording started from Meeting Planner is
+                        linked from the start, and any other can be linked from the meetings list */}
+                    {meeting.plan && (
+                      <Link
+                        href={`/meeting-planner/${meeting.plan.id}`}
+                        className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1.5 text-[12px] text-primary transition-colors hover:bg-primary/10"
+                      >
+                        <CalendarCheck size={14} className="shrink-0" aria-hidden="true" />
+                        <span className="truncate">
+                          {meeting.recording ? "Recording of" : "Notes of"} <span className="font-semibold">{meeting.plan.name}</span> ·{" "}
+                          {dayLabel(meeting.plan.meetingDate)} {formatTime(meeting.plan.meetingTime)}
+                        </span>
+                      </Link>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2 sm:shrink-0">
                     {canAnalyse && (

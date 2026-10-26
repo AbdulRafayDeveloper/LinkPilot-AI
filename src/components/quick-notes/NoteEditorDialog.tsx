@@ -9,6 +9,7 @@ import { NOTE_AUTOSAVE_DELAY_MS, NOTE_MAX_LENGTH, NOTE_TITLE_MAX_LENGTH, QUICK_N
 import { canKeepalive } from "@/constants/textLimits"
 import { NOTE_EDITOR_IMAGES } from "./noteEditorImages"
 import type { QuickNote, QuickNoteInput } from "@/types/quickNotes"
+import { formatInstant } from "@/lib/timeZone"
 
 type Form = Required<QuickNoteInput>
 
@@ -28,7 +29,7 @@ const formOf = (note: QuickNote): Form => ({ title: note.title, content: note.co
 const isSaveable = (form: Form) =>
   Boolean(form.content.trim()) && form.content.length <= NOTE_MAX_LENGTH && form.title.length <= NOTE_TITLE_MAX_LENGTH
 
-const clock = () => new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+const clock = () => formatInstant(Date.now(), { hour: "2-digit", minute: "2-digit" })
 
 const fieldClass =
   "h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"

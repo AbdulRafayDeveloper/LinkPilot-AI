@@ -10,6 +10,7 @@ import {
   CalendarPlus,
   Clock,
   ExternalLink,
+  FileText,
   Loader2,
   NotebookPen,
   Pencil,
@@ -30,6 +31,9 @@ import { MeetingChatPanel } from "@/components/meeting-planner/MeetingChatPanel"
 import { endConversationEdit, useConversationDraft } from "@/components/meeting-planner/ConversationEditor"
 import { MeetingFormModal, formValuesOf, updateScopeOf, type MeetingFormValues } from "@/components/meeting-planner/MeetingFormModal"
 import { JoinLink } from "@/components/meeting-planner/JoinLink"
+import { RecordedBadge } from "@/components/meeting-planner/RecordedBadge"
+import { LinkedMeetingsDialog } from "@/components/meeting-planner/LinkedMeetingsDialog"
+import { QuickRecordButton } from "@/components/meetings/QuickRecordButton"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
@@ -46,6 +50,7 @@ import { MoveMeetingModal } from "@/components/meeting-planner/MoveMeetingModal"
 import { ExtendSeriesModal } from "@/components/meeting-planner/ExtendSeriesModal"
 import { RichTextView } from "@/components/ui/RichTextView"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
+import { formatInstant } from "@/lib/timeZone"
 
 /** One of the three things the user pasted, shown only when there is something to show. */
 const SuppliedText: React.FC<{ title: string; text: string | null }> = ({ title, text }) =>
@@ -62,9 +67,14 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
   const router = useRouter()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [meeting, setMeeting] = useState<MeetingPlanDetail | null>(null)
-  // Only the meeting's own GET counts its series, so a later answer (a status, an edit) keeps that count
+  // Only the meeting's own GET counts its series and its records, so a later answer (a status, an edit) keeps those counts
   const showMeeting = (data: MeetingPlanDetail) =>
-    setMeeting((current) => ({ ...data, seriesSize: data.seriesSize ?? current?.seriesSize }))
+    setMeeting((current) => ({
+      ...data,
+      seriesSize: data.seriesSize ?? current?.seriesSize,
+      linkedCount: data.linkedCount ?? current?.linkedCount,
+      recordedCount: data.recordedCount ?? current?.recordedCount,
+    }))
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loadAttempt, setLoadAttempt] = useState(0)
@@ -81,6 +91,8 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
   const [deletingScope, setDeletingScope] = useState<DeleteScopeId | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isWritingNotes, setIsWritingNotes] = useState(false)
+  // The recordings and notes linked to this meeting, in the calendar's own popup
+  const [isShowingLinked, setIsShowingLinked] = useState(false)
   // Changing the day or time with a choice of this meeting or the whole series
   const [isMoving, setIsMoving] = useState(false)
   const [isSavingMove, setIsSavingMove] = useState(false)
@@ -285,7 +297,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
           <div className="mx-auto flex max-w-[1000px] flex-col gap-5 p-4 md:p-6 lg:p-8">
             <Link
               href="/meeting-planner"
-              className="inline-flex w-fit items-center gap-2 rounded-lg text-[13px] font-semibold text-on-surface-variant transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="inline-flex min-h-6 w-fit items-center gap-2 rounded-lg text-[13px] font-semibold text-on-surface-variant transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               <ArrowLeft size={15} aria-hidden="true" />
               All meetings
@@ -323,6 +335,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                         <h1 className="text-xl font-bold text-on-surface md:text-2xl">{meeting.name}</h1>
                         <PrepBadge meeting={isPreparing ? { prepEnabled: true, prepStatus: "generating" } : meeting} />
                         <SeriesBadge meeting={meeting} />
+                        <RecordedBadge meeting={meeting} onOpen={() => setIsShowingLinked(true)} />
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-on-surface-variant">
                         <span className="inline-flex items-center gap-1.5">
@@ -354,6 +367,18 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      {/* Record it from its own page: the recording is filed under this meeting from the start */}
+                      <QuickRecordButton plan={{ id: meeting.id, name: meeting.name }} />
+                      {(meeting.linkedCount ?? 0) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setIsShowingLinked(true)}
+                          className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-[13px] font-semibold text-primary transition-colors hover:bg-primary/10"
+                        >
+                          <FileText size={14} aria-hidden="true" />
+                          Recordings and notes ({meeting.linkedCount})
+                        </button>
+                      )}
                       <MeetingStatusButton meeting={meeting} isSaving={isSavingStatus} onChange={changeStatus} />
                       {/* Notes, before the meeting or after it. The dot says there is something to read. */}
                       <button
@@ -444,7 +469,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                           {meeting.notesUpdatedAt && (
                             <span className="text-[11px] text-outline">
                               Written{" "}
-                              {new Date(meeting.notesUpdatedAt).toLocaleString(undefined, {
+                              {formatInstant(meeting.notesUpdatedAt, {
                                 day: "numeric",
                                 month: "short",
                                 hour: "2-digit",
@@ -479,7 +504,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                           : meeting.prepStatus === "failed"
                             ? meeting.prepError || MEETING_PLANNER_MESSAGES.prepFailed
                             : meeting.preparedAt
-                              ? `Prepared ${new Date(meeting.preparedAt).toLocaleString(undefined, {
+                              ? `Prepared ${formatInstant(meeting.preparedAt, {
                                   day: "numeric",
                                   month: "short",
                                   hour: "2-digit",
@@ -586,6 +611,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
         </Modal>
       )}
 
+      {isShowingLinked && meeting && <LinkedMeetingsDialog meeting={meeting} onClose={() => setIsShowingLinked(false)} />}
       {isWritingNotes && meeting && (
         <MeetingNotesModal
           meeting={meeting}

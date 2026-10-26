@@ -192,7 +192,7 @@ export default function PostCommentRepliesClient() {
                     placeholder={COMMENTS_PLACEHOLDER}
                     aria-invalid={formError === missingComment}
                     aria-describedby={formError === missingComment ? `${COMMENTS_HINT_ID} ${FORM_ERROR_ID}` : COMMENTS_HINT_ID}
-                    className="flex-1 w-full min-h-[140px] short:min-h-[64px] resize-none rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary disabled:opacity-70"
+                    className="flex-1 w-full min-h-[140px] resize-none rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-[13px] leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary disabled:opacity-70"
                   />
                   <p id={COMMENTS_HINT_ID} className="text-[11px] text-outline mt-1.5">
                     Paste one comment or a whole thread. Press Ctrl + Enter to generate.
@@ -211,7 +211,6 @@ export default function PostCommentRepliesClient() {
                   onChange={(nextContext) => formStore.update({ context: nextContext })}
                   disabled={isGenerating}
                   columnsClassName="grid-cols-1 min-[440px]:grid-cols-2"
-                  compactOnShortScreens
                 />
                 <PostInput
                   idPrefix={ID_PREFIX}
@@ -244,9 +243,6 @@ export default function PostCommentRepliesClient() {
                   value={style}
                   onChange={(nextStyle) => formStore.update({ style: nextStyle })}
                   disabled={isGenerating}
-                  columnsClassName="grid-cols-2 min-[480px]:grid-cols-3 short:grid-cols-4"
-                  wrapLabels
-                  compactOnShortScreens
                 />
 
                 {formError && (

@@ -174,7 +174,6 @@ export const AddPromptDialog: React.FC<AddPromptDialogProps> = ({ endpoint, fold
               onChange={setTarget}
               disabled={isSaving}
               columnsClassName="grid-cols-1"
-              wrapLabels
             />
 
             <label className="flex shrink-0 flex-col gap-1.5">

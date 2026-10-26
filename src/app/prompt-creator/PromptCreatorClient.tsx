@@ -223,7 +223,7 @@ export default function PromptCreatorClient() {
         />
 
         <main className="flex-1 overflow-y-auto bg-background overflow-x-hidden">
-          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:h-full">
+          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:min-h-full">
             {/* Page header */}
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 shrink-0">
               <div className="min-w-0">
@@ -250,7 +250,7 @@ export default function PromptCreatorClient() {
 
             {/* The form takes about 65% and the written prompt 35%: what is typed, the targets, the
                 project and the choices all live on the left, while the prompt itself reads fine narrower */}
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)] gap-5 short:gap-3 lg:flex-1 lg:min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)] gap-5 short:gap-3 lg:flex-1">
               {/* What the user wants done */}
               {/* gap-5 between the blocks, so the targets, the project and the choice below the text box
                   are not crowded together now that the form has the wider side */}
@@ -278,7 +278,7 @@ export default function PromptCreatorClient() {
                     disabled={isBusy}
                     aria-invalid={requestInvalid}
                     placeholder="Describe the task in your own words. Example: add a dark mode toggle to my Next.js dashboard and make sure nothing else breaks."
-                    className={`w-full flex-1 min-h-[180px] short:min-h-[72px] resize-none rounded-xl border bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
+                    className={`w-full flex-1 min-h-[180px] resize-none rounded-xl border bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 ${
                       requestInvalid ? "border-error" : "border-outline-variant focus:border-primary/50"
                     }`}
                   />
@@ -332,7 +332,6 @@ export default function PromptCreatorClient() {
                   }}
                   disabled={isGenerating}
                   invalid={formError === PROMPT_CREATOR_MESSAGES.missingTarget}
-                  wrapLabels
                 />
 
                 {/* What the prompt is for. The project chosen last is waiting next time, and its

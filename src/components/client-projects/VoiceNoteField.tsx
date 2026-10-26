@@ -1,8 +1,9 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { Loader2, Mic, Play, Square, Trash2 } from "lucide-react"
+import { ClipboardPaste, Loader2, Mic, Play, Square, Trash2 } from "lucide-react"
 import { requestApi } from "@/lib/apiClient"
+import { measureDuration } from "@/lib/voiceDuration"
 import {
   PROJECT_TASK_MESSAGES,
   PROJECT_VOICE_ENDPOINT,
@@ -32,6 +33,29 @@ interface VoiceNoteFieldProps {
 /** The clock while recording, and the length of a note that is already there. */
 export const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`
 
+/** The audio files among what was pasted, each once (a browser may list one file under both). */
+const pastedAudio = (data: DataTransfer | null): File[] => {
+  if (!data) return []
+  const fromItems = Array.from(data.items)
+    .filter((item) => item.kind === "file" && item.type.startsWith("audio/"))
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => file !== null)
+  const files = [...Array.from(data.files).filter((file) => file.type.startsWith("audio/")), ...fromItems]
+  return files.filter((file, index) => files.findIndex((other) => other.name === file.name && other.size === file.size) === index)
+}
+
+/**
+ * Whether a paste on the page is this field's to take. Only one field may answer it: while a popup
+ * is open (editing an item) the field inside that popup does, and the add form behind it does not;
+ * with no popup open, the field on the page does.
+ */
+const ownsThePaste = (root: HTMLElement | null): boolean => {
+  if (!root) return false
+  const dialogs = document.querySelectorAll('[aria-modal="true"]')
+  const top = dialogs[dialogs.length - 1]
+  return top ? top.contains(root) : true
+}
+
 /**
  * One voice note on a task: record it, hear it back, or take it off.
  *
@@ -40,6 +64,11 @@ export const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(
  * speech into text through a model: nothing here is transcribed, nothing is sent to a provider, and
  * what is kept is the recording itself. The clock stops it at the shared six-minute limit, so a
  * recording the server would refuse is never made.
+ *
+ * **A voice can also be pasted** instead of recorded, the way Client Voices takes one: Ctrl+V
+ * anywhere on the page, or the Paste voice button where the browser lets a page read the clipboard.
+ * A WhatsApp voice copied as a file is Ogg/Opus, which the server reads from its bytes like any
+ * recording, so it is uploaded as it is and saved with the item when the item is saved.
  */
 export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, onError, disabled, canRecord = true, endpoint = PROJECT_VOICE_ENDPOINT }) => {
   const [isRecording, setIsRecording] = useState(false)
@@ -49,6 +78,8 @@ export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, 
   const chunks = useRef<Blob[]>([])
   const startedAt = useRef(0)
   const timer = useRef<number | null>(null)
+  const root = useRef<HTMLDivElement>(null)
+  const [isReadingClipboard, setIsReadingClipboard] = useState(false)
 
   const stopClock = () => {
     if (timer.current !== null) window.clearInterval(timer.current)
@@ -84,6 +115,59 @@ export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, 
     },
     [onChange, onError, endpoint]
   )
+
+  /** A voice that arrived as a file: checked, measured, then stored like a recording. */
+  const take = useCallback(
+    async (file: File) => {
+      if (file.size > VOICE_NOTE_MAX_BYTES) {
+        onError(PROJECT_TASK_MESSAGES.voiceTooLarge)
+        return
+      }
+      await save(file, await measureDuration(file))
+    },
+    [onError, save]
+  )
+
+  const isBusy = Boolean(disabled) || isRecording || isSaving || !canRecord
+
+  // A voice pasted anywhere on the page lands here, so nothing has to be focused first
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      if (isBusy || !ownsThePaste(root.current)) return
+      const [audio] = pastedAudio(event.clipboardData)
+      if (!audio) return
+      event.preventDefault()
+      void take(audio)
+    }
+    window.addEventListener("paste", handlePaste)
+    return () => window.removeEventListener("paste", handlePaste)
+  }, [isBusy, take])
+
+  /** The button version of the same thing, for browsers that let a page read the clipboard. */
+  const readClipboard = async () => {
+    if (isBusy || isReadingClipboard) return
+    onError(null)
+    setIsReadingClipboard(true)
+    try {
+      if (!navigator.clipboard?.read) {
+        onError(PROJECT_TASK_MESSAGES.clipboardBlocked)
+        return
+      }
+      for (const item of await navigator.clipboard.read()) {
+        const audioType = item.types.find((type) => type.startsWith("audio/"))
+        if (!audioType) continue
+        const blob = await item.getType(audioType)
+        await take(new File([blob], "pasted-voice", { type: audioType }))
+        return
+      }
+      onError(PROJECT_TASK_MESSAGES.noVoiceOnClipboard)
+    } catch {
+      // Reading the clipboard is refused in plenty of browsers, and that is worth saying
+      onError(PROJECT_TASK_MESSAGES.clipboardBlocked)
+    } finally {
+      setIsReadingClipboard(false)
+    }
+  }
 
   const stop = useCallback(() => {
     stopClock()
@@ -156,7 +240,7 @@ export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, 
 
   if (note) {
     return (
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-2">
+      <div ref={root} className="flex flex-wrap items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-2">
         <Play size={14} className="shrink-0 text-primary" aria-hidden="true" />
         <audio src={note.url} controls className="h-9 min-w-0 flex-1" aria-label="The voice note on this task" />
         <span className="text-[11px] text-outline">{clock(note.seconds)}</span>
@@ -169,7 +253,7 @@ export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, 
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div ref={root} className="flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={isRecording ? stop : start}
@@ -186,13 +270,25 @@ export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, 
         )}
         {isSaving ? "Saving..." : isRecording ? `Stop (${clock(seconds)} / ${clock(VOICE_NOTE_MAX_SECONDS)})` : "Record a voice note"}
       </button>
+      {!isRecording && !isSaving && (
+        <button
+          type="button"
+          onClick={readClipboard}
+          disabled={disabled || !canRecord || isReadingClipboard}
+          title={canRecord ? undefined : PROJECT_TASK_MESSAGES.voiceStorageUnavailable}
+          className={buttonClass}
+        >
+          {isReadingClipboard ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <ClipboardPaste size={14} aria-hidden="true" />}
+          {PROJECT_TASK_MESSAGES.pasteVoice}
+        </button>
+      )}
       {/* A quarter of an hour is long enough that it should not simply stop, so the last minute counts down */}
       {isRecording && VOICE_NOTE_MAX_SECONDS - seconds <= VOICE_NOTE_WARN_SECONDS ? (
         <span role="status" className="text-[11px] font-semibold text-error">
           {Math.max(0, Math.ceil(VOICE_NOTE_MAX_SECONDS - seconds))}s left
         </span>
       ) : (
-        <span className="text-[11px] text-outline">{canRecord ? `Up to ${clock(VOICE_NOTE_MAX_SECONDS)}` : PROJECT_TASK_MESSAGES.voiceStorageUnavailable}</span>
+        <span className="text-[11px] text-outline">{canRecord ? `Up to ${clock(VOICE_NOTE_MAX_SECONDS)}, ${PROJECT_TASK_MESSAGES.pasteVoiceHint}` : PROJECT_TASK_MESSAGES.voiceStorageUnavailable}</span>
       )}
     </div>
   )

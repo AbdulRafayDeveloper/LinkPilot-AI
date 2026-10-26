@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, Circle, CloudUpload, Headphones, Laptop, Loader2, Mic, MonitorUp, Pause, Play, Square, Video, WifiOff } from "lucide-react"
+import { AlertTriangle, ArrowLeft, CalendarCheck, Camera, CheckCircle2, Circle, CloudUpload, Headphones, Laptop, Loader2, Mic, MonitorUp, Pause, Play, Square, Video, WifiOff } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -67,7 +67,8 @@ const SoundMeter: React.FC<{ label: string; icon: React.ElementType; level: numb
 /**
  * Record a meeting: share the call's tab or screen with its sound, speak into the microphone, and the
  * app uploads it in chunks while it records. Stopping waits for the last chunk, then opens the meeting,
- * where the recording is joined, written out and turned into notes.
+ * where the recording is joined into a video and waits: it is written out and turned into notes only
+ * when Transcribe and analyse is pressed there.
  */
 export default function RecordMeetingClient() {
   const router = useRouter()
@@ -108,7 +109,7 @@ export default function RecordMeetingClient() {
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
           <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4 md:p-6 lg:p-8">
-            <Link href="/meetings" className="inline-flex w-fit items-center gap-1.5 text-[12px] font-semibold text-outline transition-colors hover:text-primary">
+            <Link href="/meetings" className="inline-flex min-h-6 w-fit items-center gap-1.5 text-[12px] font-semibold text-outline transition-colors hover:text-primary">
               <ArrowLeft size={14} aria-hidden="true" />
               All meetings
             </Link>
@@ -119,7 +120,8 @@ export default function RecordMeetingClient() {
               </h1>
               <p className="mt-1 text-sm text-on-surface-variant">
                 Record a meeting, a WhatsApp call, a video, or just yourself: your voice and whatever the laptop plays. It uploads while it
-                records; when you stop, it is written out and turned into notes, and it gets a name you can change.
+                records and is saved when you stop. Nothing is written out or analysed until you press Transcribe and analyse on the
+                recording.
               </p>
             </div>
 
@@ -157,7 +159,6 @@ export default function RecordMeetingClient() {
                   options={RECORDING_SOUND_MODES}
                   value={sound}
                   onChange={setSound}
-                  wrapLabels
                 />
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <label className={toggleClass}>
@@ -203,6 +204,10 @@ export default function RecordMeetingClient() {
                       So the laptop&apos;s sound is recorded, in the next step:
                     </p>
                     <ul className="flex flex-col gap-1.5 pl-5">
+                      <li className="list-disc">
+                        The picker opens on <span className="font-semibold text-on-surface">Entire screen</span> already; check that system audio
+                        is switched on, then press <span className="font-semibold text-on-surface">Share</span>.
+                      </li>
                       <li className="list-disc">
                         <span className="font-semibold text-on-surface">Anything that plays on the laptop</span> (a WhatsApp call, the Zoom or Teams app,
                         YouTube, any tab): pick <span className="font-semibold text-on-surface">Entire screen</span> and switch on{" "}
@@ -287,6 +292,19 @@ export default function RecordMeetingClient() {
                     </div>
                   )}
                 </div>
+
+                {/* Started from Meeting Planner: it is filed under that meeting from the start */}
+                {recorder.plan && (
+                  <Link
+                    href={`/meeting-planner/${recorder.plan.id}`}
+                    className="flex w-fit items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-[12px] text-primary hover:bg-primary/10"
+                  >
+                    <CalendarCheck size={14} className="shrink-0" aria-hidden="true" />
+                    <span>
+                      Linked to <span className="font-semibold">{recorder.plan.name}</span> in Meeting Planner
+                    </span>
+                  </Link>
+                )}
 
                 {recorder.preview && (
                   <video ref={previewRef} autoPlay muted playsInline className="aspect-video w-full rounded-xl border border-outline-variant bg-on-surface/90 object-contain" />

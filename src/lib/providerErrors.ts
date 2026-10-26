@@ -74,13 +74,23 @@ export function describeProviderFailure(error: unknown, { label, keyVariable, mo
   if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
     return `${label} took too long to answer and the request was stopped.`
   }
+  if (error instanceof RequestTooLargeError) {
+    return `${label} cannot take a request this long: it is about ${error.inputTokens.toLocaleString("en-US")} tokens, and each key may use ${error.limit.toLocaleString("en-US")} a minute. Paste less text, such as the profile without its activity and posts.`
+  }
   if (status === 401 || status === 403 || /api key not valid|invalid[_ ]api[_ ]key|unauthorized|permission denied/.test(lower)) {
     return `${label} rejected the API key. Check ${keyVariable} where the app is deployed, including a stray space or a newline at the end of it.`
   }
   if (status === 404 || /model not found|does not exist|is not found for api version|unknown model/.test(lower)) {
     return `${label} does not have the model named in ${modelVariable}, or this key cannot use it. Check that value.`
   }
-  if (/quota|billing|insufficient[_ ]quota|exceeded your current quota/.test(lower)) {
+  if (PER_DAY_LIMIT.test(message)) {
+    return `${label} has used up its daily token limit on every key. It frees up again over the next hour, or add a key from another ${label} account.`
+  }
+  if (status === 413 && TOKEN_RATE_LIMIT.test(message)) {
+    return `${label} cannot take a request this long within its per-minute token limit. Paste less text.`
+  }
+  // Groq ends every limit message with a link to its billing page, which says nothing about this key
+  if (/quota|billing|insufficient[_ ]quota|exceeded your current quota/.test(lower.replace(/https?:\/\/\S+/g, ""))) {
     return `${label} says this key is out of quota or has no billing set up. Check the account behind ${keyVariable}.`
   }
   if (status === 429) {
@@ -121,6 +131,68 @@ export function isKeyLimitError(error: unknown): boolean {
  */
 export function isDailyLimit(error: unknown): boolean {
   return PER_DAY_LIMIT.test(messageOf(error))
+}
+
+/**
+ * The per-minute token ceiling a request ran into, from Groq's 413 ("Request too large ... (TPM): Limit
+ * 8000, Requested 11293"). Groq counts a request as its input **plus the room asked for the answer**, so
+ * when the room asked for is known, `requested - room` is the exact size of the input.
+ */
+export interface TokenCeiling {
+  limit: number
+  requested: number
+}
+
+const REQUEST_TOO_LARGE = /Limit (\d+), Requested (\d+)/i
+
+export function tokenCeilingOf(error: unknown): TokenCeiling | null {
+  if (providerStatus(error) !== 413) return null
+  const match = messageOf(error).match(REQUEST_TOO_LARGE)
+  return match ? { limit: Number(match[1]), requested: Number(match[2]) } : null
+}
+
+/**
+ * The answer room that brings a request under its ceiling, or null when even `min` would not fit, so
+ * the input itself is too long. Always less than what was asked for, so fitting again can never loop.
+ */
+export function fitAnswerTokens(ceiling: TokenCeiling, askedFor: number, { min, margin }: { min: number; margin: number }): number | null {
+  const inputTokens = ceiling.requested - askedFor
+  const room = Math.min(ceiling.limit - inputTokens - margin, askedFor - 1)
+  return room >= min ? room : null
+}
+
+/**
+ * Whether the model failed to deliver the JSON it was asked for (Groq's `json_validate_failed`): it
+ * used the whole of its answer room before closing the JSON ("max completion tokens reached before
+ * generating a valid document"), or handed back nothing that could be read at all. A reasoning model
+ * does both when it thinks for too long, so asking it to think less is what helps.
+ */
+const WROTE_NO_JSON = /json_validate_failed|failed to (?:validate|generate) json/i
+
+export function wroteNoJson(error: unknown): boolean {
+  return providerStatus(error) === 400 && WROTE_NO_JSON.test(messageOf(error))
+}
+
+// Groq's refusal of a reasoning setting the model does not have
+const NO_REASONING_SETTING = /reasoning_effort/i
+
+export function refusedReasoningSetting(error: unknown): boolean {
+  return providerStatus(error) === 400 && NO_REASONING_SETTING.test(messageOf(error))
+}
+
+/**
+ * A request whose input alone leaves no room for an answer under the provider's per-minute ceiling.
+ * It belongs to the request, not the key: every key has the same ceiling, so trying the next one
+ * would only fail again, and the next provider is given the work instead.
+ */
+export class RequestTooLargeError extends Error {
+  constructor(
+    readonly inputTokens: number,
+    readonly limit: number
+  ) {
+    super(`Request too large: about ${inputTokens} tokens of input against a per-minute ceiling of ${limit}`)
+    this.name = "RequestTooLargeError"
+  }
 }
 
 /** How long a key that failed that way is tried last: a rejected key for a while, a rate limit for as long as asked. */

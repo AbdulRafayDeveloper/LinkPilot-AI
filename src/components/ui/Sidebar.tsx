@@ -64,7 +64,8 @@ const railHintHandlers = (isCollapsed: boolean, title: string, detail: string, o
  */
 const rowClass = (isCollapsed: boolean, isActive: boolean, compact = false) =>
   `group flex w-full items-center gap-3 tight:gap-2.5 rounded-xl px-2.5 tight:px-2 ${
-    compact ? "py-1.5 tight:py-px" : "py-2 tight:py-[3px]"
+    // A page link is still 24px to tap in a short window (a 20px tile and 2px above and below)
+    compact ? "py-1.5 tight:py-0.5" : "py-2 tight:py-[3px]"
   } text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${whenCollapsed(
     isCollapsed,
     "lg:justify-center lg:px-0"
@@ -87,8 +88,10 @@ const tileClass = (isActive: boolean, compact = false) =>
 // row on a short window; it stays well inside its tile, which is what keeps the row's height fixed
 const iconClass = (compact = false) => (compact ? "h-4 w-4 tight:h-3 tight:w-3" : "h-[18px] w-[18px] tight:h-3.5 tight:w-3.5")
 
+// A long name wraps onto a second line rather than being cut: the panel is 320px between lg and xl,
+// where "Meeting Scheduler & Planner" does not fit on one
 const titleClass = (isCollapsed: boolean, isActive: boolean, compact = false) =>
-  `min-w-0 flex-1 truncate ${
+  `min-w-0 flex-1 break-words ${
     compact ? "text-[14px] tight:text-[13px] leading-5" : "text-[15px] tight:text-[14px] leading-6 tight:leading-5"
   } ${isActive ? "font-semibold text-on-surface" : "font-medium text-on-surface-variant group-hover:text-on-surface"} ${whenCollapsed(
     isCollapsed,

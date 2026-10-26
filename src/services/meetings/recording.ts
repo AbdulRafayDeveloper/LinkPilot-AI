@@ -2,6 +2,7 @@ import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { UserFacingError } from "@/lib/errors"
 import { Meeting as MeetingModel } from "@/models/Meeting"
+import { MeetingPlan } from "@/models/MeetingPlan"
 import {
   completeMultipartUpload,
   deleteObject,
@@ -59,8 +60,10 @@ import { visibleById } from "@/services/auth/viewer"
  *    limit, called again by the page while there is more. The chunks of each video are joined into one
  *    file through a multipart upload whose parts the server assembles (S3 refuses parts under 5 MiB,
  *    so two 4 MB chunks make one part), with the recording's length written into its header so it can
- *    be seeked. Then each audio piece is written out by Whisper on Groq, never OpenAI. When the last
- *    piece is done the transcript goes on the meeting and the ordinary analysis takes over.
+ *    be seeked. There it **stops, at `ready`**: the video plays, and nothing is written out until the
+ *    user presses Transcribe and analyse (`transcribe` on the step). Then each audio piece is written
+ *    out by Whisper on Groq, never OpenAI. When the last piece is done the transcript goes on the
+ *    meeting and the ordinary analysis takes over.
  *
  * Every step records where it got to on the meeting, so a step that is cut off, or a failure, is picked
  * up again exactly there.
@@ -107,14 +110,28 @@ export function toRecordingSummary(recording: StoredRecording): MeetingRecording
 
 const emptyTrack = (mimeType: string): StoredRecordingTrack => ({ mimeType, chunks: {}, total: null, uploadId: null, nextPart: 1, finalKey: null, finalSize: 0 })
 
-/** Saves the meeting a recording goes into, before a single byte is recorded, so every chunk has somewhere to go. */
+/**
+ * Saves the meeting a recording goes into, before a single byte is recorded, so every chunk has
+ * somewhere to go. A recording started from Meeting Planner names its planned meeting (`planId`), and
+ * is **linked to it from this moment**, so the calendar shows it as soon as it exists and a recording
+ * whose tab closed is still filed under the right meeting. The planned meeting is read through the
+ * viewer's own scope first, and one that is gone or another account's is refused rather than linked.
+ */
 export async function createRecordedMeeting(
   viewer: Viewer,
-  input: { title?: string; screenMime: string; cameraMime?: string; audioMime: string }
+  input: { title?: string; screenMime: string; cameraMime?: string; audioMime: string; planId?: string }
 ): Promise<{ id: string; recording: MeetingRecordingSummary }> {
   if (!isStorageConfigured()) throw new UserFacingError(RECORDING_MESSAGES.storageUnavailable)
   await connectDatabase()
-  const named = (input.title ?? "").trim()
+  let plan: { id: string; name: string } | null = null
+  if (input.planId) {
+    const filter = visibleById(viewer, input.planId)
+    const record = filter ? ((await MeetingPlan.findOne(filter, { name: 1 }).lean()) as unknown as { _id: { toString: () => string }; name: string } | null) : null
+    if (!record) throw new UserFacingError(RECORDING_MESSAGES.planUnavailable)
+    plan = { id: record._id.toString(), name: record.name }
+  }
+  // A recording of a planned meeting carries that meeting's name until it is given another
+  const named = (input.title ?? "").trim() || (plan?.name ?? "")
   const recording: StoredRecording = {
     stage: "recording",
     startedAt: new Date().toISOString(),
@@ -134,6 +151,7 @@ export async function createRecordedMeeting(
     isTitleGenerated: named === "",
     status: "recording",
     recording,
+    planId: plan?.id ?? null,
   })
   return { id: record._id.toString(), recording: toRecordingSummary(recording) }
 }
@@ -279,7 +297,8 @@ export async function finishRecording(
     "recording.durationMs": durationMs ?? null,
     "recording.stage": nothing ? "failed" : "consolidating",
     "recording.error": nothing ? RECORDING_MESSAGES.nothingUploaded : null,
-    status: nothing ? "failed" : "transcribing",
+    // Joining calls no model, so the meeting reads as recorded rather than as being written out
+    status: nothing ? "failed" : "recorded",
     statusMessage: nothing ? RECORDING_MESSAGES.nothingUploaded : null,
   }
   for (const [trackId, total] of Object.entries(totals)) set[`recording.tracks.${trackId}.total`] = total
@@ -396,8 +415,14 @@ function joinTranscript(recording: StoredRecording): string {
  * Moves one recording forward by one short step: joining, then writing out, then handing the transcript
  * to the analysis. Answers where it got to and whether there is more; a failure is recorded on the
  * meeting and the next call carries on from it.
+ *
+ * Joining always runs, and stops at `ready`. **Writing out runs only when the step is asked to
+ * `transcribe`**, which is the user's click: a step without it leaves a ready recording exactly where
+ * it is, so opening a meeting page can never start a transcript nobody asked for. Once a recording is
+ * `transcribing` it carries on with or without the flag, so leaving the page mid-way and coming back
+ * still finishes it.
  */
-export async function runRecordingStep(id: string, signal: AbortSignal): Promise<RecordingStepState | null> {
+export async function runRecordingStep(id: string, signal: AbortSignal, { transcribe = false }: { transcribe?: boolean } = {}): Promise<RecordingStepState | null> {
   await connectDatabase()
   const meetingId = new mongoose.Types.ObjectId(id)
   const load = async () => {
@@ -408,14 +433,22 @@ export async function runRecordingStep(id: string, signal: AbortSignal): Promise
   if (!recording) return null
   const answer = (hasMore: boolean): RecordingStepState => ({ recording: toRecordingSummary(recording as StoredRecording), hasMore })
   if (recording.stage === "recording" || recording.stage === "done") return answer(false)
+  if (recording.stage === "ready" && !transcribe) return answer(false)
 
   const deadline = Date.now() + RECORDING_STEP_BUDGET_MS
   try {
     if (recording.stage === "failed") {
       // A failure is picked up where it happened: joining if any video isn't finished, otherwise writing out
+      // A failure is picked up where it happened: joining if any video isn't finished; otherwise writing
+      // out, but only when that was asked for, and back to ready (waiting for the click) when it wasn't
       const joining = RECORDING_TRACKS.some((trackId) => recording?.tracks[trackId] && !recording.tracks[trackId]?.finalKey && (recording.tracks[trackId]?.total ?? 0) > 0)
-      await MeetingModel.updateOne({ _id: meetingId }, { $set: { "recording.stage": joining ? "consolidating" : "transcribing", "recording.error": null, status: "transcribing", statusMessage: null } })
+      const stage = joining ? "consolidating" : transcribe ? "transcribing" : "ready"
+      await MeetingModel.updateOne(
+        { _id: meetingId },
+        { $set: { "recording.stage": stage, "recording.error": null, status: stage === "transcribing" ? "transcribing" : "recorded", statusMessage: null } }
+      )
       recording = (await load()) as StoredRecording
+      if (stage === "ready") return answer(false)
     }
 
     if (recording.stage === "consolidating") {
@@ -427,10 +460,16 @@ export async function runRecordingStep(id: string, signal: AbortSignal): Promise
           return answer(true)
         }
       }
-      await MeetingModel.updateOne({ _id: meetingId }, { $set: { "recording.stage": "transcribing" } })
+      // Joined: the video can be played, and here it waits for Transcribe and analyse
+      await MeetingModel.updateOne({ _id: meetingId }, { $set: { "recording.stage": "ready", status: "recorded" } })
       recording = (await load()) as StoredRecording
-      // Writing out starts in the next call, so joining and writing out never share one step's time
-      return answer(true)
+      return answer(false)
+    }
+
+    if (recording.stage === "ready") {
+      // Only reached when this step was asked to transcribe (a step without it answered above)
+      await MeetingModel.updateOne({ _id: meetingId }, { $set: { "recording.stage": "transcribing", status: "transcribing", statusMessage: null } })
+      recording = (await load()) as StoredRecording
     }
 
     if (recording.stage === "transcribing") {

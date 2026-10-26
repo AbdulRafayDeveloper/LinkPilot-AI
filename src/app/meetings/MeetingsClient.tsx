@@ -6,6 +6,7 @@ import Link from "next/link"
 import { AlertTriangle, CalendarClock, FilePenLine, Loader2, Plus, RefreshCw, Search, SearchX, Video, X, Link2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
+import { QuickRecordButton } from "@/components/meetings/QuickRecordButton"
 import { MeetingsTable } from "@/components/meetings/MeetingsTable"
 import { LinkToPlanDialog } from "@/components/meetings/LinkToPlanDialog"
 import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
@@ -287,9 +288,10 @@ export default function MeetingsClient() {
         />
 
         <main className="flex-1 overflow-y-auto bg-background overflow-x-hidden">
-          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:h-full">
-            {/* Page header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:min-h-full">
+            {/* Page header: four buttons need the width, so the title sits above them until xl (beside
+                them at a tablet's width the title was crushed to a 48px column, one word a line) */}
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 shrink-0">
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-on-surface flex items-center gap-2">
                   <CalendarClock size={24} className="text-primary shrink-0" aria-hidden="true" />
@@ -319,13 +321,14 @@ export default function MeetingsClient() {
                   <Plus size={16} aria-hidden="true" />
                   New Meeting
                 </button>
-                {/* Record the call itself instead of pasting its notes: transcript and notes follow on their own */}
+                {/* Record the call itself instead of pasting its notes: written out and analysed once asked for */}
+                <QuickRecordButton />
                 <Link
                   href="/meetings/record"
                   className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <Video size={16} aria-hidden="true" />
-                  Record a meeting
+                  Record with options
                 </Link>
               </div>
             </div>

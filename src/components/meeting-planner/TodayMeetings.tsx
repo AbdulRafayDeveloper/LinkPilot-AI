@@ -10,6 +10,8 @@ import { JoinLink } from "./JoinLink"
 import { MeetingStatusButton } from "./MeetingStatusButton"
 import { PrepBadge } from "./PrepBadge"
 import { SeriesBadge } from "./SeriesBadge"
+import { RecordedBadge } from "./RecordedBadge"
+import { QuickRecordButton } from "@/components/meetings/QuickRecordButton"
 
 interface TodayMeetingsProps {
   meetings: MeetingPlan[]
@@ -21,6 +23,8 @@ interface TodayMeetingsProps {
   onNotes: (meeting: MeetingPlan) => void
   // Editing it where it is read, so today's attend link can be added at the last minute
   onEditDetails: (meeting: MeetingPlan) => void
+  // Opening the recordings and notes linked to it
+  onLinked: (meeting: MeetingPlan) => void
 }
 
 /**
@@ -35,6 +39,7 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
   onChangeStatus,
   onNotes,
   onEditDetails,
+  onLinked,
 }) => (
   <section
     aria-label="Today's meetings"
@@ -85,9 +90,12 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                 </span>
                 <PrepBadge meeting={meeting} />
                 <SeriesBadge meeting={meeting} />
+                <RecordedBadge meeting={meeting} onOpen={() => onLinked(meeting)} />
                 <span className="ml-auto flex items-center gap-1">
                   {/* The attend link where the meeting is read, so the call is one click at the hour */}
                   <JoinLink url={meeting.joinUrl} name={meeting.name} />
+                  {/* Record it as it starts: the recording is filed under this meeting */}
+                  <QuickRecordButton plan={{ id: meeting.id, name: meeting.name }} variant="icon" />
                   <button
                     type="button"
                     onClick={() => onNotes(meeting)}

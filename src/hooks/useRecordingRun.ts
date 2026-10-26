@@ -26,14 +26,19 @@ export function useRecordingRun(onProgress: (recording: MeetingRecordingSummary,
     []
   )
 
-  const run = useCallback(async (meetingId: string) => {
+  // `transcribe` is the Transcribe and analyse click: without it a joined recording stays ready
+  const run = useCallback(async (meetingId: string, { transcribe = false }: { transcribe?: boolean } = {}) => {
     stopRef.current = false
     setIsRunning(true)
     setError(null)
     try {
       for (let call = 0; call < 2000; call++) {
         if (stopRef.current) break
-        const { data } = await requestApi<RecordingStepState>(`${recordingEndpoint(meetingId)}/process`, { method: "POST" }, { retry: true })
+        const { data } = await requestApi<RecordingStepState>(
+          `${recordingEndpoint(meetingId)}/process`,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transcribe }) },
+          { retry: true }
+        )
         progressRef.current(data.recording, data.hasMore)
         if (!data.hasMore) break
       }

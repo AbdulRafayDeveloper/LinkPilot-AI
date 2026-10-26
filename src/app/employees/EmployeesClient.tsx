@@ -234,11 +234,13 @@ export default function EmployeesClient() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] lg:items-start">
+            {/* Side by side only from xl: at lg the page has about 700px, which left the details a
+                300px column whose role and date broke one letter a line, so below xl they stack */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] xl:items-start">
               {/* The team */}
-              <div className="flex flex-col gap-3">
+              <div className="flex min-w-0 flex-col gap-3">
                 <FilterPanel
-                  columnsClassName="lg:grid-cols-1"
+                  columnsClassName="xl:grid-cols-1"
                   canClear={hasFilters}
                   onClear={() => {
                     setSearch("")
@@ -251,7 +253,7 @@ export default function EmployeesClient() {
                   }
                 >
                   <SearchFilter value={search} onChange={setSearch} placeholder="Name, city or role" />
-                  <div className="col-span-2 lg:col-span-1">
+                  <div className="col-span-2 xl:col-span-1">
                     <SelectFilter label="Status" allLabel="Active and inactive" value={status} options={EMPLOYEE_STATUSES} onChange={setStatus} />
                   </div>
                 </FilterPanel>
@@ -342,7 +344,7 @@ export default function EmployeesClient() {
               </div>
 
               {/* The chosen employee */}
-              <div ref={detailRef} className="flex scroll-mt-4 flex-col gap-4">
+              <div ref={detailRef} className="flex min-w-0 scroll-mt-4 flex-col gap-4">
                 {current ? (
                   <>
                     <section aria-label="Employee details" className="rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
@@ -382,7 +384,7 @@ export default function EmployeesClient() {
                           </button>
                         </div>
                       </div>
-                      <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-outline-variant/70 pt-4 sm:grid-cols-3">
+                      <dl className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-3 border-t border-outline-variant/70 pt-4">
                         {[
                           { icon: Briefcase, label: "Role", value: current.role },
                           { icon: MapPin, label: "City", value: current.city },

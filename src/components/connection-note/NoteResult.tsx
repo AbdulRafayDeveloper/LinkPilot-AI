@@ -26,7 +26,7 @@ export const NoteResult: React.FC<NoteResultProps> = ({ status, result, error, o
   return (
     <section
       aria-labelledby="connection-note-result-title"
-      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-3 min-h-[240px] lg:min-h-0"
+      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-3 min-h-[240px]"
     >
       <div className="flex items-center justify-between gap-2 min-h-[26px]">
         <h2 id="connection-note-result-title" className="text-sm font-bold text-on-surface">

@@ -100,7 +100,7 @@ export const CommentResult = React.forwardRef<HTMLElement, CommentResultProps>(f
     <section
       ref={ref}
       aria-labelledby="comment-writer-result-title"
-      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-3 min-h-[260px] lg:min-h-0 scroll-mt-4"
+      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-3 min-h-[260px] scroll-mt-4"
     >
       <div className="flex items-center justify-between gap-2 min-h-[26px]">
         <h2 id="comment-writer-result-title" className="text-sm font-bold text-on-surface">

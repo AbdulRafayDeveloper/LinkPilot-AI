@@ -35,7 +35,9 @@ export const TRANSCRIPT_PREVIEW_CHARS = 4_000
  */
 export const MEETING_STATUSES = [
   { id: "recording", label: "Recording", description: "Being recorded and uploaded from the app" },
-  { id: "transcribing", label: "Transcribing", description: "The recording is being joined and written out" },
+  // A recording that is saved and playable, waiting for Transcribe and analyse: nothing runs on it by itself
+  { id: "recorded", label: "Recorded", description: "Recorded and saved; not written out or analyzed until you ask" },
+  { id: "transcribing", label: "Transcribing", description: "The recording is being written out" },
   { id: "saved", label: "Saved", description: "Saved, waiting to be analyzed" },
   { id: "analyzing", label: "Analyzing", description: "Reading the transcript chunk by chunk" },
   { id: "summarizing", label: "Generating summary", description: "Putting the whole meeting together" },

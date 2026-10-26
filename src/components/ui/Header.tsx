@@ -107,8 +107,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarCollapse
           className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-low px-2.5 text-sm text-outline transition-colors hover:border-primary/40 hover:bg-surface-container-lowest hover:text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:w-60 sm:px-3 md:w-48 lg:w-60"
         >
           <Search size={16} className="shrink-0" aria-hidden="true" />
-          <span className="hidden sm:inline">Jump to a tool...</span>
-          <kbd className="ml-auto hidden items-center rounded-md border border-outline-variant bg-surface-container-lowest px-1.5 py-0.5 font-body-md text-[10px] font-semibold text-on-surface-variant sm:inline-flex">
+          <span className="hidden whitespace-nowrap sm:inline">Jump to a tool...</span>
+          {/* Not between md and lg, where the box is 192px and the words and the key wrapped onto two
+              lines; the shortcut still works there, it just isn't drawn */}
+          <kbd className="ml-auto hidden items-center whitespace-nowrap rounded-md border border-outline-variant bg-surface-container-lowest px-1.5 py-0.5 font-body-md text-[10px] font-semibold text-on-surface-variant sm:inline-flex md:hidden lg:inline-flex">
             {modifier} K
           </kbd>
         </button>

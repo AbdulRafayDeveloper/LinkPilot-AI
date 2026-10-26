@@ -115,7 +115,7 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
         content: senderProfile,
         emptyText: NO_SENDER_PROFILE_TEXT,
       },
-      { variable: "profile_data", tag: "profile_data", label: "Their profile", content: profileData },
+      { variable: "profile_data", tag: "profile_data", label: "Their profile", content: profileData, pasted: true },
     ],
     { tune: getInMailTuneLabel(tune) }
   )

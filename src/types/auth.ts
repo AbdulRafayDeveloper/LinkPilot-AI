@@ -8,6 +8,12 @@ export interface Viewer {
   // Where to show this person's profile photo (`/api/account/photo/<account>/<file>`), or null when
   // they have none. It is the person's own, so a child account has its own rather than its parent's
   photo: string | null
+  /**
+   * The timezone this person chose in Account Settings (an IANA name such as "Asia/Karachi"), which
+   * every time in the app is shown in; null until they choose one, when their browser's own is used.
+   * It is the person's own, so a child account keeps its own rather than its parent's
+   */
+  timeZone: string | null
   role: UserRole
   // The tools this account may not use. Always empty for an admin, who keeps every tool
   disabledTools: string[]

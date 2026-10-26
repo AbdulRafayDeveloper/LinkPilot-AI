@@ -5,6 +5,7 @@ import { RotateCcw } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { PROMPT_MAX_LENGTH } from "@/constants/prompts"
 import type { EditablePrompt } from "@/types/prompts"
+import { formatInstant } from "@/lib/timeZone"
 
 interface PromptEditorFieldProps {
   value: string
@@ -18,7 +19,7 @@ interface PromptEditorFieldProps {
 
 function describeSavedState(saved: EditablePrompt): string {
   return saved.isCustom && saved.updatedAt
-    ? `Custom prompt · saved ${new Date(saved.updatedAt).toLocaleString()}`
+    ? `Custom prompt · saved ${formatInstant(saved.updatedAt)}`
     : "Default prompt"
 }
 

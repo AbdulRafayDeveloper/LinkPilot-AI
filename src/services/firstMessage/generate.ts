@@ -65,7 +65,7 @@ export async function generateFirstMessage({ profileData, tune, signal }: Genera
         content: senderProfile,
         emptyText: NO_SENDER_PROFILE_TEXT,
       },
-      { variable: "profile_data", tag: "profile_data", label: "Their profile", content: profileData },
+      { variable: "profile_data", tag: "profile_data", label: "Their profile", content: profileData, pasted: true },
     ],
     { tune: getTuneLabel(tune) }
   )

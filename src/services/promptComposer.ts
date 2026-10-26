@@ -1,3 +1,4 @@
+import { PASTED_SOURCE, tidyPastedText } from "@/lib/pastedText"
 import { createTagSanitizer } from "@/lib/sanitize"
 import { renderPrompt } from "@/services/prompts"
 
@@ -11,6 +12,8 @@ export interface PromptDataBlock {
   content: string | null
   // Shown instead of a tagged block when there is no content
   emptyText?: string
+  // Copied off a LinkedIn page (a profile, a post, a conversation): the page's own chrome is left out
+  pasted?: boolean
 }
 
 const DEFAULT_EMPTY_TEXT = "Not provided."
@@ -32,8 +35,9 @@ export function composePromptMessage(
 
   const renderedBlocks = Object.fromEntries(
     blocks.map((block) => {
-      const content = block.content ? stripTags(block.content).trim() : ""
-      return [block.variable, content ? `<${block.tag}>\n${content}\n</${block.tag}>` : block.emptyText ?? DEFAULT_EMPTY_TEXT]
+      const content = block.content ? stripTags(block.pasted ? tidyPastedText(block.content) : block.content).trim() : ""
+      const open = block.pasted ? `<${block.tag} ${PASTED_SOURCE}>` : `<${block.tag}>`
+      return [block.variable, content ? `${open}\n${content}\n</${block.tag}>` : block.emptyText ?? DEFAULT_EMPTY_TEXT]
     })
   )
 

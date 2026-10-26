@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react"
 import { requestApi } from "@/lib/apiClient"
 import { AUTH_ENDPOINTS } from "@/constants/auth"
 import { toolsFor } from "@/constants/linkedinTools"
+import { setDisplayTimeZone } from "@/lib/timeZone"
 import type { Viewer } from "@/types/auth"
 
 /**
@@ -23,6 +24,9 @@ function load() {
   request ??= requestApi<Viewer>(AUTH_ENDPOINTS.me)
     .then(({ data }) => {
       current = { status: "ready", user: data }
+      // Every time on the page follows the zone this person chose; if the page was already drawn in
+      // another (a first visit in this browser, or a change made elsewhere) it is drawn again
+      setDisplayTimeZone(data.timeZone ?? null, { redraw: true })
     })
     .catch(() => {
       current = { status: "signed-out", user: null }

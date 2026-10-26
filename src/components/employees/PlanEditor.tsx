@@ -368,7 +368,7 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
     return (
       <div className={depth === 1 ? "" : "mt-1.5"}>
         {/* Aligned to the top, so the handle, the checkbox and the buttons stay by the first line of a long task */}
-        <div className={`group flex items-start gap-2 rounded-xl border border-outline-variant/70 bg-surface-container-lowest py-1.5 pr-2 ${handle ? "pl-1" : "pl-2"}`}>
+        <div className={`group flex flex-wrap items-start gap-2 rounded-xl border border-outline-variant/70 bg-surface-container-lowest py-1.5 pr-2 sm:flex-nowrap ${handle ? "pl-1" : "pl-2"}`}>
           {handle ??
             (children.length > 0 ? (
               <button
@@ -448,34 +448,38 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
               </form>
             )}
           </div>
-          {item.completedAt && <span className="mt-2 hidden shrink-0 text-[11px] text-outline sm:inline">Done {tickTime(item.completedAt)}</span>}
-          <button
-            type="button"
-            onClick={() => {
-              setSubtaskText("")
-              setAddingUnder((current) => (current === item.id ? null : item.id))
-            }}
-            disabled={!canNest || items.length >= PLAN_MAX_ITEMS}
-            aria-label={canNest ? `${addLabel} under "${item.text}"` : TASK_ATTACHMENT_MESSAGES.depthReached}
-            title={canNest ? addLabel : TASK_ATTACHMENT_MESSAGES.depthReached}
-            className={`${iconButton} hover:bg-primary/10 hover:text-primary`}
-          >
-            <ListPlus size={14} aria-hidden="true" />
-          </button>
-          <CopyTaskText
-            text={item.text}
-            size={14}
-            label={`${TASK_ATTACHMENT_MESSAGES.copyText}: "${item.text}"`}
-            className={`${iconButton} hover:bg-primary/10 hover:text-primary`}
-          />
-          <button
-            type="button"
-            onClick={() => removeItem(item)}
-            aria-label={`Remove "${item.text}"${children.length > 0 ? " and its subtasks" : ""}`}
-            className={`${iconButton} hover:bg-error-container hover:text-error`}
-          >
-            <Trash2 size={14} aria-hidden="true" />
-          </button>
+          {/* On a phone the actions take a line of their own under the task, so its words keep the
+              row's width rather than about 70px of it beside a circle, a handle, a box and three buttons */}
+          <div className="flex shrink-0 items-start gap-2 max-sm:w-full max-sm:justify-end">
+            {item.completedAt && <span className="mt-2 hidden shrink-0 text-[11px] text-outline sm:inline">Done {tickTime(item.completedAt)}</span>}
+            <button
+              type="button"
+              onClick={() => {
+                setSubtaskText("")
+                setAddingUnder((current) => (current === item.id ? null : item.id))
+              }}
+              disabled={!canNest || items.length >= PLAN_MAX_ITEMS}
+              aria-label={canNest ? `${addLabel} under "${item.text}"` : TASK_ATTACHMENT_MESSAGES.depthReached}
+              title={canNest ? addLabel : TASK_ATTACHMENT_MESSAGES.depthReached}
+              className={`${iconButton} hover:bg-primary/10 hover:text-primary`}
+            >
+              <ListPlus size={14} aria-hidden="true" />
+            </button>
+            <CopyTaskText
+              text={item.text}
+              size={14}
+              label={`${TASK_ATTACHMENT_MESSAGES.copyText}: "${item.text}"`}
+              className={`${iconButton} hover:bg-primary/10 hover:text-primary`}
+            />
+            <button
+              type="button"
+              onClick={() => removeItem(item)}
+              aria-label={`Remove "${item.text}"${children.length > 0 ? " and its subtasks" : ""}`}
+              className={`${iconButton} hover:bg-error-container hover:text-error`}
+            >
+              <Trash2 size={14} aria-hidden="true" />
+            </button>
+          </div>
         </div>
         {children.length > 0 && !isFolded && (
           <div className="ml-6 border-l-2 border-outline-variant/70 pl-2" role="group" aria-label={`Subtasks of "${item.text}"`}>

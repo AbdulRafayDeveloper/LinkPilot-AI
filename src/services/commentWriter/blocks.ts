@@ -17,7 +17,7 @@ const stripSectionTags = createTagSanitizer(COMMENT_WRITER_TAGS)
  * a delimiter tag its content can't close (see composePromptMessage).
  */
 export function postBlock(postText: string): PromptDataBlock {
-  return { variable: "post_content", tag: "linkedin_post", label: "LinkedIn post", content: stripSectionTags(postText) }
+  return { variable: "post_content", tag: "linkedin_post", label: "LinkedIn post", content: stripSectionTags(postText), pasted: true }
 }
 
 export function styleInstructionsBlock(styleBrief: string): PromptDataBlock {

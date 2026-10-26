@@ -14,7 +14,7 @@ interface TuneSelectorProps {
 }
 
 /**
- * The six comment styles: three per row on wider screens, stacked on phones.
+ * The comment styles, as many to a row as the form has room for.
  */
 export const TuneSelector: React.FC<TuneSelectorProps> = ({ value, onChange, disabled = false, invalid = false }) => (
   <RadioCardGroup
@@ -25,6 +25,5 @@ export const TuneSelector: React.FC<TuneSelectorProps> = ({ value, onChange, dis
     onChange={onChange}
     disabled={disabled}
     invalid={invalid}
-    columnsClassName="grid-cols-1 sm:grid-cols-3"
   />
 )

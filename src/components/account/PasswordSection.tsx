@@ -5,6 +5,7 @@ import { Eye, EyeOff, KeyRound, Loader2 } from "lucide-react"
 import { requestApi } from "@/lib/apiClient"
 import { ACCOUNT_ENDPOINTS, ACCOUNT_MESSAGES } from "@/constants/account"
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/constants/auth"
+import { SETTINGS_FIELD, SETTINGS_LABEL, SETTINGS_PRIMARY_BUTTON, SettingsCard } from "./SettingsCard"
 
 /**
  * Changing the password this account signs in with. The current one is typed as well, so a browser
@@ -17,8 +18,6 @@ import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/constants/auth"
  * re-issues its cookie.
  */
 
-const FIELD =
-  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-[14px] text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
 
 export const PasswordSection: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState("")
@@ -73,8 +72,8 @@ export const PasswordSection: React.FC = () => {
     onChange: (value: string) => void,
     autoComplete: "current-password" | "new-password"
   ) => (
-    <div className="flex flex-col gap-2">
-      <label htmlFor={id} className="text-[13px] font-semibold text-on-surface">
+    <div>
+      <label htmlFor={id} className={SETTINGS_LABEL}>
         {label}
       </label>
       <input
@@ -87,52 +86,41 @@ export const PasswordSection: React.FC = () => {
         onKeyDown={(event) => {
           if (event.key === "Enter") void change()
         }}
-        className={FIELD}
+        className={SETTINGS_FIELD}
       />
     </div>
   )
 
   return (
-    <section className="rounded-2xl border border-outline-variant bg-white p-4 sm:p-6 flex flex-col gap-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-[15px] font-bold text-on-surface">
-            <KeyRound size={16} className="text-primary shrink-0" aria-hidden="true" />
-            {ACCOUNT_MESSAGES.passwordTitle}
-          </h2>
-          <p className="mt-1 text-[13px] text-on-surface-variant">{ACCOUNT_MESSAGES.passwordHint}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsShown((shown) => !shown)}
-          className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2 text-[12px] font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high"
-        >
-          {isShown ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
-          {isShown ? "Hide passwords" : "Show passwords"}
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {field("current-password", "Password now", currentPassword, setCurrentPassword, "current-password")}
-        {field("new-password", "New password", newPassword, setNewPassword, "new-password")}
-        {field("confirm-password", "New password again", confirmPassword, setConfirmPassword, "new-password")}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={change}
-          disabled={isSaving}
-          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
-        >
+    <SettingsCard
+      title={ACCOUNT_MESSAGES.passwordTitle}
+      description={ACCOUNT_MESSAGES.passwordHint}
+      icon={KeyRound}
+      notice={problem ? { tone: "problem", text: problem } : saved ? { tone: "saved", text: saved } : null}
+      footer={
+        <button type="button" onClick={change} disabled={isSaving} className={SETTINGS_PRIMARY_BUTTON}>
           {isSaving ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <KeyRound size={15} aria-hidden="true" />}
-          Change password
+          Update password
         </button>
-        <p className="text-[12px] text-outline">At least {PASSWORD_MIN_LENGTH} characters.</p>
+      }
+    >
+      <div className="flex max-w-md flex-col gap-4">
+        {field("current-password", "Current password", currentPassword, setCurrentPassword, "current-password")}
+        <div className="border-t border-outline-variant/60" aria-hidden="true" />
+        {field("new-password", "New password", newPassword, setNewPassword, "new-password")}
+        {field("confirm-password", "Confirm new password", confirmPassword, setConfirmPassword, "new-password")}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[12px] text-outline">At least {PASSWORD_MIN_LENGTH} characters.</p>
+          <button
+            type="button"
+            onClick={() => setIsShown((shown) => !shown)}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high"
+          >
+            {isShown ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
+            {isShown ? "Hide passwords" : "Show passwords"}
+          </button>
+        </div>
       </div>
-
-      {saved && <p className="rounded-xl bg-success-container px-3 py-2 text-[13px] font-medium text-on-success-container">{saved}</p>}
-      {problem && <p className="rounded-xl bg-error-container px-3 py-2 text-[13px] font-medium text-on-error-container">{problem}</p>}
-    </section>
+    </SettingsCard>
   )
 }

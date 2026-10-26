@@ -78,15 +78,18 @@ const ModuleCard: React.FC<{
           <div className={`flex items-center gap-2 rounded-xl border py-1.5 pl-1 pr-3 ${reason ? "border-outline-variant/70 bg-surface-container-lowest" : "border-outline-variant bg-white"}`}>
             {handle}
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-[12px] font-bold text-on-surface-variant">{position}</span>
-            <span className={`min-w-0 flex-1 text-[13px] font-semibold ${reason ? "text-outline" : "text-on-surface"}`}>{AI_PROVIDER_LABELS[id]}</span>
-            {reason ? (
-              <span className="inline-flex items-center gap-1 text-[11px] text-outline">
-                <CircleSlash size={12} aria-hidden="true" />
-                {reason}
-              </span>
-            ) : (
-              <CheckCircle2 size={14} className="text-success" aria-label="Ready" />
-            )}
+            {/* Why a provider is skipped goes under its name, not beside it: beside it, the name was
+                squeezed to 79px and "Open-source model" took three lines */}
+            <span className="min-w-0 flex-1">
+              <span className={`block text-[13px] font-semibold ${reason ? "text-outline" : "text-on-surface"}`}>{AI_PROVIDER_LABELS[id]}</span>
+              {reason && (
+                <span className="mt-0.5 flex items-center gap-1 text-[11px] text-outline">
+                  <CircleSlash size={12} className="shrink-0" aria-hidden="true" />
+                  {reason}
+                </span>
+              )}
+            </span>
+            {!reason && <CheckCircle2 size={14} className="shrink-0 text-success" aria-label="Ready" />}
           </div>
         )
       }}

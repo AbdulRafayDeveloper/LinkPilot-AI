@@ -168,7 +168,7 @@ async function buildMessages(
   company: CompanyContext | null
 ): Promise<BaseMessage[]> {
   const system = renderPrompt(await loadPrompt("connection-note-system"), { MAX_CHARS: CONNECTION_NOTE_MAX_CHARS })
-  const blocks: PromptDataBlock[] = [{ variable: "profile_data", tag: "profile_data", label: "Profile", content: profileData }]
+  const blocks: PromptDataBlock[] = [{ variable: "profile_data", tag: "profile_data", label: "Profile", content: profileData, pasted: true }]
   if (company) {
     blocks.push({
       variable: "company_name",

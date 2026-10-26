@@ -391,12 +391,14 @@ export async function prepareMeeting(meeting: MeetingPlanDetail, signal: AbortSi
       tag: "lead_profile",
       label: "Profile information about the person",
       content: meeting.profileInfo,
+      pasted: true,
     },
     {
       variable: "conversation_history",
       tag: "conversation_history",
       label: "The conversation with them so far",
       content: meeting.conversationHistory,
+      pasted: true,
     },
     {
       variable: "additional_info",

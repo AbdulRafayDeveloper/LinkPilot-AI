@@ -389,7 +389,7 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
   const backLink = (
     <Link
       href="/client-projects"
-      className="inline-flex w-fit items-center gap-1.5 text-[13px] font-semibold text-on-surface-variant transition-colors hover:text-primary"
+      className="inline-flex min-h-6 w-fit items-center gap-1.5 text-[13px] font-semibold text-on-surface-variant transition-colors hover:text-primary"
     >
       <ArrowLeft size={14} aria-hidden="true" />
       {PROJECT_TASK_MESSAGES.backToProjects}

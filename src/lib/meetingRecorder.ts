@@ -62,6 +62,8 @@ export interface RecorderSnapshot {
   hasCamera: boolean
   hasMicrophone: boolean
   hasMeetingSound: boolean
+  // The planned meeting this records, when it was started from Meeting Planner, so the page can say so
+  plan: { id: string; name: string } | null
   // How loud the meeting (everyone else) and your microphone are right now, from 0 to 1
   levels: { meeting: number; mic: number }
   // The other people haven't been heard for a while although you have: their sound may not be reaching it
@@ -103,6 +105,7 @@ const IDLE: RecorderSnapshot = {
   hasCamera: false,
   hasMicrophone: false,
   hasMeetingSound: false,
+  plan: null,
   levels: { meeting: 0, mic: 0 },
   meetingSilent: false,
   notices: [],
@@ -139,9 +142,14 @@ interface MeetingShareOptions extends DisplayMediaStreamOptions {
  * This tab is left out of the list, since it has no meeting sound in it. And the meeting's sound is
  * taken as it plays: echo cancelling, noise suppression and gain control are made for a microphone,
  * and on other people's voices they thin them out or cut them off.
+ *
+ * **The picker opens on Entire screen** (`displaySurface: "monitor"`) with system audio offered, at the
+ * owner's request not to choose both every time. It is a preference the browser honours, not a choice
+ * made for the person: Chrome and Edge open on that tab with the system audio switch shown, and the
+ * person still presses Share, since no page may share a screen on its own.
  */
 const SHARE_OPTIONS: MeetingShareOptions = {
-  video: { frameRate: { ideal: 15, max: 30 } },
+  video: { frameRate: { ideal: 15, max: 30 }, displaySurface: "monitor" },
   audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
   systemAudio: "include",
   selfBrowserSurface: "exclude",
@@ -268,7 +276,7 @@ class MeetingRecorder {
    * Asks for the screen (and the microphone and camera), saves the meeting, and starts recording.
    * Must be called from a click: browsers only open the screen picker for one.
    */
-  async start(options: { title: string; withMicrophone: boolean; withCamera: boolean; sound: RecordingSoundMode }) {
+  async start(options: { title: string; withMicrophone: boolean; withCamera: boolean; sound: RecordingSoundMode; plan?: { id: string; name: string } | null }) {
     // Only your voice: there is no laptop sound to share, and the microphone is the whole recording
     const onlyVoice = options.sound === "voice"
     const withMicrophone = onlyVoice || options.withMicrophone
@@ -346,6 +354,8 @@ class MeetingRecorder {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: options.title.trim() || undefined,
+            // Started from Meeting Planner: the meeting is linked to that planned meeting from the start
+            ...(options.plan ? { planId: options.plan.id } : {}),
             screenMime,
             audioMime,
             ...(this.camera && cameraMime ? { cameraMime } : {}),
@@ -381,6 +391,7 @@ class MeetingRecorder {
       hasCamera: Boolean(this.camera && cameraMime),
       hasMicrophone: micSound.length > 0,
       hasMeetingSound: meetingSound.length > 0,
+      plan: options.plan ?? null,
       notices,
       preview: this.display,
     })

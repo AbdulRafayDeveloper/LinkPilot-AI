@@ -31,8 +31,9 @@ import {
 } from "@/constants/contentFolders"
 import type { RecordFolder } from "@/types/folders"
 import type { ImportantContent, ImportantContentPage } from "@/types/importantContent"
+import { formatInstant } from "@/lib/timeZone"
 
-const savedOn = (iso: string) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+const savedOn = (iso: string) => formatInstant(iso, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 /**
  * The list shows the words, not the formatting marks, and not the line breaks either: a few lines
@@ -56,16 +57,17 @@ const actionButton =
 /** Which folder an entry is in, or that it is in none, wherever a row is shown. */
 const FolderTag: React.FC<{ folder: ImportantContent["folder"] }> = ({ folder }) =>
   folder ? (
-    <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-outline-variant bg-surface-container-lowest px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">
-      <FolderOpen size={11} className="shrink-0" aria-hidden="true" />
-      <span className="truncate">{folder.name}</span>
+    <span className="inline-flex max-w-full items-start gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">
+      <FolderOpen size={11} className="mt-0.5 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 break-words">{folder.name}</span>
     </span>
   ) : (
     <span className="text-[11px] text-outline">{CONTENT_FOLDER_MESSAGES.unfiled}</span>
   )
 
 const TypeBadge: React.FC<{ type: string }> = ({ type }) => (
-  <span className="inline-flex max-w-full truncate rounded-full bg-primary-fixed/70 px-2 py-0.5 text-[11px] font-semibold text-on-primary-fixed-variant">{type}</span>
+  // A type the user made up can be any length, so it wraps rather than being cut to "Profile Au..."
+  <span className="inline-block max-w-full break-words rounded-lg bg-primary-fixed/70 px-2 py-0.5 text-[11px] font-semibold text-on-primary-fixed-variant">{type}</span>
 )
 
 /**

@@ -23,7 +23,12 @@ export const CreateRecordingSchema = z.object({
   screenMime: oneOf(STORED_VIDEO_TYPES),
   cameraMime: oneOf(STORED_VIDEO_TYPES).optional(),
   audioMime: oneOf(STORED_AUDIO_TYPES),
+  // The planned meeting this records, when it was started from Meeting Planner: linked from the first chunk
+  planId: z.string().regex(/^[0-9a-f]{24}$/).optional(),
 })
+
+/** What a processing step is asked to do: `transcribe` is the click that writes a ready recording out. */
+export const RecordingStepSchema = z.object({ transcribe: z.boolean().optional() })
 
 const track = z.enum(UPLOAD_TRACKS)
 const index = z.number().int().min(0).max(MAX_RECORDING_CHUNKS - 1)

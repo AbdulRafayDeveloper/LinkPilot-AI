@@ -114,7 +114,7 @@ export default function ConversationReplyClient() {
         />
 
         <main className="flex-1 overflow-y-auto bg-background overflow-x-hidden">
-          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:h-full short:py-4 short:gap-3">
+          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:min-h-full short:py-4 short:gap-3">
             {/* Page header */}
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 shrink-0">
               <div className="min-w-0">
@@ -139,7 +139,7 @@ export default function ConversationReplyClient() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0 short:gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1 short:gap-4">
               {/* Input */}
               <form
                 noValidate
@@ -171,7 +171,7 @@ export default function ConversationReplyClient() {
                     placeholder="Paste the complete conversation here..."
                     aria-invalid={isConversationMissing}
                     aria-describedby={isConversationMissing ? FORM_ERROR_ID : undefined}
-                    className={`${textareaClass} min-h-[200px] lg:min-h-[96px] short:min-h-[72px] ${
+                    className={`${textareaClass} min-h-[200px] lg:min-h-[96px] ${
                       isConversationMissing ? "border-error" : "border-outline-variant"
                     }`}
                   />
@@ -192,7 +192,7 @@ export default function ConversationReplyClient() {
                     onChange={(event) => formStore.update({ profileData: event.target.value })}
                     maxLength={CONVERSATION_REPLY_PROFILE_MAX_LENGTH}
                     placeholder="Paste the person's LinkedIn profile information here if available..."
-                    className={`${textareaClass} min-h-[110px] lg:min-h-[64px] short:min-h-[48px] border-outline-variant`}
+                    className={`${textareaClass} min-h-[110px] lg:min-h-[64px] border-outline-variant`}
                   />
                 </div>
 
@@ -200,9 +200,6 @@ export default function ConversationReplyClient() {
                   name="conversation-reply-type"
                   legend="Reply Tone"
                   options={CONVERSATION_REPLY_TYPES}
-                  columnsClassName="grid-cols-2 md:grid-cols-3"
-                  wrapLabels
-                  compactOnShortScreens
                   value={replyType}
                   onChange={(nextType) => formStore.update({ replyType: nextType })}
                   disabled={isGenerating}
@@ -231,7 +228,7 @@ export default function ConversationReplyClient() {
               </form>
 
               {/* Output: scrolls inside its own column so the page stays one screen */}
-              <div className="flex flex-col gap-5 min-w-0 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+              <div className="flex flex-col gap-5 min-w-0">
                 <div className={`grid ${showAnalysis ? "shrink-0" : "flex-1"}`}>
                   <GeneratedResultPanel
                     title="Suggested Reply"

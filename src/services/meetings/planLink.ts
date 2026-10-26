@@ -134,18 +134,25 @@ export async function meetingsOfPlan(viewer: Viewer, planId: string): Promise<Li
 }
 
 /**
- * How many records are linked to each of these planned meetings, for the calendar and the day list.
- * One grouped read for the whole month, never one per meeting.
+ * How many records are linked to each of these planned meetings, and how many of them are recordings,
+ * for the calendar and the day list: a recorded meeting says so in words, not only as a count. One
+ * grouped read for the whole month, never one per meeting.
  */
-export async function linkedCounts(viewer: Viewer, planIds: readonly string[]): Promise<Map<string, number>> {
+export async function linkedTotals(viewer: Viewer, planIds: readonly string[]): Promise<Map<string, { count: number; recorded: number }>> {
   const ids = [...new Set(planIds.filter((id) => ID_PATTERN.test(id)))]
   if (ids.length === 0) return new Map()
   await connectDatabase()
-  const rows = await Meeting.aggregate<{ _id: string; count: number }>([
+  const rows = await Meeting.aggregate<{ _id: string; count: number; recorded: number }>([
     { $match: { ...visibleTo(viewer), planId: { $in: ids } } },
-    { $group: { _id: "$planId", count: { $sum: 1 } } },
+    { $group: { _id: "$planId", count: { $sum: 1 }, recorded: { $sum: { $cond: [{ $ifNull: ["$recording", false] }, 1, 0] } } } },
   ])
-  return new Map(rows.map((row) => [String(row._id), row.count]))
+  return new Map(rows.map((row) => [String(row._id), { count: row.count, recorded: row.recorded }]))
+}
+
+/** How many records are linked to each of these planned meetings, for the picker. */
+export async function linkedCounts(viewer: Viewer, planIds: readonly string[]): Promise<Map<string, number>> {
+  const totals = await linkedTotals(viewer, planIds)
+  return new Map([...totals].map(([id, total]) => [id, total.count]))
 }
 
 /**

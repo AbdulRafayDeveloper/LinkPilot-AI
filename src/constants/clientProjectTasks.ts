@@ -654,6 +654,14 @@ export const PROJECT_TASK_MESSAGES = {
   voiceFailed: "Couldn't save the voice note. Please try again.",
   voiceStorageUnavailable: "Voice notes can't be saved here yet: file storage isn't set up.",
   recording: "Recording...",
+  // A voice pasted from WhatsApp or anywhere else, instead of recorded here
+  pasteVoice: "Paste voice",
+  pasteVoiceHint: "or paste one with Ctrl+V",
+  noVoiceOnClipboard: "There is no voice message on the clipboard. Some apps only copy a link, so save the voice and paste the file instead.",
+  clipboardBlocked: "This browser won't let the page read the clipboard. Press Ctrl+V on the page instead.",
+  // The tabs only the owner sees, set apart on the tab strip
+  privateTabsLabel: "Only you",
+  privateTabsHint: "The client never sees these tabs, not even with the shared link.",
   // The shared link
   linkInvalid: "That link doesn't open anything.",
   linkFailed: "Couldn't change the link. Please try again.",

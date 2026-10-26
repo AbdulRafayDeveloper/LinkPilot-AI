@@ -1,10 +1,12 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import { Gauge, Loader2 } from "lucide-react"
+import { CircleDollarSign, Gauge, Loader2 } from "lucide-react"
 import { requestApi } from "@/lib/apiClient"
 import { AI_PROVIDER_LABELS } from "@/constants/aiProviders"
 import { AI_USAGE_DAYS, AI_USAGE_ENDPOINT, MODEL_PRIORITY_MESSAGES } from "@/constants/modelPriority"
+import { AI_COST_MESSAGES } from "@/constants/aiCosts"
+import { AiCostDialog } from "@/components/admin/AiCostDialog"
 import type { AiUsageSummary } from "@/types/ai"
 
 const RANGE_LABELS: Record<(typeof AI_USAGE_DAYS)[number], string> = { 1: "Last 24 hours", 7: "Last 7 days", 30: "Last 30 days" }
@@ -14,11 +16,14 @@ const MODULES_SHOWN = 8
 /**
  * Budget tracking for admins: what each AI provider used over a window (calls, tokens, speech, images)
  * and the modules that used the most, from the usage every AI call records (services/aiUsage.ts).
+ * **Cost by model** opens what those calls cost, per provider and model, with its own filters and the
+ * prices the costs are worked out from (components/admin/AiCostDialog).
  */
 export const AiUsagePanel: React.FC = () => {
   const [days, setDays] = useState<(typeof AI_USAGE_DAYS)[number]>(AI_USAGE_DAYS[0])
   const [summary, setSummary] = useState<AiUsageSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isCostOpen, setIsCostOpen] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -42,19 +47,30 @@ export const AiUsagePanel: React.FC = () => {
           <Gauge size={17} className="text-primary" aria-hidden="true" />
           AI usage by provider
         </h2>
-        <select
-          value={days}
-          onChange={(event) => setDays(Number(event.target.value) as (typeof AI_USAGE_DAYS)[number])}
-          aria-label="Usage window"
-          className="rounded-lg border border-outline-variant bg-white px-2 py-1 text-[12px] font-semibold text-on-surface"
-        >
-          {AI_USAGE_DAYS.map((option) => (
-            <option key={option} value={option}>
-              {RANGE_LABELS[option]}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsCostOpen(true)}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+          >
+            <CircleDollarSign size={14} aria-hidden="true" />
+            {AI_COST_MESSAGES.open}
+          </button>
+          <select
+            value={days}
+            onChange={(event) => setDays(Number(event.target.value) as (typeof AI_USAGE_DAYS)[number])}
+            aria-label="Usage window"
+            className="rounded-lg border border-outline-variant bg-white px-2 py-1 text-[12px] font-semibold text-on-surface"
+          >
+            {AI_USAGE_DAYS.map((option) => (
+              <option key={option} value={option}>
+                {RANGE_LABELS[option]}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+      {isCostOpen && <AiCostDialog onClose={() => setIsCostOpen(false)} />}
 
       {error ? (
         <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-sm text-error">

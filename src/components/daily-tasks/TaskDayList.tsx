@@ -182,7 +182,7 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
           aria-pressed={isSelected}
           aria-label={`Pick "${task.content}" to move it with other tasks`}
           title="Pick this task, then drag any picked task to move them together"
-          className={`mt-2.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+          className={`mt-2.5 flex h-6 w-6 shrink-0 md:h-5 md:w-5 items-center justify-center rounded-full border-2 transition-colors ${
             isSelected ? "border-primary bg-primary text-white" : "border-outline-variant text-transparent hover:border-primary/60"
           }`}
         >
@@ -1022,7 +1022,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   return (
     <section
       aria-label="Your tasks"
-      className="flex min-h-[320px] flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm lg:min-h-0"
+      className="flex min-h-[320px] flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-on-surface">{current === 1 ? `Last ${VISIBLE_DAYS} Days` : "Older Tasks"}</h2>

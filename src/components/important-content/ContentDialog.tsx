@@ -9,6 +9,7 @@ import { canKeepalive } from "@/constants/textLimits"
 import type { ImportantContent } from "@/types/importantContent"
 import type { RecordFolder } from "@/types/folders"
 import { ContentFields, contentFormOf, isContentSaveable, type ContentForm } from "./ContentFields"
+import { formatInstant } from "@/lib/timeZone"
 
 interface ContentDialogProps {
   // The entry being edited, or null to add a new one
@@ -25,7 +26,7 @@ interface ContentDialogProps {
 // Where auto-save has got to, shown beside the buttons (an edit only)
 type AutoSave = { state: "idle" } | { state: "saving" } | { state: "saved"; at: string } | { state: "failed"; message: string }
 
-const clock = () => new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+const clock = () => formatInstant(Date.now(), { hour: "2-digit", minute: "2-digit" })
 
 /**
  * Add and Edit share one dialog, so editing starts from what was saved. The fields are the shared

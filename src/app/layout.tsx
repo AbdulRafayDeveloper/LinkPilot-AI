@@ -14,6 +14,8 @@ import {
 import { HOME_SEO } from "@/constants/seo"
 import { fullTitle, socialMetadata } from "@/lib/metadata"
 import { ServiceWorkerRegistration } from "@/components/ui/ServiceWorkerRegistration"
+import { TimeZoneBoundary } from "@/components/ui/TimeZoneBoundary"
+import { UpdateToast } from "@/components/ui/UpdateToast"
 import "./globals.css"
 
 const inter = Inter({
@@ -88,8 +90,9 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        {children}
+        <TimeZoneBoundary>{children}</TimeZoneBoundary>
         <ServiceWorkerRegistration />
+        <UpdateToast />
       </body>
     </html>
   )

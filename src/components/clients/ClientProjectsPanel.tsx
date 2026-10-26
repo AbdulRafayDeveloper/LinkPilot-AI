@@ -11,6 +11,7 @@ import { CLIENTS_ENDPOINT, CLIENT_PROJECT_MESSAGES } from "@/constants/clients"
 import { CLIENT_PROJECTS_TOOL, PROJECT_TASK_MESSAGES } from "@/constants/clientProjectTasks"
 import type { Client } from "@/types/clientMessaging"
 import type { ClientProject, ClientProjectsPage } from "@/types/clients"
+import { formatInstant } from "@/lib/timeZone"
 
 const EMPTY_COUNTS = { active: 0, completed: 0 }
 
@@ -25,7 +26,7 @@ const StatusBadge: React.FC<{ status: ClientProject["status"] }> = ({ status }) 
   </span>
 )
 
-const savedOn = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+const savedOn = (iso: string) => formatInstant(iso, { day: "numeric", month: "short", year: "numeric" })
 
 interface ClientProjectsPanelProps {
   client: Client

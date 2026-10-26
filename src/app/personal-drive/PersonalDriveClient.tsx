@@ -550,7 +550,7 @@ export default function PersonalDriveClient() {
             onDragOver={onDragOver}
             onDragEnd={onDragEnd}
           >
-            <div className="mx-auto flex max-w-[1500px] flex-col gap-4 p-4 md:p-6 lg:h-full lg:p-8">
+            <div className="mx-auto flex max-w-[1500px] flex-col gap-4 p-4 md:p-6 lg:min-h-full lg:p-8">
               {/* Page header */}
               <div className="flex shrink-0 flex-col justify-between gap-3 xl:flex-row xl:items-center">
                 <div className="min-w-0">

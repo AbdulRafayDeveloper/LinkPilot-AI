@@ -54,7 +54,7 @@ const RowNotes: React.FC<{ row: ModelMapRow }> = ({ row }) => (
 /**
  * The model map on AI Model Priority: for every module, each job it runs (writing, web research,
  * screenshots, speech, embeddings, images), the model that does it by default and the ones that take
- * over in turn, and the providers passed over with why. A table from xl, cards below it.
+ * over in turn, and the providers passed over with why. A table from 2xl (its 900px minimum is wider than the card at xl), cards below it.
  */
 export const ModelMapTable: React.FC<{ map: ModelMap }> = ({ map }) => {
   const columns = Math.max(MIN_COLUMNS, ...map.rows.map((row) => row.chain.length))
@@ -86,7 +86,7 @@ export const ModelMapTable: React.FC<{ map: ModelMap }> = ({ map }) => {
         </p>
       </div>
 
-      <div className="hidden xl:block">
+      <div className="hidden 2xl:block">
         <table className="w-full min-w-[900px] border-collapse text-left [overflow-wrap:anywhere]">
           <thead>
             <tr className="border-b border-outline-variant text-[11px] font-bold uppercase tracking-wide text-outline">
@@ -134,7 +134,7 @@ export const ModelMapTable: React.FC<{ map: ModelMap }> = ({ map }) => {
         </table>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:hidden">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:hidden">
         {modules.map((group) => (
           <article key={group.module} className="flex flex-col gap-2 rounded-xl border border-outline-variant p-3">
             <h3 className="text-[14px] font-bold text-on-surface">{group.title}</h3>

@@ -3,7 +3,7 @@ import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { MeetingPlan as MeetingPlanModel, type IMeetingPlan } from "@/models/MeetingPlan"
 import { daysBetween, monthEnd, monthStart } from "@/lib/meetingDates"
-import { forgetPlan, linkedCounts } from "@/services/meetings/planLink"
+import { forgetPlan, linkedTotals } from "@/services/meetings/planLink"
 import { shiftDate } from "@/lib/taskDates"
 import { datesAfter, datesForCount } from "@/lib/meetingRecurrence"
 import type {
@@ -92,8 +92,12 @@ export async function listMonth(viewer: Viewer, month: string, today: string): P
    * month, so the calendar can say which meetings have been held and written up without a request
    * per meeting.
    */
-  const linked = await linkedCounts(viewer, [...new Set([...monthMeetings, ...todayMeetings].map((meeting) => meeting.id))])
-  const withLinked = (meeting: MeetingPlan): MeetingPlan => ({ ...meeting, linkedCount: linked.get(meeting.id) ?? 0 })
+  const linked = await linkedTotals(viewer, [...new Set([...monthMeetings, ...todayMeetings].map((meeting) => meeting.id))])
+  const withLinked = (meeting: MeetingPlan): MeetingPlan => ({
+    ...meeting,
+    linkedCount: linked.get(meeting.id)?.count ?? 0,
+    recordedCount: linked.get(meeting.id)?.recorded ?? 0,
+  })
   return {
     month,
     meetings: monthMeetings.map(withLinked),
@@ -174,7 +178,11 @@ export async function getMeeting(viewer: Viewer, id: string): Promise<MeetingPla
   if (!filter) return null
   await connectDatabase()
   const record = await MeetingPlanModel.findOne(filter).lean()
-  return record ? toDetail(record as unknown as StoredPlan) : null
+  if (!record) return null
+  // Its records too, so the meeting's own page can say it was recorded and open them
+  const detail = toDetail(record as unknown as StoredPlan)
+  const linked = (await linkedTotals(viewer, [detail.id])).get(detail.id)
+  return { ...detail, linkedCount: linked?.count ?? 0, recordedCount: linked?.recorded ?? 0 }
 }
 
 export interface MeetingPlanChanges {

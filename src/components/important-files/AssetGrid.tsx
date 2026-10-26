@@ -28,6 +28,7 @@ import {
   getCategoryLabel,
 } from "@/constants/importantFiles"
 import type { Asset } from "@/types/importantFiles"
+import { formatInstant } from "@/lib/timeZone"
 
 interface AssetGridProps {
   assets: Asset[]
@@ -59,7 +60,7 @@ interface AssetGridProps {
 const actionButton =
   "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
 
-const savedAt = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+const savedAt = (iso: string) => formatInstant(iso, { day: "numeric", month: "short", year: "numeric" })
 
 /**
  * Whether this file can really be put on the clipboard by this browser. Text can, and a PNG can

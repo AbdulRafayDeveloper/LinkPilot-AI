@@ -392,7 +392,7 @@ export default function ClientVoicesClient() {
         />
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
-          <div className="mx-auto flex max-w-[1400px] flex-col gap-5 short:gap-3 p-4 md:p-6 lg:h-full lg:p-8">
+          <div className="mx-auto flex max-w-[1400px] flex-col gap-5 short:gap-3 p-4 md:p-6 lg:min-h-full lg:p-8">
             {/* Page header */}
             <div className="flex shrink-0 flex-col justify-between gap-3 xl:flex-row xl:items-center">
               <div className="min-w-0">
@@ -469,7 +469,7 @@ export default function ClientVoicesClient() {
                 30% and the task list and the transcripts get the rest. The 260px floor only binds
                 below about 1300px, where a 30% column wrapped the drop zone's words into so many
                 lines that the page gained 138px of scrolling (measured at 1093x540). */}
-            <div className="grid grid-cols-1 gap-5 short:gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(260px,30fr)_minmax(0,70fr)]">
+            <div className="grid grid-cols-1 gap-5 short:gap-3 lg:flex-1 lg:grid-cols-[minmax(260px,30fr)_minmax(0,70fr)]">
               <div className="flex min-w-0 flex-col gap-4">
                 {/* What this batch is called, and whether it is kept: both belong with what goes in */}
                 <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">

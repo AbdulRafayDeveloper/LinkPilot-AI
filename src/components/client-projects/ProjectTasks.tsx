@@ -4,6 +4,8 @@ import React, { useState } from "react"
 import { ArrowLeftRight, Download, Eye, FolderInput, Link2, Loader2, Pencil, Trash2 } from "lucide-react"
 import { SortableList } from "@/components/ui/SortableList"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
+import { CopyFileButton } from "@/components/ui/CopyFileButton"
+import { copyKindOf } from "@/lib/copyFile"
 import {
   PROJECT_DETAILS_OPEN_MAX_CHARS,
   PROJECT_FILE_MESSAGES,
@@ -19,6 +21,7 @@ import { clock } from "./VoiceNoteField"
 import { FileKindIcon, fileSize } from "./ProjectFilesField"
 import { FilePreviewDialog } from "./FilePreviewDialog"
 import type { ProjectFileView, ProjectTask } from "@/types/clientProjectTasks"
+import { formatInstant } from "@/lib/timeZone"
 
 interface ProjectTasksProps {
   tasks: ProjectTask[]
@@ -79,7 +82,7 @@ const actionButton =
 
 /** The day an item was saved, which is what a backup is read by. */
 const savedOn = (iso: string): string =>
-  new Date(iso).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+  formatInstant(iso, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
 
 /** One item's voice note, as a player. The same markup on the page and behind a shared link. */
 const VoiceNotePlayer: React.FC<{ task: ProjectTask }> = ({ task }) =>
@@ -97,14 +100,22 @@ const VoiceNotePlayer: React.FC<{ task: ProjectTask }> = ({ task }) =>
  * than a dialog for the one glance most files get. Every file, whatever it is, also has Preview
  * (the whole popup, `FilePreviewDialog`) and Download, which saves it under its own name; Preview
  * is left out only for a type no browser can show, which today is a Word document.
+ *
+ * An image and a text file also have **Copy**, which puts the picture or the text itself on the
+ * clipboard to paste into Claude, WhatsApp or anywhere else. Nothing else gets one, because no
+ * browser lets a page copy a PDF, a video or a Word document as a file.
  */
 const ItemFiles: React.FC<{ files: ProjectFileView[]; onPreview: (file: ProjectFileView) => void }> = ({ files, onPreview }) => {
   if (files.length === 0) return null
   return (
     <ul className="flex flex-col gap-2">
       {files.map((file) => {
+        const copyKind = copyKindOf(file.category, file.contentType)
         const actions = (
           <span className="flex shrink-0 items-center gap-0.5">
+            {copyKind && (
+              <CopyFileButton url={file.previewUrl ?? file.url} kind={copyKind} name={file.name} className={`${actionButton} hover:text-primary`} />
+            )}
             {/* Every file has it, including the one no browser can show: the viewer then says so
                 and offers the download, rather than the row quietly having one button fewer */}
             <button type="button" onClick={() => onPreview(file)} className={`${actionButton} hover:text-primary`} aria-label={`Preview ${file.name}`}>
@@ -231,7 +242,7 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
           isDone && shape.tick ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-white"
         }`}
       >
-        <div className="flex items-start gap-2">
+        <div className="flex flex-wrap items-start gap-2 sm:flex-nowrap">
           {handle}
           {/* The row's own number, down the side of the list: 1. 2. 3. It is the item's own, kept in
               the database, so dragging the list never renumbers anything */}
@@ -308,8 +319,9 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
             )}
           </div>
           {busyId === task.id && <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-primary" aria-hidden="true" />}
-          {/* The actions wrap onto their own line on a phone rather than squeezing the words */}
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-0.5">
+          {/* The actions take a line of their own on a phone rather than squeezing the words: beside
+              them on a 360px screen an item had 43px, one letter a line */}
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-0.5 max-sm:w-full">
             {onMoveTab && !readOnly && (
               <button
                 type="button"
@@ -354,6 +366,7 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
               description={task.description}
               images={task.images}
               label={task.content}
+              canCopyImages
               // What the tab is for is open from the start (the credentials themselves), and so
               // is a note on a shared link, unless it is long enough to bury the list
               defaultOpen={(detailsOpen || shape.text?.required) && task.description.length <= PROJECT_DETAILS_OPEN_MAX_CHARS}

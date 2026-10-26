@@ -154,11 +154,12 @@ export default function ClientsClient() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] lg:items-start">
+            {/* Side by side only from xl, where the details have room; at lg they stack (as Employees does) */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] xl:items-start">
               {/* The clients */}
-              <div className="flex flex-col gap-3">
+              <div className="flex min-w-0 flex-col gap-3">
                 <FilterPanel
-                  columnsClassName="lg:grid-cols-1"
+                  columnsClassName="xl:grid-cols-1"
                   canClear={hasFilters}
                   onClear={() => setSearch("")}
                   summary={clients ? `${shown.length.toLocaleString()} of ${clients.length.toLocaleString()} shown` : "Loading your clients..."}
@@ -232,7 +233,7 @@ export default function ClientsClient() {
                     <section aria-label="Client details" className="rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
                       {/* The details column is full width below lg but only about 290px between lg and xl,
                           where the name and the buttons cannot share a row; it has the width again from xl */}
-                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between lg:flex-col xl:flex-row xl:items-start xl:justify-between">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className="flex min-w-0 items-center gap-3">
                           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-white">
                             {initialsOf(current.name)}

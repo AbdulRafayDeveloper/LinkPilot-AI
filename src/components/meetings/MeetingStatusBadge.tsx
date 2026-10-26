@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { AlertTriangle, CheckCircle2, Circle, Clock, Loader2, RefreshCcw } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Circle, Clock, Loader2, RefreshCcw, Video } from "lucide-react"
 import { getStatusLabel, type MeetingStatusId } from "@/constants/meetings"
 import type { MeetingProgress } from "@/types/meetings"
 
@@ -12,6 +12,7 @@ interface MeetingStatusBadgeProps {
 
 const STYLES: Record<MeetingStatusId, string> = {
   recording: "border-error/40 bg-error-container text-error",
+  recorded: "border-outline-variant bg-surface-container text-on-surface-variant",
   transcribing: "border-primary/30 bg-primary/5 text-primary",
   saved: "border-outline-variant bg-surface-container text-on-surface-variant",
   analyzing: "border-primary/30 bg-primary/5 text-primary",
@@ -29,6 +30,8 @@ export const MeetingStatusBadge: React.FC<MeetingStatusBadgeProps> = ({ status, 
   const isRunning = status === "analyzing" || status === "summarizing" || status === "transcribing"
   const Icon = status === "recording"
     ? Circle
+    : status === "recorded"
+    ? Video
     : isRunning
     ? Loader2
     : status === "completed"

@@ -4,6 +4,10 @@ import mongoose, { Schema, type Model } from "mongoose"
  * One successful AI call, for budget tracking: which provider and model answered, for which module
  * and account, what kind of call it was, and what it used. Written by services/aiUsage.ts for every
  * call (text, screenshot, web search, speech, image). Never the prompt or the answer.
+ *
+ * `cost` is written as the call is made, from the price its model had then (`model_prices`), so a
+ * price changed later never rewrites what was already spent. Calls saved before their model had a
+ * price have none, and the cost report works them out at today's price and says so.
  */
 export interface IAiUsage {
   ownerId: string | null
@@ -16,6 +20,8 @@ export interface IAiUsage {
   totalTokens: number | null
   audioSeconds: number | null
   keyNumber: number | null
+  // What the call cost in US dollars at the price its model had then, or null when it had none
+  cost: number | null
   createdAt: Date
   updatedAt: Date
 }
@@ -32,6 +38,7 @@ const AiUsageSchema = new Schema<IAiUsage>(
     totalTokens: { type: Number, default: null },
     audioSeconds: { type: Number, default: null },
     keyNumber: { type: Number, default: null },
+    cost: { type: Number, default: null },
   },
   { timestamps: true, collection: "ai_usage" }
 )

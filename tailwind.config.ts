@@ -76,6 +76,16 @@ const config: Config = {
         "error-container": "#ffdad6",
         "on-error-container": "#93000a",
       },
+      // The new-version notice rises into place (components/ui/UpdateToast.tsx), only where motion is welcome
+      keyframes: {
+        "toast-in": {
+          from: { opacity: "0", transform: "translateY(16px) scale(0.98)" },
+          to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+      },
+      animation: {
+        "toast-in": "toast-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+      },
       // Soft, ink-tinted shadows instead of flat grey ones
       boxShadow: {
         sm: "0 1px 2px 0 rgb(28 24 38 / 0.04), 0 1px 3px 0 rgb(28 24 38 / 0.05)",

@@ -155,6 +155,8 @@ export interface MeetingPlan {
    * it. Only the month read carries it, since counting it is a query of its own.
    */
   linkedCount?: number
+  // How many of those are recordings made in the app, so a recorded meeting says so in words
+  recordedCount?: number
   createdAt: string
 }
 

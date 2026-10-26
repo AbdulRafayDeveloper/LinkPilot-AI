@@ -7,6 +7,7 @@ import { requestApi } from "@/lib/apiClient"
 import { SAVED_TOPIC_STATUSES, TRENDING_HISTORY_ENDPOINT, TRENDING_HISTORY_MESSAGES, type SavedTopicStatus } from "@/constants/trending"
 import type { SavedTopic, SavedTopicDetail } from "@/types/trendingHistory"
 import { TopicCard } from "./TopicCard"
+import { formatInstant } from "@/lib/timeZone"
 
 const STATUS_STYLE: Record<SavedTopicStatus, string> = {
   current: "bg-success-container text-on-success-container",
@@ -24,7 +25,7 @@ export const SavedTopicStatusBadge: React.FC<{ status: SavedTopicStatus }> = ({ 
 )
 
 export const searchedOn = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+  formatInstant(iso, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 const metaLabel = "text-[10px] font-bold uppercase tracking-wider text-outline"
 

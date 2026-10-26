@@ -6,6 +6,7 @@ import type { PlanHistoryDay, PlanHistoryPage, PlanItem } from "@/types/employee
 import { TaskReason } from "./TaskReason"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 import { depthsOf } from "@/lib/taskTree"
+import { dayIn, displayTimeZone, formatInstant } from "@/lib/timeZone"
 
 /** Ticks or unticks one task on a day gone by. Given one, the history ticks; without it, it reads. */
 export type HistoryTick = (day: PlanHistoryDay, item: PlanItem, done: boolean) => Promise<void>
@@ -16,12 +17,12 @@ export type HistoryReason = (day: PlanHistoryDay, item: PlanItem, reason: string
 export const dayHeading = (date: string) =>
   new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
 
-export const tickTime = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+export const tickTime = (iso: string) => formatInstant(iso, { hour: "2-digit", minute: "2-digit" })
 
 const tickedOn = (iso: string, day: string) => {
   // A task ticked on a later day than it was planned for says which day
-  const localDay = new Date(iso).toLocaleDateString("en-CA")
-  return localDay === day ? tickTime(iso) : `${new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" })}, ${tickTime(iso)}`
+  const localDay = dayIn(displayTimeZone(), new Date(iso))
+  return localDay === day ? tickTime(iso) : `${formatInstant(iso, { day: "numeric", month: "short" })}, ${tickTime(iso)}`
 }
 
 const HistoryDay: React.FC<{ day: PlanHistoryDay; onTick?: HistoryTick; onReason?: HistoryReason }> = ({ day, onTick, onReason }) => {

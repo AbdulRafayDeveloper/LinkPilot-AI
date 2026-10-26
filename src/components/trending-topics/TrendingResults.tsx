@@ -5,6 +5,7 @@ import { Info } from "lucide-react"
 import type { SearchProvider, TrendingResult } from "@/services/trending/schema"
 import { TopicCard } from "./TopicCard"
 import { AiSourceLabel } from "@/components/ui/AiSourceLabel"
+import { formatInstant } from "@/lib/timeZone"
 
 const PROVIDER_LABELS: Record<SearchProvider, string> = {
   groq: "Groq browser search",
@@ -37,7 +38,7 @@ export const TrendingResults: React.FC<{ result: TrendingResult }> = ({ result }
       )}
 
       <p className="text-[11px] text-outline">
-        Researched {new Date(metadata.searched_at).toLocaleString()} · {metadata.sources_checked} sources checked ·{" "}
+        Researched {formatInstant(metadata.searched_at)} · {metadata.sources_checked} sources checked ·{" "}
         {metadata.candidates_evaluated} candidates evaluated · {searchedWith(metadata.search_provider)}
         <AiSourceLabel source={result} />
       </p>

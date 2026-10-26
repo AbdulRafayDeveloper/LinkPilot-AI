@@ -11,6 +11,8 @@ import { JoinLink } from "./JoinLink"
 import { MeetingStatusButton } from "./MeetingStatusButton"
 import { PrepBadge } from "./PrepBadge"
 import { SeriesBadge } from "./SeriesBadge"
+import { RecordedBadge } from "./RecordedBadge"
+import { QuickRecordButton } from "@/components/meetings/QuickRecordButton"
 
 interface DayMeetingsPanelProps {
   date: string
@@ -104,8 +106,14 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
               </Link>
               <div className="flex flex-wrap items-center justify-end gap-0.5">
+                {/* Recorded, in words, at the start of the line: a button can't sit inside the row's link above */}
+                <span className="mr-auto">
+                  <RecordedBadge meeting={meeting} onOpen={() => onLinked(meeting)} />
+                </span>
                 {/* The attend link first, so any day's meeting is joined and copied from here */}
                 <JoinLink url={meeting.joinUrl} name={meeting.name} />
+                {/* Record it from here: the recording is linked to this meeting from the start */}
+                <QuickRecordButton plan={{ id: meeting.id, name: meeting.name }} variant="icon" />
                 {/* What it was written up as, when there is something: the records of this meeting */}
                 {(meeting.linkedCount ?? 0) > 0 && (
                   <button

@@ -5,6 +5,7 @@ import { AlertTriangle, BookMarked, ChevronDown, ChevronUp, Loader2, Pencil, Ref
 import { CopyButton } from "@/components/ui/CopyButton"
 import { REFERENCE_CONTENT_MESSAGES, REFERENCE_PREVIEW_MAX_LENGTH } from "@/constants/referenceContent"
 import type { ReferenceItem } from "@/types/referenceContent"
+import { formatInstant } from "@/lib/timeZone"
 
 interface ReferenceListProps {
   items: ReferenceItem[]
@@ -24,7 +25,7 @@ interface ReferenceListProps {
   onDelete: (item: ReferenceItem) => void
 }
 
-const savedAt = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+const savedAt = (iso: string) => formatInstant(iso, { day: "numeric", month: "short", year: "numeric" })
 
 const actionButton =
   "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"

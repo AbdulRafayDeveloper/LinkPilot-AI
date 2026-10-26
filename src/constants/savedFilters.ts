@@ -35,6 +35,8 @@ export const FILTER_VIEWS: Record<string, readonly string[]> = {
   "admin-audit": ["search", "event", "from", "to"],
   "admin-backups": ["search", "status", "trigger", "from", "to"],
   "admin-users": ["search", "role"],
+  // AI Model Priority → Cost by model: the period and the four choices
+  "admin-ai-costs": ["period", "from", "to", "provider", "model", "module", "kind"],
   // The ten "view all" pages share one page and one shape, so they share these keys under their own ids
   ...Object.fromEntries(
     SAVED_OUTPUT_TOOLS.map((tool) => [

@@ -163,8 +163,11 @@ export async function getMeeting(viewer: Viewer, id: string): Promise<Meeting | 
   const filter = visibleById(viewer, id)
   if (!filter) return null
   await connectDatabase()
-  const record = await MeetingModel.findOne(filter).lean()
-  return record ? toMeeting(record as unknown as StoredMeeting) : null
+  const record = (await MeetingModel.findOne(filter).lean()) as unknown as StoredMeeting | null
+  if (!record) return null
+  // The planned meeting it is the record of, so the page can say so and go there; one that has gone reads as none
+  const plans = await plansOfMeetings(viewer, [record.planId])
+  return { ...toMeeting(record), plan: record.planId ? (plans.get(record.planId) ?? null) : null }
 }
 
 /**

@@ -15,6 +15,7 @@ import {
 } from "@/constants/clientProjectTasks"
 import { estimateLabel } from "@/lib/projectItems"
 import type { ProjectEstimate } from "@/types/clientProjectTasks"
+import { formatInstant } from "@/lib/timeZone"
 
 /**
  * What an item on a client project carries beside its words: **how long it is expected to take**,
@@ -95,7 +96,7 @@ export const EstimateField: React.FC<EstimateFieldProps> = ({ estimate, onChange
 
 /** The one control both the stage picker and the share toggle are built on the look of. */
 const chipClass =
-  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+  "inline-flex min-h-6 items-center gap-1 rounded-full px-2 py-0.5 md:min-h-0 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
 
 // Each stage its own colour, so a roadmap is read at a glance; the word is always there as well
 const STAGE_COLOURS: Record<RoadmapStage, string> = {
@@ -195,7 +196,7 @@ interface SignOffButtonProps {
  */
 export const SignOffButton: React.FC<SignOffButtonProps> = ({ signedAt, onSign, busy, disabled, label }) => {
   const isSigned = Boolean(signedAt)
-  const day = signedAt ? new Date(signedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : ""
+  const day = signedAt ? formatInstant(signedAt, { day: "numeric", month: "short", year: "numeric" }) : ""
   return (
     <button
       type="button"

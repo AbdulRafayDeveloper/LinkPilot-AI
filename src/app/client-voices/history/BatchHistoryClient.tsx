@@ -18,11 +18,12 @@ import { requestApi } from "@/lib/apiClient"
 import { HISTORY_DEBOUNCE_MS, HISTORY_MESSAGES } from "@/constants/historyFilters"
 import { CLIENT_VOICES_MESSAGES, NO_CLIENT_FILTER, VOICE_BATCHES_ENDPOINT, clientVoicesBatchHref } from "@/constants/clientVoices"
 import type { VoiceBatch, VoiceBatchesPage } from "@/types/clientVoices"
+import { formatInstant } from "@/lib/timeZone"
 
 const NOUN = { one: "batch", many: "batches" }
 
 const runOn = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+  formatInstant(iso, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 /**
  * What a batch is called, which is what the list is read by: the user's own title, or the one

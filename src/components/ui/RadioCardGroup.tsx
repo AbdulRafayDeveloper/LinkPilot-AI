@@ -17,18 +17,24 @@ interface RadioCardGroupProps<Id extends string> {
   onChange: (id: Id) => void
   disabled?: boolean
   invalid?: boolean
-  // Grid column classes; two columns from the sm breakpoint by default
+  /**
+   * Grid column classes. Left out, the cards fill **the width they are given**, as many 10rem cards a
+   * row as fit: the same group sits in a narrow form column on a laptop and full width on a phone, so
+   * only the space it really has can say how many fit.
+   */
   columnsClassName?: string
-  // Wrap long option labels onto a second line instead of truncating them
-  wrapLabels?: boolean
-  // On a short laptop window (the `short` screen), show each card's label only, with its description as a
-  // tooltip, so the whole tool fits without scrolling
-  compactOnShortScreens?: boolean
 }
+
+// As many cards a row as fit at 10rem each, and never wider than the group itself
+export const FIT_CARD_COLUMNS = "grid-cols-[repeat(auto-fill,minmax(min(100%,10rem),1fr))]"
 
 /**
  * Single-choice option cards built on native radio inputs, so arrow keys and screen
  * readers work without extra code.
+ *
+ * **Every card shows its whole name and its whole description, on every screen**: both wrap rather
+ * than being cut short, and nothing is hidden on a short window. A page that runs longer than the
+ * window scrolls, which is far easier to use than a card that says "Thought..." with the rest in a tooltip.
  */
 export function RadioCardGroup<Id extends string>({
   name,
@@ -38,23 +44,18 @@ export function RadioCardGroup<Id extends string>({
   onChange,
   disabled = false,
   invalid = false,
-  columnsClassName = "grid-cols-1 sm:grid-cols-2",
-  wrapLabels = false,
-  compactOnShortScreens = false,
+  columnsClassName = FIT_CARD_COLUMNS,
 }: RadioCardGroupProps<Id>) {
   return (
     <fieldset disabled={disabled} aria-invalid={invalid} className="min-w-0">
-      <legend className={`text-[10px] font-bold text-outline uppercase tracking-wider mb-2 ${compactOnShortScreens ? "short:mb-1.5" : ""}`}>{legend}</legend>
+      <legend className="text-[10px] font-bold text-outline uppercase tracking-wider mb-2">{legend}</legend>
       <div className={`grid ${columnsClassName} gap-2`}>
         {options.map((option) => {
           const isSelected = value === option.id
           return (
             <label
               key={option.id}
-              // On a short window the card shows its name alone, and a long name is cut to fit, so the
-              // tooltip carries the name as well as the description rather than the description alone.
-              title={compactOnShortScreens ? `${option.label} — ${option.description}` : undefined}
-              className={`relative flex items-start gap-2 min-w-0 cursor-pointer rounded-xl border px-3 py-2 ${compactOnShortScreens ? "short:items-center short:py-1.5" : ""} transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
+              className={`relative flex items-start gap-2 min-w-0 cursor-pointer rounded-xl border px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
                 isSelected
                   ? "bg-primary-container border-primary-container text-on-primary-container"
                   : `bg-white text-on-surface hover:bg-surface-container-low ${invalid ? "border-error" : "border-outline-variant"}`
@@ -69,27 +70,12 @@ export function RadioCardGroup<Id extends string>({
                 className="sr-only"
               />
               <span className="min-w-0 flex-1">
-                <span className={`block text-sm font-semibold leading-tight ${wrapLabels ? "break-words" : "truncate"}`}>
-                  {option.label}
-                </span>
-                <span
-                  className={`block text-[11px] leading-tight mt-0.5 truncate ${compactOnShortScreens ? "short:hidden" : ""} ${
-                    isSelected ? "text-on-primary-container/80" : "text-outline"
-                  }`}
-                >
+                <span className="block text-sm font-semibold leading-tight break-words">{option.label}</span>
+                <span className={`block text-[11px] leading-snug mt-0.5 break-words ${isSelected ? "text-on-primary-container/80" : "text-outline"}`}>
                   {option.description}
                 </span>
               </span>
-              {/* Wrapped cards are narrow, so their checkmark sits on the corner instead of taking text width */}
-              {isSelected && (
-                <CheckCircle2
-                  size={16}
-                  className={
-                    wrapLabels ? "absolute -top-1.5 -right-1.5 rounded-full bg-white text-primary" : "shrink-0 mt-0.5"
-                  }
-                  aria-hidden="true"
-                />
-              )}
+              {isSelected && <CheckCircle2 size={16} className="shrink-0 mt-0.5" aria-hidden="true" />}
             </label>
           )
         })}

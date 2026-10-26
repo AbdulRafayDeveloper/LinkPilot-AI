@@ -5,6 +5,7 @@ import { Bot, HelpCircle, Monitor, Smartphone, Tablet, type LucideIcon } from "l
 import { loginEventLabel, type LoginEventType } from "@/constants/admin"
 import { deviceLabel } from "@/lib/userAgent"
 import type { DeviceSummary } from "@/types/admin"
+import { formatInstant } from "@/lib/timeZone"
 
 /** The small pieces both admin pages share: the summary cards, the device line and the event badge. */
 
@@ -24,7 +25,7 @@ export const StatCard: React.FC<{ icon: LucideIcon; label: string; value: number
       <div className="min-w-0">
         <p className="text-[12px] font-semibold text-on-surface-variant">{label}</p>
         <p className="text-2xl font-bold leading-tight text-on-surface">{value === null ? "…" : value.toLocaleString()}</p>
-        {hint && <p className="truncate text-[11px] text-outline">{hint}</p>}
+        {hint && <p className="text-[11px] leading-snug text-outline">{hint}</p>}
       </div>
     </div>
   )
@@ -59,7 +60,7 @@ export const EventBadge: React.FC<{ event: LoginEventType }> = ({ event }) => (
 )
 
 export const dateTime = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+  formatInstant(iso, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })
 
 /** "3 minutes ago", "2 days ago": how long since something happened, for the activity columns. */
 export function timeAgo(iso: string | null): string {

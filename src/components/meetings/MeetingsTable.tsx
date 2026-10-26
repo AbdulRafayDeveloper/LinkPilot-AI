@@ -7,6 +7,7 @@ import { historyLabelClass } from "@/components/history/HistoryFilters"
 import { MEETING_PLAN_LINK_MESSAGES } from "@/constants/meetings"
 import { MeetingStatusBadge } from "./MeetingStatusBadge"
 import type { MeetingSummary } from "@/types/meetings"
+import { formatInstant } from "@/lib/timeZone"
 
 interface MeetingsTableProps {
   meetings: MeetingSummary[]
@@ -23,9 +24,9 @@ interface MeetingsTableProps {
   onUnlink?: (meeting: MeetingSummary) => void
 }
 
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
-const onDay = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
-const atTime = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+const when = (iso: string) => formatInstant(iso, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+const onDay = (iso: string) => formatInstant(iso, { day: "numeric", month: "short", year: "numeric" })
+const atTime = (iso: string) => formatInstant(iso, { hour: "2-digit", minute: "2-digit" })
 
 const actionButton =
   "inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
@@ -109,7 +110,7 @@ const LinkedPlan: React.FC<{ meeting: MeetingSummary; onUnlink?: (meeting: Meeti
           type="button"
           onClick={() => onUnlink(meeting)}
           aria-label={`Unlink ${meeting.title} from ${meeting.plan.name}`}
-          className="text-[10px] font-semibold text-outline underline transition-colors hover:text-error"
+          className="min-h-6 px-1 text-[10px] font-semibold text-outline underline transition-colors hover:text-error"
         >
           {MEETING_PLAN_LINK_MESSAGES.unlink}
         </button>

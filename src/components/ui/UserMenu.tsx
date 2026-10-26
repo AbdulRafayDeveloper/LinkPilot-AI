@@ -6,6 +6,7 @@ import { BookOpen, ChevronDown, Loader2, LogOut, ShieldCheck, UserCog } from "lu
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { requestApi } from "@/lib/apiClient"
 import { clearAllToolState } from "@/lib/toolStore"
+import { setDisplayTimeZone } from "@/lib/timeZone"
 import { ACCOUNT_SETTINGS_PATH, AUTH_ENDPOINTS, LOGIN_PATH, ROLE_LABELS } from "@/constants/auth"
 import { HELP_MESSAGES, HELP_PATH } from "@/constants/helpDocs"
 import { AccountAvatar } from "./AccountAvatar"
@@ -49,6 +50,8 @@ export const UserMenu: React.FC = () => {
       await requestApi(AUTH_ENDPOINTS.logout, { method: "POST" }, { retry: true })
     } finally {
       clearAllToolState()
+      // The next account to sign in here starts in this browser's zone until its own arrives
+      setDisplayTimeZone(null)
       window.location.assign(LOGIN_PATH)
     }
   }

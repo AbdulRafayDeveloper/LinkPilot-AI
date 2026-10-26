@@ -24,9 +24,10 @@ import {
 } from "@/constants/clientVoices"
 import { describeSource } from "@/constants/aiProviders"
 import type { SavedVoice, VoiceBatchDetail } from "@/types/clientVoices"
+import { formatInstant } from "@/lib/timeZone"
 
 const runOn = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
+  formatInstant(iso, { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 const backButton =
   "inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] font-semibold text-outline transition-colors hover:bg-surface-container hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"

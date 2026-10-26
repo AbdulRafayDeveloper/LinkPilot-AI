@@ -63,11 +63,17 @@ export type UploadTrackId = (typeof UPLOAD_TRACKS)[number]
 
 /**
  * Where a recording is. `recording` while it is taken and uploaded; `consolidating` while the chunks are
- * joined into one file; `transcribing` while the audio is written out; `done` once the transcript is on
- * the meeting (the ordinary analysis takes over from there); `failed` when a step stopped, which the
- * next step picks up again from where it was.
+ * joined into one file; `ready` once the video is joined and can be played, **where it stops and waits**;
+ * `transcribing` while the audio is written out, which only starts when the user asks for it; `done`
+ * once the transcript is on the meeting (the ordinary analysis takes over from there); `failed` when a
+ * step stopped, which the next step picks up again from where it was.
+ *
+ * `ready` is the owner's rule: a recording is written out and analysed **only on a click**, never by
+ * itself, so a day of recorded calls does not turn into a day of transcripts and notes nobody asked for
+ * (and a day of Groq's tokens). Joining is not held back, since it calls no model and is what makes the
+ * video playable.
  */
-export const RECORDING_STAGES = ["recording", "consolidating", "transcribing", "done", "failed"] as const
+export const RECORDING_STAGES = ["recording", "consolidating", "ready", "transcribing", "done", "failed"] as const
 export type RecordingStage = (typeof RECORDING_STAGES)[number]
 
 // What the browser may record in, and what the server accepts as each track's type
@@ -95,6 +101,14 @@ export const RECORDING_SOUND_MODES = [
 ] as const
 export type RecordingSoundMode = (typeof RECORDING_SOUND_MODES)[number]["id"]
 export const DEFAULT_SOUND_MODE: RecordingSoundMode = "laptop"
+
+/**
+ * What **Quick record** starts with, so a recording is one click: your voice and the laptop's sound,
+ * the microphone on and no camera, which are the record page's own defaults. The screen picker is asked
+ * to open on Entire screen with system audio on (`lib/meetingRecorder.ts`); the browser still shows it,
+ * since no page may share a screen without the person choosing to.
+ */
+export const QUICK_RECORDING = { withMicrophone: true, withCamera: false, sound: DEFAULT_SOUND_MODE } as const
 
 /**
  * How loud a peak (out of 1) has to be to count as sound, judged separately for each side because they
@@ -141,6 +155,14 @@ export const RECORDING_MESSAGES = {
   transcriptionUnavailable: "Writing out a recording needs Groq's transcription model (GROQ_API_KEY_1 and GROQ_TRANSCRIPTION_MODEL).",
   processFailed: "Processing stopped. Everything uploaded is safe; press Try again to carry on.",
   leaveWarning: "A recording is still running or uploading. Leaving now stops it.",
+  // A joined recording waits here until it is asked for, so nothing is written out by itself
+  readyToTranscribe: "Recorded and saved. Nothing has been written out or analysed yet, so nothing has been spent on it.",
+  transcribe: "Transcribe and analyse",
+  transcribeHint: "Writes out what was said (Groq), then writes the notes.",
+  quickRecord: "Quick record",
+  quickRecordHint: "Starts at once with your voice, the laptop's sound and the microphone. Choose Entire screen with system audio, then Share.",
+  recordThis: (name: string) => `Record ${name}`,
+  planUnavailable: "That meeting is no longer on the calendar, so the recording couldn't be linked to it.",
   notesSaved: "Notes saved.",
   notesFailed: "Couldn't save the notes. Please try again.",
 } as const

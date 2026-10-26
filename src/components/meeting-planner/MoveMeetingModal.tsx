@@ -108,7 +108,6 @@ export const MoveMeetingModal: React.FC<MoveMeetingModalProps> = ({ meeting, isS
               value={scope}
               onChange={setScope}
               disabled={isSaving}
-              wrapLabels
             />
             {/* Moving the day of a whole series shifts every later meeting by the same number of
                 days, so a weekly meeting stays weekly on its new day rather than piling onto one. */}

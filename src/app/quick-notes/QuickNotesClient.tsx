@@ -10,6 +10,8 @@ import { SavedNotesList } from "@/components/quick-notes/SavedNotesList"
 import { NoteEditorDialog } from "@/components/quick-notes/NoteEditorDialog"
 import { MoveNoteDialog } from "@/components/quick-notes/MoveNoteDialog"
 import { NOTE_EDITOR_IMAGES } from "@/components/quick-notes/noteEditorImages"
+import { SpeakNote } from "@/components/quick-notes/SpeakNote"
+import { appendSpokenText } from "@/lib/spokenText"
 import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { ClearNotesDialog } from "@/components/quick-notes/ClearNotesDialog"
@@ -120,6 +122,18 @@ export default function QuickNotesClient() {
       setIsLoadingMore(false)
     }
   }, [feed.nextCursor])
+
+  /**
+   * A spoken take, already in English, goes on the end of the note as its own paragraph, within the
+   * note's limit. It reads the draft as it is now rather than as this render saw it, since the
+   * English arrives seconds later and the user may have typed meanwhile.
+   */
+  const addSpokenText = useCallback((text: string) => {
+    const { text: next, skipped } = appendSpokenText(draftStore.getSnapshot().content, text, NOTE_MAX_LENGTH, "\n\n")
+    draftStore.update({ content: next })
+    setSaveState({ type: "idle" })
+    return skipped
+  }, [])
 
   const save = async () => {
     if (saveState.type === "saving") return
@@ -239,7 +253,7 @@ export default function QuickNotesClient() {
         />
 
         <main className="flex-1 overflow-y-auto bg-background overflow-x-hidden">
-          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:h-full">
+          <div className="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 lg:min-h-full">
             {/* Page header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
               <div className="min-w-0">
@@ -267,7 +281,7 @@ export default function QuickNotesClient() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:flex-1">
               <BulkDeleteBar
                 pickedCount={selection.pickedIds.size}
                 total={null}
@@ -315,12 +329,19 @@ export default function QuickNotesClient() {
                   placeholder="e.g. Client login steps"
                   className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
                 />
-                <label htmlFor={contentId} className="text-[10px] font-bold uppercase tracking-wider text-outline">
-                  Paste or write anything
-                </label>
+                {/* Speaking sits beside the editor's own label: what is said is written in English and added to the note */}
+                <SpeakNote
+                  addToNote={addSpokenText}
+                  disabled={isSaving}
+                  label={
+                    <label htmlFor={contentId} className="text-[10px] font-bold uppercase tracking-wider text-outline">
+                      Paste, write or speak anything
+                    </label>
+                  }
+                />
                 {/* Ctrl/⌘+Enter saves, the way a send field does; the editor's own keys bubble up to here */}
                 <div
-                  className={`flex min-h-[320px] short:min-h-[150px] flex-1 flex-col rounded-xl ${saveState.type === "error" ? "ring-2 ring-error/60" : ""} ${isSaving ? "pointer-events-none opacity-60" : ""}`}
+                  className={`flex min-h-[320px] flex-1 flex-col rounded-xl ${saveState.type === "error" ? "ring-2 ring-error/60" : ""} ${isSaving ? "pointer-events-none opacity-60" : ""}`}
                   onKeyDown={(event) => {
                     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                       event.preventDefault()

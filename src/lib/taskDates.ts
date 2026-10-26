@@ -1,3 +1,5 @@
+import { dayIn, displayTimeZone } from "@/lib/timeZone"
+
 /**
  * Calendar-day helpers for Daily Tasks. A day is a plain YYYY-MM-DD string, so these never
  * depend on the server's timezone: the browser says which day it is on, and everything after
@@ -15,13 +17,11 @@ export function shiftDate(date: string, days: number): string {
 }
 
 /**
- * The day the given clock is on, in its own timezone (never UTC, which would turn the day over
- * in the middle of the user's).
+ * The day it is for the person, in the timezone they chose in Account Settings (this browser's own
+ * until they choose one). Never UTC, which would turn the day over in the middle of theirs.
  */
 export function todayIso(now: Date = new Date()): string {
-  const month = `${now.getMonth() + 1}`.padStart(2, "0")
-  const day = `${now.getDate()}`.padStart(2, "0")
-  return `${now.getFullYear()}-${month}-${day}`
+  return dayIn(displayTimeZone(), now)
 }
 
 /**

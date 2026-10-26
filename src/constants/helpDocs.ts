@@ -92,11 +92,11 @@ export const HELP_START_TOPICS: HelpTopic[] = [
     title: "Global AI Prompts",
     href: "/global-prompts",
     doc: {
-      summary: "The two prompts every tool reads: how your text is humanized, and the facts about you it may use.",
+      summary: "The facts about you the tools may use, and, for admins, how every tool's text is humanized.",
       steps: [
         "Open Global AI Prompts at the bottom of the sidebar and press Update Prompt.",
-        "Humanization is the last step of every LinkedIn tool: edit it to change how the finished copy reads.",
         "Rafay Profile Info holds your real experience, projects and numbers. Tools quote from it and never invent anything beyond it.",
+        "Humanization is the last step of every LinkedIn tool. Only an admin can change it, from Administration, then Global AI Prompts.",
         "Save, and the next thing you generate uses the new wording.",
       ],
       notes: [
@@ -176,11 +176,13 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
     summary: "Somewhere to drop text you will reuse shortly, newest first, with no naming or filing needed.",
     steps: [
       "Paste or write the note, give it a name if you want one, and press Save (or Ctrl/Cmd+Enter).",
+      "Or press Speak instead beside the editor and say the note in any language. Press Stop when you are done: what you said is written in clear English and added to the note, ready to read, change and save.",
       "Copy a note with its copy button, which always takes the whole note.",
       "Delete a note with one click; only Clear All asks first.",
     ],
     notes: [
       "A note can be formatted and can hold pasted images.",
+      "A spoken note can run up to six minutes. Show what you said puts the English beside your own words, and if the English cannot be written, your words are kept with Try again and a way to add them as you said them.",
       "The pencil opens a note for editing and saves itself as you type.",
       "A note worth keeping moves into Important Content with the key icon, which asks for the type and folder it should live under.",
     ],
@@ -352,11 +354,13 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
       "Paste the person's profile, your conversation so far and any notes, then ask for the preparation.",
       "Read the preparation before the call: who they are, what to cover, which projects to show and a nine-stage script.",
       "Open the script full screen during the call, or edit and reorder its stages first.",
+      "Press the camera on a meeting, or Record this meeting on its page, to record the call; the recording is filed under that meeting.",
     ],
     notes: [
       "Ask this meeting is a chat that answers from the meeting's own notes, and says plainly when something is not in them.",
       "A meeting is pending, completed or cancelled, and a cancelled one stays on its day struck through.",
       "Notes on a meeting are yours to write before and after it, and no model ever reads them.",
+      "A recorded meeting carries a Recorded tag; press it to open the recording.",
     ],
   },
   "client-voices": {
@@ -377,13 +381,16 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
   meetings: {
     summary: "Reads a whole meeting, however long, and gives you the participants, the decisions, your own tasks and a summary to send the client.",
     steps: [
-      "Paste the transcript and save it, or record the meeting in the app from Record a meeting.",
+      "Paste the transcript and save it, or press Quick record to record the meeting in the app with your voice, the laptop's sound and your microphone.",
+      "A recording is saved when you stop, ready to watch. Press Transcribe and analyse on it when you want it written out and turned into notes.",
       "Type who was in it. A recording has no speaker labels, so the names you give are the ones the report uses.",
       "Wait while it reads the meeting part by part; closing the browser loses nothing.",
       "Read the notes, edit them in place, and copy the summary.",
     ],
     notes: [
       "Recording captures the screen, the laptop's sound, your microphone and your camera, and uploads while it records.",
+      "The screen picker opens on Entire screen with system audio; check the audio switch is on, then press Share.",
+      "Nothing is written out or analysed by itself, so a recording you never need costs nothing.",
       "Share this meeting gives a read-only link that plays the recording and shows the summary, with no sign-in.",
       "Editing the transcript marks the analysis as from the earlier text until you analyse it again.",
       "Link a meeting to one on the calendar, and the planner's own notes help name the people a recording never names.",

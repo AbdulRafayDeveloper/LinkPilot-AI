@@ -7,6 +7,7 @@ import { RichTextView } from "@/components/ui/RichTextView"
 import { NOTE_IMAGES } from "@/lib/noteImages"
 import { NOTE_PREVIEW_MAX_LENGTH, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
 import type { QuickNote } from "@/types/quickNotes"
+import { formatInstant } from "@/lib/timeZone"
 
 interface SavedNotesListProps {
   notes: QuickNote[]
@@ -30,7 +31,7 @@ interface SavedNotesListProps {
 }
 
 const savedAt = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+  formatInstant(iso, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
 
 /**
  * One saved note: its name when it has one, the text as it is formatted (pictures included), when it
@@ -77,7 +78,7 @@ const NoteCard: React.FC<{
             disabled={isDeleting}
             aria-label={`Edit ${name}`}
             title="Edit this note"
-            className="inline-flex items-center gap-1 rounded-md p-1 text-[11px] text-outline transition-colors hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-6 min-w-6 items-center justify-center gap-1 rounded-md p-1 md:min-h-0 md:min-w-0 text-[11px] text-outline transition-colors hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Pencil size={14} aria-hidden="true" />
           </button>
@@ -88,7 +89,7 @@ const NoteCard: React.FC<{
               disabled={isDeleting}
               aria-label={`Move ${name} to Important Content`}
               title="Move to Important Content"
-              className="inline-flex items-center gap-1 rounded-md p-1 text-[11px] text-outline transition-colors hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-6 min-w-6 items-center justify-center gap-1 rounded-md p-1 md:min-h-0 md:min-w-0 text-[11px] text-outline transition-colors hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
               <FileKey2 size={14} aria-hidden="true" />
             </button>
@@ -99,7 +100,7 @@ const NoteCard: React.FC<{
             disabled={isDeleting}
             aria-label="Delete this note"
             title="Delete this note"
-            className="inline-flex items-center gap-1 rounded-md p-1 text-[11px] text-outline transition-colors hover:bg-error/5 hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-6 min-w-6 items-center justify-center gap-1 rounded-md p-1 md:min-h-0 md:min-w-0 text-[11px] text-outline transition-colors hover:bg-error/5 hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isDeleting ? (
               <Loader2 size={14} className="animate-spin" aria-hidden="true" />
@@ -169,7 +170,7 @@ export const SavedNotesList: React.FC<SavedNotesListProps> = ({
   return (
     <section
       aria-label="Saved notes"
-      className="flex min-h-[240px] flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm lg:min-h-0"
+      className="flex min-h-[240px] flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-on-surface">Saved Notes</h2>

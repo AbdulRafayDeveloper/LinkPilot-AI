@@ -2,6 +2,8 @@ import type { ApiEnvelope } from "@/types/api"
 import { parseRetryAfter, withRetry } from "@/lib/retry"
 import { AUTH_REQUIRED_HEADER, LOGIN_PATH } from "@/constants/auth"
 import { IDEMPOTENCY_HEADER } from "@/constants/idempotency"
+import { APP_VERSION_HEADER } from "@/constants/appVersion"
+import { noteServerVersion } from "@/lib/appVersion"
 
 /**
  * Browser → our API routes. Retries follow the HTTP rules for when a repeat is safe:
@@ -67,6 +69,8 @@ export async function fetchWithRetry(url: string, requestInit: RequestInit = {},
     return await withRetry(
       async () => {
         const response = await fetch(url, init)
+        // Every answer says which build sent it, which is how an open tab learns of a deploy for free
+        noteServerVersion(response.headers.get(APP_VERSION_HEADER))
         sendToSignIn(response)
         if (RETRYABLE_STATUS.has(response.status)) throw new RetryableResponse(response)
         return response

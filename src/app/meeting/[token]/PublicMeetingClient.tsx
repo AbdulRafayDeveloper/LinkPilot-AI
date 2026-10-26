@@ -13,9 +13,10 @@ import { SITE_LOGO_PNG, SITE_NAME } from "@/config/site"
 import { PUBLIC_MEETING_ENDPOINT, PUBLIC_MEETING_MESSAGES } from "@/constants/meetings"
 import type { PublicMeeting } from "@/types/meetings"
 import type { MeetingRecordingLinks } from "@/types/meetingRecording"
+import { formatInstant } from "@/lib/timeZone"
 
 const when = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+  formatInstant(iso, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 /**
  * What a meeting's shared link opens, for someone who is not signed in to anything: **the recording

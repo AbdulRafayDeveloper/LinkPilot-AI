@@ -166,7 +166,7 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, researchOpen = fals
               href={topic.screenshot_reference.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 mt-1 ml-6 text-[12px] font-semibold text-primary hover:underline"
+              className="inline-flex min-h-6 items-center gap-1 mt-1 ml-6 text-[12px] font-semibold text-primary hover:underline"
             >
               Open screenshot source <ExternalLink size={12} aria-hidden="true" />
               <span className="sr-only">(opens in a new tab)</span>

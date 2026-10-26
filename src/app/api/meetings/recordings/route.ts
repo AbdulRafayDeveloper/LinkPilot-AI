@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic"
 
 /**
  * POST: Saves the meeting a recording goes into, before anything is recorded, so every chunk the
- * browser uploads has a meeting to belong to. Answers 503 when file storage isn't set up.
+ * browser uploads has a meeting to belong to. Answers 503 when file storage isn't set up. With `planId`
+ * (started from Meeting Planner) it is linked to that planned meeting from the start, and a planned
+ * meeting the viewer can't see answers 404.
  */
 async function handlePost(req: NextRequest) {
   const auth = await requireViewer()
@@ -25,6 +27,9 @@ async function handlePost(req: NextRequest) {
   } catch (error: unknown) {
     if (error instanceof UserFacingError && error.message === RECORDING_MESSAGES.storageUnavailable) {
       return NextResponse.json({ success: false, message: error.message }, { status: 503 })
+    }
+    if (error instanceof UserFacingError && error.message === RECORDING_MESSAGES.planUnavailable) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 404 })
     }
     console.error("POST Meeting Recording Exception:", error instanceof Error ? error.message : error)
     return NextResponse.json({ success: false, message: toUserFacingMessage(error, RECORDING_MESSAGES.startFailed) }, { status: 500 })

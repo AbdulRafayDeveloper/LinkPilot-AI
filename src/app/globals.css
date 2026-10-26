@@ -50,6 +50,16 @@ body {
   [contenteditable="true"] {
     font-size: 16px !important;
   }
+  /* A finger needs 24px (WCAG 2.5.8): the row-picking boxes on every list are 16px on a desktop. A
+     radio hidden behind its option card (.sr-only) is left alone, since the card is what is tapped. */
+  input[type="checkbox"]:not(.sr-only),
+  input[type="radio"]:not(.sr-only) {
+    width: 1.5rem;
+    height: 1.5rem;
+    /* A box inside a row of flex items is shrunk otherwise, which kept it 16px wide */
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+  }
 }
 
 /*
@@ -62,8 +72,10 @@ body {
  * for its full spacing. On a 1366x768 laptop at Windows 125% scaling the page gets 540px of height,
  * and the frame alone was spending 174px of it on padding, gaps, a 2xl title and a description line.
  *
- * It only ever takes away spacing. Nothing is hidden but the description under the title, which is
- * the one thing on a tool page that says nothing the page does not already show.
+ * It only ever takes away spacing, and never hides or squeezes anything: a page taller than the
+ * window scrolls. Every page wrapper is `min-h-full` rather than `h-full` for the same reason, so a
+ * box is never forced smaller than what it holds (which is what laid a tool's text box under its
+ * option cards on a short laptop).
  */
 @media (min-width: 1024px) and (max-height: 860px) {
   /* `:first-child` is here for specificity as much as for aim: a plain `main > div` loses to the
@@ -82,9 +94,6 @@ body {
   main h1 {
     font-size: 1.25rem;
     line-height: 1.75rem;
-  }
-  main h1 + p {
-    display: none;
   }
   /* The header's own buttons (Reset, Update Prompt, New meeting) lose a little padding with it */
   main > div:first-child:has(h1) button {

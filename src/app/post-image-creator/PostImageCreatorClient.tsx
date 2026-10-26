@@ -121,7 +121,7 @@ export default function PostImageCreatorClient() {
         />
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
-          <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:h-full lg:p-8">
+          <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:min-h-full lg:p-8">
             {/* Page header */}
             <div className="flex shrink-0 flex-col justify-between gap-3 xl:flex-row xl:items-center">
               <div className="min-w-0">
@@ -166,7 +166,7 @@ export default function PostImageCreatorClient() {
               </p>
             )}
 
-            <div className="grid grid-cols-1 gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-5 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <section className="custom-scrollbar flex min-h-0 flex-col gap-4 overflow-y-auto rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
                 {/* The defaults this image will use */}
                 <div className="flex flex-col gap-2 rounded-xl bg-surface-container-lowest p-3">
@@ -294,7 +294,6 @@ export default function PostImageCreatorClient() {
                     value={pose}
                     onChange={(next) => formStore.update({ pose: next })}
                     disabled={isGenerating}
-                    columnsClassName="grid-cols-2 sm:grid-cols-3"
                   />
                 )}
 
@@ -305,7 +304,6 @@ export default function PostImageCreatorClient() {
                   value={size}
                   onChange={(next) => formStore.update({ size: next })}
                   disabled={isGenerating}
-                  columnsClassName="grid-cols-3"
                 />
 
                 {formError && (

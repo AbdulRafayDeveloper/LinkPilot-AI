@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { Check, ImagePlus, Loader2, Trash2 } from "lucide-react"
+import { Check, ImagePlus, Loader2, Trash2, UserRound } from "lucide-react"
 import { AccountAvatar } from "@/components/ui/AccountAvatar"
 import { removeAccountPhoto, uploadAccountPhoto } from "@/lib/accountPhotoUpload"
 import { requestApi } from "@/lib/apiClient"
@@ -9,6 +9,7 @@ import { updateCurrentUser } from "@/hooks/useCurrentUser"
 import { ACCOUNT_ENDPOINTS, ACCOUNT_MESSAGES, ACCOUNT_PHOTO_ACCEPT } from "@/constants/account"
 import { NAME_MAX_LENGTH } from "@/constants/auth"
 import type { Viewer } from "@/types/auth"
+import { SETTINGS_FIELD, SETTINGS_LABEL, SETTINGS_PRIMARY_BUTTON, SETTINGS_SECONDARY_BUTTON, SettingsCard } from "./SettingsCard"
 
 /**
  * The person's name and photo. Both are saved one at a time with a small write of their own, and
@@ -91,56 +92,48 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ user }) => {
   }
 
   return (
-    <section className="rounded-2xl border border-outline-variant bg-white p-4 sm:p-6 flex flex-col gap-5">
-      <div>
-        <h2 className="text-[15px] font-bold text-on-surface">{ACCOUNT_MESSAGES.profileTitle}</h2>
-        <p className="mt-1 text-[13px] text-on-surface-variant">{ACCOUNT_MESSAGES.profileHint}</p>
-      </div>
-
-      {/* The photo */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <AccountAvatar name={user.name} photo={user.photo} size="lg" isAdmin={isAdmin} />
-        <div className="flex flex-col gap-2 min-w-0">
-          <p className="text-[13px] font-semibold text-on-surface">{ACCOUNT_MESSAGES.photoTitle}</p>
-          <p className="text-[12px] text-on-surface-variant">{ACCOUNT_MESSAGES.photoHint}</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => picker.current?.click()}
-              disabled={isSavingPhoto}
-              className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-60"
-            >
-              {isSavingPhoto ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <ImagePlus size={15} aria-hidden="true" />}
-              {user.photo ? ACCOUNT_MESSAGES.photoChange : ACCOUNT_MESSAGES.photoAdd}
-            </button>
-            {user.photo && (
-              <button
-                type="button"
-                onClick={dropPhoto}
-                disabled={isSavingPhoto}
-                className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2 text-[13px] font-semibold text-error transition-colors hover:bg-error-container/40 disabled:opacity-60"
-              >
-                <Trash2 size={15} aria-hidden="true" />
-                {ACCOUNT_MESSAGES.photoRemove}
+    <SettingsCard
+      title={ACCOUNT_MESSAGES.profileTitle}
+      description={ACCOUNT_MESSAGES.profileHint}
+      icon={UserRound}
+      notice={problem ? { tone: "problem", text: problem } : saved ? { tone: "saved", text: saved } : null}
+      footer={
+        <button type="button" onClick={saveName} disabled={!canSaveName} className={SETTINGS_PRIMARY_BUTTON}>
+          {isSavingName ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}
+          Save name
+        </button>
+      }
+    >
+      <div className="flex flex-col gap-6">
+        {/* The photo: the picture, and what can be done with it beside it */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <AccountAvatar name={user.name} photo={user.photo} size="lg" isAdmin={isAdmin} />
+          <div className="flex min-w-0 flex-col gap-2">
+            <div>
+              <p className="text-[13px] font-semibold text-on-surface">{ACCOUNT_MESSAGES.photoTitle}</p>
+              <p className="text-[12px] text-on-surface-variant">{ACCOUNT_MESSAGES.photoHint}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => picker.current?.click()} disabled={isSavingPhoto} className={SETTINGS_SECONDARY_BUTTON}>
+                {isSavingPhoto ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <ImagePlus size={15} aria-hidden="true" />}
+                {user.photo ? ACCOUNT_MESSAGES.photoChange : ACCOUNT_MESSAGES.photoAdd}
               </button>
-            )}
+              {user.photo && (
+                <button type="button" onClick={dropPhoto} disabled={isSavingPhoto} className={`${SETTINGS_SECONDARY_BUTTON} text-error hover:bg-error-container/40`}>
+                  <Trash2 size={15} aria-hidden="true" />
+                  {ACCOUNT_MESSAGES.photoRemove}
+                </button>
+              )}
+            </div>
+            <input ref={picker} type="file" accept={ACCOUNT_PHOTO_ACCEPT} onChange={(event) => void choosePhoto(event.target.files?.[0])} className="hidden" />
           </div>
-          <input
-            ref={picker}
-            type="file"
-            accept={ACCOUNT_PHOTO_ACCEPT}
-            onChange={(event) => void choosePhoto(event.target.files?.[0])}
-            className="hidden"
-          />
         </div>
-      </div>
 
-      {/* The name */}
-      <div className="flex flex-col gap-2">
-        <label htmlFor="account-name" className="text-[13px] font-semibold text-on-surface">
-          Your name
-        </label>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        {/* The name */}
+        <div className="max-w-md">
+          <label htmlFor="account-name" className={SETTINGS_LABEL}>
+            Full name
+          </label>
           <input
             id="account-name"
             type="text"
@@ -150,23 +143,12 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ user }) => {
             onKeyDown={(event) => {
               if (event.key === "Enter") void saveName()
             }}
-            className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-[14px] text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className={SETTINGS_FIELD}
             placeholder="The name shown in the header"
           />
-          <button
-            type="button"
-            onClick={saveName}
-            disabled={!canSaveName}
-            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-50 sm:shrink-0"
-          >
-            {isSavingName ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}
-            Save name
-          </button>
+          <p className="mt-1.5 text-[12px] text-outline">Shown in the header, the account menu and to the admins.</p>
         </div>
       </div>
-
-      {saved && <p className="rounded-xl bg-success-container px-3 py-2 text-[13px] font-medium text-on-success-container">{saved}</p>}
-      {problem && <p className="rounded-xl bg-error-container px-3 py-2 text-[13px] font-medium text-on-error-container">{problem}</p>}
-    </section>
+    </SettingsCard>
   )
 }

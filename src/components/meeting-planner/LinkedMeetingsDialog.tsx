@@ -10,6 +10,7 @@ import { MEETING_PLANNER_ENDPOINT } from "@/constants/meetingPlanner"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { LinkedMeeting } from "@/types/meetings"
 import type { MeetingPlan } from "@/types/meetingPlanner"
+import { formatInstant } from "@/lib/timeZone"
 
 interface LinkedMeetingsDialogProps {
   meeting: MeetingPlan
@@ -94,7 +95,7 @@ export const LinkedMeetingsDialog: React.FC<LinkedMeetingsDialogProps> = ({ meet
                   <span className="block truncate text-[13px] font-semibold text-on-surface group-hover:text-primary">{record.title}</span>
                   <span className="mt-0.5 block text-[11px] text-outline">
                     {record.hasRecording ? "Recorded in the app" : "Transcript"} · {sizeOf(record.transcriptChars)} ·{" "}
-                    {new Date(record.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+                    {formatInstant(record.createdAt, { day: "numeric", month: "short", year: "numeric" })}
                   </span>
                 </span>
                 <ChevronRight size={14} className="mt-0.5 shrink-0 text-outline" aria-hidden="true" />

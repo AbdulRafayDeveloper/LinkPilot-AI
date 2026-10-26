@@ -1,4 +1,5 @@
 import { todayIso } from "@/lib/taskDates"
+import { displayTimeZone, timeIn } from "@/lib/timeZone"
 
 /**
  * Calendar helpers for the meeting planner. A day is a plain YYYY-MM-DD string and a time a
@@ -121,9 +122,9 @@ export function fromTwelveHour(hour: number, minute: string, period: DayPeriod):
   return `${`${hour24}`.padStart(2, "0")}:${minute}`
 }
 
-/** The next half hour on the user's own clock, as a sensible default for a new meeting. */
+/** The next half hour on the user's own clock (their chosen timezone), as a sensible default for a new meeting. */
 export function nextHalfHour(now: Date = new Date()): string {
-  const next = new Date(now.getTime())
-  next.setMinutes(now.getMinutes() > 30 ? 60 : 30, 0, 0)
-  return `${`${next.getHours()}`.padStart(2, "0")}:${`${next.getMinutes()}`.padStart(2, "0")}`
+  const { hour, minute } = timeIn(displayTimeZone(), now)
+  const minutes = (hour * 60 + (minute > 30 ? 60 : 30)) % (24 * 60)
+  return `${`${Math.floor(minutes / 60)}`.padStart(2, "0")}:${`${minutes % 60}`.padStart(2, "0")}`
 }

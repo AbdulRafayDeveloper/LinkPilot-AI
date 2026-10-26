@@ -45,6 +45,9 @@ export type PromptName =
   | "prompt-creator-english"
   | "prompt-creator-english-system"
   | `prompt-creator-${PromptTargetId}`
+  // Reading a spoken Quick Note back in English before it goes into the editor (services/quickNotes/english.ts)
+  | "quick-notes-english"
+  | "quick-notes-english-system"
   | "client-message-system"
   | "client-message"
   | "meeting-prep-system"

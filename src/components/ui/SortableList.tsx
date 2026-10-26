@@ -275,7 +275,7 @@ export function SortableList<T>({
               aria-pressed={isPicked}
               aria-label={`Pick "${getLabel(item)}" to move it with other ${itemNoun}`}
               title={`Pick this, then drag any picked one to move them together`}
-              className={`flex h-5 w-5 shrink-0 items-center justify-center self-center rounded-full border-2 transition-colors disabled:opacity-40 ${
+              className={`flex h-6 w-6 shrink-0 md:h-5 md:w-5 items-center justify-center self-center rounded-full border-2 transition-colors disabled:opacity-40 ${
                 isPicked ? "border-primary bg-primary text-white" : "border-outline-variant text-transparent hover:border-primary/60"
               }`}
             >

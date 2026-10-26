@@ -46,7 +46,7 @@ export const TopicPost: React.FC<{ topic: StoredTrendingTopic }> = ({ topic }) =
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 border-t border-outline-variant/60 bg-surface-container-lowest text-[11px] text-outline">
-        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-6 items-center gap-1 text-primary hover:underline">
           <ExternalLink size={12} aria-hidden="true" />
           Open the source
           <span className="sr-only">(opens in a new tab)</span>
