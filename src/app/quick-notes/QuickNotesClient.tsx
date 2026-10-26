@@ -311,7 +311,7 @@ export default function QuickNotesClient() {
               {/* Save something new */}
               <section
                 aria-label="Save content"
-                className="flex min-h-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 short:p-3 shadow-sm"
+                className="flex flex-col gap-3 rounded-2xl lg:self-start border border-outline-variant bg-white p-5 short:p-3 shadow-sm"
               >
                 <h2 className="text-sm font-bold text-on-surface">Save Content</h2>
                 {/* The name is the `title` field in the API; it is the word Important Content uses, where a note may go next */}

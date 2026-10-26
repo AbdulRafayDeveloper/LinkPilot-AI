@@ -39,7 +39,7 @@ const TileShell: React.FC<{ label: string; value: React.ReactNode; summary: stri
 }) => (
   <li className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 min-w-0 flex flex-col">
     <div className="flex items-center justify-between gap-2 min-h-[22px]">
-      <h4 className="text-[10px] font-bold text-outline uppercase tracking-wider leading-tight">{label}</h4>
+      <h4 className="min-w-0 text-[10px] font-bold text-outline uppercase tracking-wider leading-tight">{label}</h4>
       <div className="shrink-0 text-right">{value}</div>
     </div>
     {children}
@@ -71,7 +71,7 @@ const ValueChip: React.FC<{ className: string; children: React.ReactNode }> = ({
  * each tile carries a one-line explanation (full text on hover when clamped).
  */
 export const SignalsGrid: React.FC<{ signals: ConversationSignals }> = ({ signals }) => (
-  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+  <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-2">
     {SIGNAL_TILES.map((tile) => {
       if (tile.kind === "score") {
         return <ScoreTile key={tile.key} label={tile.label} signal={signals[tile.key]} />

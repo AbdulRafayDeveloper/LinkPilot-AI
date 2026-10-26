@@ -50,7 +50,7 @@ function tagStyle(value: string): string {
 }
 
 const ScoreValue: React.FC<{ label: string; entry: LeadScore }> = ({ label, entry }) => (
-  <div className="flex items-center gap-2 min-w-0">
+  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
     <span className="w-10 shrink-0 text-right text-sm font-bold text-on-surface">{entry.score}%</span>
     <ScoreMeter label={label} score={entry.score} className="flex-1 min-w-[48px] max-w-[140px]" />
     <span className="shrink-0 text-[11px] font-semibold text-outline">{getScoreBand(entry.score).label}</span>

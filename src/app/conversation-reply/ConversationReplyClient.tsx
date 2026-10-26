@@ -147,7 +147,7 @@ export default function ConversationReplyClient() {
                   event.preventDefault()
                   submit()
                 }}
-                className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-h-0 lg:overflow-y-auto short:p-4 short:gap-3"
+                className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 lg:self-start short:p-4 short:gap-3"
               >
                 {/* The fields grow into spare height but never shrink below their textarea's minimum */}
                 <div className="flex flex-col flex-[3]">
@@ -269,7 +269,7 @@ export default function ConversationReplyClient() {
                           <button
                             type="button"
                             onClick={() => setPromptsTab(ABOUT_ME_TAB_ID)}
-                            className="font-semibold text-primary hover:underline"
+                            className="py-1 font-semibold text-primary hover:underline"
                           >
                             Update Prompt → About Me
                           </button>

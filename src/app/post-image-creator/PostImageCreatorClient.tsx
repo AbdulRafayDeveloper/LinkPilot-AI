@@ -167,7 +167,7 @@ export default function PostImageCreatorClient() {
             )}
 
             <div className="grid grid-cols-1 gap-5 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              <section className="custom-scrollbar flex min-h-0 flex-col gap-4 overflow-y-auto rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
+              <section className="flex flex-col gap-4 rounded-2xl lg:self-start border border-outline-variant bg-white p-5 shadow-sm">
                 {/* The defaults this image will use */}
                 <div className="flex flex-col gap-2 rounded-xl bg-surface-container-lowest p-3">
                   <div className="flex items-center justify-between gap-2">

@@ -254,7 +254,7 @@ export default function PromptCreatorClient() {
               {/* What the user wants done */}
               {/* gap-5 between the blocks, so the targets, the project and the choice below the text box
                   are not crowded together now that the form has the wider side */}
-              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 short:p-3 flex flex-col gap-5 short:gap-4">
+              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 short:p-3 flex flex-col gap-5 short:gap-4 lg:self-start">
                 <div className="flex flex-col gap-2 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label htmlFor="prompt-request" className="text-[10px] font-bold text-outline uppercase tracking-wider">

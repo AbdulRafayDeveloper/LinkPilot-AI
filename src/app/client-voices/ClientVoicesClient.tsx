@@ -470,7 +470,7 @@ export default function ClientVoicesClient() {
                 below about 1300px, where a 30% column wrapped the drop zone's words into so many
                 lines that the page gained 138px of scrolling (measured at 1093x540). */}
             <div className="grid grid-cols-1 gap-5 short:gap-3 lg:flex-1 lg:grid-cols-[minmax(260px,30fr)_minmax(0,70fr)]">
-              <div className="flex min-w-0 flex-col gap-4">
+              <div className="flex min-w-0 flex-col gap-4 lg:self-start">
                 {/* What this batch is called, and whether it is kept: both belong with what goes in */}
                 <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
                   <label className="flex flex-col gap-1">

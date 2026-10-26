@@ -67,7 +67,7 @@ export function ProfileTuneForm<TuneId extends string>({
         event.preventDefault()
         onSubmit()
       }}
-      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-h-0"
+      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 lg:self-start"
     >
       <div className="flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between gap-2 mb-1.5">

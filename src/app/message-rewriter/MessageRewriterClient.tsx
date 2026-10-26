@@ -141,7 +141,7 @@ export default function MessageRewriterClient() {
 
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1">
               {/* The message to rewrite */}
-              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4">
+              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 lg:self-start">
                 <div className="flex flex-col gap-2 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label htmlFor="original-message" className="text-[10px] font-bold text-outline uppercase tracking-wider">

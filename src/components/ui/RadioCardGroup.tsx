@@ -18,15 +18,17 @@ interface RadioCardGroupProps<Id extends string> {
   disabled?: boolean
   invalid?: boolean
   /**
-   * Grid column classes. Left out, the cards fill **the width they are given**, as many 10rem cards a
+   * Grid column classes. Left out, the cards fill **the width they are given**, as many 8.5rem cards a
    * row as fit: the same group sits in a narrow form column on a laptop and full width on a phone, so
    * only the space it really has can say how many fit.
    */
   columnsClassName?: string
 }
 
-// As many cards a row as fit at 10rem each, and never wider than the group itself
-export const FIT_CARD_COLUMNS = "grid-cols-[repeat(auto-fill,minmax(min(100%,10rem),1fr))]"
+// As many cards a row as fit at 8.5rem each, and never wider than the group itself. 8.5rem is what
+// puts two cards side by side in a 300px form column (a laptop's) and on a 360px phone; at 10rem nine
+// tones stood one a row and the form ran far below the button that uses them
+export const FIT_CARD_COLUMNS = "grid-cols-[repeat(auto-fill,minmax(min(100%,8.5rem),1fr))]"
 
 /**
  * Single-choice option cards built on native radio inputs, so arrow keys and screen

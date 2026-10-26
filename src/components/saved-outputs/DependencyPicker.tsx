@@ -159,7 +159,7 @@ export const DependencyPicker: React.FC<DependencyPickerProps> = ({
                   >
                     {isPicked && <Check size={11} />}
                   </span>
-                  <span className="min-w-0 flex-1 truncate font-semibold">{choice.name || "Untitled prompt"}</span>
+                  <span className="min-w-0 flex-1 break-words font-semibold">{choice.name || "Untitled prompt"}</span>
                   <span
                     className={`inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold ${
                       choice.appliedAt ? "text-on-success-container" : "text-outline"

@@ -79,7 +79,8 @@ export function PromptTabStrip<Id extends string>({
                 : "text-on-surface-variant font-semibold hover:text-on-surface hover:bg-white/60"
             }`}
           >
-            <span className="truncate">{tab.label}</span>
+            {/* A long name wraps rather than being cut: "Based on My Past Experience" read "Based on My Pa..." */}
+            <span className="min-w-0 break-words text-center leading-snug">{tab.label}</span>
             {isDirty(tab.id) && (
               <>
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary shrink-0" aria-hidden="true" />

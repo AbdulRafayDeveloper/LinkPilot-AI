@@ -15,7 +15,7 @@ export const AboutMeNotice: React.FC<{ onOpenAboutMe: () => void; outputName: st
     <Info size={14} className="shrink-0 mt-0.5 text-primary" aria-hidden="true" />
     <span>
       About Me isn&apos;t filled in, so this {outputName} says nothing about you. Add it under{" "}
-      <button type="button" onClick={onOpenAboutMe} className="font-semibold text-primary hover:underline">
+      <button type="button" onClick={onOpenAboutMe} className="py-1 font-semibold text-primary hover:underline">
         Update Prompt → About Me
       </button>{" "}
       for pitches that describe what you do.

@@ -138,7 +138,7 @@ export const FoldersDialog: React.FC<FoldersDialogProps> = ({ folders, onCreate,
                   </form>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-on-surface">{folder.name}</span>
+                    <span className="min-w-0 flex-1 break-words text-[13px] text-on-surface">{folder.name}</span>
                     <span className="shrink-0 text-[11px] text-outline">
                       {folder.recordCount.toLocaleString()} {folder.recordCount === 1 ? copy.noun.one : copy.noun.many}
                     </span>

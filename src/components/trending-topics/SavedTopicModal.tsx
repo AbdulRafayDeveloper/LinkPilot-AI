@@ -95,7 +95,7 @@ export const SavedTopicModal: React.FC<{ topic: SavedTopic; onClose: () => void 
                     href={source.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex max-w-full items-center gap-1 text-[13px] font-semibold text-primary hover:underline"
+                    className="inline-flex min-h-6 max-w-full items-center gap-1 text-[13px] font-semibold text-primary hover:underline"
                   >
                     <span className="truncate">{source.source || source.title}</span>
                     <ExternalLink size={13} className="shrink-0" aria-hidden="true" />
