@@ -29,7 +29,7 @@ export async function GET() {
  * were drawn from on their own record.
  */
 export async function PUT(req: NextRequest) {
-  const auth = await requireViewer()
+  const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)

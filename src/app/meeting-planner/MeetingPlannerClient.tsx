@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
-import { CalendarPlus, FilePenLine, Loader2, Sparkles } from "lucide-react"
+import { CalendarPlus, Loader2, Sparkles } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { TodayMeetings } from "@/components/meeting-planner/TodayMeetings"
@@ -17,7 +17,6 @@ import {
 } from "@/components/meeting-planner/MeetingFormModal"
 import { MoveMeetingModal } from "@/components/meeting-planner/MoveMeetingModal"
 import { DeleteMeetingDialog } from "@/components/meeting-planner/DeleteMeetingDialog"
-import { MeetingPlannerPromptsModal } from "@/components/meeting-planner/MeetingPlannerPromptsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { monthOf, monthsBetween, nextHalfHour, shiftMonth, todayIso } from "@/lib/meetingDates"
@@ -52,7 +51,6 @@ export default function MeetingPlannerClient() {
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [preparingName, setPreparingName] = useState<string | null>(null)
-  const [isPromptsOpen, setIsPromptsOpen] = useState(false)
   /**
    * The meeting being edited from the calendar, read in full first: a list carries no preparation
    * inputs, and the form needs them, so it opens on what the meeting really holds. This is how the
@@ -386,14 +384,6 @@ export default function MeetingPlannerClient() {
               <div className="flex flex-wrap gap-2 sm:shrink-0">
                 <button
                   type="button"
-                  onClick={() => setIsPromptsOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
-                </button>
-                <button
-                  type="button"
                   onClick={() => openForm(selectedDate)}
                   className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant sm:flex-none"
                 >
@@ -514,7 +504,6 @@ export default function MeetingPlannerClient() {
           }}
         />
       )}
-      {isPromptsOpen && <MeetingPlannerPromptsModal onClose={() => setIsPromptsOpen(false)} />}
       {moving && (
         <MoveMeetingModal
           key={moving.id}

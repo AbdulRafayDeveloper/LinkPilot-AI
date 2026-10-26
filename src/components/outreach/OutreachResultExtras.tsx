@@ -1,24 +1,32 @@
 "use client"
 
 import React from "react"
+import Link from "next/link"
 import { Info } from "lucide-react"
+import { useIsAdmin } from "@/hooks/useCurrentUser"
+import { ADMIN_GLOBAL_PROMPTS_HREF } from "@/constants/globalPrompts"
 
 /**
- * Tells the user the output says nothing about them because About Me is empty, with a
- * shortcut to fill it in.
+ * Where About Me is filled in. It is a prompt every account shares, so only an admin may change it,
+ * under Administration → Global AI Prompts: an admin is given the way there, anyone else is told who
+ * can do it, rather than a link to an editor they would be refused.
  */
-export const AboutMeNotice: React.FC<{ onOpenAboutMe: () => void; outputName: string }> = ({
-  onOpenAboutMe,
-  outputName,
-}) => (
+export const AboutMeWhere: React.FC = () =>
+  useIsAdmin() ? (
+    <Link href={ADMIN_GLOBAL_PROMPTS_HREF} className="py-1 font-semibold text-primary hover:underline">
+      Administration → Global AI Prompts (About Me)
+    </Link>
+  ) : (
+    <span className="font-semibold text-on-surface">About Me, which an admin fills in</span>
+  )
+
+/** Tells the user the output says nothing about them because About Me is empty, and where it is filled in. */
+export const AboutMeNotice: React.FC<{ outputName: string }> = ({ outputName }) => (
   <p className="flex items-start gap-2 bg-surface-container-low border border-outline-variant rounded-xl px-3 py-2 text-[12px] text-on-surface-variant">
     <Info size={14} className="shrink-0 mt-0.5 text-primary" aria-hidden="true" />
     <span>
-      About Me isn&apos;t filled in, so this {outputName} says nothing about you. Add it under{" "}
-      <button type="button" onClick={onOpenAboutMe} className="py-1 font-semibold text-primary hover:underline">
-        Update Prompt → About Me
-      </button>{" "}
-      for pitches that describe what you do.
+      About Me isn&apos;t filled in, so this {outputName} says nothing about you. It is added under <AboutMeWhere /> for pitches that
+      describe what you do.
     </span>
   </p>
 )

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useRef, useState } from "react"
-import { FilePenLine, Languages, Sparkles } from "lucide-react"
+import { Languages, Sparkles } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ResetButton } from "@/components/ui/ResetButton"
@@ -10,7 +10,6 @@ import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
 import { appendSpokenText } from "@/lib/spokenText"
 import { VOICE_MESSAGES } from "@/constants/voiceInput"
 import { useDummyHandoff } from "@/hooks/useDummyHandoff"
-import { MessageRewriterPromptModal } from "@/components/message-rewriter/MessageRewriterPromptModal"
 import { RewrittenMessageResult } from "@/components/message-rewriter/RewrittenMessageResult"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
@@ -41,7 +40,6 @@ const generation = createGenerationRequest<RewritePayload, RewrittenMessage>(
 
 export default function MessageRewriterClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isPromptOpen, setIsPromptOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null)
@@ -128,14 +126,6 @@ export default function MessageRewriterClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <button
-                  type="button"
-                  onClick={() => setIsPromptOpen(true)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
-                </button>
               </div>
             </div>
 
@@ -210,7 +200,6 @@ export default function MessageRewriterClient() {
         </main>
       </div>
 
-      {isPromptOpen && <MessageRewriterPromptModal onClose={() => setIsPromptOpen(false)} />}
     </div>
   )
 }

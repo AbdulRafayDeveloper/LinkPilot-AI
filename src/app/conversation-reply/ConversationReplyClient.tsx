@@ -1,31 +1,29 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { AlertTriangle, FilePenLine, Info, Loader2, MessagesSquare, ScanSearch } from "lucide-react"
+import { AlertTriangle, Info, Loader2, MessagesSquare, ScanSearch } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
 import { GeneratedResultPanel } from "@/components/ui/GeneratedResultPanel"
 import { ConversationAnalysisCard } from "@/components/conversation-reply/ConversationAnalysisCard"
 import { LeadSignalsTable } from "@/components/lead-signals/LeadSignalsTable"
-import { ConversationReplyPromptsModal } from "@/components/conversation-reply/ConversationReplyPromptsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { ResetButton } from "@/components/ui/ResetButton"
 import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import {
-  ABOUT_ME_TAB_ID,
   CONVERSATION_REPLY_CONVERSATION_MAX_LENGTH,
   CONVERSATION_REPLY_MESSAGES,
   CONVERSATION_REPLY_PROFILE_MAX_LENGTH,
   CONVERSATION_REPLY_TYPES,
   DEFAULT_CONVERSATION_REPLY_TYPE,
   getReplyTypeLabel,
-  type ConversationReplyPromptId,
   type ConversationReplyTypeId,
 } from "@/constants/conversationReply"
 import type { ConversationReplyResult } from "@/types/conversationReply"
+import { AboutMeWhere } from "@/components/outreach/OutreachResultExtras"
 
 const CONVERSATION_INPUT_ID = "conversation-reply-conversation"
 const PROFILE_INPUT_ID = "conversation-reply-profile"
@@ -61,7 +59,6 @@ const textareaClass =
 export default function ConversationReplyClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   // The tab the prompts modal opens on; null means the modal is closed
-  const [promptsTab, setPromptsTab] = useState<ConversationReplyPromptId | null>(null)
   const { conversation, profileData, replyType } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement>(null)
@@ -128,14 +125,6 @@ export default function ConversationReplyClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <button
-                  type="button"
-                  onClick={() => setPromptsTab(replyType)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
-                </button>
               </div>
             </div>
 
@@ -265,15 +254,7 @@ export default function ConversationReplyClient() {
                         <Info size={14} className="shrink-0 mt-0.5 text-primary" aria-hidden="true" />
                         <span>
                           About Me isn&apos;t filled in, so the reply and Opportunity Fit only know what you said in the
-                          conversation. Add it under{" "}
-                          <button
-                            type="button"
-                            onClick={() => setPromptsTab(ABOUT_ME_TAB_ID)}
-                            className="py-1 font-semibold text-primary hover:underline"
-                          >
-                            Update Prompt → About Me
-                          </button>
-                          .
+                          conversation. It is added under <AboutMeWhere />.
                         </span>
                       </p>
                     )}
@@ -288,7 +269,6 @@ export default function ConversationReplyClient() {
         </main>
       </div>
 
-      {promptsTab && <ConversationReplyPromptsModal initialTab={promptsTab} onClose={() => setPromptsTab(null)} />}
     </div>
   )
 }

@@ -20,7 +20,6 @@ interface InMailResultProps {
   result: GeneratedInMail | null
   error: string | null
   onRetry: () => void
-  onOpenAboutMe: () => void
 }
 
 const partLabel = "text-[10px] font-bold text-outline uppercase tracking-wider"
@@ -29,7 +28,7 @@ const partLabel = "text-[10px] font-bold text-outline uppercase tracking-wider"
  * Shows the InMail as two independent parts, subject and message, each editable in place (with
  * bold) and with its own copy action for the edited text.
  */
-export const InMailResult: React.FC<InMailResultProps> = ({ status, result, error, onRetry, onOpenAboutMe }) => {
+export const InMailResult: React.FC<InMailResultProps> = ({ status, result, error, onRetry }) => {
   const subject = useEditableText("inmail-subject", result?.subject ?? "")
   const message = useEditableText("inmail-message", result?.message ?? "")
 
@@ -82,7 +81,7 @@ export const InMailResult: React.FC<InMailResultProps> = ({ status, result, erro
           </div>
 
           {result.warning && !subject.isEdited && !message.isEdited && <ResultWarning text={result.warning} />}
-          {!result.usedSenderProfile && <AboutMeNotice outputName="InMail" onOpenAboutMe={onOpenAboutMe} />}
+          {!result.usedSenderProfile && <AboutMeNotice outputName="InMail" />}
           <AnalysisDetails keyDetail={result.analysis.keyDetail} senderLink={result.analysis.senderLink} />
         </>
       )}

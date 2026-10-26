@@ -15,7 +15,7 @@ const IdSchema = z.enum(MEETING_PROMPT_IDS)
  * change and no deployment.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireViewer()
+  const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
   try {
     const id = IdSchema.safeParse((await params).id)

@@ -14,7 +14,7 @@ const ToneSchema = idWithRenamesSchema(CONNECTION_NOTE_TONE_IDS, RENAMED_CONNECT
  * PUT: Saves the prompt for one tone only. Other tones' prompts are untouched.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ tone: string }> }) {
-  const auth = await requireViewer()
+  const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
   try {
     const tone = ToneSchema.safeParse((await params).tone)

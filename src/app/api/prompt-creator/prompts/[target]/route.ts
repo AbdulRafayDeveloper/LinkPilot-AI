@@ -14,7 +14,7 @@ const TargetSchema = z.enum(PROMPT_TARGET_IDS)
  * PUT: Saves the prompt for one target only. The other target's prompt is untouched.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ target: string }> }) {
-  const auth = await requireViewer()
+  const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
   try {
     const target = TargetSchema.safeParse((await params).target)

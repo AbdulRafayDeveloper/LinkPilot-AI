@@ -2,14 +2,13 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { AudioLines, FilePenLine, History, RotateCcw, Users } from "lucide-react"
+import { AudioLines, History, RotateCcw, Users } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { VoiceInputPanel } from "@/components/client-voices/VoiceInputPanel"
 import { TranscriptList } from "@/components/client-voices/TranscriptList"
 import { TaskListPanel } from "@/components/client-voices/TaskListPanel"
 import { QuestionListPanel } from "@/components/client-voices/QuestionListPanel"
-import { ClientVoicesPromptModal } from "@/components/client-voices/ClientVoicesPromptModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
 import { checkAudioFile, runWithLimit, transcribeVoice } from "@/lib/voiceBatch"
@@ -71,7 +70,6 @@ export default function ClientVoicesClient() {
   const [isExtracting, setIsExtracting] = useState(false)
   const [taskError, setTaskError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [isPromptOpen, setIsPromptOpen] = useState(false)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const [clients, setClients] = useState<Client[]>([])
   const [clientId, setClientId] = useState("")
@@ -448,14 +446,6 @@ export default function ClientVoicesClient() {
                   <RotateCcw size={16} aria-hidden="true" />
                   Clear batch
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsPromptOpen(true)}
-                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
-                </button>
               </div>
             </div>
 
@@ -567,7 +557,6 @@ export default function ClientVoicesClient() {
         </main>
       </div>
 
-      {isPromptOpen && <ClientVoicesPromptModal onClose={() => setIsPromptOpen(false)} />}
     </div>
   )
 }

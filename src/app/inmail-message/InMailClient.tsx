@@ -1,24 +1,22 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { FilePenLine, Mail, Send } from "lucide-react"
+import { Mail, Send } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ProfileTuneForm } from "@/components/outreach/ProfileTuneForm"
 import { InMailResult } from "@/components/inmail/InMailResult"
-import { InMailPromptsModal } from "@/components/inmail/InMailPromptsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { ResetButton } from "@/components/ui/ResetButton"
 import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
-import { ABOUT_ME_TAB_ID, DEFAULT_OUTREACH_FORMAT, VOICE_TUNE, VOICE_TUNE_ID, type OutreachFormatId } from "@/constants/outreachTunes"
+import { DEFAULT_OUTREACH_FORMAT, VOICE_TUNE, VOICE_TUNE_ID, type OutreachFormatId } from "@/constants/outreachTunes"
 import {
   DEFAULT_INMAIL_TUNE,
   INMAIL_MESSAGES,
   INMAIL_PROFILE_MAX_LENGTH,
   INMAIL_TEXT_TUNES,
-  type InMailPromptId,
   type InMailTuneId,
 } from "@/constants/inmail"
 import type { GeneratedInMail } from "@/types/inmail"
@@ -52,7 +50,6 @@ const generation = createGenerationRequest<GeneratePayload, GeneratedInMail>(
 export default function InMailClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   // The tab the prompts modal opens on; null means the modal is closed
-  const [promptsTab, setPromptsTab] = useState<InMailPromptId | null>(null)
   const { profileData, tune, format } = useToolStore(formStore)
   // A voice note is one script with one tone of its own; text keeps the tone the user last chose
   const isVoice = format === "voice"
@@ -124,14 +121,6 @@ export default function InMailClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <button
-                  type="button"
-                  onClick={() => setPromptsTab(chosenTune ?? DEFAULT_INMAIL_TUNE)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
-                </button>
               </div>
             </div>
 
@@ -173,14 +162,12 @@ export default function InMailClient() {
                 result={result}
                 error={error}
                 onRetry={submit}
-                onOpenAboutMe={() => setPromptsTab(ABOUT_ME_TAB_ID)}
               />
             </div>
           </div>
         </main>
       </div>
 
-      {promptsTab && <InMailPromptsModal initialTab={promptsTab} onClose={() => setPromptsTab(null)} />}
     </div>
   )
 }

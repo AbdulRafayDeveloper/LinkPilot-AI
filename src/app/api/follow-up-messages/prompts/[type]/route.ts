@@ -15,7 +15,7 @@ const PromptIdSchema = z.enum(FOLLOW_UP_PROMPT_IDS)
  * PUT: Saves one follow-up prompt only. The other prompts are untouched.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ type: string }> }) {
-  const auth = await requireViewer()
+  const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
   try {
     const id = PromptIdSchema.safeParse((await params).type)

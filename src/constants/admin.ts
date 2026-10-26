@@ -79,7 +79,7 @@ export const ADMIN_TOOL: {
     { title: "Database Backup", description: "Weekly backups, and one on demand", icon: DatabaseBackup, href: BACKUPS_HREF, pageTitle: "Database Backup" },
     // Every tool's sample data, in one place rather than a button on each tool
     { title: "Dummy Data for Testing", description: "Sample data for every tool", icon: FlaskConical, href: DUMMY_DATA_HREF, pageTitle: "Dummy Data for Testing" },
-    // The prompts only an admin may change (Humanization), moved here from Global AI Prompts
-    { title: "Global AI Prompts", description: "The Humanization prompt, admins only", icon: WandSparkles, href: ADMIN_GLOBAL_PROMPTS_HREF, pageTitle: "Global AI Prompts (Admin)" },
+    // Every module's prompts and the Humanization prompt: only an admin may change a prompt, since all accounts share them
+    { title: "Global AI Prompts", description: "Every module's prompts, admins only", icon: WandSparkles, href: ADMIN_GLOBAL_PROMPTS_HREF, pageTitle: "Global AI Prompts (Admin)" },
   ],
 }

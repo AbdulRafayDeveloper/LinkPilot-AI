@@ -14,7 +14,7 @@ const PromptIdSchema = z.enum(FIRST_MESSAGE_PROMPT_IDS)
  * PUT: Saves one tune's prompt, or the shared sender profile. Nothing else changes.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireViewer()
+  const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
   try {
     const id = PromptIdSchema.safeParse((await params).id)

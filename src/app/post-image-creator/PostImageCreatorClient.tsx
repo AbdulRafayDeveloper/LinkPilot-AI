@@ -2,13 +2,12 @@
 
 import React, { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { FilePenLine, GalleryHorizontalEnd, ImagePlus, Settings2, Sparkles } from "lucide-react"
+import { GalleryHorizontalEnd, ImagePlus, Settings2, Sparkles } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { RadioCardGroup } from "@/components/ui/RadioCardGroup"
 import { BrandSettingsDialog } from "@/components/post-images/BrandSettingsDialog"
 import { PostImageResult } from "@/components/post-images/PostImageResult"
-import { PostImagePromptModal } from "@/components/post-images/PostImagePromptModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
@@ -49,7 +48,6 @@ export default function PostImageCreatorClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [settings, setSettings] = useState<BrandSettings | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isPromptOpen, setIsPromptOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const { postContent, assetId, pose, size } = useToolStore(formStore)
@@ -148,14 +146,6 @@ export default function PostImageCreatorClient() {
                 >
                   <Settings2 size={16} aria-hidden="true" />
                   Default Settings
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsPromptOpen(true)}
-                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
                 </button>
               </div>
             </div>
@@ -339,7 +329,6 @@ export default function PostImageCreatorClient() {
           onClose={() => setIsSettingsOpen(false)}
         />
       )}
-      {isPromptOpen && <PostImagePromptModal onClose={() => setIsPromptOpen(false)} />}
     </div>
   )
 }

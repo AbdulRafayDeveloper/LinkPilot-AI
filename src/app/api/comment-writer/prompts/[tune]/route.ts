@@ -14,7 +14,7 @@ const TuneSchema = commentTuneSchema()
  * PUT: Saves the prompt for one tune only. The other tunes' prompts are untouched.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ tune: string }> }) {
-  const auth = await requireViewer()
+  const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
   try {
     const tune = TuneSchema.safeParse((await params).tune)

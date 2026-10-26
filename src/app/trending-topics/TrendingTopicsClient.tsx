@@ -1,10 +1,9 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import { AlertTriangle, Flame, FilePenLine, Loader2, Search } from "lucide-react"
+import { AlertTriangle, Flame, Loader2, Search } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
-import { TrendingPromptModal } from "@/components/trending-topics/TrendingPromptModal"
 import { ResearchProgress } from "@/components/trending-topics/ResearchProgress"
 import { TrendingEmptyState, TrendingErrorState } from "@/components/trending-topics/StatusPanels"
 import { TrendingResults } from "@/components/trending-topics/TrendingResults"
@@ -15,7 +14,6 @@ import { TRENDING_ERROR_MESSAGE } from "@/constants/trending"
 
 export default function TrendingTopicsClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isPromptEditorOpen, setIsPromptEditorOpen] = useState(false)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
   const { status, result, stages, error, search, reset, loadSaved } = useTrendingTopicsSearch()
   const isLoading = status === "loading"
@@ -54,14 +52,6 @@ export default function TrendingTopicsClient() {
                 <ResetButton onReset={() => void reset()} disabled={status === "idle" || status === "checking"} />
                 <button
                   type="button"
-                  onClick={() => setIsPromptEditorOpen(true)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
-                </button>
-                <button
-                  type="button"
                   onClick={() => void search()}
                   disabled={isLoading}
                   aria-busy={isLoading}
@@ -97,7 +87,6 @@ export default function TrendingTopicsClient() {
         </main>
       </div>
 
-      {isPromptEditorOpen && <TrendingPromptModal onClose={() => setIsPromptEditorOpen(false)} />}
     </div>
   )
 }

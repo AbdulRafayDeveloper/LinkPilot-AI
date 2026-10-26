@@ -6,10 +6,6 @@ import type { EditablePrompt } from "@/types/prompts"
 
 type PromptRecord = Pick<IPrompt, "key" | "content" | "defaultContent" | "updatedAt">
 
-// A template loaded for generation is reused this long; saving a prompt clears it at once
-const TEMPLATE_CACHE_MS = 60_000
-const templateCache = new Map<PromptName, { content: string; expiresAt: number }>()
-
 async function findPrompts(names: readonly PromptName[]): Promise<Map<string, PromptRecord>> {
   await connectDatabase()
   const records = await Prompt.find({ key: { $in: names } }, { key: 1, content: 1, defaultContent: 1, updatedAt: 1 }).lean()
@@ -28,14 +24,15 @@ function toEditablePrompt({ content, defaultContent, updatedAt }: PromptRecord):
 
 /**
  * The current text of one template, for building a generation's messages.
+ *
+ * **Read fresh every time, never cached.** An admin's save has to reach every account on every
+ * device at once, and on a serverless host each request may land on a different server: a cache per
+ * process (it was 60 seconds) was cleared only on the server that took the save, so the others went
+ * on writing with the old prompt for up to a minute. One indexed read by key costs nothing beside the
+ * AI call it feeds.
  */
 export async function loadPromptText(name: PromptName): Promise<string> {
-  const cached = templateCache.get(name)
-  if (cached && cached.expiresAt > Date.now()) return cached.content
-
-  const content = (await findPrompts([name])).get(name)?.content ?? ""
-  templateCache.set(name, { content, expiresAt: Date.now() + TEMPLATE_CACHE_MS })
-  return content
+  return (await findPrompts([name])).get(name)?.content ?? ""
 }
 
 /**
@@ -71,6 +68,5 @@ export async function saveStoredPrompt(name: PromptName, prompt: string): Promis
   if (!saved) {
     throw new Error(`PromptSaveException: the prompts collection returned no document for '${name}'`)
   }
-  templateCache.delete(name)
   return toEditablePrompt(saved)
 }

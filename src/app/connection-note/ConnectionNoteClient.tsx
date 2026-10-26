@@ -1,12 +1,11 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { AlertTriangle, FilePenLine, Loader2, Sparkles, UserPlus } from "lucide-react"
+import { AlertTriangle, Loader2, Sparkles, UserPlus } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ToneSelector } from "@/components/connection-note/ToneSelector"
 import { NoteResult } from "@/components/connection-note/NoteResult"
-import { ConnectionNotePromptsModal } from "@/components/connection-note/ConnectionNotePromptsModal"
 import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { ResetButton } from "@/components/ui/ResetButton"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -44,7 +43,6 @@ const generation = createGenerationRequest<
 
 export default function ConnectionNoteClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isPromptsOpen, setIsPromptsOpen] = useState(false)
   const { profileData, tone, companyName } = useToolStore(formStore)
   const [formError, setFormError] = useState<string | null>(null)
   const profileInputRef = useRef<HTMLTextAreaElement>(null)
@@ -110,14 +108,6 @@ export default function ConnectionNoteClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <button
-                  type="button"
-                  onClick={() => setIsPromptsOpen(true)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
-                </button>
               </div>
             </div>
 
@@ -215,7 +205,6 @@ export default function ConnectionNoteClient() {
         </main>
       </div>
 
-      {isPromptsOpen && <ConnectionNotePromptsModal initialTone={tone} onClose={() => setIsPromptsOpen(false)} />}
     </div>
   )
 }

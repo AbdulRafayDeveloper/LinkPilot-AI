@@ -1,26 +1,23 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { FilePenLine, Hand, Send } from "lucide-react"
+import { Hand, Send } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { GeneratedResultPanel } from "@/components/ui/GeneratedResultPanel"
 import { ProfileTuneForm } from "@/components/outreach/ProfileTuneForm"
 import { AboutMeNotice, AnalysisDetails } from "@/components/outreach/OutreachResultExtras"
-import { FirstMessagePromptsModal } from "@/components/first-message/FirstMessagePromptsModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { ResetButton } from "@/components/ui/ResetButton"
 import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
 import {
-  ABOUT_ME_TAB_ID,
   DEFAULT_FIRST_MESSAGE_TUNE,
   FIRST_MESSAGE_MESSAGES,
   FIRST_MESSAGE_PROFILE_MAX_LENGTH,
   FIRST_MESSAGE_TEXT_TUNES,
   getTuneLabel,
-  type FirstMessagePromptId,
   type FirstMessageTuneId,
 } from "@/constants/firstMessage"
 import { DEFAULT_OUTREACH_FORMAT, VOICE_TUNE, VOICE_TUNE_ID, type OutreachFormatId } from "@/constants/outreachTunes"
@@ -56,7 +53,6 @@ const generation = createGenerationRequest<GeneratePayload, GeneratedFirstMessag
 export default function FirstMessageClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   // The tab the prompts modal opens on; null means the modal is closed
-  const [promptsTab, setPromptsTab] = useState<FirstMessagePromptId | null>(null)
   const { profileData, tune, format } = useToolStore(formStore)
   // A voice note is one script with one tone of its own; text keeps the tone the user last chose
   const isVoice = format === "voice"
@@ -128,14 +124,6 @@ export default function FirstMessageClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <button
-                  type="button"
-                  onClick={() => setPromptsTab(chosenTune ?? DEFAULT_FIRST_MESSAGE_TUNE)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
-                </button>
               </div>
             </div>
 
@@ -197,7 +185,7 @@ export default function FirstMessageClient() {
                 source={result}
               >
                 {result && !result.usedSenderProfile && (
-                  <AboutMeNotice outputName="message" onOpenAboutMe={() => setPromptsTab(ABOUT_ME_TAB_ID)} />
+                  <AboutMeNotice outputName="message" />
                 )}
                 {result && <AnalysisDetails keyDetail={result.analysis.keyDetail} senderLink={result.analysis.senderLink} />}
               </GeneratedResultPanel>
@@ -206,7 +194,6 @@ export default function FirstMessageClient() {
         </main>
       </div>
 
-      {promptsTab && <FirstMessagePromptsModal initialTab={promptsTab} onClose={() => setPromptsTab(null)} />}
     </div>
   )
 }

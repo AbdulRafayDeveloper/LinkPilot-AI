@@ -37,7 +37,7 @@ export async function GET() {
  * PUT: Persists an updated prompt. The next search uses it without any code change.
  */
 export async function PUT(req: NextRequest) {
-  const auth = await requireViewer()
+  const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)

@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { FilePenLine, Send, Users } from "lucide-react"
+import { Send, Users } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ResetButton } from "@/components/ui/ResetButton"
@@ -11,7 +11,6 @@ import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
 import { appendSpokenText } from "@/lib/spokenText"
 import { VOICE_MESSAGES } from "@/constants/voiceInput"
 import { ClientMessageResult } from "@/components/client-messaging/ClientMessageResult"
-import { ClientMessagePromptModal } from "@/components/client-messaging/ClientMessagePromptModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { createGenerationRequest, useGenerationRequest } from "@/hooks/useGenerationRequest"
 import { createToolStore, useToolStore } from "@/lib/toolStore"
@@ -47,7 +46,6 @@ const generation = createGenerationRequest<GeneratePayload, GeneratedClientMessa
 
 export default function ClientMessagingClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isPromptOpen, setIsPromptOpen] = useState(false)
   const [clients, setClients] = useState<Client[] | null>(null)
   const [clientsError, setClientsError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
@@ -150,14 +148,6 @@ export default function ClientMessagingClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <button
-                  type="button"
-                  onClick={() => setIsPromptOpen(true)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
-                </button>
               </div>
             </div>
 
@@ -331,7 +321,6 @@ export default function ClientMessagingClient() {
         </main>
       </div>
 
-      {isPromptOpen && <ClientMessagePromptModal onClose={() => setIsPromptOpen(false)} />}
     </div>
   )
 }

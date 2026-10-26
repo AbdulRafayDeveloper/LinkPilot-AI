@@ -22,7 +22,7 @@ const ParamsSchema = z.object({
  * PUT: Saves the prompt for exactly one context + style pair. Every other prompt is untouched.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ context: string; style: string }> }) {
-  const auth = await requireViewer()
+  const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
   try {
     const target = ParamsSchema.safeParse(await params)

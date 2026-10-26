@@ -63,7 +63,7 @@ export const HELP_START_TOPICS: HelpTopic[] = [
       notes: [
         "Nothing is posted to LinkedIn for you. The tools write the text and the image; you paste or upload them yourself.",
         "Every result can be edited in place before you copy it, and Ctrl/Cmd+B makes the selection bold in LinkedIn's own style.",
-        "Each tool's Reset button (the arrow beside Update Prompt) clears what you pasted and what was written, and keeps the tone or style you chose.",
+        "Each tool's Reset button (the arrow in the tool's header) clears what you pasted and what was written, and keeps the tone or style you chose.",
         "Where an AI wrote something, the result says which model it came from, so you can tell a fallback from the usual one.",
       ],
     },
@@ -102,7 +102,7 @@ export const HELP_START_TOPICS: HelpTopic[] = [
       ],
       notes: [
         "These prompts are shared by every account in the workspace, so a change here changes them for everyone.",
-        "Your background also comes from About Me, which is edited from First Message or InMail under Update Prompt.",
+        "Your background also comes from About Me, which an admin edits under Administration → Global AI Prompts, since every account shares it.",
         "Leave the facts honest: the tools check what they write against these words and rewrite anything they cannot support.",
       ],
     },
@@ -267,7 +267,7 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
     notes: [
       "ABCD Method ends by offering four replies, so answering costs the reader one letter.",
       "Voice note gives you a script to read aloud and record yourself, about 110 words, with the subject that carries it.",
-      "The facts about you come from About Me and Profile Info, which you edit under Update Prompt.",
+      "The facts about you come from Profile Info, which you edit on My AI Profile, and About Me, which an admin edits under Administration → Global AI Prompts.",
     ],
   },
   "follow-up-message": {

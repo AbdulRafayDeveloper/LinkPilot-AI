@@ -85,5 +85,5 @@ export const COMMENT_WRITER_MESSAGES = {
   noRecentDevelopment: "No verified recent development fit this post, so the comment doesn't cite one.",
   noExperience: "Nothing in your About Me profile fit this post, so the comment doesn't claim personal experience.",
   missingProfile:
-    "Your About Me profile is empty, so the comment doesn't claim personal experience. Fill it in under First Message → Update Prompt → About Me so the writer knows which experience is yours.",
+    "Your About Me profile is empty, so the comment doesn't claim personal experience. An admin fills it in under Administration → Global AI Prompts (About Me) so the writer knows which experience is yours.",
 } as const

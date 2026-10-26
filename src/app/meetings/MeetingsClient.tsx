@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { AlertTriangle, CalendarClock, FilePenLine, Loader2, Plus, RefreshCw, Search, SearchX, Video, X, Link2 } from "lucide-react"
+import { AlertTriangle, CalendarClock, Loader2, Plus, RefreshCw, Search, SearchX, Video, X, Link2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { QuickRecordButton } from "@/components/meetings/QuickRecordButton"
@@ -13,7 +13,6 @@ import { BulkDeleteBar, ConfirmBulkDelete } from "@/components/ui/BulkDelete"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { DeleteMeetingDialog } from "@/components/meetings/DeleteMeetingDialog"
 import { MeetingFormDialog } from "@/components/meetings/MeetingFormDialog"
-import { MeetingsPromptModal } from "@/components/meetings/MeetingsPromptModal"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useSavedFilters } from "@/hooks/useSavedFilters"
 import { ClearFiltersButton } from "@/components/history/HistoryFilters"
@@ -27,7 +26,6 @@ import {
   MEETING_STATUS_IDS,
   RUNNING_STATUSES,
   SEARCH_DEBOUNCE_MS,
-  type MeetingPromptId,
   type MeetingStatusId, MEETINGS_LINK_ENDPOINT, MEETING_PLAN_LINK_MESSAGES } from "@/constants/meetings"
 import type { Meeting, MeetingInput, MeetingSummary, MeetingsPage } from "@/types/meetings"
 
@@ -50,7 +48,6 @@ export default function MeetingsClient() {
   const [isCreating, setIsCreating] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [promptTab, setPromptTab] = useState<MeetingPromptId | null>(null)
   // The meeting waiting on a Delete that has been asked for but not confirmed
   const [meetingToDelete, setMeetingToDelete] = useState<MeetingSummary | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -304,14 +301,6 @@ export default function MeetingsClient() {
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <button
                   type="button"
-                  onClick={() => setPromptTab("chunk")}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
-                </button>
-                <button
-                  type="button"
                   onClick={() => {
                     setSaveError(null)
                     setIsCreating(true)
@@ -540,7 +529,6 @@ export default function MeetingsClient() {
           }}
         />
       )}
-      {promptTab && <MeetingsPromptModal initialTab={promptTab} onClose={() => setPromptTab(null)} />}
     </div>
   )
 }

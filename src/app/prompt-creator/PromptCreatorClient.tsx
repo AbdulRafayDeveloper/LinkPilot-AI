@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useRef, useState } from "react"
-import { AudioLines, FilePenLine, FolderKanban, Languages, Sparkles, Wand2 } from "lucide-react"
+import { AudioLines, FolderKanban, Languages, Sparkles, Wand2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { ResultCard } from "@/components/ui/ResultCard"
@@ -11,7 +11,6 @@ import { CopyButton } from "@/components/ui/CopyButton"
 import { useDummyHandoff } from "@/hooks/useDummyHandoff"
 import { CreatedPromptPanel, type CreatedPromptChanges } from "@/components/prompt-creator/CreatedPromptPanel"
 import { EnglishDescriptionPanel } from "@/components/prompt-creator/EnglishDescriptionPanel"
-import { PromptCreatorPromptsModal } from "@/components/prompt-creator/PromptCreatorPromptsModal"
 import Link from "next/link"
 import { usePromptProjects } from "@/hooks/usePromptProjects"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
@@ -81,7 +80,6 @@ const generation = createGenerationRequest<GeneratePayload, CreatedPrompt>(
 
 export default function PromptCreatorClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [promptsTab, setPromptsTab] = useState<PromptTargetId | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null)
@@ -237,14 +235,6 @@ export default function PromptCreatorClient() {
               </div>
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <ResetButton onReset={resetTool} disabled={!canReset} />
-                <button
-                  type="button"
-                  onClick={() => setPromptsTab(target ?? DEFAULT_PROMPT_TARGET)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
-                >
-                  <FilePenLine size={16} aria-hidden="true" />
-                  Update Prompt
-                </button>
               </div>
             </div>
 
@@ -458,7 +448,6 @@ export default function PromptCreatorClient() {
         </main>
       </div>
 
-      {promptsTab && <PromptCreatorPromptsModal initialTarget={promptsTab} onClose={() => setPromptsTab(null)} />}
     </div>
   )
 }

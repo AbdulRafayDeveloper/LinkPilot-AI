@@ -28,7 +28,7 @@ export async function GET() {
  * PUT: Saves the prompt. The next message written uses it, for every client and channel.
  */
 export async function PUT(req: NextRequest) {
-  const auth = await requireViewer()
+  const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
   try {
     const body = await req.json().catch(() => null)
