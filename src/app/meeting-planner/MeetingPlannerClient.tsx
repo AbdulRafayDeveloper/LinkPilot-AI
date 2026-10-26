@@ -39,6 +39,8 @@ export default function MeetingPlannerClient() {
   const [today, setToday] = useState("")
   const [month, setMonth] = useState("")
   const [selectedDate, setSelectedDate] = useState("")
+  // The calendar across the whole page, with today and the day's meetings put away until it is closed again
+  const [isCalendarExpanded, setIsCalendarExpanded] = useState(false)
   const [page, setPage] = useState<MeetingPlannerPage | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -422,7 +424,7 @@ export default function MeetingPlannerClient() {
 
             {/* Side by side from xl: at lg the calendar got about 450px, its meetings read "4:..." and
                 today's controls ran off the page, so below xl the calendar has the whole width */}
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+            <div className={`grid grid-cols-1 gap-5 ${isCalendarExpanded ? "" : "xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]"}`}>
               {month && (
                 <MonthCalendar
                   month={month}
@@ -434,11 +436,14 @@ export default function MeetingPlannerClient() {
                   canGoForward={monthsFromToday < CALENDAR_MONTH_RANGE}
                   onMonthChange={changeMonth}
                   onSelectDay={setSelectedDate}
+                  isExpanded={isCalendarExpanded}
+                  onToggleExpanded={() => setIsCalendarExpanded((expanded) => !expanded)}
                 />
               )}
               {/* Today's meetings sits beside the calendar rather than above it: on a short laptop
-                  window the page is as tall as the calendar, and this is the column with room. */}
-              <div className="flex flex-col gap-5 short:gap-3 min-w-0">
+                  window the page is as tall as the calendar, and this is the column with room.
+                  An expanded calendar puts it away; below xl it is under the calendar either way. */}
+              <div className={`flex flex-col gap-5 short:gap-3 min-w-0 ${isCalendarExpanded ? "xl:hidden" : ""}`}>
               <TodayMeetings
                 meetings={page?.today ?? []}
                 todayDate={page?.todayDate ?? today}

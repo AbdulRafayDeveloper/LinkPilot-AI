@@ -2,7 +2,7 @@
 
 import React from "react"
 import Link from "next/link"
-import { CalendarCheck, ChevronRight, NotebookPen, Pencil, Sun } from "lucide-react"
+import { CalendarCheck, ChevronRight, Sun } from "lucide-react"
 import { MEETING_PLANNER_MESSAGES, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
@@ -11,7 +11,7 @@ import { MeetingStatusButton } from "./MeetingStatusButton"
 import { PrepBadge } from "./PrepBadge"
 import { SeriesBadge } from "./SeriesBadge"
 import { RecordedBadge } from "./RecordedBadge"
-import { QuickRecordButton } from "@/components/meetings/QuickRecordButton"
+import { MeetingRowMenu } from "./MeetingRowMenu"
 
 interface TodayMeetingsProps {
   meetings: MeetingPlan[]
@@ -41,17 +41,19 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
   onEditDetails,
   onLinked,
 }) => (
+  /* The whole card is the brand's dark violet, the colour of the buttons, at the owner's request, so it
+     reads as today at a glance; each meeting sits on a solid card of its own inside it */
   <section
     aria-label="Today's meetings"
-    className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
+    className="flex flex-col gap-3 rounded-2xl border border-primary bg-primary p-5 shadow-sm"
   >
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
-        <Sun size={16} className="text-primary" aria-hidden="true" />
+      <h2 className="flex items-center gap-2 text-sm font-bold text-white">
+        <Sun size={16} className="text-white" aria-hidden="true" />
         Today
-        {todayDate && <span className="text-[11px] font-medium text-outline">{dayLabel(todayDate)}</span>}
+        {todayDate && <span className="text-[11px] font-medium text-white/80">{dayLabel(todayDate)}</span>}
       </h2>
-      <span className="text-[11px] font-semibold text-outline">
+      <span className="text-[11px] font-semibold text-white/85">
         {meetings.length === 0
           ? "0 meetings"
           : `${meetings.length} ${meetings.length === 1 ? "meeting" : "meetings"}${
@@ -61,8 +63,8 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
     </div>
 
     {meetings.length === 0 ? (
-      <p className="flex items-center gap-2 rounded-xl bg-surface-container-low px-3 py-3 text-[13px] text-on-surface-variant">
-        <CalendarCheck size={15} className="shrink-0 text-outline" aria-hidden="true" />
+      <p className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-3 text-[13px] text-white">
+        <CalendarCheck size={15} className="shrink-0 text-white/80" aria-hidden="true" />
         {MEETING_PLANNER_MESSAGES.emptyToday}
       </p>
     ) : (
@@ -72,14 +74,13 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
         {meetings.map((meeting) => (
           <li key={meeting.id}>
             <div
-              /* Today's meetings are the brand's violet, at the owner's request: they sat in the
-                 same plain grey as the day panel below them and the two cards read as one list */
+              // Solid, never see-through, so a row reads the same on the violet card as anywhere else
               className={`flex flex-col gap-1.5 rounded-xl border p-3 ${
                 meeting.status === "completed"
-                  ? "border-success/40 bg-success-container/40"
+                  ? "border-success/40 bg-success-container"
                   : meeting.status === "cancelled"
-                    ? "border-error/30 bg-error-container/30"
-                    : "border-primary/30 bg-primary/5"
+                    ? "border-error/30 bg-error-container"
+                    : "border-white bg-white"
               }`}
             >
               {/* The time, the tags and what can be done, all of which keep their own width: the
@@ -91,36 +92,18 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                 <PrepBadge meeting={meeting} />
                 <SeriesBadge meeting={meeting} />
                 <RecordedBadge meeting={meeting} onOpen={() => onLinked(meeting)} />
-                {/* Wraps on a small phone, where six controls in one line ran 20px past the card */}
-                <span className="ml-auto flex flex-wrap items-center justify-end gap-1">
-                  {/* The attend link where the meeting is read, so the call is one click at the hour */}
-                  <JoinLink url={meeting.joinUrl} name={meeting.name} />
-                  {/* Record it as it starts: the recording is filed under this meeting */}
-                  <QuickRecordButton plan={{ id: meeting.id, name: meeting.name }} variant="icon" />
-                  <button
-                    type="button"
-                    onClick={() => onNotes(meeting)}
-                    aria-label={`${meeting.hasNotes ? "Read or write" : "Write"} notes for ${meeting.name}`}
-                    title={meeting.hasNotes ? "Notes on this meeting" : "Write notes for this meeting"}
-                    className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-primary/5 hover:text-primary ${
-                      meeting.hasNotes ? "text-primary" : "text-outline"
-                    }`}
-                  >
-                    <NotebookPen size={14} aria-hidden="true" />
-                    {meeting.hasNotes && (
-                      <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onEditDetails(meeting)}
-                    aria-label={`Edit ${meeting.name}`}
-                    title="Edit this meeting: its name, the person, the attend link"
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-outline transition-colors hover:bg-primary/5 hover:text-primary"
-                  >
-                    <Pencil size={14} aria-hidden="true" />
-                  </button>
+                {/* What is wanted at a glance or in one click at the hour, then everything else
+                    behind the three dots, as a daily task's row has it */}
+                <span className="ml-auto flex items-center justify-end gap-1">
+                  <JoinLink url={meeting.joinUrl} name={meeting.name} showCopy={false} />
                   <MeetingStatusButton meeting={meeting} isSaving={savingIds.has(meeting.id)} onChange={onChangeStatus} />
+                  <MeetingRowMenu
+                    meeting={meeting}
+                    isSaving={savingIds.has(meeting.id)}
+                    onNotes={onNotes}
+                    onEditDetails={onEditDetails}
+                    onLinked={onLinked}
+                  />
                 </span>
               </div>
 

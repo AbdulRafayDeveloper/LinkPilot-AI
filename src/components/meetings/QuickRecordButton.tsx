@@ -26,7 +26,11 @@ interface QuickRecordButtonProps {
  * meters and Stop; the recorder lives outside React, so moving page never stops it. While something is
  * already being recorded the button just goes to that recording instead of starting a second.
  */
-export const QuickRecordButton: React.FC<QuickRecordButtonProps> = ({ plan, variant = "button" }) => {
+/**
+ * Starting a quick recording, for the button below and for a meeting row's menu. `start` has to be
+ * called straight from a click, since that click is what lets the browser open its screen picker.
+ */
+export function useQuickRecord(plan?: { id: string; name: string }) {
   const router = useRouter()
   const recorder = useMeetingRecorder()
   const isBusy = ["starting", "recording", "paused", "stopping", "finishing"].includes(recorder.status)
@@ -42,6 +46,11 @@ export const QuickRecordButton: React.FC<QuickRecordButtonProps> = ({ plan, vari
 
   const label = isBusy ? "Go to the recording" : plan ? RECORDING_MESSAGES.recordThis(plan.name) : RECORDING_MESSAGES.quickRecord
   const hint = isBusy ? "A recording is already running in this tab" : RECORDING_MESSAGES.quickRecordHint
+  return { start, label, hint, isBusy }
+}
+
+export const QuickRecordButton: React.FC<QuickRecordButtonProps> = ({ plan, variant = "button" }) => {
+  const { start, label, hint, isBusy } = useQuickRecord(plan)
 
   if (variant === "icon") {
     return (

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useMemo } from "react"
-import { CalendarDays, ChevronLeft, ChevronRight, FileText, Loader2, Repeat, Sparkles } from "lucide-react"
+import { CalendarDays, ChevronLeft, ChevronRight, FileText, Loader2, Maximize2, Minimize2, Repeat, Sparkles } from "lucide-react"
 import { DAY_CELL_MAX_MEETINGS } from "@/constants/meetingPlanner"
 import { WEEKDAY_LABELS, calendarDays, dayOfMonth, formatTime, monthLabel, monthOf } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
@@ -17,6 +17,9 @@ interface MonthCalendarProps {
   canGoForward: boolean
   onMonthChange: (move: "previous" | "next" | "today") => void
   onSelectDay: (date: string) => void
+  // The calendar has the page's whole width, with today and the day's meetings put away
+  isExpanded: boolean
+  onToggleExpanded: () => void
 }
 
 /**
@@ -34,6 +37,8 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
   canGoForward,
   onMonthChange,
   onSelectDay,
+  isExpanded,
+  onToggleExpanded,
 }) => {
   const days = useMemo(() => calendarDays(month), [month])
   const byDay = useMemo(() => {
@@ -83,22 +88,21 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
           >
             <ChevronRight size={16} aria-hidden="true" />
           </button>
+          {/* Only where the cards sit beside the calendar: below xl it already has the whole width */}
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            aria-pressed={isExpanded}
+            aria-label={isExpanded ? "Show today and the day's meetings again" : "Expand the calendar"}
+            title={isExpanded ? "Show today and the day's meetings again" : "Expand the calendar to the full page"}
+            className={`ml-1 hidden rounded-lg border p-1.5 transition-colors xl:inline-flex ${
+              isExpanded ? "border-primary bg-primary text-white hover:bg-on-primary-fixed-variant" : "border-outline-variant bg-white text-on-surface hover:bg-surface-container-high"
+            }`}
+          >
+            {isExpanded ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}
+          </button>
         </div>
       </div>
-
-      {/* What the marks on a meeting mean. On a short laptop window this line gives way to the weeks
-          themselves, and each mark still says the same thing in its chip's own tooltip. */}
-      <p className="-mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-on-surface-variant">
-        <span className="inline-flex items-center gap-0.5 rounded bg-primary-fixed px-1 py-0.5 text-[10px] text-on-primary-fixed-variant ring-1 ring-primary/50" aria-hidden="true">
-          <Sparkles size={9} className="text-primary" />
-          10:00
-        </span>
-        A spark on a meeting means its preparation is written;
-        <Repeat size={11} className="text-on-secondary-fixed-variant" aria-hidden="true" />
-        means it repeats;
-        <FileText size={11} className="text-primary" aria-hidden="true" />
-        means its notes or recording are kept with it.
-      </p>
 
       <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wider text-outline">
         {WEEKDAY_LABELS.map((label) => (

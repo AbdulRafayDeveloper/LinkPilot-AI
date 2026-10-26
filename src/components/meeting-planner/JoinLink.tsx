@@ -11,6 +11,8 @@ interface JoinLinkProps {
   name: string
   // "row" sits among a list row's controls; "panel" is the block on the meeting's own page
   variant?: "row" | "panel"
+  // A row whose three-dot menu already copies the link shows Join alone
+  showCopy?: boolean
 }
 
 /**
@@ -23,7 +25,7 @@ interface JoinLinkProps {
  * three places that show a meeting (today's list, the day panel and the meeting's own page) can
  * never drift apart on what the link looks like or what the copy button copies.
  */
-export const JoinLink: React.FC<JoinLinkProps> = ({ url, name, variant = "row" }) => {
+export const JoinLink: React.FC<JoinLinkProps> = ({ url, name, variant = "row", showCopy = true }) => {
   if (!url) return null
   const copyLabel = `Copy the attend link for ${name}`
 
@@ -40,7 +42,7 @@ export const JoinLink: React.FC<JoinLinkProps> = ({ url, name, variant = "row" }
           <Video size={12} aria-hidden="true" />
           Join
         </a>
-        <CopyButton text={url} label={copyLabel} />
+        {showCopy && <CopyButton text={url} label={copyLabel} />}
       </span>
     )
   }

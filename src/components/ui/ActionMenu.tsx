@@ -70,7 +70,8 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ label, groups, isBusy = 
   const open = () => {
     const rect = button.current?.getBoundingClientRect()
     if (!rect) return
-    const height = menuHeightOf(groups)
+    // A menu taller than the window (a phone on its side) is as tall as the window and scrolls inside
+    const height = Math.min(menuHeightOf(groups), window.innerHeight - 16)
     // Below the button, or above it when the window has no room, then clamped on every edge
     const roomBelow = window.innerHeight - rect.bottom - 8
     const preferred = roomBelow >= height ? rect.bottom + 4 : rect.top - height - 4
@@ -99,14 +100,18 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ label, groups, isBusy = 
         button.current?.focus()
       }
     }
+    // Scrolling the page moves the button away from the menu, so it closes; scrolling the menu itself does not
+    const onScroll = (event: Event) => {
+      if (!menu.current?.contains(event.target as Node)) close()
+    }
     document.addEventListener("pointerdown", onPointerDown)
     document.addEventListener("keydown", onKeyDown)
-    window.addEventListener("scroll", close, true)
+    window.addEventListener("scroll", onScroll, true)
     window.addEventListener("resize", close)
     return () => {
       document.removeEventListener("pointerdown", onPointerDown)
       document.removeEventListener("keydown", onKeyDown)
-      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("scroll", onScroll, true)
       window.removeEventListener("resize", close)
     }
   }, [isOpen, close])
@@ -169,8 +174,8 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ label, groups, isBusy = 
             aria-label={`Actions: ${label}`}
             onKeyDown={onMenuKeyDown}
             onPointerDown={stop}
-            style={{ top: menuAt.top, left: menuAt.left, width: MENU_WIDTH }}
-            className="fixed z-[70] overflow-hidden rounded-xl border border-outline-variant bg-white py-1 shadow-lg"
+            style={{ top: menuAt.top, left: menuAt.left, width: MENU_WIDTH, maxHeight: "calc(100dvh - 16px)" }}
+            className="custom-scrollbar fixed z-[70] overflow-y-auto overflow-x-hidden rounded-xl border border-outline-variant bg-white py-1 shadow-lg"
           >
             {groups.map((group, index) => (
               <div key={group.id} className={index > 0 ? "mt-1 border-t border-outline-variant/70 pt-1" : ""}>

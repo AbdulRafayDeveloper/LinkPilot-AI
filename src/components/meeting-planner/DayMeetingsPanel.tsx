@@ -2,9 +2,8 @@
 
 import React from "react"
 import Link from "next/link"
-import { CalendarPlus, ChevronRight, Clock, FileText, NotebookPen, Pencil, Trash2 } from "lucide-react"
+import { CalendarPlus, ChevronRight } from "lucide-react"
 import { MEETING_PLANNER_MESSAGES, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
-import { MEETING_PLAN_LINK_MESSAGES } from "@/constants/meetings"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
 import type { MeetingPlan } from "@/types/meetingPlanner"
 import { JoinLink } from "./JoinLink"
@@ -12,7 +11,7 @@ import { MeetingStatusButton } from "./MeetingStatusButton"
 import { PrepBadge } from "./PrepBadge"
 import { SeriesBadge } from "./SeriesBadge"
 import { RecordedBadge } from "./RecordedBadge"
-import { QuickRecordButton } from "@/components/meetings/QuickRecordButton"
+import { MeetingRowMenu } from "./MeetingRowMenu"
 
 interface DayMeetingsPanelProps {
   date: string
@@ -34,14 +33,11 @@ interface DayMeetingsPanelProps {
   onLinked: (meeting: MeetingPlan) => void
 }
 
-const iconButton =
-  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-outline transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-
 /**
  * Every meeting on the selected day, in time order. However many there are, they are all here
  * with their name, exact time and status, so a full calendar cell never hides one. Each can be
- * moved (the pencil) or deleted (the bin) here; for a meeting in a repeating series both act on
- * that one occurrence, and deleting also offers the whole series.
+ * moved or deleted from its three-dot menu; for a meeting in a repeating series both act on that
+ * one occurrence, and deleting also offers the whole series.
  */
 export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
   date,
@@ -105,80 +101,24 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                 </span>
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
               </Link>
-              <div className="flex flex-wrap items-center justify-end gap-0.5">
+              <div className="flex flex-wrap items-center justify-end gap-1">
                 {/* Recorded, in words, at the start of the line: a button can't sit inside the row's link above */}
                 <span className="mr-auto">
                   <RecordedBadge meeting={meeting} onOpen={() => onLinked(meeting)} />
                 </span>
-                {/* The attend link first, so any day's meeting is joined and copied from here */}
-                <JoinLink url={meeting.joinUrl} name={meeting.name} />
-                {/* Record it from here: the recording is linked to this meeting from the start */}
-                <QuickRecordButton plan={{ id: meeting.id, name: meeting.name }} variant="icon" />
-                {/* What it was written up as, when there is something: the records of this meeting */}
-                {(meeting.linkedCount ?? 0) > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onLinked(meeting)}
-                    aria-label={`Open the notes and recordings of ${meeting.name}`}
-                    title={MEETING_PLAN_LINK_MESSAGES.notesOn(meeting.linkedCount ?? 0)}
-                    className={`${iconButton} relative text-primary hover:bg-primary/5`}
-                  >
-                    <FileText size={14} aria-hidden="true" />
-                    <span className="absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] font-bold leading-[14px] text-white">
-                      {meeting.linkedCount}
-                    </span>
-                  </button>
-                )}
+                {/* Join and the status stay on the row; everything else is behind the three dots,
+                    as a daily task's row has it, each line with its word and its icon */}
+                <JoinLink url={meeting.joinUrl} name={meeting.name} showCopy={false} />
                 <MeetingStatusButton meeting={meeting} isSaving={savingIds.has(meeting.id)} onChange={onChangeStatus} />
-                <button
-                  type="button"
-                  onClick={() => onNotes(meeting)}
-                  aria-label={`${meeting.hasNotes ? "Read or write" : "Write"} notes for ${meeting.name}`}
-                  title={meeting.hasNotes ? "Notes on this meeting" : "Write notes for this meeting"}
-                  className={`${iconButton} relative hover:bg-primary/5 hover:text-primary ${
-                    meeting.hasNotes ? "text-primary" : ""
-                  }`}
-                >
-                  <NotebookPen size={14} aria-hidden="true" />
-                  {/* A dot rather than a count: a list says there is something to read, not how much */}
-                  {meeting.hasNotes && (
-                    <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-                  )}
-                </button>
-                {/* Everything about the meeting, the attend link included, without opening it first:
-                    the owner asked to be able to add that link while editing from here */}
-                <button
-                  type="button"
-                  onClick={() => onEditDetails(meeting)}
-                  disabled={savingIds.has(meeting.id)}
-                  aria-label={`Edit ${meeting.name}`}
-                  title="Edit this meeting: its name, the person, the attend link"
-                  className={`${iconButton} hover:bg-primary/5 hover:text-primary`}
-                >
-                  <Pencil size={14} aria-hidden="true" />
-                </button>
-                {/* The day and the time have their own button, as the meeting's own page does,
-                    because for a repeating meeting they move the series rather than one week */}
-                <button
-                  type="button"
-                  onClick={() => onEdit(meeting)}
-                  disabled={savingIds.has(meeting.id)}
-                  aria-label={`Change the day or time of ${meeting.name}`}
-                  title={meeting.seriesId ? "Change the day or time of this meeting only" : "Change the day or time"}
-                  className={`${iconButton} hover:bg-primary/5 hover:text-primary`}
-                >
-                  <Clock size={14} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(meeting)}
-                  disabled={savingIds.has(meeting.id)}
-                  aria-label={`Delete ${meeting.name}`}
-                  title={meeting.seriesId ? "Delete this meeting or its whole series" : "Delete this meeting"}
-                  className={`${iconButton} hover:bg-error/5 hover:text-error`}
-                >
-                  <Trash2 size={14} aria-hidden="true" />
-                </button>
+                <MeetingRowMenu
+                  meeting={meeting}
+                  isSaving={savingIds.has(meeting.id)}
+                  onNotes={onNotes}
+                  onEditDetails={onEditDetails}
+                  onLinked={onLinked}
+                  onMove={onEdit}
+                  onDelete={onDelete}
+                />
               </div>
             </div>
           </li>
