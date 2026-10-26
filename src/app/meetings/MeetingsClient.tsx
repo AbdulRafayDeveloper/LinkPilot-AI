@@ -301,7 +301,7 @@ export default function MeetingsClient() {
                   Paste a whole call, however long, and get the decisions, the tasks and a summary to send the client.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 sm:shrink-0">
+              <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <button
                   type="button"
                   onClick={() => setPromptTab("chunk")}

@@ -247,7 +247,7 @@ const DummyDataEditor: React.FC<DummyDataModalProps> = ({ kind, onUse, onClose }
         />
       ) : (
         <div className="flex flex-col gap-3 flex-1 min-h-0">
-          <div className="flex items-start gap-2 shrink-0">
+          <div className="flex flex-col-reverse gap-2 shrink-0 sm:flex-row sm:items-start">
             {entries.length > 0 && (
               <div className="flex-1 min-w-0">
                 <PromptTabStrip
@@ -262,7 +262,7 @@ const DummyDataEditor: React.FC<DummyDataModalProps> = ({ kind, onUse, onClose }
                 />
               </div>
             )}
-            <button type="button" onClick={addEntry} disabled={isLocked} className={`${secondaryButton} shrink-0`}>
+            <button type="button" onClick={addEntry} disabled={isLocked} className={`${secondaryButton} shrink-0 self-end sm:self-auto`}>
               <Plus size={16} aria-hidden="true" />
               Add {config.item}
             </button>

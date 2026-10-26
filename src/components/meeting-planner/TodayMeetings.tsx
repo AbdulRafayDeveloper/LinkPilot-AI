@@ -91,7 +91,8 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                 <PrepBadge meeting={meeting} />
                 <SeriesBadge meeting={meeting} />
                 <RecordedBadge meeting={meeting} onOpen={() => onLinked(meeting)} />
-                <span className="ml-auto flex items-center gap-1">
+                {/* Wraps on a small phone, where six controls in one line ran 20px past the card */}
+                <span className="ml-auto flex flex-wrap items-center justify-end gap-1">
                   {/* The attend link where the meeting is read, so the call is one click at the hour */}
                   <JoinLink url={meeting.joinUrl} name={meeting.name} />
                   {/* Record it as it starts: the recording is filed under this meeting */}

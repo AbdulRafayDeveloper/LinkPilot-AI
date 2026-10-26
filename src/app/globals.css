@@ -88,8 +88,14 @@ body {
   /* The page header: the title beside its buttons rather than above them, and smaller */
   main > div > div:first-child:has(h1) {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
+  }
+  /* The title keeps room for itself, and the buttons go under it when there are too many to sit
+     beside it: Meeting Notes' four buttons left its title a 37px column, one word a line */
+  main > div > div:first-child:has(h1) > div:first-child {
+    flex: 1 1 18rem;
   }
   main h1 {
     font-size: 1.25rem;
