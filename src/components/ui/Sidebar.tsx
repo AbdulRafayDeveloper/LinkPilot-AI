@@ -457,7 +457,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
 
       {/* The drawer is 92vw rather than 86vw: with the bigger names a 328px drawer cut four of the
           seven Client Work names, and at 352px not one name is cut at any size */}
+      {/* `data-collapsed` is what lets the page beside it widen into the room it gives back
+          (globals.css), on every page at once rather than in each page's own wrapper */}
       <aside
+        data-app-sidebar=""
+        data-collapsed={isCollapsed ? "true" : undefined}
         className={`fixed inset-y-0 left-0 z-[45] flex h-screen w-[min(92vw,352px)] flex-shrink-0 border-r border-outline-variant/80 bg-white transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
           isOpen ? "translate-x-0 shadow-xl lg:shadow-none" : "-translate-x-full"
         } ${isCollapsed ? "lg:w-[72px]" : "lg:w-[320px] xl:w-[352px]"}`}

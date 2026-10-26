@@ -109,6 +109,35 @@ body {
 }
 
 /*
+ * **A collapsed sidebar gives its room to the page.** Collapsing it (Ctrl/⌘+B) is done to see more of
+ * the page, but every page caps its own width (`max-w-[1400px]` on the wrapper inside `main`), so the
+ * room the panel gave back only became wider margins either side. With the sidebar collapsed, the page
+ * beside it (`aside[data-collapsed] ~ div main`, so only a page that has the sidebar: never sign-in,
+ * help or a shared link) widens:
+ * - the work pages, capped at 1400px, lose the cap and use the whole width, keeping their padding;
+ * - the few narrow pages (a form, a single record) grow by exactly the room the panel gave back,
+ *   352px less the 72px rail, so a short form never stretches across a wide screen.
+ * From `lg` only, since below it the sidebar is a drawer and collapsing does not apply.
+ */
+@media (min-width: 1024px) {
+  aside[data-app-sidebar][data-collapsed] ~ div main > [class*="max-w-"] {
+    max-width: none;
+  }
+  aside[data-app-sidebar][data-collapsed] ~ div main > .max-w-\[1000px\] {
+    max-width: 1280px;
+  }
+  aside[data-app-sidebar][data-collapsed] ~ div main > .max-w-\[1080px\] {
+    max-width: 1360px;
+  }
+  aside[data-app-sidebar][data-collapsed] ~ div main > .max-w-\[1100px\] {
+    max-width: 1380px;
+  }
+  aside[data-app-sidebar][data-collapsed] ~ div main > .max-w-3xl {
+    max-width: 1048px;
+  }
+}
+
+/*
  * The visual editor (components/ui/VisualEditor): the page a description is written on. Its elements
  * are made by the browser while typing, so they are styled here rather than one by one, sized in em
  * so the entry's own text size (A- and A+) scales all of them, and matching components/ui/RichTextView.
