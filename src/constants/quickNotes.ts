@@ -1,11 +1,14 @@
 import { NotebookPen, type LucideIcon } from "lucide-react"
 import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
+import { REQUEST_MAX_LENGTH } from "./promptCreator"
 
 /**
- * Quick Notes: text the user pastes or types to keep for later reuse. No AI runs on it, so the
- * only limits here are what one note may hold and how many are listed at a time.
+ * Quick Notes: text the user pastes, types or speaks to keep for later reuse. A saved note is never
+ * read by a model; the only AI here is reading a spoken note back in English before it reaches the
+ * editor, so the limits below are what one note may hold, how much speech is read, and how many
+ * notes are listed at a time.
  */
-// No AI reads a note, so it takes the shared ceiling for a plain text box (constants/textLimits.ts)
+// No AI reads a saved note, so it takes the shared ceiling for a plain text box (constants/textLimits.ts)
 export const NOTE_MAX_LENGTH = TEXT_BOX_MAX_LENGTH
 // How many notes one batch of the list holds; the next batch loads as the list is scrolled
 export const NOTES_BATCH_SIZE = 40
@@ -27,6 +30,14 @@ export const NOTE_IMAGE_MAX_BYTES = 4 * 1024 * 1024
 export const NOTE_IMAGE_ACCEPT = "image/png,image/jpeg,image/webp"
 
 export const QUICK_NOTES_ENDPOINT = "/api/quick-notes"
+// Reads what was spoken back in English; it stores nothing, the note is saved as usual afterwards
+export const QUICK_NOTES_ENGLISH_ENDPOINT = "/api/quick-notes/english"
+/**
+ * How much spoken text is read back in English at once: a whole six-minute recording, the same
+ * ceiling every other spoken field has (Prompt Creator's description, a client update). This one is
+ * read by a model, so it stays far under the note's own million characters.
+ */
+export const NOTE_SPEECH_MAX_LENGTH = REQUEST_MAX_LENGTH
 
 export const QUICK_NOTES_MESSAGES = {
   missingContent: "Write or paste something to save.",
@@ -57,6 +68,15 @@ export const QUICK_NOTES_MESSAGES = {
   movedButKept: (name: string) => `"${name}" is saved in Important Content, but the note could not be deleted here. Delete it yourself.`,
   moveFailed: "Couldn't move the note to Important Content. It is still here; please try again.",
   moveUnavailable: "Important Content is turned off for this account, so a note cannot be moved there.",
+  // Speaking a note: what was said is written out, read back in English and added to the editor
+  speechMissing: "Nothing was heard to write in English.",
+  speechTooLong: `That recording is too long to read back at once. Keep it under ${NOTE_SPEECH_MAX_LENGTH.toLocaleString()} characters.`,
+  speechEnglishing: "Writing what you said in English...",
+  speechEnglishFailed: "Couldn't write what you said in English. What you said is kept below.",
+  speechAdded: (language: string) =>
+    language && !/^english$/i.test(language) ? `Added to the note in English (you spoke ${language}).` : "Added to the note in English.",
+  speechClipped: (count: number) => `The note was full, so the last ${count.toLocaleString()} characters were left out.`,
+  speechAddAsSaid: "Add it as you said it",
 } as const
 
 // The module's sidebar entry, listed with the other non-LinkedIn modules

@@ -38,3 +38,13 @@ export interface QuickNotesFeed {
   nextCursor: string | null
   total: number
 }
+
+/**
+ * What was spoken for a note, read back in English (POST /api/quick-notes/english). Nothing is
+ * saved by it: the page adds the English to the editor and the note is saved as any other.
+ */
+export interface SpokenNoteEnglish {
+  english: string
+  // The language it was spoken in, named in English ("Roman Urdu"); "Unknown" when the model didn't say
+  sourceLanguage: string
+}

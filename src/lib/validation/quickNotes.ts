@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { NOTE_MAX_LENGTH, NOTE_TITLE_MAX_LENGTH, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
+import { NOTE_MAX_LENGTH, NOTE_SPEECH_MAX_LENGTH, NOTE_TITLE_MAX_LENGTH, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
 
 /**
  * A note as it is saved or edited: the content is required, the title optional (a note saved without
@@ -21,3 +21,12 @@ export const QuickNoteSchema = z.object({
 })
 
 export type QuickNoteFields = z.infer<typeof QuickNoteSchema>
+
+/** What was spoken for a note, to be read back in English: the words the recording was written out as. */
+export const SpokenNoteSchema = z.object({
+  text: z
+    .string({ error: QUICK_NOTES_MESSAGES.speechMissing })
+    .trim()
+    .min(1, QUICK_NOTES_MESSAGES.speechMissing)
+    .max(NOTE_SPEECH_MAX_LENGTH, QUICK_NOTES_MESSAGES.speechTooLong),
+})
