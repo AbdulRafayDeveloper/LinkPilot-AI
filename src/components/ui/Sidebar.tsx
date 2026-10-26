@@ -11,7 +11,7 @@ import { markToolSeen, useToolActivity, type ActivityState } from "@/lib/toolAct
 import { groupOfPath, shownGroup } from "@/lib/sidebarGroups"
 import { useSidebarDropdowns } from "@/hooks/useSidebarDropdowns"
 import { useSidebarGroup } from "@/hooks/useSidebarGroup"
-import { useVisibleTools } from "@/hooks/useCurrentUser"
+import { useCurrentUser, useVisibleTools } from "@/hooks/useCurrentUser"
 
 interface SidebarProps {
   isOpen: boolean
@@ -139,12 +139,17 @@ interface SidebarLinkProps {
   onHint: (hint: RailHint | null) => void
   // A page inside a dropdown, one size smaller than the tools around it
   compact?: boolean
+  // The person's own photo in place of the icon (My AI Profile), the icon again until there is one
+  photo?: string | null
 }
 
 // One navigation row: an icon tile and the name, on a single line, so a long list of tools stays
 // scannable. The description is the row's tooltip, and the rail tooltip when collapsed.
-const SidebarLink: React.FC<SidebarLinkProps> = ({ link, isActive, isCollapsed, activity, onNavigate, onHint, compact = false }) => {
+const SidebarLink: React.FC<SidebarLinkProps> = ({ link, isActive, isCollapsed, activity, onNavigate, onHint, compact = false, photo = null }) => {
   const { title, description, icon: Icon, href } = link
+  // A photo that can't be loaded (its signed link expired, say) gives the row its icon back
+  const [failedPhoto, setFailedPhoto] = useState<string | null>(null)
+  const showsPhoto = photo !== null && photo !== failedPhoto
 
   return (
     <li className="relative">
@@ -157,10 +162,23 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ link, isActive, isCollapsed, 
         aria-current={isActive ? "page" : undefined}
         className={rowClass(isCollapsed, isActive, compact)}
       >
-        <span className={tileClass(isActive, compact)}>
-          <Icon className={iconClass(compact)} aria-hidden="true" />
-          {activity && isCollapsed && <ActivityMark state={activity} className="absolute -right-1 -top-1 hidden lg:block" />}
-        </span>
+        {showsPhoto ? (
+          // The same size as an icon tile, as a circle, ringed in violet while its page is open
+          <span
+            className={`relative flex ${compact ? "h-6 w-6 tight:h-5 tight:w-5" : "h-8 w-8 tight:h-6 tight:w-6"} shrink-0 rounded-full ${
+              isActive ? "ring-2 ring-primary ring-offset-1 ring-offset-surface-container-lowest" : "ring-1 ring-outline-variant"
+            }`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={photo} alt="" onError={() => setFailedPhoto(photo)} className="h-full w-full rounded-full object-cover" />
+            {activity && isCollapsed && <ActivityMark state={activity} className="absolute -right-1 -top-1 hidden lg:block" />}
+          </span>
+        ) : (
+          <span className={tileClass(isActive, compact)}>
+            <Icon className={iconClass(compact)} aria-hidden="true" />
+            {activity && isCollapsed && <ActivityMark state={activity} className="absolute -right-1 -top-1 hidden lg:block" />}
+          </span>
+        )}
         <span className={titleClass(isCollapsed, isActive, compact)}>{title}</span>
         {activity && (
           <span className={`flex shrink-0 items-center ${whenCollapsed(isCollapsed, "lg:hidden")}`}>
@@ -295,6 +313,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
   const { picked, pick } = useSidebarGroup()
   // The admin area appears only once the account is known to be an admin, never flashing for a user
   const tools = useVisibleTools()
+  // My AI Profile is about this person, so its row shows their own photo once they have one
+  const myPhoto = useCurrentUser().user?.photo ?? null
   const [hint, setHint] = useState<RailHint | null>(null)
   const [query, setQuery] = useState("")
   const router = useRouter()
@@ -377,7 +397,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
     markToolSeen(pathname)
   }, [pathname])
 
-  const renderLink = (link: NavLink) => (
+  const renderLink = (link: NavLink, photo: string | null = null) => (
     <SidebarLink
       key={link.href}
       link={link}
@@ -386,6 +406,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
       activity={pathname === link.href ? undefined : activityOf(link.href)}
       onNavigate={onClose}
       onHint={setHint}
+      photo={photo}
     />
   )
 
@@ -417,7 +438,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
    */
   const renderArea = (areaTools: LinkedInTool[]) => {
     const [only] = areaTools
-    if (!isSearching && areaTools.length === 1 && only.links) return only.links.map(renderLink)
+    if (!isSearching && areaTools.length === 1 && only.links) return only.links.map((link) => renderLink(link))
     return areaTools.map(renderTool)
   }
 
@@ -524,7 +545,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
 
           {isCollapsed && (
             <div className="mt-auto hidden w-full border-t border-outline-variant/80 px-2 py-2 lg:block">
-              <ul>{renderLink(GLOBAL_PROMPTS_LINK)}</ul>
+              <ul>{renderLink(GLOBAL_PROMPTS_LINK, myPhoto)}</ul>
             </div>
           )}
         </div>
@@ -625,7 +646,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
           {/* My AI Profile: the profile and projects every tool personalizes with, not a LinkedIn tool */}
           {showGlobalPrompts && (
             <div className="shrink-0 border-t border-outline-variant/80 px-3 py-2">
-              <ul>{renderLink(GLOBAL_PROMPTS_LINK)}</ul>
+              <ul>{renderLink(GLOBAL_PROMPTS_LINK, myPhoto)}</ul>
             </div>
           )}
         </div>
