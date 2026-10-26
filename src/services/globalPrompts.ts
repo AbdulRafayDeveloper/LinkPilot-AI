@@ -10,9 +10,10 @@ import type { GlobalPrompt } from "@/types/globalPrompts"
  */
 const globalPromptName = (id: GlobalPromptId): PromptName => `global-${id}`
 
-export async function getGlobalPrompts(): Promise<GlobalPrompt[]> {
-  const stored = await getStoredPrompts(GLOBAL_PROMPTS.map((prompt) => globalPromptName(prompt.id)))
-  return GLOBAL_PROMPTS.map((prompt, index) => ({ id: prompt.id, ...stored[index] }))
+/** The latest text of the prompts named, in the order given: every account's or the admin's own. */
+export async function getGlobalPrompts(ids: readonly GlobalPromptId[] = GLOBAL_PROMPTS.map((prompt) => prompt.id)): Promise<GlobalPrompt[]> {
+  const stored = await getStoredPrompts(ids.map(globalPromptName))
+  return ids.map((id, index) => ({ id, ...stored[index] }))
 }
 
 export async function getActiveGlobalPrompt(id: GlobalPromptId): Promise<string> {

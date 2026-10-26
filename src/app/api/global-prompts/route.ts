@@ -1,24 +1,15 @@
-import { NextResponse } from "next/server"
-import { toUserFacingMessage } from "@/lib/errors"
-import { getGlobalPrompts } from "@/services/globalPrompts"
+import { SHARED_GLOBAL_PROMPT_IDS } from "@/constants/globalPrompts"
+import { respondWithGlobalPrompts } from "@/lib/globalPromptRoutes"
 import { requireViewer } from "@/services/auth/viewer"
 
 export const dynamic = "force-dynamic"
 
 /**
- * GET: Returns the latest saved text (or default) of every global prompt.
+ * GET: The latest saved text (or default) of every global prompt every account may change. The
+ * admin's own (Humanization) are at /api/admin/global-prompts and are never answered here.
  */
 export async function GET() {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  try {
-    const prompts = await getGlobalPrompts()
-    return NextResponse.json({ success: true, message: "Global prompts retrieved", data: prompts })
-  } catch (error: unknown) {
-    console.error("GET Global Prompts Exception:", error)
-    return NextResponse.json(
-      { success: false, message: toUserFacingMessage(error, "Failed to load the global prompts") },
-      { status: 500 }
-    )
-  }
+  return respondWithGlobalPrompts(SHARED_GLOBAL_PROMPT_IDS)
 }

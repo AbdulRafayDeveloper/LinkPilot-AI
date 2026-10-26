@@ -1,13 +1,15 @@
-import { DatabaseBackup, FlaskConical, ListOrdered, ScrollText, ShieldCheck, UsersRound, type LucideIcon } from "lucide-react"
+import { DatabaseBackup, FlaskConical, ListOrdered, ScrollText, ShieldCheck, UsersRound, WandSparkles, type LucideIcon } from "lucide-react"
 import { BACKUPS_HREF } from "./backups"
 import { DUMMY_DATA_HREF } from "./dummyData"
+import { ADMIN_GLOBAL_PROMPTS_HREF } from "./globalPrompts"
 
 /**
  * The admin area: Audit Management (every sign-in, sign-up, sign-out and refused attempt, newest
  * first), User Management (every account, its sign-ins and what it has made in each tool), AI Model
  * Priority (the order each module tries the AI providers in, for admins; constants/modelPriority.ts)
  * Database Backup (the weekly backup of the whole database, and every run of it; constants/backups.ts)
- * and Dummy Data for Testing (the sample data every tool is tried with; constants/dummyData.ts).
+ * Dummy Data for Testing (the sample data every tool is tried with; constants/dummyData.ts) and
+ * Global AI Prompts (the prompts only an admin may change, today Humanization; constants/globalPrompts.ts).
  * Only an admin sees it in the sidebar, and every route and page behind it checks the role.
  */
 
@@ -77,5 +79,7 @@ export const ADMIN_TOOL: {
     { title: "Database Backup", description: "Weekly backups, and one on demand", icon: DatabaseBackup, href: BACKUPS_HREF, pageTitle: "Database Backup" },
     // Every tool's sample data, in one place rather than a button on each tool
     { title: "Dummy Data for Testing", description: "Sample data for every tool", icon: FlaskConical, href: DUMMY_DATA_HREF, pageTitle: "Dummy Data for Testing" },
+    // The prompts only an admin may change (Humanization), moved here from Global AI Prompts
+    { title: "Global AI Prompts", description: "The Humanization prompt, admins only", icon: WandSparkles, href: ADMIN_GLOBAL_PROMPTS_HREF, pageTitle: "Global AI Prompts (Admin)" },
   ],
 }
