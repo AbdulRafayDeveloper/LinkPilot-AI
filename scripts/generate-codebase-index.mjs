@@ -115,7 +115,8 @@ function importsOf(source) {
 const routeOf = (file) => file.replace(/^src\/app/, "").replace(/\/(route|page)\.tsx?$/, "") || "/"
 
 const entries = files.map((file) => {
-  const source = readFileSync(join(ROOT, file), "utf8")
+  // Line endings are read as \n, so a checkout with CRLF writes the same index as one without
+  const source = readFileSync(join(ROOT, file), "utf8").replace(/\r\n/g, "\n")
   const exported = exportsOf(source)
   const lines = source.split("\n").length
   let summary = summaryOf(source)
