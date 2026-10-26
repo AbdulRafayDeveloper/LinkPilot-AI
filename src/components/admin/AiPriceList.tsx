@@ -7,6 +7,11 @@ import { formatInstant } from "@/lib/timeZone"
 import { NO_PRICES } from "@/lib/aiCost"
 import { AI_COST_MESSAGES, AI_PRICES_ENDPOINT, MODEL_ID_MAX_LENGTH, PRICE_FIELDS, PRICE_MAX, PROVIDER_ID_MAX_LENGTH } from "@/constants/aiCosts"
 import { AI_PROVIDER_LABELS, MODEL_PROVIDERS } from "@/constants/aiProviders"
+import { MODEL_PRIORITY_MESSAGES } from "@/constants/modelPriority"
+import { FilterPanel, SearchFilter, SelectFilter } from "@/components/history/HistoryFilters"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
+import { filtersOf, isFiltering, oneOf, savedText } from "@/lib/savedFilters"
+import { distinctChoices, filterPrices, PRICED_CHOICES, type PriceFilters } from "@/lib/modelPageFilters"
 import type { ModelPriceRow, ModelPrices } from "@/types/aiCosts"
 
 type PriceKey = keyof ModelPrices
@@ -251,13 +256,29 @@ const AddModel: React.FC<{ rows: ModelPriceRow[]; onSaved: (rows: ModelPriceRow[
   )
 }
 
+const NO_FILTERS: PriceFilters = { search: "", provider: "", priced: "" }
+
 /**
- * The Prices tab: every model the app has used (most used first, the ones with no price marked),
- * each with its four prices to set, plus a form for a model or provider not used yet.
+ * AI Model Priority → Prices: every model the app has used (most used first, the ones with no price
+ * marked), each with its four prices to set, plus a form for a model or provider not used yet. A
+ * search, the provider and whether it has a price narrow the list, kept on the account.
  */
-export const AiPriceList: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
+export const AiPriceList: React.FC = () => {
   const [rows, setRows] = useState<ModelPriceRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<PriceFilters>(NO_FILTERS)
+  const set = (patch: Partial<PriceFilters>) => setFilters((current) => ({ ...current, ...patch }))
+
+  useSavedFilters({
+    view: "admin-ai-prices",
+    filters: filtersOf(filters),
+    apply: (kept) =>
+      setFilters({
+        search: savedText(kept.search),
+        provider: savedText(kept.provider),
+        priced: oneOf(kept.priced, PRICED_CHOICES.map((choice) => choice.id)),
+      }),
+  })
 
   useEffect(() => {
     const controller = new AbortController()
@@ -269,10 +290,8 @@ export const AiPriceList: React.FC<{ onChanged: () => void }> = ({ onChanged }) 
     return () => controller.abort()
   }, [])
 
-  const saved = (next: ModelPriceRow[]) => {
-    setRows(next)
-    onChanged()
-  }
+  const shown = rows ? filterPrices(rows, filters) : []
+  const providers = rows ? distinctChoices(rows, (row) => row.provider, (row) => row.providerLabel) : []
 
   return (
     <div className="flex flex-col gap-3">
@@ -290,12 +309,26 @@ export const AiPriceList: React.FC<{ onChanged: () => void }> = ({ onChanged }) 
         </p>
       ) : (
         <>
-          <AddModel rows={rows} onSaved={saved} />
-          <ul className="flex flex-col gap-2" aria-label="Model prices">
-            {rows.map((row) => (
-              <PriceRow key={`${row.provider}\u0000${row.model}`} row={row} onSaved={saved} />
-            ))}
-          </ul>
+          <AddModel rows={rows} onSaved={setRows} />
+          <FilterPanel
+            columnsClassName="md:grid-cols-3"
+            summary={`${shown.length} of ${rows.length} ${rows.length === 1 ? "model" : "models"}`}
+            canClear={isFiltering(filtersOf(filters))}
+            onClear={() => setFilters(NO_FILTERS)}
+          >
+            <SearchFilter value={filters.search} onChange={(search) => set({ search })} placeholder="Search a model or provider" />
+            <SelectFilter label="Provider" allLabel="All providers" value={filters.provider} options={providers} onChange={(provider) => set({ provider })} />
+            <SelectFilter label="Price" allLabel="Priced or not" value={filters.priced} options={PRICED_CHOICES} onChange={(priced) => set({ priced })} />
+          </FilterPanel>
+          {shown.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-outline-variant px-3 py-6 text-center text-[13px] text-on-surface-variant">{MODEL_PRIORITY_MESSAGES.nothingMatches}</p>
+          ) : (
+            <ul className="flex flex-col gap-2" aria-label="Model prices">
+              {shown.map((row) => (
+                <PriceRow key={`${row.provider}\u0000${row.model}`} row={row} onSaved={setRows} />
+              ))}
+            </ul>
+          )}
         </>
       )}
     </div>

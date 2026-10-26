@@ -1,7 +1,7 @@
 import type { AiUsageKind } from "@/types/ai"
 
 /**
- * What the AI calls cost, per model (AI Model Priority → Cost by model). Every call is already
+ * What the AI calls cost, per model (AI Model Priority → Usage & cost, and Prices). Every call is already
  * counted in `ai_usage`; this turns those counts into money with the prices an admin keeps in
  * `model_prices`, one per provider and model. Nothing here names a price or a model in code: a
  * provider or model the app starts using shows up in the filters and the price list by itself.
@@ -9,7 +9,7 @@ import type { AiUsageKind } from "@/types/ai"
 
 export const AI_COSTS_ENDPOINT = "/api/admin/ai-costs"
 export const AI_PRICES_ENDPOINT = "/api/admin/ai-costs/prices"
-// The popup keeps its filters on the account, like every list (constants/savedFilters.ts)
+// The Usage & cost tab keeps its filters on the account, like every list (constants/savedFilters.ts)
 export const AI_COSTS_FILTER_VIEW = "admin-ai-costs"
 
 export const AI_USAGE_KINDS = ["text", "screenshot", "web-search", "speech", "image", "embedding"] as const satisfies readonly AiUsageKind[]
@@ -57,11 +57,6 @@ export const COST_PERIOD_IDS = COST_PERIODS.map((period) => period.id)
 export const DEFAULT_COST_PERIOD: CostPeriodId = "all"
 
 export const AI_COST_MESSAGES = {
-  open: "Cost by model",
-  title: "AI cost by model",
-  description: "What each provider and model has cost, from every AI call the app has made.",
-  costTab: "Cost",
-  pricesTab: "Prices",
   loadFailed: "Couldn't load the AI costs. Please try again.",
   pricesFailed: "Couldn't load the prices. Please try again.",
   saveFailed: "Couldn't save that price. Please try again.",

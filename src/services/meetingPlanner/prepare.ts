@@ -14,7 +14,7 @@ import { getActivePreparationPrompt } from "./prompts"
 /**
  * Writes the preparation for one meeting: who the person appears to be, what is worth talking
  * about, and a conversation to follow on the call. It reads only what the user supplied about
- * the lead and what the user has saved about themselves (About Me plus Rafay Profile Info, the
+ * the lead and what the user has saved about themselves (About Me plus Profile Info, the
  * same source every writing tool uses), so it can never invent a background for either side.
  */
 // Preparation is advice, not copy: enough freedom to sound human, little enough to stay grounded

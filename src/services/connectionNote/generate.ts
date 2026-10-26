@@ -103,7 +103,7 @@ const findNewsClaimedAsOwn = (note: string) =>
 const NO_SENDER_PROFILE_TEXT =
   "The user hasn't written about their own work yet, so say nothing about their services, skills or experience."
 
-// The user's own profile (About me + Rafay Profile Info), loaded only when the tone prompt uses it
+// The user's own profile (About me + Profile Info), loaded only when the tone prompt uses it
 interface SenderProfile {
   isUsed: boolean
   text: string | null

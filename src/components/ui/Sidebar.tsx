@@ -622,7 +622,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
             ))}
           </nav>
 
-          {/* Global AI Prompts: shared settings for every tool, not a LinkedIn tool */}
+          {/* My AI Profile: the profile and projects every tool personalizes with, not a LinkedIn tool */}
           {showGlobalPrompts && (
             <div className="shrink-0 border-t border-outline-variant/80 px-3 py-2">
               <ul>{renderLink(GLOBAL_PROMPTS_LINK)}</ul>

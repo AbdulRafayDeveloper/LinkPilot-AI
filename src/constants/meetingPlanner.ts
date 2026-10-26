@@ -4,7 +4,7 @@ import { TEXT_BOX_MAX_LENGTH } from "./textLimits"
 /**
  * Meeting Planner & Preparation: meetings that haven't happened yet. A meeting is a name, a day
  * and a time; everything else is optional. When preparation is switched on, the lead's own
- * information plus the user's saved context (About Me and Rafay Profile Info) become a read of
+ * information plus the user's saved context (About Me and Profile Info) become a read of
  * the person and a plan for the conversation, saved with the meeting so it is written once.
  *
  * The other meetings module (`constants/meetings.ts`) is the opposite end: a transcript of a

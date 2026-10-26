@@ -243,11 +243,11 @@ export const SEO_PAGES: SeoPage[] = [
   {
     slug: "global-prompts",
     path: "/global-prompts",
-    title: "Global AI Prompts",
-    description: "Password-protected prompts shared across LinkPilot AI: profile information and text humanization.",
+    title: "My AI Profile",
+    description: "Your profile and projects, which every LinkPilot AI tool uses to write as you.",
     keywords: [],
-    heading: "Global AI Prompts",
-    subheading: "Profile and humanization prompts for every tool",
+    heading: "My AI Profile",
+    subheading: "Your profile and projects, for every tool",
     indexable: false,
   },
 ]

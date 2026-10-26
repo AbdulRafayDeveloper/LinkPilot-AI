@@ -1,25 +1,41 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import { AlertTriangle, CheckCircle2, CircleSlash, ListOrdered, Loader2, RefreshCw, RotateCcw } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { AlertTriangle, CheckCircle2, CircleDollarSign, CircleSlash, Gauge, ListOrdered, Loader2, RefreshCw, RotateCcw, Table2, type LucideIcon } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { SortableList } from "@/components/ui/SortableList"
+import { FilterPanel, SearchFilter, SelectFilter } from "@/components/history/HistoryFilters"
 import { dateTime } from "@/components/admin/AdminParts"
-import { AiUsagePanel } from "@/components/admin/AiUsagePanel"
-import { ModelMapTable } from "@/components/admin/ModelMapTable"
+import { AiCostView } from "@/components/admin/AiCostView"
+import { AiPriceList } from "@/components/admin/AiPriceList"
+import { ModelMapView } from "@/components/admin/ModelMapView"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
+import { useSavedFilters } from "@/hooks/useSavedFilters"
 import { requestApi } from "@/lib/apiClient"
+import { filtersOf, isFiltering, oneOf, savedText } from "@/lib/savedFilters"
+import { filterModules, ORDER_CHOICES, SKIP_CHOICES, skipReasonOf, type ModuleOrderFilters } from "@/lib/modelPageFilters"
 import { AI_PROVIDER_LABELS, type AiProviderId } from "@/constants/aiProviders"
-import { AI_NEED_LABELS, MODEL_PRIORITY_ENDPOINT, MODEL_PRIORITY_MESSAGES } from "@/constants/modelPriority"
+import {
+  AI_NEED_LABELS,
+  DEFAULT_MODEL_PAGE_TAB,
+  isModelPageTab,
+  MODEL_PAGE_TABS,
+  MODEL_PRIORITY_ENDPOINT,
+  MODEL_PRIORITY_MESSAGES,
+  type AiNeed,
+  type ModelPageTab,
+} from "@/constants/modelPriority"
 import type { ModelPriorityModule, ModelPriorityOverview, ModelProviderStatus } from "@/types/modelPriority"
 
-/** Why a provider will be passed over in this module on this deployment, or null when it can take part. */
-function skipReason(provider: ModelProviderStatus | undefined, module: ModelPriorityModule): string | null {
-  if (!provider?.configured) return "Not configured, skipped"
-  const missing = module.needs.filter((need) => !provider.can[need])
-  return missing.length > 0 ? `Skipped for ${missing.map((need) => AI_NEED_LABELS[need]).join(" and ")}` : null
-}
+const TAB_ICONS: Record<ModelPageTab, LucideIcon> = { models: Table2, order: ListOrdered, usage: Gauge, prices: CircleDollarSign }
+
+const NEED_CHOICES = [
+  { id: "text", label: "Writes text only" },
+  ...(Object.entries(AI_NEED_LABELS) as [AiNeed, string][]).map(([id, label]) => ({ id, label: `Uses ${label}` })),
+]
+const NO_ORDER_FILTERS: ModuleOrderFilters = { search: "", order: "", need: "", skipped: "" }
 
 const ModuleCard: React.FC<{
   module: ModelPriorityModule
@@ -69,9 +85,10 @@ const ModuleCard: React.FC<{
       onReorder={(ids) => onReorder(ids as AiProviderId[])}
       className="flex flex-col gap-1.5"
       renderItem={(id, handle) => {
-        const reason = skipReason(
+        const reason = skipReasonOf(
           providers.find((provider) => provider.id === id),
-          module
+          module.needs,
+          AI_NEED_LABELS
         )
         const position = module.order.indexOf(id) + 1
         return (
@@ -104,14 +121,82 @@ const ModuleCard: React.FC<{
   </section>
 )
 
+/** The Priority order tab: each module's provider order, dragged into place, narrowed by its filters. */
+const ModuleOrderView: React.FC<{
+  overview: ModelPriorityOverview
+  savingId: string | null
+  onSave: (module: ModelPriorityModule, order: AiProviderId[] | null) => void
+}> = ({ overview, savingId, onSave }) => {
+  const [filters, setFilters] = useState<ModuleOrderFilters>(NO_ORDER_FILTERS)
+  const set = (patch: Partial<ModuleOrderFilters>) => setFilters((current) => ({ ...current, ...patch }))
+
+  useSavedFilters({
+    view: "admin-model-order",
+    filters: filtersOf(filters),
+    apply: (kept) =>
+      setFilters({
+        search: savedText(kept.search),
+        order: oneOf(kept.order, ORDER_CHOICES.map((choice) => choice.id)),
+        need: oneOf(kept.need, NEED_CHOICES.map((choice) => choice.id)),
+        skipped: oneOf(kept.skipped, SKIP_CHOICES.map((choice) => choice.id)),
+      }),
+  })
+
+  const shown = filterModules(overview.modules, overview.providers, filters, AI_NEED_LABELS)
+  const defaultOrder = overview.defaultOrder.map((id) => AI_PROVIDER_LABELS[id]).join(", then ")
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="rounded-xl bg-surface-container-lowest px-3 py-2 text-[12.5px] leading-relaxed text-on-surface-variant">
+        Drag a provider up or down; it saves at once. Your order applies to admin accounts only, and everyone else always uses the default: {defaultOrder}. Groq
+        tries each of its keys before the next provider.
+      </p>
+      <FilterPanel
+        columnsClassName="md:grid-cols-4"
+        summary={`${shown.length} of ${overview.modules.length} modules`}
+        canClear={isFiltering(filtersOf(filters))}
+        onClear={() => setFilters(NO_ORDER_FILTERS)}
+      >
+        <SearchFilter value={filters.search} onChange={(search) => set({ search })} placeholder="Search a module" />
+        <SelectFilter label="Order" allLabel="Any order" value={filters.order} options={ORDER_CHOICES} onChange={(order) => set({ order })} />
+        <SelectFilter label="What it needs" allLabel="Anything" value={filters.need} options={NEED_CHOICES} onChange={(need) => set({ need })} />
+        <SelectFilter label="Providers" allLabel="All modules" value={filters.skipped} options={SKIP_CHOICES} onChange={(skipped) => set({ skipped })} />
+      </FilterPanel>
+      {shown.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-outline-variant bg-white px-3 py-6 text-center text-[13px] text-on-surface-variant">
+          {MODEL_PRIORITY_MESSAGES.nothingMatches}
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {shown.map((module) => (
+            <ModuleCard
+              key={module.id}
+              module={module}
+              providers={overview.providers}
+              isSaving={savingId === module.id}
+              onReorder={(order) => onSave(module, order)}
+              onReset={() => onSave(module, null)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /**
- * AI Model Priority (admin only): each module's provider order, dragged into place (or moved with the
- * arrow keys). A change saves at once and applies to admins' own requests to that module; regular
- * users always get the default order, Groq first.
+ * AI Model Priority (admin only), as four tabs that each answer one question: which model does
+ * each job (Models in use), the order the providers are tried in (Priority order), what the calls
+ * used and cost (Usage & cost) and what each model costs (Prices). Every tab has its own filters,
+ * kept on the account, and the open tab is in the address (`?tab=`), so a reload or a link opens it.
  */
 export default function ModelPriorityClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const { isCollapsed, toggleCollapsed } = useSidebarCollapse()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const askedTab = searchParams.get("tab")
+  const tab: ModelPageTab = isModelPageTab(askedTab) ? askedTab : DEFAULT_MODEL_PAGE_TAB
   const [overview, setOverview] = useState<ModelPriorityOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -130,6 +215,9 @@ export default function ModelPriorityClient() {
       })
     return () => controller.abort()
   }, [attempt])
+
+  // The open tab is in the address, replaced rather than pushed, so Back still leaves the page
+  const choose = (next: ModelPageTab) => router.replace(next === DEFAULT_MODEL_PAGE_TAB ? "?" : `?tab=${next}`, { scroll: false })
 
   const save = async (module: ModelPriorityModule, order: AiProviderId[] | null) => {
     if (!overview) return
@@ -152,7 +240,9 @@ export default function ModelPriorityClient() {
     }
   }
 
-  const defaultOrder = overview?.defaultOrder.map((id) => AI_PROVIDER_LABELS[id]).join(", then ")
+  const current = MODEL_PAGE_TABS.find((entry) => entry.id === tab) ?? MODEL_PAGE_TABS[0]
+  // The first two tabs read the overview; the other two load their own data
+  const needsOverview = tab === "models" || tab === "order"
 
   return (
     <div className="font-body-md text-body-md flex h-screen min-h-screen overflow-hidden bg-background text-on-surface">
@@ -168,31 +258,36 @@ export default function ModelPriorityClient() {
                 <ListOrdered size={24} className="shrink-0 text-primary" aria-hidden="true" />
                 AI Model Priority
               </h1>
-              <p className="mt-1 text-sm text-on-surface-variant">
-                The order each module tries the AI models in. Drag a model up or down; it saves at once. Your order applies to admin accounts only, and
-                everyone else always uses the default{defaultOrder ? `: ${defaultOrder}` : ""}. Groq tries each of its keys before the next model.
-              </p>
+              <p className="mt-1 text-sm text-on-surface-variant">The AI models this app uses, the order it tries them in, what they cost and their prices.</p>
             </div>
 
-            {overview && <ModelMapTable map={overview.modelMap} />}
-
-            <AiUsagePanel />
-
-            {overview && (
-              <div className="flex flex-wrap gap-2" aria-label="Models on this deployment">
-                {overview.providers.map((provider) => (
-                  <span
-                    key={provider.id}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-semibold ${
-                      provider.configured ? "border-success/40 bg-success-container/40 text-on-success-container" : "border-outline-variant bg-surface-container-lowest text-outline"
-                    }`}
-                  >
-                    {provider.configured ? <CheckCircle2 size={13} aria-hidden="true" /> : <CircleSlash size={13} aria-hidden="true" />}
-                    {provider.label}: {provider.configured ? "configured" : "not configured"}
-                  </span>
-                ))}
+            <div className="flex flex-col gap-2">
+              <div role="tablist" aria-label="AI Model Priority" className="flex flex-wrap gap-1 rounded-2xl border border-outline-variant bg-white p-1">
+                {MODEL_PAGE_TABS.map((entry) => {
+                  const Icon = TAB_ICONS[entry.id]
+                  const isChosen = entry.id === tab
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      role="tab"
+                      id={`model-tab-${entry.id}`}
+                      aria-selected={isChosen}
+                      aria-controls={`model-panel-${entry.id}`}
+                      onClick={() => choose(entry.id)}
+                      className={`inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:px-4 sm:text-[14px] ${
+                        isChosen ? "bg-primary text-white" : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                      }`}
+                    >
+                      <Icon size={16} aria-hidden="true" />
+                      {entry.label}
+                    </button>
+                  )
+                })}
               </div>
-            )}
+              {/* What the open tab is for, in one line, so nobody has to guess */}
+              <p className="px-1 text-[13px] text-on-surface-variant">{current.hint}</p>
+            </div>
 
             {saveError && (
               <p role="alert" className="flex items-center gap-2 rounded-xl bg-error-container px-3 py-2 text-sm text-error">
@@ -201,37 +296,34 @@ export default function ModelPriorityClient() {
               </p>
             )}
 
-            {error ? (
-              <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-white px-6 py-12 short:py-4 text-center">
-                <p className="text-sm text-error">{error}</p>
-                <button
-                  type="button"
-                  onClick={() => setAttempt((count) => count + 1)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold hover:bg-surface-container-high"
-                >
-                  <RefreshCw size={15} aria-hidden="true" />
-                  Try again
-                </button>
-              </div>
-            ) : !overview ? (
-              <div role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
-                <Loader2 size={18} className="animate-spin text-primary" aria-hidden="true" />
-                Loading the model priorities...
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {overview.modules.map((module) => (
-                  <ModuleCard
-                    key={module.id}
-                    module={module}
-                    providers={overview.providers}
-                    isSaving={savingId === module.id}
-                    onReorder={(order) => void save(module, order)}
-                    onReset={() => void save(module, null)}
-                  />
-                ))}
-              </div>
-            )}
+            <div id={`model-panel-${tab}`} role="tabpanel" aria-labelledby={`model-tab-${tab}`} className="min-w-0">
+              {needsOverview && error ? (
+                <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-white px-6 py-12 short:py-4 text-center">
+                  <p className="text-sm text-error">{error}</p>
+                  <button
+                    type="button"
+                    onClick={() => setAttempt((count) => count + 1)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold hover:bg-surface-container-high"
+                  >
+                    <RefreshCw size={15} aria-hidden="true" />
+                    Try again
+                  </button>
+                </div>
+              ) : needsOverview && !overview ? (
+                <div role="status" className="flex items-center justify-center gap-2 py-16 short:py-5 text-sm text-on-surface-variant">
+                  <Loader2 size={18} className="animate-spin text-primary" aria-hidden="true" />
+                  Loading the models...
+                </div>
+              ) : tab === "models" && overview ? (
+                <ModelMapView overview={overview} />
+              ) : tab === "order" && overview ? (
+                <ModuleOrderView overview={overview} savingId={savingId} onSave={(module, order) => void save(module, order)} />
+              ) : tab === "usage" ? (
+                <AiCostView onSetPrices={() => choose("prices")} />
+              ) : (
+                <AiPriceList />
+              )}
+            </div>
           </div>
         </main>
       </div>

@@ -2,9 +2,7 @@
 
 import React, { useEffect, useState } from "react"
 import { AlertTriangle, Loader2 } from "lucide-react"
-import { Modal } from "@/components/ui/Modal"
 import { DateRangeFilters, FilterPanel, SelectFilter } from "@/components/history/HistoryFilters"
-import { AiPriceList } from "@/components/admin/AiPriceList"
 import { requestApi } from "@/lib/apiClient"
 import { appendDayRange, isBackwardsRange } from "@/lib/dayRange"
 import { dayIn, displayTimeZone } from "@/lib/timeZone"
@@ -87,8 +85,12 @@ const Breakdown: React.FC<{ title: string; rows: { key: string; label: string; t
   )
 }
 
-/** The Cost tab: the filters, the totals, then what each model, provider, module, kind and day cost. */
-const CostView: React.FC<{ onSetPrices: () => void; reloadKey: number }> = ({ onSetPrices, reloadKey }) => {
+/**
+ * AI Model Priority → Usage & cost: the filters (period, provider, model, module and kind, kept on
+ * the account), the totals, then what each model, provider, module, kind and day used and cost. A
+ * provider or model the app starts using offers itself in the filters with no change here.
+ */
+export const AiCostView: React.FC<{ onSetPrices: () => void }> = ({ onSetPrices }) => {
   const [filters, setFilters] = useState<Filters>(NO_FILTERS)
   const [report, setReport] = useState<CostReport | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -116,13 +118,13 @@ const CostView: React.FC<{ onSetPrices: () => void; reloadKey: number }> = ({ on
   const params = appendDayRange(new URLSearchParams(), range.from, range.to)
   for (const key of ["provider", "model", "module", "kind"] as const) if (filters[key]) params.set(key, filters[key])
   params.set("tz", displayTimeZone())
-  const query = `${params}#${reloadKey}`
+  const query = params.toString()
   const isLoading = loadedFor !== query
 
   useEffect(() => {
     if (isBackwards) return
     const controller = new AbortController()
-    requestApi<CostReport>(`${AI_COSTS_ENDPOINT}?${query.split("#")[0]}`, { signal: controller.signal })
+    requestApi<CostReport>(`${AI_COSTS_ENDPOINT}?${query}`, { signal: controller.signal })
       .then(({ data }) => {
         setReport(data)
         setLoadedFor(query)
@@ -309,52 +311,5 @@ const CostView: React.FC<{ onSetPrices: () => void; reloadKey: number }> = ({ on
         </div>
       )}
     </div>
-  )
-}
-
-/**
- * AI Model Priority → Cost by model. Two tabs: what each provider and model has cost (filtered by
- * period, provider, model, module and kind, the filters kept on the account), and the prices those
- * costs are worked out from. A provider or model the app starts using offers itself in both.
- */
-export const AiCostDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [tab, setTab] = useState<"cost" | "prices">("cost")
-  // A saved price changes what the Cost tab shows, so it reads again when it is next opened
-  const [reloadKey, setReloadKey] = useState(0)
-  const tabs = [
-    { id: "cost", label: AI_COST_MESSAGES.costTab },
-    { id: "prices", label: AI_COST_MESSAGES.pricesTab },
-  ] as const
-
-  return (
-    <Modal title={AI_COST_MESSAGES.title} description={AI_COST_MESSAGES.description} onClose={onClose} size="large">
-      <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-        <div role="tablist" aria-label="Cost and prices" className="flex w-fit gap-1 rounded-xl border border-outline-variant bg-white p-1">
-          {tabs.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              role="tab"
-              id={`ai-cost-tab-${entry.id}`}
-              aria-selected={tab === entry.id}
-              aria-controls={`ai-cost-panel-${entry.id}`}
-              onClick={() => setTab(entry.id)}
-              className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-                tab === entry.id ? "bg-primary text-white" : "text-on-surface-variant hover:bg-surface-container-high"
-              }`}
-            >
-              {entry.label}
-            </button>
-          ))}
-        </div>
-        <div id={`ai-cost-panel-${tab}`} role="tabpanel" aria-labelledby={`ai-cost-tab-${tab}`}>
-          {tab === "cost" ? (
-            <CostView onSetPrices={() => setTab("prices")} reloadKey={reloadKey} />
-          ) : (
-            <AiPriceList onChanged={() => setReloadKey((key) => key + 1)} />
-          )}
-        </div>
-      </div>
-    </Modal>
   )
 }

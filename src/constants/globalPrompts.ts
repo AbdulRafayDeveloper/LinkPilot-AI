@@ -1,10 +1,10 @@
-import { Globe, type LucideIcon } from "lucide-react"
+import { UserRound, type LucideIcon } from "lucide-react"
 
 /**
  * Global AI Prompts registry: app-wide prompts that aren't tied to one LinkedIn tool.
  * Each owns an independent, separately stored prompt (prompt record:
  * global-<id> in the prompts collection). Every tool's output is rewritten with the Humanization
- * prompt (services/humanizer.ts); Post Comment Replies takes Abdul's facts from Rafay Profile Info.
+ * prompt (services/humanizer.ts); Post Comment Replies takes Abdul's facts from Profile Info.
  *
  * **`adminOnly` decides who may read and change a prompt**, at the owner's request: Rafay Profile
  * Info is on Global AI Prompts for every account, while Humanization lives under Administration
@@ -14,8 +14,9 @@ import { Globe, type LucideIcon } from "lucide-react"
 export const GLOBAL_PROMPTS = [
   {
     id: "rafay-profile",
-    label: "Rafay Profile Info",
-    description: "Abdul Rafay's background, experience, projects and skills, written as a reusable prompt.",
+    // Generic, since every account fills in its own (the prompt key stays global-rafay-profile, so saved text is kept)
+    label: "Profile Info",
+    description: "Your background, experience, projects and skills, written as a reusable prompt the tools quote from.",
     usage: "Used by Post Comment Replies as the source of your experience, projects and numbers",
     adminOnly: false,
   },
@@ -50,11 +51,13 @@ export function getGlobalPromptLabel(id: GlobalPromptId): string {
   return GLOBAL_PROMPTS.find((prompt) => prompt.id === id)?.label ?? id
 }
 
-// The module's sidebar entry, shown below the LinkedIn tools
+// The module's sidebar entry, pinned below the groups. Shown as My AI Profile (at the owner's request:
+// it is where each person personalizes the system), while its id and address stay global-prompts,
+// so links, settings and the home-page rule that name it keep working
 export const GLOBAL_PROMPTS_LINK: { id: string; title: string; description: string; icon: LucideIcon; href: string } = {
   id: "global-prompts",
-  title: "Global AI Prompts",
-  description: "Your profile information prompt",
-  icon: Globe,
+  title: "My AI Profile",
+  description: "Your profile and projects, for every tool",
+  icon: UserRound,
   href: "/global-prompts",
 }

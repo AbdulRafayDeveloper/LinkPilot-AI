@@ -62,7 +62,7 @@ const VariablesHint = () => (
     <code className={variableChip}>{"{{latest_comment}}"}</code> or <code className={variableChip}>{"{{comment}}"}</code>{" "}
     the comment being answered (the latest one from someone other than you) ·{" "}
     <code className={variableChip}>{"{{post_content}}"}</code> the original post ·{" "}
-    <code className={variableChip}>{"{{sender_profile}}"}</code> your profile (About Me + Rafay Profile Info) ·{" "}
+    <code className={variableChip}>{"{{sender_profile}}"}</code> your profile (About Me + Profile Info) ·{" "}
     <code className={variableChip}>{"{{web_research}}"}</code> live web research (slower). Anything you leave out is added
     at the end. Replies always answer a real comment and never invent facts or numbers.
   </p>

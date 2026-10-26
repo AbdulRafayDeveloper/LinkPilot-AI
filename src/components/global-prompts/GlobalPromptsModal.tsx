@@ -50,8 +50,8 @@ export const GlobalPromptsModal: React.FC<GlobalPromptsModalProps> = ({ prompts,
 
   return (
     <PromptTabsModal
-      title="Update Global AI Prompts"
-      description="Each global prompt is stored independently. Saving one never changes another."
+      title="Update Prompt"
+      description="Each prompt is stored on its own. Saving one never changes another."
       tabs={prompts.map(({ id, label }) => ({ id, label }))}
       initialTab={initialPrompt}
       loadPrompts={load}

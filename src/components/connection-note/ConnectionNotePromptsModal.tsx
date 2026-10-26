@@ -34,7 +34,7 @@ const renderHint = () => (
   <p className="leading-relaxed">
     Variables: <code className={variableChip}>{"{{profile_data}}"}</code> inserts the pasted profile (it&apos;s added at
     the end if you leave it out) · <code className={variableChip}>{"{{sender_profile}}"}</code> inserts your own profile
-    (About Me + Rafay Profile Info), only in prompts that use it ·{" "}
+    (About Me + Profile Info), only in prompts that use it ·{" "}
     <code className={variableChip}>{"{{company_name}}"}</code> the company you type in (Recently Funded and Hiring
     Startup only) · <code className={variableChip}>{"{{tone}}"}</code>{" "}
     inserts the tone name. The app

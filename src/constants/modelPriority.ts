@@ -59,15 +59,26 @@ export const VOICE_MODULE_IDS = ["prompt-creator", "client-messaging", "message-
 export type VoiceModuleId = (typeof VOICE_MODULE_IDS)[number]
 
 export const MODEL_PRIORITY_ENDPOINT = "/api/admin/model-priority"
-export const AI_USAGE_ENDPOINT = "/api/admin/ai-usage"
-// The windows the usage summary offers, in days
-export const AI_USAGE_DAYS = [1, 7, 30] as const
+
+/**
+ * The page's tabs, in the order they read: what runs, the order it is tried in, what it used and
+ * cost, and the prices. Each answers one question, and the one open is kept in the address
+ * (`?tab=`), so a reload or a shared link opens the same tab.
+ */
+export const MODEL_PAGE_TABS = [
+  { id: "models", label: "Models in use", hint: "Which model does each job in each module, and what takes over when it fails." },
+  { id: "order", label: "Priority order", hint: "The order each module tries the providers in. Drag to change it; it applies to admin accounts only." },
+  { id: "usage", label: "Usage & cost", hint: "How many calls, tokens and minutes of speech each model used, and what they cost." },
+  { id: "prices", label: "Prices", hint: "What each model costs, in US dollars. The costs are worked out from these." },
+] as const
+export type ModelPageTab = (typeof MODEL_PAGE_TABS)[number]["id"]
+export const DEFAULT_MODEL_PAGE_TAB: ModelPageTab = "models"
+export const isModelPageTab = (value: string | null): value is ModelPageTab => MODEL_PAGE_TABS.some((tab) => tab.id === value)
 
 export const MODEL_PRIORITY_MESSAGES = {
   loadFailed: "Couldn't load the model priorities. Please try again.",
   saveFailed: "Couldn't save that order. Please try again.",
   badOrder: "List every provider exactly once.",
   unknownModule: "That module doesn't use an AI model.",
-  usageFailed: "Couldn't load the AI usage. Please try again.",
-  badUsageRange: "Choose 1, 7 or 30 days.",
+  nothingMatches: "Nothing matches these filters.",
 } as const

@@ -89,13 +89,14 @@ export const HELP_START_TOPICS: HelpTopic[] = [
   },
   {
     id: "global-prompts",
-    title: "Global AI Prompts",
+    title: "My AI Profile",
     href: "/global-prompts",
     doc: {
-      summary: "The facts about you the tools may use, and, for admins, how every tool's text is humanized.",
+      summary: "Everything about you that the tools use to write as you: your profile, and the projects you can point to.",
       steps: [
-        "Open Global AI Prompts at the bottom of the sidebar and press Update Prompt.",
-        "Rafay Profile Info holds your real experience, projects and numbers. Tools quote from it and never invent anything beyond it.",
+        "Open My AI Profile at the bottom of the sidebar.",
+        "On the Profile Info tab, press Update Prompt. Profile Info holds your real experience, projects and numbers. Tools quote from it and never invent anything beyond it.",
+        "On the Projects tab, press Add project and fill in the name, a summary, what stands out, the Upwork jobs it matches, what to emphasize for each kind of client need and its search keywords. For now projects are kept in your browser only and no tool reads them yet.",
         "Humanization is the last step of every LinkedIn tool. Only an admin can change it, from Administration, then Global AI Prompts.",
         "Save, and the next thing you generate uses the new wording.",
       ],
@@ -266,7 +267,7 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
     notes: [
       "ABCD Method ends by offering four replies, so answering costs the reader one letter.",
       "Voice note gives you a script to read aloud and record yourself, about 110 words, with the subject that carries it.",
-      "The facts about you come from About Me and Rafay Profile Info, which you edit under Update Prompt.",
+      "The facts about you come from About Me and Profile Info, which you edit under Update Prompt.",
     ],
   },
   "follow-up-message": {

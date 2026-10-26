@@ -6,7 +6,7 @@ import type { GlobalPrompt } from "@/types/globalPrompts"
 /**
  * Each global prompt has its own prompt record, so editing one can never change another.
  * Every tool's output passes through the Humanization prompt (services/humanizer.ts);
- * Rafay Profile Info is part of the sender's facts (services/senderProfile.ts).
+ * Profile Info is part of the sender's facts (services/senderProfile.ts).
  */
 const globalPromptName = (id: GlobalPromptId): PromptName => `global-${id}`
 

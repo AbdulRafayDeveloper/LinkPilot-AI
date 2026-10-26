@@ -472,7 +472,7 @@ export default function MeetingPlannerClient() {
 
             <p className="flex items-center gap-2 text-[11px] text-outline">
               <Sparkles size={12} aria-hidden="true" />
-              Preparation reads what you paste plus your own About Me and Rafay Profile Info, and is saved with the meeting.
+              Preparation reads what you paste plus your own About Me and Profile Info, and is saved with the meeting.
             </p>
           </div>
         </main>

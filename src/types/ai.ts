@@ -35,20 +35,3 @@ export interface AiUsage {
   // Groq only: the number of the GROQ_API_KEY_<n> that answered
   keyNumber: number | null
 }
-
-export interface AiUsageTotals {
-  provider: AiProviderId
-  calls: number
-  inputTokens: number
-  outputTokens: number
-  totalTokens: number
-  audioSeconds: number
-  images: number
-}
-
-export interface AiUsageSummary {
-  days: number
-  since: string
-  byProvider: AiUsageTotals[]
-  byModule: { module: string; title: string; provider: AiProviderId; calls: number; totalTokens: number }[]
-}
