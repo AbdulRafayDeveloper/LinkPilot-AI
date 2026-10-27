@@ -508,10 +508,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
             role="tablist"
             aria-orientation="vertical"
             aria-label="Areas of the app"
-            className="flex w-full flex-col items-center gap-1.5 px-2 py-3"
+            // As tall as the rail, so Administration can sit at its foot; collapsed, the tools below need the room
+            className={`flex w-full flex-1 flex-col items-center gap-1.5 px-2 py-3 ${whenCollapsed(isCollapsed, "lg:flex-none")}`}
           >
             {railEntries.map((rail, index) => {
               const isChosen = isChosenOnRail(rail)
+              /**
+               * Administration sits apart, at the foot of the rail under a hairline, at the owner's
+               * request: it is about the app rather than the work, so it is not read as one more area.
+               * Collapsed it stays last in the row, still under its line, because the chosen area's
+               * tools are listed under the rail then.
+               */
+              const isAdminArea = rail.kind === "area" && rail.entry.group.id === "admin"
               const label = rail.kind === "area" ? rail.entry.group.label : rail.entry.label
               const Icon = rail.kind === "area" ? rail.entry.group.icon : rail.entry.icon
               // An area that is not on screen carries what its tools would have shown
@@ -523,8 +531,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
                       .map((href) => (href === pathname ? undefined : activityOf(href)))
                       .find((state) => state !== undefined)
               return (
+                <React.Fragment key={rail.kind === "area" ? rail.entry.group.id : `upcoming-${rail.entry.id}`}>
+                {isAdminArea && (
+                  <span
+                    role="presentation"
+                    className={`mt-auto mb-1.5 block h-px w-8 shrink-0 bg-outline-variant ${whenCollapsed(isCollapsed, "lg:mt-1")}`}
+                  />
+                )}
                 <button
-                  key={rail.kind === "area" ? rail.entry.group.id : `upcoming-${rail.entry.id}`}
                   ref={(node) => {
                     tabRefs.current[index] = node
                   }}
@@ -561,6 +575,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
                   <span className="sr-only">{rail.kind === "area" ? label : UPCOMING_MESSAGES.railTitle(label)}</span>
                   {hiddenActivity && <ActivityMark state={hiddenActivity} className="absolute -right-0.5 -top-0.5" />}
                 </button>
+                </React.Fragment>
               )
             })}
           </div>
