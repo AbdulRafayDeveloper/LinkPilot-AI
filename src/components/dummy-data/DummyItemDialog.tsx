@@ -43,7 +43,7 @@ export const DummyItemDialog: React.FC<DummyItemDialogProps> = ({ kind, item, to
           <button
             type="button"
             onClick={onEdit}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
           >
             <Pencil size={14} aria-hidden="true" />
             Edit
@@ -52,7 +52,7 @@ export const DummyItemDialog: React.FC<DummyItemDialogProps> = ({ kind, item, to
             <button
               type="button"
               onClick={() => onUse(opens.href)}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
             >
               <Play size={15} aria-hidden="true" />
               Use in {opens.title}

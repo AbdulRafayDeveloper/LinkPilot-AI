@@ -37,7 +37,7 @@ export const SettingsNoticeLine: React.FC<{ notice: SettingsNotice }> = ({ notic
 }
 
 export const SettingsCard: React.FC<SettingsCardProps> = ({ title, description, icon: Icon, children, footer, notice = null, allowOverflow = false }) => (
-  <section className={`rounded-2xl border border-outline-variant bg-white shadow-sm ${allowOverflow ? "" : "overflow-hidden"}`}>
+  <section className={`rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm ${allowOverflow ? "" : "overflow-hidden"}`}>
     <header className="flex items-start gap-3 border-b border-outline-variant/70 px-5 py-4 sm:px-6">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
         <Icon size={18} aria-hidden="true" />
@@ -69,12 +69,12 @@ export const SettingsRow: React.FC<{ label: string; children: React.ReactNode }>
 
 // The look every field on the page shares, so they line up with one another
 export const SETTINGS_FIELD =
-  "w-full rounded-xl border border-outline-variant bg-white px-3.5 py-2.5 text-[14px] text-on-surface placeholder:text-outline transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2.5 text-[14px] text-on-surface placeholder:text-outline transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
 
 export const SETTINGS_LABEL = "mb-1.5 block text-[13px] font-semibold text-on-surface"
 
 export const SETTINGS_PRIMARY_BUTTON =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
 
 export const SETTINGS_SECONDARY_BUTTON =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3.5 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"

@@ -46,7 +46,7 @@ export const ListEditor: React.FC<ListEditorProps> = ({ entries, onChange, noun,
               onChange={(event) => change(index, event.target.value)}
               rows={2}
               maxLength={TRANSCRIPT_MAX_LENGTH}
-              className="w-full resize-y rounded-lg border border-outline-variant bg-white px-2 py-1.5 text-[13px] leading-relaxed text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+              className="w-full resize-y rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1.5 text-[13px] leading-relaxed text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
             />
             {entry.voices.length > 0 && (
               <p className="mt-0.5 text-[11px] text-outline">({entry.voices.map((voice) => `Voice ${voice}`).join(", ")})</p>

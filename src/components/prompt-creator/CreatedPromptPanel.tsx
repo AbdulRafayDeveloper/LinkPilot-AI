@@ -182,7 +182,7 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
         <button
           type="button"
           onClick={() => setIsMoving(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           <FolderInput size={12} aria-hidden="true" />
           {created.folderId ? "Move to another folder" : "Add to a folder"}
@@ -202,7 +202,7 @@ export const CreatedPromptPanel: React.FC<CreatedPromptPanelProps> = ({ created,
         <button
           type="button"
           onClick={() => setIsPickingDependencies(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           <ListChecks size={12} aria-hidden="true" />
           {waitsFor.length === 0 ? PROMPT_DEPENDENCY_MESSAGES.setDependencies : PROMPT_DEPENDENCY_MESSAGES.changeDependencies}

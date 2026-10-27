@@ -73,14 +73,14 @@ export const EstimateField: React.FC<EstimateFieldProps> = ({ estimate, onChange
           }}
           disabled={disabled}
           placeholder="2"
-          className="h-10 w-24 rounded-xl border border-outline-variant bg-white px-3 text-[13px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+          className="h-10 w-24 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[13px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
         />
         <select
           value={unit}
           onChange={(event) => onChange(estimate?.value ? { value: estimate.value, unit: event.target.value as EstimateUnit } : null)}
           disabled={disabled}
           aria-label="The unit the time is counted in"
-          className="h-10 rounded-xl border border-outline-variant bg-white px-3 text-[13px] text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+          className="h-10 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[13px] text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
         >
           {ESTIMATE_UNITS.map((entry) => (
             <option key={entry.id} value={entry.id}>
@@ -163,7 +163,7 @@ export const StageField: React.FC<{ stage: RoadmapStage | null; onChange: (stage
       onChange={(event) => onChange(event.target.value as RoadmapStage)}
       disabled={disabled}
       aria-label={PROJECT_TASK_MESSAGES.stage}
-      className="h-10 rounded-xl border border-outline-variant bg-white px-3 text-[13px] text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+      className="h-10 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[13px] text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
     >
       {ROADMAP_STAGES.map((entry) => (
         <option key={entry.id} value={entry.id}>

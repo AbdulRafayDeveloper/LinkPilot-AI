@@ -31,7 +31,7 @@ export const HelpTopicList: React.FC<HelpTopicListProps> = ({ sections, activeId
         <div key={section.id}>
           <div className="flex items-baseline justify-between gap-2 px-2">
             <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-outline">{section.label}</p>
-            <span className="text-[11px] font-semibold text-outline/70">{section.topics.length}</span>
+            <span className="text-[11px] font-semibold text-outline">{section.topics.length}</span>
           </div>
           <ul className="mt-1.5 flex flex-col gap-0.5">
             {section.topics.map((topic) => {

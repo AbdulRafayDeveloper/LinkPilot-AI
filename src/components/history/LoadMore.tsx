@@ -46,7 +46,7 @@ export const LoadMore: React.FC<LoadMoreProps> = ({ hasMore, isLoadingMore, erro
         <button
           type="button"
           onClick={onLoadMore}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           {error && <RefreshCw size={13} aria-hidden="true" />}
           Load more

@@ -8,6 +8,7 @@ import { AccountAvatar } from "@/components/ui/AccountAvatar"
 import { PasswordSection } from "@/components/account/PasswordSection"
 import { ProfileSection } from "@/components/account/ProfileSection"
 import { TimeZoneSection } from "@/components/account/TimeZoneSection"
+import { ColorSchemeSection } from "@/components/account/ColorSchemeSection"
 import { SettingsCard, SettingsRow } from "@/components/account/SettingsCard"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
@@ -62,21 +63,21 @@ export default function AccountClient() {
             </div>
 
             {status === "loading" && (
-              <p role="status" className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-white px-5 py-8 text-[13px] text-on-surface-variant">
+              <p role="status" className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest px-5 py-8 text-[13px] text-on-surface-variant">
                 <Loader2 size={16} className="animate-spin text-primary" aria-hidden="true" />
                 Reading your account...
               </p>
             )}
 
             {status !== "loading" && !user && (
-              <p className="rounded-2xl border border-outline-variant bg-white px-5 py-8 text-[13px] text-on-surface-variant">{ACCOUNT_MESSAGES.gone}</p>
+              <p className="rounded-2xl border border-outline-variant bg-surface-container-lowest px-5 py-8 text-[13px] text-on-surface-variant">{ACCOUNT_MESSAGES.gone}</p>
             )}
 
             {user && (
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
                 {/* Who is signed in, then the tabs: down the left on a laptop, across the top on a phone */}
                 <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-0 lg:self-start">
-                  <div className="flex items-center gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
                     <AccountAvatar name={user.name} photo={user.photo} size="md" isAdmin={isAdmin} />
                     <div className="min-w-0">
                       <p className="truncate text-[14px] font-bold text-on-surface">{user.name}</p>
@@ -87,7 +88,7 @@ export default function AccountClient() {
                     role="tablist"
                     aria-label="Settings"
                     // Two by two on a phone, where one row cut "Preferences" short; one row from sm, a column from lg
-                    className="grid grid-cols-2 gap-1 rounded-2xl border border-outline-variant bg-white p-1.5 shadow-sm sm:flex lg:flex-col"
+                    className="grid grid-cols-2 gap-1 rounded-2xl border border-outline-variant bg-surface-container-lowest p-1.5 shadow-sm sm:flex lg:flex-col"
                   >
                     {ACCOUNT_TABS.map((entry) => {
                       const Icon = TAB_ICONS[entry.id]
@@ -108,7 +109,7 @@ export default function AccountClient() {
                           <Icon size={17} className={`shrink-0 ${isOpen ? "text-white" : "text-primary"}`} aria-hidden="true" />
                           <span className="min-w-0">
                             <span className="block truncate text-[14px] font-semibold">{entry.label}</span>
-                            <span className={`hidden truncate text-[11px] lg:block ${isOpen ? "text-white/80" : "text-outline"}`}>{entry.hint}</span>
+                            <span className={`hidden truncate text-[11px] lg:block ${isOpen ? "text-white/90" : "text-outline"}`}>{entry.hint}</span>
                           </span>
                         </button>
                       )
@@ -149,7 +150,12 @@ export default function AccountClient() {
                     </>
                   )}
 
-                  {tab === "preferences" && <TimeZoneSection user={user} />}
+                  {tab === "preferences" && (
+                    <>
+                      <ColorSchemeSection user={user} />
+                      <TimeZoneSection user={user} />
+                    </>
+                  )}
 
                   {tab === "security" && (
                     <>

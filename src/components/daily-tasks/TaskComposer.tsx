@@ -131,7 +131,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   return (
     <section
       aria-label="Add tasks"
-      className={`flex min-h-0 flex-1 flex-col gap-3 ${plain ? "" : "rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"}`}
+      className={`flex min-h-0 flex-1 flex-col gap-3 ${plain ? "" : "rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm"}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         {/* In the popup the dialog's own title names it, so only the row count is shown */}
@@ -254,7 +254,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         type="button"
         onClick={onSubmit}
         disabled={isSaving || filled === 0}
-        className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isSaving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <ListPlus size={16} aria-hidden="true" />}
         {isSaving ? "Adding..." : filled > 1 ? `Add ${filled} tasks` : "Add task"}

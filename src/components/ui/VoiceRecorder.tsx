@@ -302,7 +302,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         } ${
           isRecording
             ? "border-error bg-error-container text-error"
-            : "border-outline-variant bg-white text-on-surface hover:border-primary/40 hover:text-primary"
+            : "border-outline-variant bg-surface-container-lowest text-on-surface hover:border-primary/40 hover:text-primary"
         }`}
       >
         {isTranscribing ? (

@@ -30,7 +30,7 @@ export const PromptModuleNav: React.FC<PromptModuleNavProps> = ({ sections, chos
         <select
           value={chosen.id}
           onChange={(event) => onChoose(event.target.value)}
-          className="w-full rounded-xl border border-outline-variant bg-white px-3 py-2.5 text-[14px] text-on-surface"
+          className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-[14px] text-on-surface"
         >
           {sections.map((section) => (
             <optgroup key={section.id} label={section.label}>
@@ -47,7 +47,7 @@ export const PromptModuleNav: React.FC<PromptModuleNavProps> = ({ sections, chos
       {/* From lg: the list beside the prompts */}
       <nav
         aria-label={ADMIN_PROMPT_MESSAGES.navHeading}
-        className="hidden flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm lg:sticky lg:top-0 lg:flex lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto"
+        className="hidden flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-sm lg:sticky lg:top-0 lg:flex lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto"
       >
         <div className="px-1">
           <h2 className="text-[14px] font-bold text-on-surface">{ADMIN_PROMPT_MESSAGES.navHeading}</h2>

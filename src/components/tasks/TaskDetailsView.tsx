@@ -55,7 +55,7 @@ const ImageThumbnail: React.FC<{ image: TaskImageView; alt: string; onOpen: () =
           kind="image"
           name={alt}
           iconOnly
-          className="absolute -bottom-1.5 -right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border border-outline-variant bg-white text-on-surface-variant shadow-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="absolute -bottom-1.5 -right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface-variant shadow-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         />
       )}
     </li>
@@ -145,7 +145,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({ description, i
             type="button"
             onClick={() => setOpen(null)}
             aria-label="Close the image"
-            className="absolute right-4 top-4 rounded-lg bg-white/90 p-2 text-on-surface transition-colors hover:bg-white"
+            className="absolute right-4 top-4 rounded-lg bg-surface-container-lowest/90 p-2 text-on-surface transition-colors hover:bg-surface-container-lowest"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -154,7 +154,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({ description, i
               url={open.url}
               kind="image"
               name={`Image on ${label}`}
-              className="absolute right-16 top-4 inline-flex items-center gap-1.5 rounded-lg bg-white/90 px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-white"
+              className="absolute right-16 top-4 inline-flex items-center gap-1.5 rounded-lg bg-surface-container-lowest/90 px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest"
             />
           )}
           {/* eslint-disable-next-line @next/next/no-img-element */}

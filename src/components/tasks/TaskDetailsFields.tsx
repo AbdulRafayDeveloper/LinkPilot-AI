@@ -68,7 +68,7 @@ const labelClass = "mb-1.5 block text-[10px] font-bold uppercase tracking-wider 
 const Thumbnail: React.FC<{ image: TaskImageView; label: string; onRemove: () => void; disabled: boolean }> = ({ image, label, onRemove, disabled }) => {
   const [hasFailed, setHasFailed] = useState(false)
   return (
-    <li className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-outline-variant bg-white">
+    <li className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest">
       {hasFailed || !image.url ? (
         // A link that has expired in a draft kept overnight: the image is still saved with the task
         <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-[10px] text-outline">
@@ -85,7 +85,7 @@ const Thumbnail: React.FC<{ image: TaskImageView; label: string; onRemove: () =>
         onClick={onRemove}
         disabled={disabled}
         aria-label={`Remove ${label}`}
-        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-on-surface shadow-sm transition-colors hover:bg-error hover:text-white disabled:opacity-50"
+        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-surface-container-lowest/90 text-on-surface shadow-sm transition-colors hover:bg-error hover:text-white disabled:opacity-50"
       >
         <X size={13} aria-hidden="true" />
       </button>
@@ -230,7 +230,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
                 </button>
               )}
             </div>
-            <div className="bg-white">
+            <div className="bg-surface-container-lowest">
               <RichTextEditor
                 id={descriptionId}
                 value={details.description}
@@ -303,7 +303,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
                       onClick={() => fileRef.current?.click()}
                       disabled={disabled}
                       title="Choose images, or drop or paste them here"
-                      className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-outline-variant bg-white text-[10px] font-semibold text-on-surface-variant transition-colors hover:border-primary/50 hover:text-primary disabled:opacity-50"
+                      className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest text-[10px] font-semibold text-on-surface-variant transition-colors hover:border-primary/50 hover:text-primary disabled:opacity-50"
                     >
                       <ImagePlus size={18} aria-hidden="true" />
                       {TASK_ATTACHMENT_MESSAGES.addImages}

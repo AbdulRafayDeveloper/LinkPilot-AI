@@ -96,7 +96,7 @@ export const ConversationFullView: React.FC<{
       className="fixed inset-0 z-[80] flex flex-col bg-background"
     >
       {/* Floating over the conversation, so the controls cost the reading area no height at all */}
-      <div className="absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-xl border border-outline-variant/70 bg-white/85 p-0.5 opacity-50 shadow-sm backdrop-blur-sm transition-opacity hover:opacity-100 focus-within:opacity-100 sm:right-3 sm:top-3">
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-xl border border-outline-variant/70 bg-surface-container-lowest/85 p-0.5 opacity-50 shadow-sm backdrop-blur-sm transition-opacity hover:opacity-100 focus-within:opacity-100 sm:right-3 sm:top-3">
         <button type="button" onClick={() => changeSize(-1)} disabled={size === SIZES[0]} aria-label="Smaller text" title="Smaller text" className={iconButton}>
           <AArrowDown size={18} aria-hidden="true" />
         </button>

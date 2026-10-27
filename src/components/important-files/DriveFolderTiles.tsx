@@ -33,7 +33,7 @@ const Tile: React.FC<{ folder: DriveFolder; isOver: boolean; onOpen: (folderId: 
         onClick={() => onOpen(folder.id)}
         aria-label={`Open the folder ${folder.name}`}
         className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-          isOver ? "border-primary bg-primary-container" : "border-outline-variant bg-white hover:border-primary/40"
+          isOver ? "border-primary bg-primary-container" : "border-outline-variant bg-surface-container-lowest hover:border-primary/40"
         }`}
       >
         {isOver ? (

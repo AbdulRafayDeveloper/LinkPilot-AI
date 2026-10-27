@@ -34,7 +34,7 @@ export const ReplyResult: React.FC<ReplyResultProps> = ({ status, stage, result,
   return (
     <section
       aria-labelledby={TITLE_ID}
-      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-3 min-h-[220px] lg:min-h-[180px] lg:flex-1 short:p-4 short:gap-2"
+      className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-3 min-h-[220px] lg:min-h-[180px] lg:flex-1 short:p-4 short:gap-2"
     >
       <div className="flex items-center justify-between gap-2 min-h-[26px]">
         <h2 id={TITLE_ID} className="text-sm font-bold text-on-surface">
@@ -70,7 +70,7 @@ export const ReplyResult: React.FC<ReplyResultProps> = ({ status, stage, result,
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-outline-variant bg-surface-container-lowest text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
           >
             <RefreshCw size={15} aria-hidden="true" />
             Try again

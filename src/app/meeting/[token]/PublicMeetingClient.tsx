@@ -64,7 +64,7 @@ export default function PublicMeetingClient({ token }: { token: string }) {
 
   return (
     <div className="font-body-md text-body-md min-h-screen bg-background text-on-surface">
-      <header className="border-b border-outline-variant bg-white">
+      <header className="border-b border-outline-variant bg-surface-container-lowest">
         <div className="flex w-full items-center gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <Image src={SITE_LOGO_PNG} alt="" width={24} height={24} className="rounded-md" />
           <span className="text-[13px] font-semibold text-on-surface">{SITE_NAME}</span>
@@ -77,7 +77,7 @@ export default function PublicMeetingClient({ token }: { token: string }) {
 
       <main className="flex w-full flex-col gap-4 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {error ? (
-          <div role="alert" className="flex flex-col items-center gap-2 rounded-2xl border border-outline-variant bg-white px-4 py-16 short:py-5 text-center">
+          <div role="alert" className="flex flex-col items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 py-16 short:py-5 text-center">
             <CalendarClock size={22} className="text-outline" aria-hidden="true" />
             <p className="text-sm text-on-surface-variant">{error}</p>
           </div>
@@ -88,7 +88,7 @@ export default function PublicMeetingClient({ token }: { token: string }) {
           </p>
         ) : (
           <>
-            <section className="rounded-2xl border border-outline-variant bg-white p-4">
+            <section className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
               <h1 className="min-w-0 break-words text-xl font-bold text-on-surface">{meeting.title}</h1>
               {/* A div, not a p: on a short laptop window globals.css hides the one-line description
                   under a page's h1, and when this meeting was recorded and how long it runs is a
@@ -100,7 +100,7 @@ export default function PublicMeetingClient({ token }: { token: string }) {
             </section>
 
             {/* The recording, first: it is what the link was sent for */}
-            <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+            <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
               <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
                 <Video size={16} className="text-primary" aria-hidden="true" />
                 Recording
@@ -125,7 +125,7 @@ export default function PublicMeetingClient({ token }: { token: string }) {
                 built from the analysis and open with the summary, so the summary gets a card of its
                 own only when there are none, rather than saying the same three lines twice over */}
             {!meeting.notes && meeting.minutes && (
-              <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+              <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
                     <MessageSquareQuote size={16} className="text-primary" aria-hidden="true" />
@@ -138,7 +138,7 @@ export default function PublicMeetingClient({ token }: { token: string }) {
             )}
 
             {meeting.notes && (
-              <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+              <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
                     <NotebookPen size={16} className="text-primary" aria-hidden="true" />
@@ -153,7 +153,7 @@ export default function PublicMeetingClient({ token }: { token: string }) {
             {meeting.analysis ? (
               <MeetingAnalysisView analysis={meeting.analysis} />
             ) : (
-              <p className="rounded-2xl border border-outline-variant bg-white p-6 text-center text-sm text-on-surface-variant shadow-sm">
+              <p className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 text-center text-sm text-on-surface-variant shadow-sm">
                 {PUBLIC_MEETING_MESSAGES.notAnalysed}
               </p>
             )}

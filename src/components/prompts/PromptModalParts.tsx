@@ -55,7 +55,7 @@ export const PromptModalFooter: React.FC<PromptModalFooterProps> = ({
         type="button"
         onClick={onSave}
         disabled={!canSave}
-        className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSaving && <Loader2 size={16} className="animate-spin" aria-hidden="true" />}
         {isSaving ? "Saving..." : unsavedCount > 1 ? `Save ${unsavedCount} Prompts` : "Save Prompt"}

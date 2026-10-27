@@ -414,7 +414,7 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                 <button
                   type="button"
                   onClick={() => setAttempt((count) => count + 1)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold"
+                  className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold"
                 >
                   <RefreshCw size={14} aria-hidden="true" />
                   Try again
@@ -526,7 +526,7 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                       const path = folderPath(tabFolders, folderId)
                       return (
                         <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
-                          <div className="min-w-0 rounded-2xl border border-outline-variant bg-white p-2">
+                          <div className="min-w-0 rounded-2xl border border-outline-variant bg-surface-container-lowest p-2">
                             <ProjectFolderTree
                               folders={tabFolders}
                               selectedId={folderId}
@@ -590,7 +590,7 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                                 onChange={(event) => setFolderSearch(event.target.value)}
                                 placeholder={PROJECT_FOLDER_MESSAGES.searchHere}
                                 aria-label={PROJECT_FOLDER_MESSAGES.searchHere}
-                                className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[13px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
+                                className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[13px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
                               />
                               <p className="mt-1 text-[11px] text-outline">{PROJECT_FOLDER_MESSAGES.searchScope}</p>
                             </div>

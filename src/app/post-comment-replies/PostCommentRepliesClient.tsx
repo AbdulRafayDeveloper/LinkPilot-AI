@@ -57,7 +57,7 @@ const formStore = createToolStore(
 )
 
 // Compact cards so the Generate button is on screen without scrolling on laptop-height windows
-const cardClass = "bg-white border border-outline-variant rounded-2xl shadow-sm p-4 flex flex-col gap-3 short:p-2.5 short:gap-1.5"
+const cardClass = "bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-4 flex flex-col gap-3 short:p-2.5 short:gap-1.5"
 const labelClass = "text-[10px] font-bold text-outline uppercase tracking-wider"
 
 export default function PostCommentRepliesClient() {
@@ -243,12 +243,12 @@ export default function PostCommentRepliesClient() {
                 )}
 
                 {/* The card's footer sticks to the bottom of the window on short screens, so Generate is always one click away */}
-                <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-auto px-4 pb-4 pt-3 short:-mx-3 short:-mb-3 short:px-3 short:pb-3 short:pt-2 bg-white rounded-b-2xl border-t border-outline-variant/50">
+                <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-auto px-4 pb-4 pt-3 short:-mx-3 short:-mb-3 short:px-3 short:pb-3 short:pt-2 bg-surface-container-lowest rounded-b-2xl border-t border-outline-variant/50">
                   <button
                     type="submit"
                     disabled={isGenerating}
                     aria-busy={isGenerating}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-semibold shadow-sm active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-semibold shadow-sm active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     {isGenerating ? (
                       <Loader2 size={16} className="animate-spin" aria-hidden="true" />

@@ -18,7 +18,7 @@ import type { ProjectFolder } from "@/types/clientProjectTasks"
 import { folderPath } from "@/lib/projectFolders"
 
 const fieldClass =
-  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
 const labelClass = "text-[13px] font-semibold text-on-surface"
 
 const Problem = FolderProblemLine
@@ -97,7 +97,7 @@ export const WriteDocumentDialog: React.FC<{
               type="submit"
               form="write-document-form"
               disabled={isSaving || !name.trim() || !text.trim()}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
               {PROJECT_FOLDER_MESSAGES.write}

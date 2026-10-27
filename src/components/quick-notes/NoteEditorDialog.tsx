@@ -32,7 +32,7 @@ const isSaveable = (form: Form) =>
 const clock = () => formatInstant(Date.now(), { hour: "2-digit", minute: "2-digit" })
 
 const fieldClass =
-  "h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
+  "h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
 
 /**
  * One saved note, open to edit: an optional name (the `title` field) above the shared visual editor, which takes
@@ -178,7 +178,7 @@ export const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({ note, onSave
             type="button"
             onClick={() => void close()}
             disabled={isClosing}
-            className="ml-auto inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+            className="ml-auto inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
             {isClosing && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
             Close

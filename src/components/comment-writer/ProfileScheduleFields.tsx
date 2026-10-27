@@ -17,7 +17,7 @@ import {
 import type { ProfileScheduleInput } from "@/types/profileScheduler"
 
 export const scheduleFieldClass =
-  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
 const labelClass = "text-[13px] font-semibold text-on-surface"
 const quickButton =
   "rounded-lg px-2 py-1 text-[12px] font-semibold text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
@@ -147,12 +147,12 @@ export const ProfileScheduleFields: React.FC<ProfileScheduleFieldsProps> = ({ id
               <label
                 key={type.id}
                 className={`flex min-h-10 cursor-pointer flex-col justify-center rounded-xl border px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
-                  isOn ? "border-primary bg-primary text-white" : "border-outline-variant bg-white text-on-surface hover:bg-surface-container-high"
+                  isOn ? "border-primary bg-primary text-white" : "border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-high"
                 }`}
               >
                 <input type="checkbox" checked={isOn} onChange={() => toggleType(type.id)} disabled={disabled} className="sr-only" />
                 <span className="text-[13px] font-semibold">{type.label}</span>
-                <span className={`text-[11px] leading-snug ${isOn ? "text-white/85" : "text-on-surface-variant"}`}>{type.description}</span>
+                <span className={`text-[11px] leading-snug ${isOn ? "text-white/90" : "text-on-surface-variant"}`}>{type.description}</span>
               </label>
             )
           })}
@@ -184,7 +184,7 @@ export const ProfileScheduleFields: React.FC<ProfileScheduleFieldsProps> = ({ id
                 key={day.id}
                 title={day.label}
                 className={`flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-2 text-[13px] font-semibold transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
-                  isOn ? "border-primary bg-primary text-white" : "border-outline-variant bg-white text-on-surface hover:bg-surface-container-high"
+                  isOn ? "border-primary bg-primary text-white" : "border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-high"
                 }`}
               >
                 <input type="checkbox" checked={isOn} onChange={() => toggle(day.id)} disabled={disabled} className="sr-only" />

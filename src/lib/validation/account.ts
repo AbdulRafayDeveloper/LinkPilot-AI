@@ -2,6 +2,7 @@ import { z } from "zod"
 import { NAME_MAX_LENGTH, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/constants/auth"
 import { ACCOUNT_MESSAGES } from "@/constants/account"
 import { isTimeZone } from "@/lib/timeZone"
+import { COLOR_SCHEME_IDS, COLOR_SCHEME_MESSAGES } from "@/constants/colorScheme"
 
 /**
  * What Account Settings accepts. The confirmation is checked here as well as in the form, so a
@@ -9,8 +10,8 @@ import { isTimeZone } from "@/lib/timeZone"
  */
 
 /**
- * The name, the timezone, or both: each is written only when it is sent, so saving one never touches
- * the other. A timezone is a name the runtime knows ("Asia/Karachi"), and null goes back to following
+ * The name, the timezone and the colour scheme, any of them: each is written only when it is sent,
+ * so saving one never touches the others. A timezone is a name the runtime knows ("Asia/Karachi"), and null goes back to following
  * the browser. A body that says nothing is refused rather than saved as an empty change.
  */
 export const AccountProfileSchema = z
@@ -22,8 +23,11 @@ export const AccountProfileSchema = z
       .max(NAME_MAX_LENGTH, ACCOUNT_MESSAGES.nameTooLong)
       .optional(),
     timeZone: z.string().max(64).refine(isTimeZone, ACCOUNT_MESSAGES.timeZoneUnknown).nullable().optional(),
+    colorScheme: z.enum(COLOR_SCHEME_IDS, { error: COLOR_SCHEME_MESSAGES.unknown }).optional(),
   })
-  .refine((input) => input.name !== undefined || input.timeZone !== undefined, { message: ACCOUNT_MESSAGES.nothingToSave })
+  .refine((input) => input.name !== undefined || input.timeZone !== undefined || input.colorScheme !== undefined, {
+    message: ACCOUNT_MESSAGES.nothingToSave,
+  })
 
 export const ChangePasswordSchema = z
   .object({

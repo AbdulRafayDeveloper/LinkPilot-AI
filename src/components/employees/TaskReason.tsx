@@ -58,7 +58,7 @@ export const TaskReason: React.FC<TaskReasonProps> = ({ reason, taskText, isDone
             autoFocus
             placeholder="Waiting on the client's reply..."
             aria-label={`Why "${taskText}" isn't done`}
-            className="mt-1 w-full resize-y rounded-lg border border-outline-variant bg-white px-2.5 py-2 text-[14px] font-normal normal-case tracking-normal text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+            className="mt-1 w-full resize-y rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-2 text-[14px] font-normal normal-case tracking-normal text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
           />
         </label>
         {error && (
@@ -74,14 +74,14 @@ export const TaskReason: React.FC<TaskReasonProps> = ({ reason, taskText, isDone
               setError(null)
             }}
             disabled={isSaving}
-            className="rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface hover:bg-surface-container-high disabled:opacity-50"
+            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface hover:bg-surface-container-high disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSaving}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-on-primary-fixed-variant disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
           >
             {isSaving && <Loader2 size={13} className="animate-spin" aria-hidden="true" />}
             Save reason
@@ -105,7 +105,7 @@ export const TaskReason: React.FC<TaskReasonProps> = ({ reason, taskText, isDone
               onClick={() => setDraft(reason)}
               aria-label={`Change why "${taskText}" isn't done`}
               title="Change this reason"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-on-secondary-fixed-variant hover:bg-white/70"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-on-secondary-fixed-variant hover:bg-surface-container-lowest/70"
             >
               <Pencil size={13} aria-hidden="true" />
             </button>

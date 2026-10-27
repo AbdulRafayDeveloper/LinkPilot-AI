@@ -48,7 +48,7 @@ export const ConversationAnalysisCard: React.FC<ConversationAnalysisCardProps> =
     <section
       aria-labelledby={titleId}
       aria-busy={isLoading}
-      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4"
+      className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h2 id={titleId} className="text-sm font-bold text-on-surface">

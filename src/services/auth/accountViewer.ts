@@ -2,6 +2,7 @@ import { accountPhotoPath } from "@/lib/accountPhoto"
 import { UserModel, type IUser } from "@/models/User"
 import { manageableFeatures, primaryOnlyFeatures } from "@/constants/featureAccess"
 import { childDisabledTools, effectiveDisabledTools } from "@/lib/featureAccess"
+import { DEFAULT_COLOR_SCHEME, isColorScheme } from "@/constants/colorScheme"
 import type { Viewer } from "@/types/auth"
 
 /**
@@ -19,6 +20,7 @@ export const ACCOUNT_FIELDS = {
   name: 1,
   photoFile: 1,
   timeZone: 1,
+  colorScheme: 1,
   role: 1,
   sessionVersion: 1,
   disabledTools: 1,
@@ -27,7 +29,7 @@ export const ACCOUNT_FIELDS = {
 } as const
 
 export type Account = Pick<IUser, "email" | "name" | "role"> &
-  Partial<Pick<IUser, "disabledTools" | "enabledTools" | "parentId" | "photoFile" | "timeZone">> & { _id: unknown }
+  Partial<Pick<IUser, "disabledTools" | "enabledTools" | "parentId" | "photoFile" | "timeZone" | "colorScheme">> & { _id: unknown }
 
 /** Every tool a child can be granted. The admin area is not one of them, so it can never be. */
 const grantableTools = () => manageableFeatures().map((tool) => tool.id)
@@ -39,6 +41,8 @@ export async function viewerOf(user: Account, defaults: readonly string[]): Prom
   const photo = user.photoFile ? accountPhotoPath({ ownerId: id, file: user.photoFile }) : null
   // So is the timezone: a child sees times in its own zone, not its parent's
   const timeZone = user.timeZone ?? null
+  // And the colour scheme; an account from before schemes, or a value the app no longer has, is System
+  const colorScheme = isColorScheme(user.colorScheme) ? user.colorScheme : DEFAULT_COLOR_SCHEME
   if (!parentId) {
     return {
       id,
@@ -46,6 +50,7 @@ export async function viewerOf(user: Account, defaults: readonly string[]): Prom
       name: user.name,
       photo,
       timeZone,
+      colorScheme,
       role: user.role,
       // What is off for everyone, with this account's own choices on top; an admin keeps every tool
       disabledTools: effectiveDisabledTools(user.role, defaults, user),
@@ -70,6 +75,7 @@ export async function viewerOf(user: Account, defaults: readonly string[]): Prom
     name: user.name,
     photo,
     timeZone,
+    colorScheme,
     role: "user",
     disabledTools: [...disabledTools],
     parentId,

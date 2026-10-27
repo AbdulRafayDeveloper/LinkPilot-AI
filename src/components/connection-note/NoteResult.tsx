@@ -26,7 +26,7 @@ export const NoteResult: React.FC<NoteResultProps> = ({ status, result, error, o
   return (
     <section
       aria-labelledby="connection-note-result-title"
-      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-3 min-h-[240px]"
+      className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-3 min-h-[240px]"
     >
       <div className="flex items-center justify-between gap-2 min-h-[26px]">
         <h2 id="connection-note-result-title" className="text-sm font-bold text-on-surface">
@@ -62,7 +62,7 @@ export const NoteResult: React.FC<NoteResultProps> = ({ status, result, error, o
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-outline-variant bg-surface-container-lowest text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
           >
             <RefreshCw size={15} aria-hidden="true" />
             Try again

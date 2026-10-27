@@ -305,7 +305,7 @@ export default function MeetingsClient() {
                     setSaveError(null)
                     setIsCreating(true)
                   }}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover"
                 >
                   <Plus size={16} aria-hidden="true" />
                   New Meeting
@@ -314,7 +314,7 @@ export default function MeetingsClient() {
                 <QuickRecordButton />
                 <Link
                   href="/meetings/record"
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <Video size={16} aria-hidden="true" />
                   Record with options
@@ -324,7 +324,7 @@ export default function MeetingsClient() {
 
             {/* Search and filter */}
             <div className="flex flex-col gap-2 shrink-0 sm:flex-row sm:items-center">
-              <label className="flex w-full items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 sm:max-w-md">
+              <label className="flex w-full items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 sm:max-w-md">
                 <Search size={16} className="shrink-0 text-outline" aria-hidden="true" />
                 <input
                   type="search"
@@ -359,7 +359,7 @@ export default function MeetingsClient() {
                   setIsLoading(true)
                 }}
                 aria-label="Filter meetings by status"
-                className="rounded-xl border border-outline-variant bg-white px-3 py-2 text-sm text-on-surface focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
                 <option value="">Any status</option>
                 {MEETING_STATUSES.map((entry) => (
@@ -384,7 +384,7 @@ export default function MeetingsClient() {
                 <button
                   type="button"
                   onClick={reload}
-                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <RefreshCw size={15} aria-hidden="true" />
                   Try again
@@ -425,7 +425,7 @@ export default function MeetingsClient() {
                         setLinkError(null)
                         setIsLinking(true)
                       }}
-                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                     >
                       <Link2 size={14} aria-hidden="true" />
                       {MEETING_PLAN_LINK_MESSAGES.link}

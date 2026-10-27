@@ -27,7 +27,7 @@ interface ProjectForm {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-outline-variant bg-white px-3 py-2 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+  "w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
 
 interface ProjectsToShowPanelProps {
   meetingId: string
@@ -147,7 +147,7 @@ export const ProjectsToShowPanel: React.FC<ProjectsToShowPanelProps> = ({ meetin
               setError(null)
             }}
             disabled={isSaving}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[13px] font-semibold text-on-surface hover:bg-surface-container-high disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[13px] font-semibold text-on-surface hover:bg-surface-container-high disabled:opacity-50"
           >
             <X size={14} aria-hidden="true" />
             Cancel
@@ -155,7 +155,7 @@ export const ProjectsToShowPanel: React.FC<ProjectsToShowPanelProps> = ({ meetin
           <button
             type="submit"
             disabled={isSaving}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-on-primary-fixed-variant disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
           >
             {isSaving && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
             {form.id ? "Save project" : "Add project"}

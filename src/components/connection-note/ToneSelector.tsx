@@ -28,7 +28,7 @@ export const ToneSelector: React.FC<ToneSelectorProps> = ({ value, onChange, dis
             className={`flex items-start gap-2 min-w-0 cursor-pointer rounded-xl border px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
               isSelected
                 ? "bg-primary-container border-primary-container text-on-primary-container"
-                : "bg-white border-outline-variant text-on-surface hover:bg-surface-container-low"
+                : "bg-surface-container-lowest border-outline-variant text-on-surface hover:bg-surface-container-low"
             }`}
           >
             <input

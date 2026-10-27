@@ -130,7 +130,7 @@ export const MeetingStatusButton: React.FC<MeetingStatusButtonProps> = ({ meetin
             aria-label="Meeting status"
             data-meeting-status-menu=""
             style={{ top: menuAt.top, left: menuAt.left, width: MENU_WIDTH }}
-            className="fixed z-[70] overflow-hidden rounded-xl border border-outline-variant bg-white py-1 shadow-lg"
+            className="fixed z-[70] overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest py-1 shadow-lg"
           >
           {MEETING_PLAN_STATUSES.map((status) => {
             const option = STATUS_LOOK[status.id]

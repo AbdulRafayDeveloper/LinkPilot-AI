@@ -282,7 +282,7 @@ export default function UsersClient() {
                 <button
                   type="button"
                   onClick={() => setIsDefaultsOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
                 >
                   <SlidersHorizontal size={16} aria-hidden="true" />
                   Tools for all users
@@ -301,7 +301,7 @@ export default function UsersClient() {
               <p role="status" className="flex items-start gap-2 rounded-xl bg-success-container px-3 py-2 text-[13px] text-on-success-container">
                 <CheckCircle2 size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <span className="flex-1">{notice}</span>
-                <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="shrink-0 rounded p-0.5 hover:bg-black/5">
+                <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="shrink-0 rounded p-0.5 hover:bg-on-surface/5">
                   <X size={14} aria-hidden="true" />
                 </button>
               </p>
@@ -331,7 +331,7 @@ export default function UsersClient() {
               <div role="alert" className="flex flex-col items-center gap-3 py-16 short:py-5 text-center">
                 <AlertTriangle size={20} className="text-error" aria-hidden="true" />
                 <p className="max-w-sm text-sm text-on-surface-variant">{list.error}</p>
-                <button type="button" onClick={list.retry} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold">
+                <button type="button" onClick={list.retry} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold">
                   <RefreshCw size={15} aria-hidden="true" />
                   Try again
                 </button>
@@ -346,7 +346,7 @@ export default function UsersClient() {
             ) : (
               <div className={`flex flex-col gap-3 transition-opacity ${list.isLoading ? "opacity-60" : ""}`} aria-busy={list.isLoading}>
                 {/* The table from xl, where it fits beside the open sidebar; cards below, two to a row on a tablet */}
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm xl:block">
                   <table className="w-full min-w-[900px] border-collapse text-left">
                     <caption className="sr-only">Accounts, newest first</caption>
                     <thead className="bg-surface-container-lowest">
@@ -411,7 +411,7 @@ export default function UsersClient() {
                 <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {list.items.map((user) => (
                     <li key={user.id}>
-                      <button type="button" onClick={() => setOpen(user)} className="flex w-full flex-col gap-1.5 rounded-2xl border border-outline-variant bg-white p-3 text-left shadow-sm">
+                      <button type="button" onClick={() => setOpen(user)} className="flex w-full flex-col gap-1.5 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 text-left shadow-sm">
                         <span className="flex items-start justify-between gap-2">
                           <span className="min-w-0">
                             <span className="block truncate text-[13px] font-semibold text-on-surface">{user.name}</span>

@@ -48,7 +48,7 @@ export function endConversationEdit() {
 export const useConversationDraft = () => useToolStore(conversationDraftStore)
 
 const inputClass =
-  "w-full rounded-lg border border-outline-variant bg-white px-2.5 py-2 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+  "w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-2 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
 
 // What goes into a saved script: a feature list without the blank lines typing leaves behind
 const cleaned = (stages: ScriptStage[]): ScriptStage[] =>
@@ -89,7 +89,7 @@ const StepEditor: React.FC<StepEditorProps> = ({ step, handle, projects, onChang
             value={step.kind}
             onChange={(event) => onChange({ kind: event.target.value as ScriptStepKindId })}
             aria-label="Kind of step"
-            className="rounded-lg border border-outline-variant bg-white px-2 py-1 text-[12px] font-bold uppercase tracking-wide text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1 text-[12px] font-bold uppercase tracking-wide text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
           >
             {SCRIPT_STEP_KINDS.map((kind) => (
               <option key={kind.id} value={kind.id}>
@@ -256,7 +256,7 @@ export const ConversationEditor: React.FC<ConversationEditorProps> = ({ projects
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="sticky top-0 z-10 -mx-5 flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant bg-white/95 px-5 py-2.5 backdrop-blur">
+      <div className="sticky top-0 z-10 -mx-5 flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant bg-surface-container-lowest/95 px-5 py-2.5 backdrop-blur">
         <button
           type="button"
           onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(stages.map((stage) => stage.id)))}
@@ -301,7 +301,7 @@ export const ConversationEditor: React.FC<ConversationEditorProps> = ({ projects
             onClick={save}
             disabled={isSaving || missingTitle}
             title={missingTitle ? "Every stage needs a title" : "Save (Ctrl+S)"}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSaving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}
             {isSaving ? "Saving..." : "Save conversation"}
@@ -329,7 +329,7 @@ export const ConversationEditor: React.FC<ConversationEditorProps> = ({ projects
             <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-3">
               <div className="flex items-center gap-2">
                 {handle}
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-on-surface text-[13px] font-bold text-white tabular-nums">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-[13px] font-bold text-white tabular-nums">
                   {index + 1}
                 </span>
                 <input
@@ -431,7 +431,7 @@ export const ConversationEditor: React.FC<ConversationEditorProps> = ({ projects
                           onClick={() => addStep(stage, kind.id)}
                           disabled={stage.steps.length >= SCRIPT_MAX_STEPS_PER_STAGE}
                           title={kind.hint}
-                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-outline-variant bg-white px-2.5 py-1 text-[12px] font-semibold text-on-surface transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-outline-variant bg-surface-container-lowest px-2.5 py-1 text-[12px] font-semibold text-on-surface transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
                         >
                           <Icon size={13} aria-hidden="true" />
                           {kind.label}

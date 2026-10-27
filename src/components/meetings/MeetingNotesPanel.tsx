@@ -39,7 +39,7 @@ export const MeetingNotesPanel: React.FC<{ meeting: Meeting; onSaved: (meeting: 
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+    <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
           <NotebookPen size={16} className="text-primary" aria-hidden="true" />
@@ -73,7 +73,7 @@ export const MeetingNotesPanel: React.FC<{ meeting: Meeting; onSaved: (meeting: 
               type="button"
               onClick={() => void save()}
               disabled={isSaving}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
             >
               {isSaving ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Check size={13} aria-hidden="true" />}
               Save notes

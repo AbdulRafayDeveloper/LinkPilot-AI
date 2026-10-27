@@ -147,7 +147,7 @@ export default function ClientsClient() {
               <button
                 type="button"
                 onClick={() => setDialog({ client: null })}
-                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant sm:shrink-0"
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover sm:shrink-0"
               >
                 <Plus size={16} aria-hidden="true" />
                 Add client
@@ -168,7 +168,7 @@ export default function ClientsClient() {
                 </FilterPanel>
 
                 {error && !clients ? (
-                  <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-white py-10 text-center">
+                  <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest py-10 text-center">
                     <AlertTriangle size={20} className="text-error" aria-hidden="true" />
                     <p className="max-w-xs text-sm text-on-surface-variant">{error}</p>
                     <button
@@ -184,12 +184,12 @@ export default function ClientsClient() {
                     </button>
                   </div>
                 ) : !clients ? (
-                  <div role="status" className="flex items-center justify-center gap-2 rounded-2xl border border-outline-variant bg-white py-10 text-sm text-on-surface-variant">
+                  <div role="status" className="flex items-center justify-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest py-10 text-sm text-on-surface-variant">
                     <Loader2 size={18} className="animate-spin text-primary" aria-hidden="true" />
                     Loading your clients...
                   </div>
                 ) : shown.length === 0 ? (
-                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-10 text-center">
+                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest px-6 py-10 text-center">
                     <Building2 size={22} className="text-primary" aria-hidden="true" />
                     <p className="text-sm text-on-surface-variant">{hasFilters ? CLIENTS_MESSAGES.noMatch : CLIENTS_MESSAGES.empty}</p>
                   </div>
@@ -204,7 +204,7 @@ export default function ClientsClient() {
                             onClick={() => choose(client)}
                             aria-current={isSelected ? "true" : undefined}
                             className={`flex w-full min-w-0 items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-                              isSelected ? "border-primary bg-primary-fixed/40" : "border-outline-variant bg-white hover:bg-surface-container-lowest"
+                              isSelected ? "border-primary bg-primary-fixed/40" : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container-lowest"
                             }`}
                           >
                             <span
@@ -230,7 +230,7 @@ export default function ClientsClient() {
               <div ref={detailRef} className="flex scroll-mt-4 flex-col gap-4">
                 {current ? (
                   <>
-                    <section aria-label="Client details" className="rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
+                    <section aria-label="Client details" className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm sm:p-5">
                       {/* The details column is full width below lg but only about 290px between lg and xl,
                           where the name and the buttons cannot share a row; it has the width again from xl */}
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -282,7 +282,7 @@ export default function ClientsClient() {
                     <ClientProjectsPanel key={current.id} client={current} />
                   </>
                 ) : (
-                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-16 short:py-5 text-center">
+                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest px-6 py-16 short:py-5 text-center">
                     <Building2 size={24} className="text-primary" aria-hidden="true" />
                     <p className="text-[15px] font-semibold text-on-surface">{CLIENTS_MESSAGES.choose}</p>
                     <p className="max-w-sm text-sm text-on-surface-variant">{CLIENTS_MESSAGES.chooseHint}</p>

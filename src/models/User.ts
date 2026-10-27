@@ -1,5 +1,6 @@
 import mongoose, { Schema, type Model } from "mongoose"
 import { USER_ROLES, type UserRole } from "@/constants/auth"
+import { COLOR_SCHEME_IDS, DEFAULT_COLOR_SCHEME, type ColorScheme } from "@/constants/colorScheme"
 
 /**
  * One account. The password is only ever stored as a scrypt hash (lib/passwords.ts). Raising
@@ -16,6 +17,8 @@ export interface IUser {
   photoFile: string | null
   // The timezone this person sees every time in (an IANA name, "Asia/Karachi"); null follows their browser
   timeZone: string | null
+  // How the app looks for this person: "system" (follows the device, the default), "light" or "dark"
+  colorScheme: ColorScheme
   passwordHash: string
   role: UserRole
   sessionVersion: number
@@ -57,6 +60,7 @@ const UserSchema = new Schema<IUser>(
     name: { type: String, required: true, trim: true },
     photoFile: { type: String, default: null },
     timeZone: { type: String, default: null },
+    colorScheme: { type: String, enum: COLOR_SCHEME_IDS, default: DEFAULT_COLOR_SCHEME },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: USER_ROLES, required: true, default: "user" },
     sessionVersion: { type: Number, required: true, default: 1 },

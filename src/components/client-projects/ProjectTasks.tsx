@@ -163,7 +163,7 @@ const ItemFiles: React.FC<{ files: ProjectFileView[]; onPreview: (file: ProjectF
               <button
                 type="button"
                 onClick={() => onPreview(file)}
-                className="overflow-hidden rounded-xl border border-outline-variant bg-white p-1 transition-colors hover:border-primary/50"
+                className="overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest p-1 transition-colors hover:border-primary/50"
                 aria-label={`Preview ${file.name}`}
               >
                 {/* A short-lived signed link on the storage host, like every other stored image here, so a plain img */}
@@ -178,7 +178,7 @@ const ItemFiles: React.FC<{ files: ProjectFileView[]; onPreview: (file: ProjectF
           )
         }
         return (
-          <li key={file.assetId} className="flex flex-wrap items-center gap-2 rounded-xl border border-outline-variant bg-white px-2.5 py-1.5">
+          <li key={file.assetId} className="flex flex-wrap items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-2.5 py-1.5">
             <FileKindIcon category={file.category} className="shrink-0 text-primary" />
             {caption}
             {actions}
@@ -239,7 +239,7 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
     return (
       <div
         className={`flex flex-col gap-2 rounded-2xl border p-3 transition-colors ${
-          isDone && shape.tick ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-white"
+          isDone && shape.tick ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-surface-container-lowest"
         }`}
       >
         <div className="flex flex-wrap items-start gap-2 sm:flex-nowrap">

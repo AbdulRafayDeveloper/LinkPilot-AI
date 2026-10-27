@@ -88,7 +88,7 @@ export const FeatureDefaultsDialog: React.FC<{ onClose: () => void; onChanged: (
                 type="button"
                 onClick={() => change(allOff, true)}
                 disabled={busy.size > 0}
-                className="whitespace-nowrap rounded-lg border border-outline-variant bg-white px-2.5 py-1 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-60"
+                className="whitespace-nowrap rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-1 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-60"
               >
                 Turn everything on
               </button>

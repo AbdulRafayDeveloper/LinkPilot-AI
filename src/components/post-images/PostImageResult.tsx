@@ -87,7 +87,7 @@ export const PostImageResult: React.FC<PostImageResultProps> = ({ status, image,
               type="button"
               onClick={() => onDownload(image)}
               aria-label="Download the image"
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover"
             >
               <Download size={14} aria-hidden="true" />
               Download

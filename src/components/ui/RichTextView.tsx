@@ -84,7 +84,7 @@ const ListView: React.FC<{ list: RichList }> = ({ list }) => {
                 role="img"
                 aria-label={item.checked ? "Done" : "Not done"}
                 className={`mt-[3px] flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                  item.checked ? "border-primary bg-primary text-white" : "border-outline-variant bg-white"
+                  item.checked ? "border-primary bg-primary text-white" : "border-outline-variant bg-surface-container-lowest"
                 }`}
               >
                 {item.checked && <Check size={11} strokeWidth={3} aria-hidden="true" />}

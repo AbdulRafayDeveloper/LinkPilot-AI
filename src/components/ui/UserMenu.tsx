@@ -75,7 +75,7 @@ export const UserMenu: React.FC = () => {
       {isOpen && (
         <div
           id={menuId}
-          className="absolute right-0 top-11 z-50 w-64 overflow-hidden rounded-2xl border border-outline-variant bg-white shadow-xl"
+          className="absolute right-0 top-11 z-50 w-64 overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-xl"
         >
           <div className="border-b border-outline-variant/70 px-4 py-3">
             <div className="flex items-center gap-3">

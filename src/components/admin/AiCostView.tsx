@@ -53,7 +53,7 @@ const Bar: React.FC<{ value: number; max: number; label: string }> = ({ value, m
 )
 
 const Stat: React.FC<{ label: string; value: string; detail?: string; strong?: boolean }> = ({ label, value, detail, strong }) => (
-  <div className="rounded-xl border border-outline-variant bg-white p-3">
+  <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3">
     <p className="text-[10px] font-bold uppercase tracking-wider text-outline">{label}</p>
     <p className={`mt-1 font-bold text-on-surface ${strong ? "text-2xl text-primary" : "text-lg"}`}>{value}</p>
     {detail && <p className="text-[11px] text-on-surface-variant">{detail}</p>}
@@ -64,7 +64,7 @@ const Stat: React.FC<{ label: string; value: string; detail?: string; strong?: b
 const Breakdown: React.FC<{ title: string; rows: { key: string; label: string; totals: CostTotals }[]; scroll?: boolean }> = ({ title, rows, scroll }) => {
   const max = Math.max(0, ...rows.map((row) => row.totals.cost))
   return (
-    <section className="flex min-w-0 flex-col gap-2 rounded-xl border border-outline-variant bg-white p-3">
+    <section className="flex min-w-0 flex-col gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-3">
       <h3 className="text-[13px] font-bold text-on-surface">{title}</h3>
       <ul className={`flex flex-col gap-2 ${scroll ? "custom-scrollbar max-h-72 overflow-y-auto pr-1" : ""}`}>
         {rows.map((row) => (
@@ -222,7 +222,7 @@ export const AiCostView: React.FC<{ onSetPrices: () => void }> = ({ onSetPrices 
                 {totals.unpricedCalls > 0 && AI_COST_MESSAGES.unpriced(totals.unpricedCalls)}
               </p>
               {totals.unpricedCalls > 0 && (
-                <button type="button" onClick={onSetPrices} className="shrink-0 rounded-md bg-white px-2 py-1 font-semibold text-on-surface hover:text-primary">
+                <button type="button" onClick={onSetPrices} className="shrink-0 rounded-md bg-surface-container-lowest px-2 py-1 font-semibold text-on-surface hover:text-primary">
                   {AI_COST_MESSAGES.setPrices}
                 </button>
               )}
@@ -238,7 +238,7 @@ export const AiCostView: React.FC<{ onSetPrices: () => void }> = ({ onSetPrices 
                 {/* Cards on a phone, the table from md, where its columns fit the popup */}
                 <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:hidden">
                   {report.byModel.map((row) => (
-                    <li key={`${row.provider}-${row.model}`} className="flex flex-col gap-1 rounded-xl border border-outline-variant bg-white p-3 text-[12px]">
+                    <li key={`${row.provider}-${row.model}`} className="flex flex-col gap-1 rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-[12px]">
                       <span className="flex items-baseline justify-between gap-2">
                         <span className="min-w-0 break-all font-mono text-on-surface">{row.model}</span>
                         <span className="shrink-0 text-[14px] font-bold text-on-surface">{formatCost(row.cost)}</span>
@@ -252,7 +252,7 @@ export const AiCostView: React.FC<{ onSetPrices: () => void }> = ({ onSetPrices 
                     </li>
                   ))}
                 </ul>
-                <div className="hidden overflow-x-auto rounded-xl border border-outline-variant bg-white md:block">
+                <div className="hidden overflow-x-auto rounded-xl border border-outline-variant bg-surface-container-lowest md:block">
                   <table className="w-full min-w-[640px] border-collapse text-left text-[12px]">
                     <thead className="bg-surface-container-lowest text-[11px] uppercase tracking-wide text-outline">
                       <tr>

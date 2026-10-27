@@ -27,7 +27,7 @@ export const HelpArticle: React.FC<HelpArticleProps> = ({ topic }) => {
     <article
       id={sectionDomId(topic.id)}
       aria-labelledby={`${sectionDomId(topic.id)}-heading`}
-      className="scroll-mt-28 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm sm:p-7"
+      className="scroll-mt-28 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm sm:p-7"
     >
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">

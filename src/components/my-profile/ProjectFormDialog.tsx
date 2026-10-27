@@ -10,7 +10,7 @@ import type { ProfileProject, ProjectDraft } from "@/types/profileProjects"
 const labelClass = "text-[11px] font-bold uppercase tracking-wider text-outline"
 const hintClass = "text-[12px] text-on-surface-variant"
 const fieldClass =
-  "w-full rounded-xl border border-outline-variant bg-white px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
 
 const Field: React.FC<{ id: string; label: string; hint: string; required?: boolean; children: React.ReactNode }> = ({ id, label, hint, required, children }) => (
   <div className="flex flex-col gap-1">
@@ -76,7 +76,7 @@ export const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ editing, o
           <button type="button" onClick={onClose} className="rounded-xl border border-outline-variant px-4 py-2 text-[14px] font-semibold text-on-surface hover:bg-surface-container-high">
             {PROFILE_PROJECT_MESSAGES.cancel}
           </button>
-          <button type="submit" form="project-form" className="rounded-xl bg-primary px-4 py-2 text-[14px] font-semibold text-white hover:bg-on-primary-fixed-variant">
+          <button type="submit" form="project-form" className="rounded-xl bg-primary px-4 py-2 text-[14px] font-semibold text-white hover:bg-primary-hover">
             {PROFILE_PROJECT_MESSAGES.save}
           </button>
         </div>
@@ -178,7 +178,7 @@ export const ProjectFormDialog: React.FC<ProjectFormDialogProps> = ({ editing, o
         </fieldset>
 
         <Field id="project-keywords" label={f.keywords.label} hint={f.keywords.hint}>
-          <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-outline-variant bg-white p-2 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25">
+          <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest p-2 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25">
             {draft.keywords.map((word) => (
               <span key={word} className="inline-flex items-center gap-1 rounded-full bg-primary-fixed px-2.5 py-1 text-[12px] font-semibold text-primary">
                 {word}

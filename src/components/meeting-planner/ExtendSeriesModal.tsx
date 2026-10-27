@@ -66,7 +66,7 @@ export const ExtendSeriesModal: React.FC<ExtendSeriesModalProps> = ({ meeting, i
               type="button"
               onClick={() => onSubmit(count)}
               disabled={isSaving || missing === 0}
-              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving ? (
                 <Loader2 size={16} className="animate-spin" aria-hidden="true" />

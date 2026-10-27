@@ -562,7 +562,7 @@ export default function DailyTasksClient() {
                     setNotice(null)
                     setIsAdding(true)
                   }}
-                  className="inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                  className="inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
                 >
                   <Plus size={16} aria-hidden="true" />
                   Add task

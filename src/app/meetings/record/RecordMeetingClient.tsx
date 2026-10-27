@@ -30,7 +30,7 @@ const clock = (ms: number) => {
 }
 
 const toggleClass =
-  "flex items-start gap-3 rounded-xl border border-outline-variant bg-white p-3 text-left transition-colors hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+  "flex items-start gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-left transition-colors hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
 
 /**
  * How loud one side of the meeting is, live. Filled when there is sound, and saying so in words too,
@@ -126,7 +126,7 @@ export default function RecordMeetingClient() {
             </div>
 
             {(recorder.status === "idle" || recorder.status === "error") && (
-              <section className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
+              <section className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
                 {recorder.error && (
                   <p role="alert" className="flex items-start gap-2 rounded-xl border border-error/40 bg-error-container px-3 py-2 text-[12px] text-error">
                     <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
@@ -231,7 +231,7 @@ export default function RecordMeetingClient() {
                 <button
                   type="button"
                   onClick={() => void meetingRecorder.start({ title, withMicrophone, withCamera, sound })}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover"
                 >
                   <Circle size={14} className="fill-current" aria-hidden="true" />
                   Start recording
@@ -240,14 +240,14 @@ export default function RecordMeetingClient() {
             )}
 
             {recorder.status === "starting" && (
-              <p role="status" className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-white p-5 text-sm text-on-surface-variant shadow-sm">
+              <p role="status" className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 text-sm text-on-surface-variant shadow-sm">
                 <Loader2 size={16} className="animate-spin text-primary" aria-hidden="true" />
                 Choose what to share, then the recording starts...
               </p>
             )}
 
             {(isLive || isClosing) && (
-              <section className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm" aria-live="polite">
+              <section className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm" aria-live="polite">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="flex items-center gap-2 text-sm font-semibold text-on-surface">
                     {recorder.status === "recording" ? (
@@ -266,7 +266,7 @@ export default function RecordMeetingClient() {
                         <button
                           type="button"
                           onClick={() => meetingRecorder.pause()}
-                          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                         >
                           <Pause size={16} aria-hidden="true" />
                           Pause
@@ -275,7 +275,7 @@ export default function RecordMeetingClient() {
                         <button
                           type="button"
                           onClick={() => meetingRecorder.resume()}
-                          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                         >
                           <Play size={16} aria-hidden="true" />
                           Resume
@@ -307,7 +307,7 @@ export default function RecordMeetingClient() {
                 )}
 
                 {recorder.preview && (
-                  <video ref={previewRef} autoPlay muted playsInline className="aspect-video w-full rounded-xl border border-outline-variant bg-on-surface/90 object-contain" />
+                  <video ref={previewRef} autoPlay muted playsInline className="aspect-video w-full rounded-xl border border-outline-variant bg-ink/90 object-contain" />
                 )}
 
                 <div className="flex flex-col gap-1.5">

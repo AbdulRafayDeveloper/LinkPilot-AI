@@ -136,7 +136,7 @@ export default function ConversationReplyClient() {
                   event.preventDefault()
                   submit()
                 }}
-                className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 lg:self-start short:p-4 short:gap-3"
+                className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 lg:self-start short:p-4 short:gap-3"
               >
                 {/* The fields grow into spare height but never shrink below their textarea's minimum */}
                 <div className="flex flex-col flex-[3]">
@@ -205,7 +205,7 @@ export default function ConversationReplyClient() {
                   type="submit"
                   disabled={isGenerating}
                   aria-busy={isGenerating}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 short:py-2.5 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-semibold shadow-sm active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed shrink-0"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 short:py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-semibold shadow-sm active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed shrink-0"
                 >
                   {isGenerating ? (
                     <Loader2 size={16} className="animate-spin" aria-hidden="true" />

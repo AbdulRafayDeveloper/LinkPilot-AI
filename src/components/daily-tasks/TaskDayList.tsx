@@ -300,7 +300,7 @@ const SubtaskItem: React.FC<Omit<SubtaskTreeProps, "parentId"> & { task: DailyTa
             <ChevronDown size={14} className={`transition-transform ${isOpen ? "" : "-rotate-90"}`} aria-hidden="true" />
           </button>
         ) : (
-          <CornerDownRight size={13} className="ml-1.5 mr-1 mt-3 shrink-0 text-outline/70" aria-hidden="true" />
+          <CornerDownRight size={13} className="ml-1.5 mr-1 mt-3 shrink-0 text-outline" aria-hidden="true" />
         )}
         <label className="flex min-w-[10rem] flex-1 cursor-pointer items-start gap-2.5 py-2 pr-1">
           <input
@@ -444,7 +444,7 @@ const handleClass =
 const filterClass =
   "h-6 cursor-pointer rounded-full border px-2 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
-const plainFilter = "border-outline-variant bg-white text-on-surface-variant"
+const plainFilter = "border-outline-variant bg-surface-container-lowest text-on-surface-variant"
 
 /**
  * One yes-or-no narrowing: blocked or not, done or not. Both read the same way and are built from
@@ -656,7 +656,7 @@ const AddToDayRow: React.FC<{ date: string; onAddTask: AddTaskHandler }> = ({ da
           onMouseDown={(event) => event.preventDefault()}
           onClick={save}
           disabled={isSaving || !content.trim()}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSaving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
           Add
@@ -1022,7 +1022,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   return (
     <section
       aria-label="Your tasks"
-      className="flex min-h-[320px] flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
+      className="flex min-h-[320px] flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-on-surface">{current === 1 ? `Last ${VISIBLE_DAYS} Days` : "Older Tasks"}</h2>
@@ -1130,7 +1130,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+            className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
           >
             <RefreshCw size={15} aria-hidden="true" />
             Try again
@@ -1201,7 +1201,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 <div
                   className={`flex cursor-grabbing items-start gap-1 rounded-xl border pr-1 shadow-xl ring-2 ring-primary/30 ${
                     stateStyles[taskState({ ...activeTask, taskDate: overDate ?? activeTask.taskDate }, today)]
-                  } bg-white`}
+                  } bg-surface-container-lowest`}
                 >
                   <TaskRowBody
                     task={{ ...activeTask, taskDate: overDate ?? activeTask.taskDate }}
@@ -1231,7 +1231,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
             type="button"
             onClick={() => onPageChange(current - 1)}
             disabled={current <= 1 || isLoading}
-            className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             Newer
@@ -1243,7 +1243,7 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
             type="button"
             onClick={() => onPageChange(current + 1)}
             disabled={current >= pageCount || isLoading}
-            className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
           >
             Older
             <ChevronRight size={14} aria-hidden="true" />

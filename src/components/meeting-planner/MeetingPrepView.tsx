@@ -50,7 +50,7 @@ const Section: React.FC<{
   action?: React.ReactNode
   children: React.ReactNode
 }> = ({ icon: Icon, title, subtitle, action, children }) => (
-  <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
+  <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
       <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
         <Icon size={16} className="text-primary" aria-hidden="true" />
@@ -259,7 +259,7 @@ export const MeetingPrepView: React.FC<MeetingPrepViewProps> = ({ prep, meetingI
                 <button
                   type="button"
                   onClick={() => setIsFullView(true)}
-                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-white px-2.5 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <Maximize2 size={13} aria-hidden="true" />
                   Full view
@@ -269,7 +269,7 @@ export const MeetingPrepView: React.FC<MeetingPrepViewProps> = ({ prep, meetingI
                   onClick={() => startConversationEdit(meetingId, stages)}
                   disabled={isPreparing}
                   title={isPreparing ? "Wait for the preparation to finish" : "Edit the conversation"}
-                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-white px-2.5 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Pencil size={13} aria-hidden="true" />
                   Edit

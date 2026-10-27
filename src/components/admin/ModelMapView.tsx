@@ -86,7 +86,7 @@ export const ModelMapView: React.FC<{ overview: ModelPriorityOverview }> = ({ ov
       </FilterPanel>
 
       {shown.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-outline-variant bg-white px-3 py-6 text-center text-[13px] text-on-surface-variant">
+        <p className="rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest px-3 py-6 text-center text-[13px] text-on-surface-variant">
           {MODEL_PRIORITY_MESSAGES.nothingMatches}
         </p>
       ) : (

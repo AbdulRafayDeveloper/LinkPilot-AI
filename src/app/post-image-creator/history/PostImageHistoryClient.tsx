@@ -202,7 +202,7 @@ export default function PostImageHistoryClient() {
               </div>
               <Link
                 href="/post-image-creator"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant sm:shrink-0"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover sm:shrink-0"
               >
                 <SquarePlus size={16} aria-hidden="true" />
                 Create New Image
@@ -262,7 +262,7 @@ export default function PostImageHistoryClient() {
                 <button
                   type="button"
                   onClick={list.retry}
-                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <RefreshCw size={15} aria-hidden="true" />
                   Try again
@@ -293,12 +293,12 @@ export default function PostImageHistoryClient() {
                   {images.map((image) => (
                     <li
                       key={image.id}
-                      className={`relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm ${
+                      className={`relative flex flex-col overflow-hidden rounded-2xl border bg-surface-container-lowest shadow-sm ${
                         selection.isPicked(image.id) ? "border-primary" : "border-outline-variant"
                       }`}
                     >
                       {/* Ticking an image picks it for deleting several at once */}
-                      <label className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-white/90 shadow-sm">
+                      <label className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-surface-container-lowest/90 shadow-sm">
                         <input
                           type="checkbox"
                           checked={selection.isPicked(image.id)}
@@ -411,7 +411,7 @@ export default function PostImageHistoryClient() {
               <button
                 type="button"
                 onClick={() => download(detail)}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
               >
                 <Download size={16} aria-hidden="true" />
                 Download

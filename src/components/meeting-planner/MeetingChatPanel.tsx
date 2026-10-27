@@ -273,7 +273,7 @@ export const MeetingChatPanel: React.FC<{ surface: MeetingChatSurfaceId; meeting
           rows={isExpanded ? 2 : 1}
           placeholder="Ask anything about this meeting..."
           aria-label="Your question about this meeting"
-          className="custom-scrollbar max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-outline-variant bg-white px-3 py-2.5 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+          className="custom-scrollbar max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
         />
         <VoiceRecorder
           compact
@@ -293,7 +293,7 @@ export const MeetingChatPanel: React.FC<{ surface: MeetingChatSurfaceId; meeting
             type="button"
             onClick={stop}
             aria-label="Stop the answer"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-colors hover:bg-surface-container-high"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface-variant transition-colors hover:bg-surface-container-high"
           >
             <Square size={15} aria-hidden="true" />
           </button>
@@ -303,7 +303,7 @@ export const MeetingChatPanel: React.FC<{ surface: MeetingChatSurfaceId; meeting
             onClick={() => void ask(question)}
             disabled={!question.trim()}
             aria-label="Ask"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowUp size={17} aria-hidden="true" />
           </button>
@@ -328,7 +328,7 @@ export const MeetingChatPanel: React.FC<{ surface: MeetingChatSurfaceId; meeting
 
   return (
     <>
-      <section aria-label="Ask this meeting" className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
+      <section aria-label="Ask this meeting" className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
         {!isExpanded && chat}
         {isExpanded && (
           <p className="flex items-center gap-2 py-2 text-[13px] text-on-surface-variant">

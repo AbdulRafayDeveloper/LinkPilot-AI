@@ -408,7 +408,7 @@ export default function ClientVoicesClient() {
                     On a phone it takes its own line, so the chosen name is never squeezed out by the buttons */}
                 <label
                   title={chosenClient ? CLIENT_VOICES_MESSAGES.keptWith(chosenClient.name) : CLIENT_VOICES_MESSAGES.noClient}
-                  className="inline-flex min-h-10 w-full min-w-0 items-center gap-2 rounded-xl border border-outline-variant bg-white pl-3 pr-1 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25 sm:w-auto"
+                  className="inline-flex min-h-10 w-full min-w-0 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest pl-3 pr-1 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25 sm:w-auto"
                 >
                   <Users size={15} className="shrink-0 text-primary" aria-hidden="true" />
                   <span className="sr-only">Client</span>
@@ -432,7 +432,7 @@ export default function ClientVoicesClient() {
                 </label>
                 <Link
                   href={CLIENT_VOICES_HISTORY_HREF}
-                  className="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
+                  className="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
                 >
                   <History size={16} aria-hidden="true" />
                   Saved Batches
@@ -441,7 +441,7 @@ export default function ClientVoicesClient() {
                   type="button"
                   onClick={startAgain}
                   disabled={voices.length === 0 && !tasks}
-                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
                 >
                   <RotateCcw size={16} aria-hidden="true" />
                   Clear batch
@@ -462,7 +462,7 @@ export default function ClientVoicesClient() {
             <div className="grid grid-cols-1 gap-5 short:gap-3 lg:flex-1 lg:grid-cols-[minmax(260px,30fr)_minmax(0,70fr)]">
               <div className="flex min-w-0 flex-col gap-4 lg:self-start">
                 {/* What this batch is called, and whether it is kept: both belong with what goes in */}
-                <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+                <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
                   <label className="flex flex-col gap-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-outline">{CLIENT_VOICES_MESSAGES.title}</span>
                     <input
@@ -470,7 +470,7 @@ export default function ClientVoicesClient() {
                       onChange={(event) => setTitle(event.target.value)}
                       maxLength={BATCH_TITLE_MAX_LENGTH}
                       placeholder={CLIENT_VOICES_MESSAGES.titlePlaceholder}
-                      className="w-full rounded-xl border border-outline-variant bg-white px-3 py-2 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+                      className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
                     />
                     <span className="text-[11px] text-outline">{CLIENT_VOICES_MESSAGES.titleHint}</span>
                   </label>

@@ -33,7 +33,7 @@ const runOn = (iso: string) =>
 const titleOf = (batch: VoiceBatch) => batch.title || batch.clientName || CLIENT_VOICES_MESSAGES.untitled
 
 const pagerButton =
-  "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+  "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
 
 /** Whose batch it was, or that it was kept under no client, which is just as ordinary. */
 const ClientTag: React.FC<{ batch: VoiceBatch }> = ({ batch }) =>
@@ -252,7 +252,7 @@ export default function BatchHistoryClient() {
               </div>
               <Link
                 href="/client-voices"
-                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant sm:shrink-0"
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover sm:shrink-0"
               >
                 <SquarePlus size={16} aria-hidden="true" />
                 New Batch
@@ -350,7 +350,7 @@ export default function BatchHistoryClient() {
             ) : (
               <div className={`flex flex-col gap-3 transition-opacity ${isLoading ? "opacity-60" : ""}`} aria-busy={isLoading}>
                 {/* The table from xl, where it fits beside the open sidebar; cards below */}
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm xl:block">
                   <table className="w-full min-w-[900px] border-collapse text-left">
                     <caption className="sr-only">
                       Saved voice batches, page {page} of {totalPages}
@@ -406,7 +406,7 @@ export default function BatchHistoryClient() {
 
                 <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {items.map((batch) => (
-                    <li key={batch.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                    <li key={batch.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-sm">
                       <div className="flex items-start justify-between gap-2">
                         <input
                           type="checkbox"

@@ -132,7 +132,7 @@ export default function AuditClient() {
               <div role="alert" className="flex flex-col items-center gap-3 py-16 short:py-5 text-center">
                 <AlertTriangle size={20} className="text-error" aria-hidden="true" />
                 <p className="max-w-sm text-sm text-on-surface-variant">{list.error}</p>
-                <button type="button" onClick={list.retry} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold">
+                <button type="button" onClick={list.retry} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold">
                   <RefreshCw size={15} aria-hidden="true" />
                   Try again
                 </button>
@@ -147,7 +147,7 @@ export default function AuditClient() {
             ) : (
               <div className={`flex flex-col gap-3 transition-opacity ${list.isLoading ? "opacity-60" : ""}`} aria-busy={list.isLoading}>
                 {/* The table from xl, where it fits beside the open sidebar; cards below, two to a row on a tablet */}
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm xl:block">
                   <table className="w-full min-w-[880px] border-collapse text-left">
                     <caption className="sr-only">Sign-in activity, newest first</caption>
                     <thead className="bg-surface-container-lowest">
@@ -186,7 +186,7 @@ export default function AuditClient() {
 
                 <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {list.items.map((entry) => (
-                    <li key={entry.id} className="flex min-w-0 flex-col gap-1.5 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                    <li key={entry.id} className="flex min-w-0 flex-col gap-1.5 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-sm">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-[13px] font-semibold text-on-surface">{entry.name ?? "No such account"}</p>

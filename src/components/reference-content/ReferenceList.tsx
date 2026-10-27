@@ -48,7 +48,7 @@ const ReferenceCard: React.FC<{
 
   return (
     <li
-      className={`flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm transition-opacity ${
+      className={`flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm transition-opacity ${
         isDeleting ? "opacity-50" : ""
       }`}
     >
@@ -179,7 +179,7 @@ export const ReferenceList: React.FC<ReferenceListProps> = ({
         <button
           type="button"
           onClick={onRetry}
-          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
         >
           <RefreshCw size={15} aria-hidden="true" />
           Try again

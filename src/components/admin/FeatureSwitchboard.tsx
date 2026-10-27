@@ -25,7 +25,7 @@ const Track: React.FC<{ on: boolean; mixed?: boolean }> = ({ on, mixed = false }
     aria-hidden="true"
     className={`flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors ${on ? "bg-primary" : mixed ? "bg-primary/40" : "bg-outline-variant"}`}
   >
-    <span className={`flex h-4 w-4 items-center justify-center rounded-full bg-white transition-transform ${on ? "translate-x-4" : mixed ? "translate-x-2" : ""}`}>
+    <span className={`flex h-4 w-4 items-center justify-center rounded-full bg-surface-container-lowest transition-transform ${on ? "translate-x-4" : mixed ? "translate-x-2" : ""}`}>
       {on && <Check size={10} className="text-primary" />}
     </span>
   </span>
@@ -82,7 +82,7 @@ export const FeatureSwitchboard: React.FC<FeatureSwitchboardProps> = ({ isOff, n
                       disabled={disabled || saving}
                       title={tool.description}
                       className={`flex w-full items-center justify-between gap-2 rounded-xl border px-2.5 py-2 text-left transition-colors disabled:opacity-60 ${
-                        off ? "border-outline-variant bg-white text-outline" : "border-primary/30 bg-primary-fixed/25 text-on-surface"
+                        off ? "border-outline-variant bg-surface-container-lowest text-outline" : "border-primary/30 bg-primary-fixed/25 text-on-surface"
                       }`}
                     >
                       <span className="flex min-w-0 flex-1 items-center gap-2">

@@ -36,7 +36,7 @@ const Tab: React.FC<TabProps> = ({ kind, isChosen, count, onChoose, isPrivate })
     : isChosen
       ? "bg-primary text-white"
       : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
-  const countTone = isChosen ? "bg-white/20 text-white" : isPrivate ? "bg-secondary-fixed-dim text-on-secondary-fixed-variant" : "bg-surface-container-high text-outline"
+  const countTone = isChosen ? "bg-primary-hover text-white" : isPrivate ? "bg-secondary-fixed-dim text-on-secondary-fixed-variant" : "bg-surface-container-high text-outline"
   return (
     <button
       type="button"
@@ -70,7 +70,7 @@ export const ProjectTabs: React.FC<ProjectTabsProps> = ({ chosen, onChoose, coun
   const shared = kinds.filter((kind) => kind.isPublic)
   const own = kinds.filter((kind) => !kind.isPublic)
   return (
-    <div role="tablist" aria-label="What this project holds" className="flex flex-wrap items-center gap-1 rounded-2xl border border-outline-variant bg-white p-1">
+    <div role="tablist" aria-label="What this project holds" className="flex flex-wrap items-center gap-1 rounded-2xl border border-outline-variant bg-surface-container-lowest p-1">
       {shared.map((kind) => (
         <Tab key={kind.id} kind={kind} isChosen={kind.id === chosen} count={counts[kind.id]} onChoose={onChoose} isPrivate={false} />
       ))}

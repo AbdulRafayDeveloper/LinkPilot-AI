@@ -434,7 +434,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       }}
       aria-pressed={mode === target}
       className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-        mode === target ? "bg-white text-on-surface shadow-sm" : "text-on-surface-variant hover:text-on-surface"
+        mode === target ? "bg-surface-container-lowest text-on-surface shadow-sm" : "text-on-surface-variant hover:text-on-surface"
       }`}
     >
       <Icon size={13} aria-hidden="true" />
@@ -538,14 +538,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       </div>
 
       {bar && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-outline-variant bg-white px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 border-b border-outline-variant bg-surface-container-lowest px-3 py-2">
           {bar.kind === "image" && images && (
             <>
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={imageStatus.busy}
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
               >
                 {imageStatus.busy ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Upload size={13} aria-hidden="true" />}
                 {imageStatus.busy ? "Adding image..." : "Upload from computer"}
@@ -610,13 +610,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         </div>
       )}
       {!bar && imageStatus.busy && (
-        <p role="status" className="flex items-center gap-2 border-b border-outline-variant bg-white px-3 py-1.5 text-[12px] text-on-surface-variant">
+        <p role="status" className="flex items-center gap-2 border-b border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] text-on-surface-variant">
           <Loader2 size={13} className="animate-spin text-primary" aria-hidden="true" />
           Adding image...
         </p>
       )}
       {!bar && imageStatus.error && (
-        <p role="alert" className="border-b border-outline-variant bg-white px-3 py-1.5 text-[12px] text-error">
+        <p role="alert" className="border-b border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] text-error">
           {imageStatus.error}
         </p>
       )}

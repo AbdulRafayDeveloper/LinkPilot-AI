@@ -15,7 +15,7 @@ import { folderBranch, folderPath, type FolderNode } from "@/lib/folderTree"
  */
 
 const fieldClass =
-  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
 const labelClass = "text-[13px] font-semibold text-on-surface"
 
 export interface FolderDialogCopy {
@@ -87,7 +87,7 @@ export function FolderNameDialog<T extends FolderNode>({
             type="submit"
             form="folder-name-form"
             disabled={isSaving || !name.trim()}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
             {isSaving && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
             {renaming ? "Save" : "Make folder"}
@@ -190,7 +190,7 @@ export function MoveToFolderDialog<T extends FolderNode>({
               type="button"
               onClick={() => onSubmit(chosen)}
               disabled={isSaving || chosen === currentFolderId}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
               {copy.moveHere}

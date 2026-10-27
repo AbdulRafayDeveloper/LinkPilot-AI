@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { AccountProfileSchema } from "@/lib/validation/account"
 import { ACCOUNT_MESSAGES } from "@/constants/account"
+import { COLOR_SCHEME_MESSAGES } from "@/constants/colorScheme"
 import { updateAccountProfile } from "@/services/account/profile"
 import { requireViewer } from "@/services/auth/viewer"
 
@@ -9,8 +10,8 @@ export const dynamic = "force-dynamic"
 
 /**
  * PUT: the signed-in account's own name (what the header, the account menu and the admin pages show)
- * and its timezone (what every time in the app is shown in), either or both, each written only when
- * it is sent. It is the person's own record, so there is nothing to scope and nothing to own: the
+ * its timezone (what every time in the app is shown in) and its colour scheme (System, Light or
+ * Dark), any of them, each written only when it is sent. It is the person's own record, so there is nothing to scope and nothing to own: the
  * account changed is always the one making the request.
  */
 export async function PUT(req: NextRequest) {
@@ -22,7 +23,12 @@ export async function PUT(req: NextRequest) {
   }
   try {
     const saved = await updateAccountProfile(auth.viewer, parsed.data)
-    const message = parsed.data.name === undefined ? ACCOUNT_MESSAGES.timeZoneSaved : ACCOUNT_MESSAGES.nameSaved
+    const message =
+      parsed.data.name !== undefined
+        ? ACCOUNT_MESSAGES.nameSaved
+        : parsed.data.timeZone !== undefined
+          ? ACCOUNT_MESSAGES.timeZoneSaved
+          : COLOR_SCHEME_MESSAGES.saved
     return NextResponse.json({ success: true, message, data: saved })
   } catch (error: unknown) {
     console.error("PUT Account Exception:", error instanceof Error ? error.message : error)

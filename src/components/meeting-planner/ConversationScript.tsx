@@ -36,13 +36,13 @@ export const STEP_STYLE: Record<ScriptStepKindId, { icon: LucideIcon; label: str
   show_project: {
     icon: MonitorPlay,
     label: "Show project",
-    badge: "bg-on-primary-fixed-variant text-white",
+    badge: "bg-primary-hover text-white",
     box: "border-primary/40 bg-primary-fixed/60",
   },
   note: {
     icon: StickyNote,
     label: "Note",
-    badge: "bg-outline text-white",
+    badge: "bg-on-surface-variant text-surface-container-lowest",
     box: "border-dashed border-outline-variant bg-surface-container-low",
   },
 }
@@ -77,7 +77,7 @@ const ScriptStepView: React.FC<{ step: ScriptStep; size: ScriptTextSize; link?: 
               href={link}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-on-primary-fixed-variant"
+              className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-primary-hover"
             >
               <ExternalLink size={11} aria-hidden="true" />
               Open project
@@ -85,7 +85,7 @@ const ScriptStepView: React.FC<{ step: ScriptStep; size: ScriptTextSize; link?: 
             </a>
           )}
           {isShow && step.minutes > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">
+            <span className="inline-flex items-center gap-1 rounded-full bg-surface-container-lowest px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">
               <Clock size={11} aria-hidden="true" />
               about {step.minutes} min
             </span>
@@ -130,7 +130,7 @@ export const ConversationScript: React.FC<{
         className="scroll-mt-24 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4"
       >
         <div className="flex items-start gap-2.5">
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-on-surface text-[13px] font-bold text-white tabular-nums">
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-[13px] font-bold text-white tabular-nums">
             {index + 1}
           </span>
           <div className="min-w-0">

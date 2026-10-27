@@ -26,7 +26,7 @@ export const ResetButton: React.FC<ResetButtonProps> = ({ onReset, disabled = fa
     disabled={disabled}
     title="Reset: clear the inputs and the result"
     aria-label="Reset"
-    className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-outline-variant bg-white text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white"
+    className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface-container-lowest"
   >
     <RotateCcw size={18} aria-hidden="true" />
   </button>

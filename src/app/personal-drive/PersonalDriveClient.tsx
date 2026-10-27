@@ -66,7 +66,7 @@ import type { Asset, AssetMetadataInput, AssetsPage, DriveFolder, UploadProgress
 
 const chipClass = "inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold transition-colors"
 const headerButton =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface shadow-sm transition-colors hover:bg-surface-container-high"
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface shadow-sm transition-colors hover:bg-surface-container-high"
 
 export default function PersonalDriveClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -577,7 +577,7 @@ export default function PersonalDriveClient() {
                   <button
                     type="button"
                     onClick={() => setIsAdding(true)}
-                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover"
                   >
                     <Upload size={16} aria-hidden="true" />
                     Upload file
@@ -592,7 +592,7 @@ export default function PersonalDriveClient() {
                   type="button"
                   onClick={() => setAreFoldersShown((shown) => !shown)}
                   aria-expanded={areFoldersShown}
-                  className="rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface-variant transition-colors hover:text-primary lg:hidden"
+                  className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface-variant transition-colors hover:text-primary lg:hidden"
                 >
                   {areFoldersShown ? "Hide folders" : "All folders"}
                 </button>
@@ -609,7 +609,7 @@ export default function PersonalDriveClient() {
                     maxLength={ASSET_SEARCH_MAX_LENGTH}
                     placeholder={folderId ? DRIVE_FOLDER_MESSAGES.searchHere : DRIVE_FOLDER_MESSAGES.everywhere}
                     aria-label="Search your files by name"
-                    className="w-full rounded-xl border border-outline-variant bg-white py-2.5 pl-9 pr-9 text-[13px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest py-2.5 pl-9 pr-9 text-[13px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                   {typedSearch && (
                     <button
@@ -641,7 +641,7 @@ export default function PersonalDriveClient() {
                         className={`${chipClass} ${
                           isActive
                             ? "bg-primary-container text-on-primary-container"
-                            : "border border-outline-variant bg-white text-on-surface-variant hover:border-primary/40 hover:text-primary"
+                            : "border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-primary/40 hover:text-primary"
                         }`}
                       >
                         <Icon size={13} aria-hidden="true" />
@@ -690,7 +690,7 @@ export default function PersonalDriveClient() {
               {/* 260px is what a folder five deep needs before its name starts to truncate */}
               <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
                 <aside
-                  className={`${areFoldersShown ? "flex" : "hidden"} min-h-0 flex-col gap-2 overflow-y-auto rounded-2xl border border-outline-variant bg-white p-2 lg:flex`}
+                  className={`${areFoldersShown ? "flex" : "hidden"} min-h-0 flex-col gap-2 overflow-y-auto rounded-2xl border border-outline-variant bg-surface-container-lowest p-2 lg:flex`}
                 >
                   {tree}
                 </aside>
@@ -728,7 +728,7 @@ export default function PersonalDriveClient() {
             {/* What travels with the pointer, so it is always clear what a drop will file */}
             <DragOverlay dropAnimation={null}>
               {dragged && (
-                <span className="inline-flex items-center gap-2 rounded-xl border border-primary bg-white px-3 py-2 text-[12px] font-semibold text-on-surface shadow-lg">
+                <span className="inline-flex items-center gap-2 rounded-xl border border-primary bg-surface-container-lowest px-3 py-2 text-[12px] font-semibold text-on-surface shadow-lg">
                   <FolderInput size={14} className="text-primary" aria-hidden="true" />
                   {movingCount > 1 ? `${movingCount} files` : dragged.name}
                 </span>

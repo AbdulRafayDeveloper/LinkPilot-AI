@@ -54,7 +54,7 @@ export const AssetViewerDialog: React.FC<AssetViewerDialogProps> = ({ asset, onD
           <button
             type="button"
             onClick={() => onDownload(asset)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover"
           >
             <Download size={16} aria-hidden="true" />
             Download

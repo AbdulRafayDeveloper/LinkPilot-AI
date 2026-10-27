@@ -209,7 +209,7 @@ export const PlanLinkConfirmDialog: React.FC<{ employee: Employee; link: PlanLin
               onClick={() => link.run(action)}
               disabled={isWorking}
               className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                isReplacing ? "bg-primary hover:bg-on-primary-fixed-variant" : "bg-error hover:bg-error/90"
+                isReplacing ? "bg-primary hover:bg-primary-hover" : "bg-error hover:bg-error/90"
               }`}
             >
               {isWorking ? (

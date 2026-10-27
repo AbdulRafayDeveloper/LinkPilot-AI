@@ -44,7 +44,7 @@ export default function GlobalPromptsClient() {
     >
       <div className="flex flex-col gap-2">
         {/* Eight tabs wrap onto a second row rather than running off a phone or a laptop's edge */}
-        <div role="tablist" aria-label={GLOBAL_PROMPTS_LINK.title} className="flex flex-wrap gap-1 rounded-2xl border border-outline-variant bg-white p-1">
+        <div role="tablist" aria-label={GLOBAL_PROMPTS_LINK.title} className="flex flex-wrap gap-1 rounded-2xl border border-outline-variant bg-surface-container-lowest p-1">
           {MY_PROFILE_TABS.map((entry) => {
             const Icon = TAB_ICONS[entry.id]
             const isChosen = entry.id === tab
@@ -67,7 +67,7 @@ export default function GlobalPromptsClient() {
                 {isComing && (
                   <span
                     className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                      isChosen ? "bg-white/20 text-white" : "bg-secondary-fixed text-on-secondary-fixed-variant"
+                      isChosen ? "bg-primary-hover text-white" : "bg-secondary-fixed text-on-secondary-fixed-variant"
                     }`}
                   >
                     Soon
@@ -91,7 +91,7 @@ export default function GlobalPromptsClient() {
         ) : tab === "projects" ? (
           <ProjectsTab />
         ) : (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-14 text-center">
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest px-6 py-14 text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary-fixed text-on-secondary-fixed-variant">
               <Hourglass size={22} aria-hidden="true" />
             </span>

@@ -120,7 +120,7 @@ export default function HelpClient() {
         onChange={(event) => setQuery(event.target.value)}
         placeholder={HELP_MESSAGES.search}
         aria-label={HELP_MESSAGES.search}
-        className="w-full rounded-xl border border-outline-variant bg-white py-2.5 pl-9 pr-9 text-[14px] text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest py-2.5 pl-9 pr-9 text-[14px] text-on-surface placeholder:text-outline focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
       />
       {isSearching && (
         <button
@@ -138,7 +138,7 @@ export default function HelpClient() {
   return (
     <div className="font-body-md text-body-md min-h-dvh bg-background text-on-surface">
       {/* The page's own header: no sidebar and no account menu, because nobody has to be signed in */}
-      <header className="sticky top-0 z-40 border-b border-outline-variant bg-white/95 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-outline-variant bg-surface-container-lowest/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
           <BrandLogo priority />
           <span className="hidden text-[13px] font-semibold text-on-surface-variant sm:inline" aria-hidden="true">
@@ -149,7 +149,7 @@ export default function HelpClient() {
             {searchBox("help-search-top", "hidden w-72 md:block")}
             <Link
               href={HOME_PATH}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3.5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3.5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-primary-hover"
             >
               {HELP_MESSAGES.openApp}
               <ExternalLink size={14} aria-hidden="true" />
@@ -159,7 +159,7 @@ export default function HelpClient() {
       </header>
 
       {/* What this page is, and the areas it covers */}
-      <section className="border-b border-outline-variant bg-white">
+      <section className="border-b border-outline-variant bg-surface-container-lowest">
         <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
           <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-primary">{SITE_NAME}</p>
           <h1 className="mt-2 text-[30px] font-bold leading-tight tracking-tight text-on-surface sm:text-[38px]">{HELP_MESSAGES.title}</h1>
@@ -193,7 +193,7 @@ export default function HelpClient() {
               type="button"
               onClick={() => setIsListOpen((open) => !open)}
               aria-expanded={isListOpen}
-              className="flex w-full items-center justify-between gap-2 rounded-xl border border-outline-variant bg-white px-3.5 py-3 text-left text-[13.5px] font-semibold text-on-surface shadow-sm transition-colors hover:bg-surface-container-high lg:hidden"
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-3 text-left text-[13.5px] font-semibold text-on-surface shadow-sm transition-colors hover:bg-surface-container-high lg:hidden"
             >
               <span className="min-w-0 truncate">{current ? current.title : HELP_MESSAGES.allTopics}</span>
               <ChevronDown size={16} className={`shrink-0 text-outline transition-transform ${isListOpen ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -203,7 +203,7 @@ export default function HelpClient() {
               activeId={activeId}
               onPick={goTo}
               listRef={listRef}
-              className={`${isListOpen ? "mt-2 max-h-[65vh]" : "hidden"} rounded-2xl border border-outline-variant bg-white p-3 shadow-sm lg:mt-0 lg:block lg:max-h-[calc(100dvh-7rem)]`}
+              className={`${isListOpen ? "mt-2 max-h-[65vh]" : "hidden"} rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-sm lg:mt-0 lg:block lg:max-h-[calc(100dvh-7rem)]`}
             />
           </aside>
 
@@ -227,7 +227,7 @@ export default function HelpClient() {
               </section>
             ))}
             {shown.length === 0 && !isSearching && (
-              <p className="rounded-2xl border border-outline-variant bg-white px-4 py-6 text-[13px] text-on-surface-variant">
+              <p className="rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 py-6 text-[13px] text-on-surface-variant">
                 {HELP_MESSAGES.nothingToRead}
               </p>
             )}
@@ -235,7 +235,7 @@ export default function HelpClient() {
         </div>
       </div>
 
-      <footer className="border-t border-outline-variant bg-white">
+      <footer className="border-t border-outline-variant bg-surface-container-lowest">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-6 sm:px-6 lg:px-8">
           <p className="max-w-[60ch] text-[12.5px] text-on-surface-variant">{HELP_MESSAGES.footer}</p>
           <p className="text-[12.5px] font-semibold text-outline">
@@ -254,7 +254,7 @@ export default function HelpClient() {
             window.scrollTo({ top: 0, behavior: glide ? "smooth" : "auto" })
             setActiveId(ids[0] ?? "")
           }}
-          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-1.5 rounded-full border border-outline-variant bg-white px-3.5 py-2.5 text-[12.5px] font-semibold text-on-surface shadow-lg transition-colors hover:bg-surface-container-high"
+          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3.5 py-2.5 text-[12.5px] font-semibold text-on-surface shadow-lg transition-colors hover:bg-surface-container-high"
         >
           <ArrowUp size={14} aria-hidden="true" />
           {HELP_MESSAGES.backToTop}

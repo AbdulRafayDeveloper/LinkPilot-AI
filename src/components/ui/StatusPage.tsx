@@ -19,7 +19,7 @@ interface StatusPageProps {
 const ACTION_BASE =
   "inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 const ACTION_STYLES = {
-  primary: `${ACTION_BASE} bg-primary text-white shadow-sm hover:bg-on-primary-fixed-variant`,
+  primary: `${ACTION_BASE} bg-primary text-white shadow-sm hover:bg-primary-hover`,
   secondary: `${ACTION_BASE} border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-high`,
 }
 

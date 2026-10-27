@@ -2,19 +2,157 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * The colour scheme. Every colour token is a variable here (space-separated RGB channels, which
+ * tailwind.config.ts turns into `rgb(var(--c-name) / <alpha-value>)`), so one class is right in
+ * both schemes and no component needs a `dark:` variant.
+ *
+ * Light is the "Signal Violet & Gold" scheme, exactly as it was. Dark is a jet black one in the way
+ * an iPhone's is: a pure black page, cards a step lighter (#1c1c1e), raised surfaces lighter again,
+ * white text, and every colour readable on black. Every text colour is at least 4.5:1 on what it sits
+ * on, and so is white on every filled button: violet, gold, green and red each have a deep value for
+ * a fill and a light one for text (`--c-primary` and `--c-primary-text`; tailwind.config.ts gives the
+ * text utilities the second), because on black no single value can be both.
+ *
+ * Which one applies is `data-theme` on <html>, set before the page paints from the person's choice
+ * (Account Settings → Preferences: System, Light or Dark; System follows the device). See
+ * lib/colorScheme.ts.
+ */
+:root {
+  color-scheme: light;
+  --c-secondary-text: 180 83 9;
+  --c-success-text: 21 128 61;
+  --c-error-text: 186 26 26;
+  --c-primary-text: 91 33 182;
+  --c-secondary: 180 83 9;
+  --c-success: 21 128 61;
+  --c-error: 186 26 26;
+  --c-primary-hover: 76 29 149;
+  --c-primary: 91 33 182;
+  --c-on-primary: 255 255 255;
+  --c-on-primary-fixed-variant: 76 29 149;
+  --c-primary-container: 109 40 217;
+  --c-on-primary-container: 237 233 254;
+  --c-primary-fixed: 221 214 254;
+  --c-primary-fixed-dim: 196 181 253;
+  --c-inverse-primary: 196 181 253;
+  --c-surface-tint: 109 40 217;
+  --c-on-primary-fixed: 46 16 101;
+  --c-on-secondary: 255 255 255;
+  --c-secondary-container: 245 158 11;
+  --c-on-secondary-container: 69 26 3;
+  --c-secondary-fixed: 254 243 199;
+  --c-secondary-fixed-dim: 253 230 138;
+  --c-on-secondary-fixed: 69 26 3;
+  --c-on-secondary-fixed-variant: 146 64 14;
+  --c-tertiary: 87 83 106;
+  --c-on-tertiary: 255 255 255;
+  --c-tertiary-container: 111 106 130;
+  --c-on-tertiary-container: 239 236 246;
+  --c-tertiary-fixed: 230 226 240;
+  --c-tertiary-fixed-dim: 201 196 214;
+  --c-on-tertiary-fixed: 30 26 41;
+  --c-on-tertiary-fixed-variant: 72 68 87;
+  --c-background: 247 246 250;
+  --c-on-background: 28 24 38;
+  --c-surface: 252 251 254;
+  --c-surface-bright: 252 251 254;
+  --c-surface-dim: 217 212 227;
+  --c-surface-container-lowest: 255 255 255;
+  --c-surface-container-low: 246 244 250;
+  --c-surface-container: 239 236 245;
+  --c-surface-container-high: 232 228 240;
+  --c-surface-container-highest: 225 220 234;
+  --c-surface-variant: 228 224 236;
+  --c-on-surface: 28 24 38;
+  --c-on-surface-variant: 74 70 88;
+  --c-outline: 104 100 119;
+  --c-outline-variant: 214 210 223;
+  --c-inverse-surface: 43 38 54;
+  --c-inverse-on-surface: 244 241 249;
+  --c-ink: 28 24 38;
+  --c-on-success: 255 255 255;
+  --c-success-container: 220 252 231;
+  --c-on-success-container: 20 83 45;
+  --c-on-error: 255 255 255;
+  --c-error-container: 255 218 214;
+  --c-on-error-container: 147 0 10;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --c-secondary-text: 251 191 36;
+  --c-success-text: 74 222 128;
+  --c-error-text: 255 122 114;
+  --c-primary-text: 179 157 251;
+  --c-secondary: 180 83 9;
+  --c-success: 21 128 61;
+  --c-error: 220 38 38;
+  --c-primary-hover: 109 40 217;
+  --c-primary: 124 58 237;
+  --c-on-primary: 255 255 255;
+  --c-on-primary-fixed-variant: 196 181 253;
+  --c-primary-container: 109 40 217;
+  --c-on-primary-container: 245 243 255;
+  --c-primary-fixed: 42 29 85;
+  --c-primary-fixed-dim: 59 42 117;
+  --c-inverse-primary: 91 33 182;
+  --c-surface-tint: 124 58 237;
+  --c-on-primary-fixed: 237 233 254;
+  --c-on-secondary: 255 255 255;
+  --c-secondary-container: 180 83 9;
+  --c-on-secondary-container: 254 243 199;
+  --c-secondary-fixed: 58 42 6;
+  --c-secondary-fixed-dim: 77 55 8;
+  --c-on-secondary-fixed: 254 243 199;
+  --c-on-secondary-fixed-variant: 252 211 77;
+  --c-tertiary: 99 99 102;
+  --c-on-tertiary: 255 255 255;
+  --c-tertiary-container: 72 72 74;
+  --c-on-tertiary-container: 242 242 247;
+  --c-tertiary-fixed: 44 44 46;
+  --c-tertiary-fixed-dim: 58 58 60;
+  --c-on-tertiary-fixed: 242 242 247;
+  --c-on-tertiary-fixed-variant: 199 199 204;
+  --c-background: 0 0 0;
+  --c-on-background: 255 255 255;
+  --c-surface: 0 0 0;
+  --c-surface-bright: 44 44 46;
+  --c-surface-dim: 0 0 0;
+  --c-surface-container-lowest: 28 28 30;
+  --c-surface-container-low: 35 35 37;
+  --c-surface-container: 44 44 46;
+  --c-surface-container-high: 54 54 56;
+  --c-surface-container-highest: 58 58 60;
+  --c-surface-variant: 44 44 46;
+  --c-on-surface: 255 255 255;
+  --c-on-surface-variant: 199 199 204;
+  --c-outline: 165 165 171;
+  --c-outline-variant: 58 58 60;
+  --c-inverse-surface: 229 229 234;
+  --c-inverse-on-surface: 28 28 30;
+  --c-ink: 72 72 74;
+  --c-on-success: 255 255 255;
+  --c-success-container: 15 46 27;
+  --c-on-success-container: 134 239 172;
+  --c-on-error: 255 255 255;
+  --c-error-container: 59 18 16;
+  --c-on-error-container: 255 180 171;
+}
+
 html {
   scroll-behavior: smooth;
 }
 
 body {
-  background-color: #f7f6fa;
-  color: #1c1826;
+  background-color: rgb(var(--c-background));
+  color: rgb(var(--c-on-surface));
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: #ddd6fe;
-  color: #2e1065;
+  background: rgb(var(--c-primary-fixed));
+  color: rgb(var(--c-on-primary-fixed));
 }
 
 .ambient-card-shadow {
@@ -30,11 +168,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d6d2df;
+  background: rgb(var(--c-outline-variant));
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #5b21b6;
+  background: rgb(var(--c-primary));
 }
 
 /*
@@ -192,7 +330,7 @@ body {
     @apply text-outline line-through;
   }
   .visual-editor [data-checkbox] {
-    @apply absolute left-0 top-[0.3em] flex h-4 w-4 cursor-pointer select-none items-center justify-center rounded border border-outline-variant bg-white text-[11px] font-bold leading-none text-white no-underline;
+    @apply absolute left-0 top-[0.3em] flex h-4 w-4 cursor-pointer select-none items-center justify-center rounded border border-outline-variant bg-surface-container-lowest text-[11px] font-bold leading-none text-white no-underline;
   }
   .visual-editor li[data-checked="true"] > [data-checkbox] {
     @apply border-primary bg-primary;

@@ -103,7 +103,7 @@ export const Modal: React.FC<ModalProps> = ({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className={`bg-white rounded-2xl ${PANEL_SIZE[size]} flex flex-col border border-outline-variant shadow-xl outline-none`}
+        className={`bg-surface-container-lowest rounded-2xl ${PANEL_SIZE[size]} flex flex-col border border-outline-variant shadow-xl outline-none`}
       >
         <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3 border-b border-outline-variant/60 shrink-0">
           <div className="min-w-0">

@@ -94,8 +94,8 @@ export const PostInput: React.FC<PostInputProps> = ({
               onKeyDown={(event) => handleTabKeyDown(event, index)}
               className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs transition-colors ${
                 isActive
-                  ? "bg-white text-primary font-bold shadow-sm"
-                  : "text-on-surface-variant font-semibold hover:text-on-surface hover:bg-white/60"
+                  ? "bg-surface-container-lowest text-primary font-bold shadow-sm"
+                  : "text-on-surface-variant font-semibold hover:text-on-surface hover:bg-surface-container-lowest/60"
               }`}
             >
               <Icon size={14} aria-hidden="true" />

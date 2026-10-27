@@ -29,7 +29,7 @@ const List: React.FC<{ title: string; items: string[] }> = ({ title, items }) =>
 const ProjectCard: React.FC<{ project: ProfileProject; onEdit: () => void; onRemove: () => void }> = ({ project, onEdit, onRemove }) => {
   const [isConfirming, setIsConfirming] = useState(false)
   return (
-    <article aria-labelledby={`project-${project.id}`} className="flex min-w-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
+    <article aria-labelledby={`project-${project.id}`} className="flex min-w-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h3 id={`project-${project.id}`} className="min-w-0 text-[16px] font-bold text-on-surface [overflow-wrap:anywhere]">
           {project.name}
@@ -120,7 +120,7 @@ export const ProjectsTab: React.FC = () => {
           onClick={() => setEditing(null)}
           disabled={isFull}
           title={isFull ? PROFILE_PROJECT_MESSAGES.tooMany : undefined}
-          className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-50"
+          className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
         >
           <Plus size={16} aria-hidden="true" />
           {PROFILE_PROJECT_MESSAGES.add}
@@ -128,7 +128,7 @@ export const ProjectsTab: React.FC = () => {
       </div>
 
       {projects.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-12 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest px-6 py-12 text-center">
           <FolderKanban size={28} className="text-primary" aria-hidden="true" />
           <p className="max-w-md text-[14px] text-on-surface-variant">{PROFILE_PROJECT_MESSAGES.empty}</p>
           <button type="button" onClick={() => setEditing(null)} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface hover:bg-surface-container-high">

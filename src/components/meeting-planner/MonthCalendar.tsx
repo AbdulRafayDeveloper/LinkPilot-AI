@@ -54,7 +54,7 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
   return (
     <section
       aria-label="Meeting calendar"
-      className="flex min-h-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
+      className="flex min-h-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
@@ -68,14 +68,14 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
             onClick={() => onMonthChange("previous")}
             disabled={!canGoBack}
             aria-label="Previous month"
-            className="rounded-lg border border-outline-variant bg-white p-1.5 text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg border border-outline-variant bg-surface-container-lowest p-1.5 text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronLeft size={16} aria-hidden="true" />
           </button>
           <button
             type="button"
             onClick={() => onMonthChange("today")}
-            className="rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
           >
             Today
           </button>
@@ -84,7 +84,7 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
             onClick={() => onMonthChange("next")}
             disabled={!canGoForward}
             aria-label="Next month"
-            className="rounded-lg border border-outline-variant bg-white p-1.5 text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg border border-outline-variant bg-surface-container-lowest p-1.5 text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronRight size={16} aria-hidden="true" />
           </button>
@@ -96,7 +96,7 @@ export const MonthCalendar: React.FC<MonthCalendarProps> = ({
             aria-label={isExpanded ? "Show today and the day's meetings again" : "Expand the calendar"}
             title={isExpanded ? "Show today and the day's meetings again" : "Expand the calendar to the full page"}
             className={`ml-1 hidden rounded-lg border p-1.5 transition-colors xl:inline-flex ${
-              isExpanded ? "border-primary bg-primary text-white hover:bg-on-primary-fixed-variant" : "border-outline-variant bg-white text-on-surface hover:bg-surface-container-high"
+              isExpanded ? "border-primary bg-primary text-white hover:bg-primary-hover" : "border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-high"
             }`}
           >
             {isExpanded ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}

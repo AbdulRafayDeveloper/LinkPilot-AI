@@ -60,7 +60,7 @@ export function RadioCardGroup<Id extends string>({
               className={`relative flex items-start gap-2 min-w-0 cursor-pointer rounded-xl border px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-primary/40 ${
                 isSelected
                   ? "bg-primary-container border-primary-container text-on-primary-container"
-                  : `bg-white text-on-surface hover:bg-surface-container-low ${invalid ? "border-error" : "border-outline-variant"}`
+                  : `bg-surface-container-lowest text-on-surface hover:bg-surface-container-low ${invalid ? "border-error" : "border-outline-variant"}`
               }`}
             >
               <input

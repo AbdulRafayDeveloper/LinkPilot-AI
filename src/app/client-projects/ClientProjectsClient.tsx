@@ -112,7 +112,7 @@ export default function ClientProjectsClient() {
                 <button
                   type="button"
                   onClick={() => setAttempt((count) => count + 1)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold"
+                  className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold"
                 >
                   <RefreshCw size={14} aria-hidden="true" />
                   Try again

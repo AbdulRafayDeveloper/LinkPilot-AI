@@ -104,7 +104,7 @@ export default function ChildAccountsClient() {
                 <button
                   type="button"
                   onClick={reload}
-                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <RefreshCw size={15} aria-hidden="true" />
                   Refresh
@@ -114,7 +114,7 @@ export default function ChildAccountsClient() {
                   onClick={() => setAdding(true)}
                   disabled={!page || page.remaining === 0}
                   title={page?.remaining === 0 ? CHILDREN_MESSAGES.tooMany : `Up to ${MAX_CHILDREN} child accounts`}
-                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
                 >
                   <Plus size={15} aria-hidden="true" />
                   New account
@@ -154,7 +154,7 @@ export default function ChildAccountsClient() {
                         className={`w-full rounded-2xl border p-3 text-left transition-colors ${
                           chosen?.id === child.id
                             ? "border-primary bg-primary-fixed/40"
-                            : "border-outline-variant bg-white hover:bg-surface-container-lowest"
+                            : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container-lowest"
                         }`}
                       >
                         <p className="truncate text-[14px] font-semibold text-on-surface">{child.name}</p>
@@ -173,7 +173,7 @@ export default function ChildAccountsClient() {
 
                 {chosen && (
                   <section aria-label={`What ${chosen.name} can use`} className="flex min-w-0 flex-col gap-4">
-                    <div className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <h2 className="truncate text-lg font-bold text-on-surface">{chosen.name}</h2>
                         <p className="truncate text-[13px] text-on-surface-variant">{chosen.email}</p>
@@ -183,7 +183,7 @@ export default function ChildAccountsClient() {
                         <button
                           type="button"
                           onClick={() => setChangingPassword(chosen)}
-                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                         >
                           <KeyRound size={14} aria-hidden="true" />
                           Change password
@@ -191,7 +191,7 @@ export default function ChildAccountsClient() {
                         <button
                           type="button"
                           onClick={() => setDeleting(chosen)}
-                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-error/40 bg-white px-3 py-2 text-[13px] font-semibold text-error transition-colors hover:bg-error-container"
+                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-error/40 bg-surface-container-lowest px-3 py-2 text-[13px] font-semibold text-error transition-colors hover:bg-error-container"
                         >
                           <Trash2 size={14} aria-hidden="true" />
                           Delete
@@ -199,7 +199,7 @@ export default function ChildAccountsClient() {
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+                    <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
                       <h3 className="text-[13px] font-bold text-on-surface">Tools this account can open</h3>
                       <p className="mb-3 mt-1 text-[12px] text-on-surface-variant">
                         Only the tools you have yourself are offered. A tool you lose later goes from this account too.
@@ -265,7 +265,7 @@ export default function ChildAccountsClient() {
 }
 
 const fieldClass =
-  "h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
+  "h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface placeholder:text-outline focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
 const labelClass = "text-[12px] font-semibold text-on-surface"
 
 /** The one submit button every dialog here uses, so they read and behave the same. */
@@ -279,7 +279,7 @@ const SaveButton: React.FC<{ isSaving: boolean; label: string; tone?: "primary" 
     type="submit"
     disabled={isSaving || disabled}
     className={`inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-60 ${
-      tone === "error" ? "bg-error hover:bg-error/90" : "bg-primary hover:bg-on-primary-fixed-variant"
+      tone === "error" ? "bg-error hover:bg-error/90" : "bg-primary hover:bg-primary-hover"
     }`}
   >
     {isSaving && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}

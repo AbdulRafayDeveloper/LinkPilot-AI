@@ -34,7 +34,7 @@ const sizeLabel = (bytes: number) => {
 }
 
 const boxClass =
-  "w-full resize-y rounded-lg border border-outline-variant bg-white px-2 py-1.5 text-[13px] leading-relaxed text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+  "w-full resize-y rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1.5 text-[13px] leading-relaxed text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
 
 /**
  * The voices a batch was made from, in the order they arrived: the recording to **play** where it
@@ -56,7 +56,7 @@ export const KeptVoiceList: React.FC<KeptVoiceListProps> = ({ voices, deletingId
   return (
     <ul className="flex flex-col gap-3">
       {voices.map((voice) => (
-        <li key={voice.id} className="rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+        <li key={voice.id} className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="flex min-w-0 items-center gap-2 text-sm font-bold text-on-surface">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary/5 text-[11px] font-bold text-primary">

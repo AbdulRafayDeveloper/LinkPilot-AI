@@ -27,7 +27,7 @@ export const TopicPost: React.FC<{ topic: StoredTrendingTopic }> = ({ topic }) =
   const isOffTarget = length < POST_TARGET_MIN_CHARS || length > POST_TARGET_MAX_CHARS
 
   return (
-    <section aria-label="Ready-to-post LinkedIn post" className="rounded-xl border border-primary/30 bg-white shadow-sm overflow-hidden">
+    <section aria-label="Ready-to-post LinkedIn post" className="rounded-xl border border-primary/30 bg-surface-container-lowest shadow-sm overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-primary/5 border-b border-primary/15">
         <h4 className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">
           <PenLine size={13} aria-hidden="true" />

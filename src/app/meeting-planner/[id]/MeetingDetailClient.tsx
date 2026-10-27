@@ -55,7 +55,7 @@ import { formatInstant } from "@/lib/timeZone"
 /** One of the three things the user pasted, shown only when there is something to show. */
 const SuppliedText: React.FC<{ title: string; text: string | null }> = ({ title, text }) =>
   text ? (
-    <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
+    <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
       <h2 className="text-sm font-bold text-on-surface">{title}</h2>
       <p className="custom-scrollbar max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-[13px] leading-relaxed text-on-surface-variant">
         {text}
@@ -319,7 +319,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                 <button
                   type="button"
                   onClick={reload}
-                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <RefreshCw size={15} aria-hidden="true" />
                   Try again
@@ -328,7 +328,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
             ) : (
               <>
                 {/* The meeting itself */}
-                <section className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
+                <section className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -384,7 +384,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                       <button
                         type="button"
                         onClick={() => setIsWritingNotes(true)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                        className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                       >
                         <NotebookPen size={14} aria-hidden="true" />
                         Notes
@@ -399,7 +399,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                             setMoveError(null)
                             setIsMoving(true)
                           }}
-                          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                         >
                           <Clock size={14} aria-hidden="true" />
                           Day or time
@@ -412,7 +412,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                             setExtendError(null)
                             setIsExtending(true)
                           }}
-                          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                         >
                           <CalendarPlus size={14} aria-hidden="true" />
                           Repeat for longer
@@ -424,7 +424,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                           setEditError(null)
                           setIsEditing(true)
                         }}
-                        className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                        className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                       >
                         <Pencil size={14} aria-hidden="true" />
                         Edit
@@ -480,7 +480,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                           <button
                             type="button"
                             onClick={() => setIsWritingNotes(true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                           >
                             <Pencil size={12} aria-hidden="true" />
                             Edit notes
@@ -518,7 +518,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                         type="button"
                         onClick={requestPreparation}
                         disabled={isPreparing}
-                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {isPreparing ? (
                           <Loader2 size={14} className="animate-spin" aria-hidden="true" />
@@ -597,7 +597,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
               <button
                 type="button"
                 onClick={() => void runPreparation()}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
               >
                 <RefreshCw size={16} aria-hidden="true" />
                 Prepare again

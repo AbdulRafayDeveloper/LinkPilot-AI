@@ -43,7 +43,7 @@ export const RecordingVideo: React.FC<RecordingVideoProps> = ({ screen, camera, 
     // At most 70% of the window's height, so a wide screen doesn't push the summary under the fold
     // while the video still has as much room as it can use
     <div className="mx-auto flex w-full max-w-[min(100%,124vh)] flex-col gap-2">
-      <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-on-surface">
+      <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-ink">
         <video ref={screenRef} src={screen.url} controls preload="metadata" className="aspect-video w-full" />
         {camera && (
           <video

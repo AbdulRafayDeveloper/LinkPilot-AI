@@ -5,6 +5,7 @@ import { requestApi } from "@/lib/apiClient"
 import { AUTH_ENDPOINTS } from "@/constants/auth"
 import { toolsFor } from "@/constants/linkedinTools"
 import { setDisplayTimeZone } from "@/lib/timeZone"
+import { applyColorScheme } from "@/lib/colorScheme"
 import type { Viewer } from "@/types/auth"
 
 /**
@@ -27,6 +28,9 @@ function load() {
       // Every time on the page follows the zone this person chose; if the page was already drawn in
       // another (a first visit in this browser, or a change made elsewhere) it is drawn again
       setDisplayTimeZone(data.timeZone ?? null, { redraw: true })
+      // The colour scheme saved on the account wins over this browser's copy, which only gave the
+      // page its head start before paint; a choice made on another device arrives here
+      applyColorScheme(data.colorScheme)
     })
     .catch(() => {
       current = { status: "signed-out", user: null }

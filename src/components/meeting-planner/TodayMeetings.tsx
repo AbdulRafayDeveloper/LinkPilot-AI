@@ -51,9 +51,9 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
       <h2 className="flex items-center gap-2 text-sm font-bold text-white">
         <Sun size={16} className="text-white" aria-hidden="true" />
         Today
-        {todayDate && <span className="text-[11px] font-medium text-white/80">{dayLabel(todayDate)}</span>}
+        {todayDate && <span className="text-[11px] font-medium text-white/90">{dayLabel(todayDate)}</span>}
       </h2>
-      <span className="text-[11px] font-semibold text-white/85">
+      <span className="text-[11px] font-semibold text-white/90">
         {meetings.length === 0
           ? "0 meetings"
           : `${meetings.length} ${meetings.length === 1 ? "meeting" : "meetings"}${
@@ -64,7 +64,7 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
 
     {meetings.length === 0 ? (
       <p className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-3 text-[13px] text-white">
-        <CalendarCheck size={15} className="shrink-0 text-white/80" aria-hidden="true" />
+        <CalendarCheck size={15} className="shrink-0 text-white/90" aria-hidden="true" />
         {MEETING_PLANNER_MESSAGES.emptyToday}
       </p>
     ) : (
@@ -80,7 +80,7 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                   ? "border-success/40 bg-success-container"
                   : meeting.status === "cancelled"
                     ? "border-error/30 bg-error-container"
-                    : "border-white bg-white"
+                    : "border-surface-container-lowest bg-surface-container-lowest"
               }`}
             >
               {/* The time, the tags and what can be done, all of which keep their own width: the

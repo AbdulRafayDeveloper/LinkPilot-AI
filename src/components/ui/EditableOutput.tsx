@@ -85,7 +85,7 @@ export const EditableOutput: React.FC<EditableOutputProps> = ({
           aria-label="Bold the selected text"
           aria-keyshortcuts="Control+B Meta+B"
           title="Bold the selected text (Ctrl+B). It stays bold when pasted on LinkedIn."
-          className={`${toolButton} border border-outline-variant bg-white text-on-surface hover:border-primary/40 hover:text-primary`}
+          className={`${toolButton} border border-outline-variant bg-surface-container-lowest text-on-surface hover:border-primary/40 hover:text-primary`}
         >
           <Bold size={13} aria-hidden="true" />
           Bold

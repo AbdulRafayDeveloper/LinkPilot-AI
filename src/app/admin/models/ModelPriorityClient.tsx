@@ -44,7 +44,7 @@ const ModuleCard: React.FC<{
   onReorder: (order: AiProviderId[]) => void
   onReset: () => void
 }> = ({ module, providers, isSaving, onReorder, onReset }) => (
-  <section aria-labelledby={`module-${module.id}`} className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+  <section aria-labelledby={`module-${module.id}`} className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div className="min-w-0">
         <h2 id={`module-${module.id}`} className="text-[15px] font-bold text-on-surface">
@@ -92,7 +92,7 @@ const ModuleCard: React.FC<{
         )
         const position = module.order.indexOf(id) + 1
         return (
-          <div className={`flex items-center gap-2 rounded-xl border py-1.5 pl-1 pr-3 ${reason ? "border-outline-variant/70 bg-surface-container-lowest" : "border-outline-variant bg-white"}`}>
+          <div className={`flex items-center gap-2 rounded-xl border py-1.5 pl-1 pr-3 ${reason ? "border-outline-variant/70 bg-surface-container-lowest" : "border-outline-variant bg-surface-container-lowest"}`}>
             {handle}
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-[12px] font-bold text-on-surface-variant">{position}</span>
             {/* Why a provider is skipped goes under its name, not beside it: beside it, the name was
@@ -163,7 +163,7 @@ const ModuleOrderView: React.FC<{
         <SelectFilter label="Providers" allLabel="All modules" value={filters.skipped} options={SKIP_CHOICES} onChange={(skipped) => set({ skipped })} />
       </FilterPanel>
       {shown.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-outline-variant bg-white px-3 py-6 text-center text-[13px] text-on-surface-variant">
+        <p className="rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest px-3 py-6 text-center text-[13px] text-on-surface-variant">
           {MODEL_PRIORITY_MESSAGES.nothingMatches}
         </p>
       ) : (
@@ -262,7 +262,7 @@ export default function ModelPriorityClient() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <div role="tablist" aria-label="AI Model Priority" className="flex flex-wrap gap-1 rounded-2xl border border-outline-variant bg-white p-1">
+              <div role="tablist" aria-label="AI Model Priority" className="flex flex-wrap gap-1 rounded-2xl border border-outline-variant bg-surface-container-lowest p-1">
                 {MODEL_PAGE_TABS.map((entry) => {
                   const Icon = TAB_ICONS[entry.id]
                   const isChosen = entry.id === tab
@@ -298,7 +298,7 @@ export default function ModelPriorityClient() {
 
             <div id={`model-panel-${tab}`} role="tabpanel" aria-labelledby={`model-tab-${tab}`} className="min-w-0">
               {needsOverview && error ? (
-                <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-white px-6 py-12 short:py-4 text-center">
+                <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest px-6 py-12 short:py-4 text-center">
                   <p className="text-sm text-error">{error}</p>
                   <button
                     type="button"

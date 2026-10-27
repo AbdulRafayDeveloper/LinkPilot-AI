@@ -20,7 +20,7 @@ interface EditPromptDialogProps {
 }
 
 const fieldClass =
-  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
+  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
 const labelClass = "text-[13px] font-semibold text-on-surface"
 
 /**
@@ -90,7 +90,7 @@ export const EditPromptDialog: React.FC<EditPromptDialogProps> = ({ endpoint, re
               type="button"
               onClick={() => void save()}
               disabled={isSaving || !isFilled || !isChanged}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSaving ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}
               {isSaving ? PROMPT_CREATOR_MESSAGES.addSaving : PROMPT_CREATOR_MESSAGES.editSave}

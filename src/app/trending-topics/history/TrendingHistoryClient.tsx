@@ -84,7 +84,7 @@ const SearchLinks: React.FC<{ topic: SavedTopic }> = ({ topic }) =>
   )
 
 const iconButton =
-  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-outline-variant bg-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-outline-variant bg-surface-container-lowest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
 
 // View details opens the topic in full; Delete removes it at once, with no confirmation
 const TopicActions: React.FC<{ topic: SavedTopic; onView: () => void; onDelete: () => void }> = ({ topic, onView, onDelete }) => (
@@ -99,7 +99,7 @@ const TopicActions: React.FC<{ topic: SavedTopic; onView: () => void; onDelete: 
 )
 
 const pagerButton =
-  "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+  "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
 
 /**
  * Every topic every Trending Topics search has found, 50 to a page. Paging, search and filters all
@@ -290,7 +290,7 @@ export default function TrendingHistoryClient() {
               </div>
               <Link
                 href="/trending-topics"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant sm:shrink-0"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover sm:shrink-0"
               >
                 <SquarePlus size={16} aria-hidden="true" />
                 Create new topics
@@ -383,7 +383,7 @@ export default function TrendingHistoryClient() {
 
                 {/* A table where there is room for one */}
                 {/* The table from 2xl, where its 1080px fit beside the open sidebar; cards below */}
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm 2xl:block">
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm 2xl:block">
                   <table className="w-full min-w-[1080px] border-collapse text-left">
                     <caption className="sr-only">Saved trending topics, page {page} of {totalPages}</caption>
                     <thead className="bg-surface-container-lowest">
@@ -443,7 +443,7 @@ export default function TrendingHistoryClient() {
                 {/* Cards on a phone, with the same fields */}
                 <ul className="flex flex-col gap-3 2xl:hidden">
                   {visibleItems.map((topic) => (
-                    <li key={topicKey(topic)} className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                    <li key={topicKey(topic)} className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-sm">
                       <input
                         type="checkbox"
                         checked={selection.isPicked(topicKey(topic))}

@@ -174,7 +174,7 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                     setIsLoading(true)
                     setReloadAttempt((attempt) => attempt + 1)
                   }}
-                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <RefreshCw size={15} aria-hidden="true" />
                   Try again
@@ -216,7 +216,7 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                       <button
                         type="button"
                         onClick={() => analyse(false)}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover"
                       >
                         <Play size={16} aria-hidden="true" />
                         {meeting.status === "failed" ? "Analyse again" : "Analyse"}
@@ -226,7 +226,7 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                       <button
                         type="button"
                         onClick={() => analyse(true)}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                       >
                         <RefreshCw size={16} aria-hidden="true" />
                         Re-analyse
@@ -239,7 +239,7 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                         setIsEditing(true)
                       }}
                       disabled={isRunning}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Pencil size={16} aria-hidden="true" />
                       Edit
@@ -301,7 +301,7 @@ export default function MeetingDetailClient({ id }: { id: string }) {
                   <MeetingAnalysisView analysis={meeting.analysis} />
                 ) : (
                   !isRunning && !awaitingRecording && (
-                    <p className="rounded-2xl border border-outline-variant bg-white p-6 text-center text-sm text-on-surface-variant shadow-sm">
+                    <p className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 text-center text-sm text-on-surface-variant shadow-sm">
                       This meeting has not been analyzed yet. Press Analyse to read the transcript.
                     </p>
                   )
@@ -313,7 +313,7 @@ export default function MeetingDetailClient({ id }: { id: string }) {
 
                 {/* The transcript, kept exactly as it was pasted, or as the recording was written out */}
                 {transcript && (
-                <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+                <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-sm font-bold text-on-surface">{meeting.recording ? "Transcript of the recording" : "Original notes"}</h2>
                     <div className="flex items-center gap-1">

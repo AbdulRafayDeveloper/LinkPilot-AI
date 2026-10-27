@@ -212,7 +212,7 @@ export default function BackupsClient() {
         type="button"
         onClick={() => void downloadStored(entry)}
         disabled={downloading === entry.id}
-        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-white px-2.5 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-60"
+        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-60"
       >
         {downloading === entry.id ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Download size={13} aria-hidden="true" />}
         Download
@@ -247,7 +247,7 @@ export default function BackupsClient() {
                   type="button"
                   onClick={reload}
                   disabled={isLoading}
-                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-60"
                 >
                   <RefreshCw size={15} className={isLoading ? "animate-spin" : ""} aria-hidden="true" />
                   Refresh
@@ -257,7 +257,7 @@ export default function BackupsClient() {
                   onClick={() => void backUpToCloud()}
                   disabled={running !== null}
                   title="Runs exactly what the weekly schedule runs"
-                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-60"
                 >
                   {running === "cloud" ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <CloudUpload size={15} aria-hidden="true" />}
                   Back up to cloud
@@ -267,7 +267,7 @@ export default function BackupsClient() {
                   onClick={downloadNow}
                   disabled={running !== null}
                   title={BACKUP_MESSAGES.exportHint}
-                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
                 >
                   {running === "export" ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Download size={15} aria-hidden="true" />}
                   Download backup
@@ -295,7 +295,7 @@ export default function BackupsClient() {
               <StatCard icon={DatabaseBackup} label="Backups recorded" value={summary?.total ?? null} />
               <StatCard icon={CheckCircle2} label="Succeeded" value={summary?.succeeded ?? null} tone="success" />
               <StatCard icon={CircleX} label="Failed" value={summary?.failed ?? null} tone="error" />
-              <div className="flex items-center gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-fixed text-on-primary-fixed-variant">
                   <CloudUpload size={20} aria-hidden="true" />
                 </span>
@@ -340,7 +340,7 @@ export default function BackupsClient() {
               <div role="alert" className="flex flex-col items-center gap-3 py-16 short:py-5 text-center">
                 <AlertTriangle size={20} className="text-error" aria-hidden="true" />
                 <p className="max-w-sm text-sm text-on-surface-variant">{error}</p>
-                <button type="button" onClick={reload} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold">
+                <button type="button" onClick={reload} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold">
                   <RefreshCw size={15} aria-hidden="true" />
                   Try again
                 </button>
@@ -357,7 +357,7 @@ export default function BackupsClient() {
             ) : (
               <div className={`flex flex-col gap-3 transition-opacity ${isLoading ? "opacity-60" : ""}`} aria-busy={isLoading}>
                 {/* The table from xl, where its 880px fits beside the open sidebar (936px there); cards below */}
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm xl:block">
                   <table className="w-full min-w-[880px] border-collapse text-left [overflow-wrap:anywhere]">
                     <caption className="sr-only">Database backups, newest first</caption>
                     <thead className="bg-surface-container-lowest">
@@ -399,7 +399,7 @@ export default function BackupsClient() {
 
                 <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {items.map((entry) => (
-                    <li key={entry.id} className="flex min-w-0 flex-col gap-1.5 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                    <li key={entry.id} className="flex min-w-0 flex-col gap-1.5 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-sm">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">{fileCell(entry)}</div>
                         <StatusBadge entry={entry} />

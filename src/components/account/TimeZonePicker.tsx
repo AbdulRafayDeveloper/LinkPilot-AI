@@ -113,7 +113,7 @@ export const TimeZonePicker: React.FC<TimeZonePickerProps> = ({ value, browserZo
         aria-haspopup="listbox"
         onClick={() => (isOpen ? setIsOpen(false) : open())}
         disabled={disabled}
-        className="flex w-full items-center gap-3 rounded-xl border border-outline-variant bg-white px-3.5 py-2.5 text-left transition-colors hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2.5 text-left transition-colors hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {selected ? <Globe2 size={17} className="shrink-0 text-primary" aria-hidden="true" /> : <Laptop size={17} className="shrink-0 text-primary" aria-hidden="true" />}
         <span className="min-w-0 flex-1">
@@ -127,7 +127,7 @@ export const TimeZonePicker: React.FC<TimeZonePickerProps> = ({ value, browserZo
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-outline-variant bg-white shadow-xl">
+        <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-xl">
           <label className="flex items-center gap-2 border-b border-outline-variant/70 px-3.5 py-2.5">
             <Search size={16} className="shrink-0 text-outline" aria-hidden="true" />
             <span className="sr-only">{ACCOUNT_MESSAGES.timeZoneSearch}</span>

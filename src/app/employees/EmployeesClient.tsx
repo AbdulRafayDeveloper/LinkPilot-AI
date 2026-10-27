@@ -227,7 +227,7 @@ export default function EmployeesClient() {
               <button
                 type="button"
                 onClick={() => setDialog({ employee: null })}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant sm:shrink-0"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover sm:shrink-0"
               >
                 <Plus size={16} aria-hidden="true" />
                 Add employee
@@ -259,7 +259,7 @@ export default function EmployeesClient() {
                 </FilterPanel>
 
                 {list.error && !list.hasAnswer ? (
-                  <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-white py-10 text-center">
+                  <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest py-10 text-center">
                     <AlertTriangle size={20} className="text-error" aria-hidden="true" />
                     <p className="max-w-xs text-sm text-on-surface-variant">{list.error}</p>
                     <button type="button" onClick={list.retry} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold">
@@ -268,12 +268,12 @@ export default function EmployeesClient() {
                     </button>
                   </div>
                 ) : !list.hasAnswer ? (
-                  <div role="status" className="flex items-center justify-center gap-2 rounded-2xl border border-outline-variant bg-white py-10 text-sm text-on-surface-variant">
+                  <div role="status" className="flex items-center justify-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest py-10 text-sm text-on-surface-variant">
                     <Loader2 size={18} className="animate-spin text-primary" aria-hidden="true" />
                     Loading the team...
                   </div>
                 ) : list.items.length === 0 ? (
-                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-10 text-center">
+                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest px-6 py-10 text-center">
                     <UserRound size={22} className="text-primary" aria-hidden="true" />
                     <p className="text-sm text-on-surface-variant">
                       {hasFilters ? "No employees match these filters." : "No employees yet. Add the first one to start planning their work."}
@@ -312,7 +312,7 @@ export default function EmployeesClient() {
                         return (
                           <div
                             className={`flex items-center rounded-2xl border pl-1.5 transition-colors ${
-                              isSelected ? "border-primary bg-primary-fixed/40" : "border-outline-variant bg-white hover:bg-surface-container-lowest"
+                              isSelected ? "border-primary bg-primary-fixed/40" : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container-lowest"
                             }`}
                           >
                             {handle}
@@ -347,7 +347,7 @@ export default function EmployeesClient() {
               <div ref={detailRef} className="flex min-w-0 scroll-mt-4 flex-col gap-4">
                 {current ? (
                   <>
-                    <section aria-label="Employee details" className="rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
+                    <section aria-label="Employee details" className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm sm:p-5">
                       {/* Four actions need the width: below xl they go on their own line under the
                           name, so they never squeeze it (the same rule the tool headers follow) */}
                       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -408,7 +408,7 @@ export default function EmployeesClient() {
                     <PlanLinkConfirmDialog employee={current} link={planLink} />
                   </>
                 ) : (
-                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-white px-6 py-16 short:py-5 text-center">
+                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest px-6 py-16 short:py-5 text-center">
                     <CalendarDays size={24} className="text-primary" aria-hidden="true" />
                     <p className="text-[15px] font-semibold text-on-surface">Choose an employee</p>
                     <p className="max-w-sm text-sm text-on-surface-variant">Their details, their daily plan and its history open here.</p>

@@ -39,12 +39,12 @@ function Banner() {
         <span className="block text-[12px] text-on-surface-variant">Open their posts, paste the one to answer below, and write the comment.</span>
       </p>
       <div className="flex flex-wrap gap-2 sm:shrink-0">
-        <a href={profilePostsUrl(profileUrl)} target="_blank" rel="noopener noreferrer" className={`${bannerButton} bg-primary text-white hover:bg-on-primary-fixed-variant`}>
+        <a href={profilePostsUrl(profileUrl)} target="_blank" rel="noopener noreferrer" className={`${bannerButton} bg-primary text-white hover:bg-primary-hover`}>
           <ExternalLink size={14} aria-hidden="true" />
           Open their posts
           <span className="sr-only">(opens LinkedIn in a new tab)</span>
         </a>
-        <Link href={PROFILE_SCHEDULER_HREF} className={`${bannerButton} border border-outline-variant bg-white text-on-surface hover:bg-surface-container-high`}>
+        <Link href={PROFILE_SCHEDULER_HREF} className={`${bannerButton} border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-high`}>
           <ArrowLeft size={14} aria-hidden="true" />
           Profile Scheduler
         </Link>

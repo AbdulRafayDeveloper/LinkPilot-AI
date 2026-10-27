@@ -122,7 +122,7 @@ export const ProjectFilesField: React.FC<ProjectFilesFieldProps> = ({ files, onA
           type="button"
           onClick={() => input.current?.click()}
           disabled={disabled || !canAttach || room <= 0}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Paperclip size={13} aria-hidden="true" />
           Attach files
@@ -150,7 +150,7 @@ export const ProjectFilesField: React.FC<ProjectFilesFieldProps> = ({ files, onA
       {(files.length > 0 || going.length > 0) && (
         <ul className="flex flex-col gap-1.5">
           {files.map((file) => (
-            <li key={file.assetId} className="flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-2.5 py-1.5">
+            <li key={file.assetId} className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-2.5 py-1.5">
               <FileKindIcon category={file.category} className="shrink-0 text-primary" />
               <span className="min-w-0 flex-1 truncate text-[12px] text-on-surface" title={file.name}>
                 {file.name}

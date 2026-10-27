@@ -385,7 +385,7 @@ export default function MeetingPlannerClient() {
                 <button
                   type="button"
                   onClick={() => openForm(selectedDate)}
-                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant sm:flex-none"
+                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover sm:flex-none"
                 >
                   <CalendarPlus size={16} aria-hidden="true" />
                   New meeting

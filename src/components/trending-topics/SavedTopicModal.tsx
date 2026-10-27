@@ -72,7 +72,7 @@ export const SavedTopicModal: React.FC<{ topic: SavedTopic; onClose: () => void 
                 setError(null)
                 setAttempt((current) => current + 1)
               }}
-              className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+              className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
             >
               <RefreshCw size={14} aria-hidden="true" />
               Try again

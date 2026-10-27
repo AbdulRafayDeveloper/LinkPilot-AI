@@ -231,7 +231,7 @@ export default function ReferenceContentClient() {
                     setSaveError(null)
                     setEditing({ mode: "new" })
                   }}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover"
                 >
                   <Plus size={16} aria-hidden="true" />
                   Add Content
@@ -241,7 +241,7 @@ export default function ReferenceContentClient() {
 
             {/* Search */}
             <div className="flex flex-col gap-2 shrink-0 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex w-full items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 sm:max-w-md">
+              <div className="flex w-full items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 sm:max-w-md">
                 <Search size={16} className="shrink-0 text-outline" aria-hidden="true" />
                 <input
                   type="search"

@@ -268,7 +268,7 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
               type="button"
               onClick={() => void leave(onClose)}
               disabled={isClosing || draft.details.uploading > 0}
-              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover disabled:opacity-50"
             >
               {isClosing ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
               Save
@@ -307,7 +307,7 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
               setDraft((current) => ({ ...current, content }))
               setFieldError(null)
             }}
-            className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] font-semibold text-on-surface focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
+            className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] font-semibold text-on-surface focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
           />
         </label>
 
@@ -440,7 +440,7 @@ export const TaskEditorDialog: React.FC<TaskEditorDialogProps> = ({
                 type="button"
                 onClick={() => void addSubtask()}
                 disabled={isAdding || !subtask.trim()}
-                className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-50"
+                className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
               >
                 {isAdding ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
                 {depth === 1 ? TASK_ATTACHMENT_MESSAGES.addSubtask : TASK_ATTACHMENT_MESSAGES.addSubSubtask}

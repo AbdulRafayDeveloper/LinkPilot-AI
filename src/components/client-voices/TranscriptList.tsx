@@ -26,7 +26,7 @@ interface TranscriptListProps {
 export const TranscriptList: React.FC<TranscriptListProps> = ({ voices, isProcessing, onRetry }) => (
   <ul className="flex flex-col gap-3">
     {voices.map((voice) => (
-      <li key={voice.id} className="rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+      <li key={voice.id} className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="flex items-center gap-2 text-sm font-bold text-on-surface">
             <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/5 text-[11px] font-bold text-primary">

@@ -121,7 +121,7 @@ export const VoiceInputPanel: React.FC<VoiceInputPanelProps> = ({
   }
 
   return (
-    <section className="flex min-h-0 flex-col gap-4 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
+    <section className="flex min-h-0 flex-col gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
       <div
         onDragOver={(event) => {
           event.preventDefault()
@@ -152,7 +152,7 @@ export const VoiceInputPanel: React.FC<VoiceInputPanelProps> = ({
             type="button"
             onClick={readClipboard}
             disabled={isProcessing || isFull || isReadingClipboard}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isReadingClipboard ? (
               <Loader2 size={14} className="animate-spin" aria-hidden="true" />
@@ -165,7 +165,7 @@ export const VoiceInputPanel: React.FC<VoiceInputPanelProps> = ({
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={isProcessing || isFull}
-            className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 text-[12px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-[12px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Upload size={14} aria-hidden="true" />
             Choose files
@@ -239,7 +239,7 @@ export const VoiceInputPanel: React.FC<VoiceInputPanelProps> = ({
         type="button"
         onClick={onProcess}
         disabled={!canProcess}
-        className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isProcessing ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
         {isProcessing ? "Working through the batch..." : `Transcribe ${voices.length || ""} ${voices.length === 1 ? "voice" : "voices"}`.trim()}

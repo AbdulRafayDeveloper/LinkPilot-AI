@@ -122,7 +122,7 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
   const counts = page?.counts ?? EMPTY_COUNTS
 
   return (
-    <section aria-label="Projects" className="rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
+    <section aria-label="Projects" className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm sm:p-5">
       {/* Full width below lg, about 290px between lg and xl, wide again from xl */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between lg:flex-col lg:items-start xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
@@ -203,7 +203,7 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
                     <Link
                       href={`${CLIENT_PROJECTS_TOOL.href}/${project.id}`}
                       aria-label={PROJECT_TASK_MESSAGES.manageOne(project.name)}
-                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                     >
                       {PROJECT_TASK_MESSAGES.manage}
                       <ArrowRight size={13} aria-hidden="true" />
@@ -212,7 +212,7 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
                   <button
                     type="button"
                     onClick={() => setDialog({ project })}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                   >
                     <Pencil size={13} aria-hidden="true" />
                     Edit
@@ -223,7 +223,7 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
                       setDeleteError(null)
                       setDeleting(project)
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-outline transition-colors hover:border-error/40 hover:text-error"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-outline transition-colors hover:border-error/40 hover:text-error"
                   >
                     <Trash2 size={13} aria-hidden="true" />
                     Delete

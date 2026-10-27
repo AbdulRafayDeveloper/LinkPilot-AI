@@ -27,7 +27,7 @@ export const GlobalPromptCard: React.FC<GlobalPromptCardProps> = ({ id, label, d
   return (
     <article
       aria-labelledby={titleId}
-      className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-w-0"
+      className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-w-0"
     >
       <div className="flex items-start gap-3 min-w-0">
         <span className="w-10 h-10 shrink-0 rounded-xl bg-primary/5 flex items-center justify-center text-primary">
@@ -47,7 +47,7 @@ export const GlobalPromptCard: React.FC<GlobalPromptCardProps> = ({ id, label, d
           type="button"
           onClick={() => onEdit(id)}
           aria-label={`Edit ${label}`}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-outline-variant bg-surface-container-lowest text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high transition-colors"
         >
           <FilePenLine size={16} aria-hidden="true" />
           Edit Prompt

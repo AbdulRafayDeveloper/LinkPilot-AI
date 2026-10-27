@@ -32,10 +32,10 @@ const runOn = (iso: string) =>
 const backButton =
   "inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] font-semibold text-outline transition-colors hover:bg-surface-container hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 const pagerButton =
-  "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
+  "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
 const headerButton =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
-const panel = "flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
+const panel = "flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm"
 
 /**
  * What is being reworded: the batch's name, both of its lists, and what each voice said, word for
@@ -230,7 +230,7 @@ export default function BatchDetailClient({ batchId }: { batchId: string }) {
                           onChange={(event) => setDraft({ ...draft, title: event.target.value })}
                           maxLength={BATCH_TITLE_MAX_LENGTH}
                           placeholder={CLIENT_VOICES_MESSAGES.titlePlaceholder}
-                          className="w-full rounded-xl border border-outline-variant bg-white px-3 py-2 text-lg font-bold text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+                          className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-lg font-bold text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
                         />
                       </label>
                     ) : (
@@ -262,7 +262,7 @@ export default function BatchDetailClient({ batchId }: { batchId: string }) {
                           type="button"
                           onClick={() => void save()}
                           disabled={isSaving}
-                          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {isSaving && <Loader2 size={16} className="animate-spin" aria-hidden="true" />}
                           {CLIENT_VOICES_MESSAGES.save}
@@ -281,7 +281,7 @@ export default function BatchDetailClient({ batchId }: { batchId: string }) {
                         <button
                           type="button"
                           onClick={() => setConfirmingBatch(true)}
-                          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-error/40 bg-white px-4 py-2.5 text-sm font-semibold text-error transition-colors hover:bg-error-container"
+                          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-error/40 bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-error transition-colors hover:bg-error-container"
                         >
                           <Trash2 size={16} aria-hidden="true" />
                           Delete batch
@@ -343,7 +343,7 @@ export default function BatchDetailClient({ batchId }: { batchId: string }) {
                 <div className="flex flex-col gap-2">
                   <h2 className="text-[10px] font-bold uppercase tracking-wider text-outline">The voices this came from, with their transcripts</h2>
                   {batch.voices.length === 0 ? (
-                    <p className="rounded-2xl border border-outline-variant bg-white px-4 py-6 text-center text-[12px] text-on-surface-variant">
+                    <p className="rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 py-6 text-center text-[12px] text-on-surface-variant">
                       No recordings are kept for this batch.
                     </p>
                   ) : (

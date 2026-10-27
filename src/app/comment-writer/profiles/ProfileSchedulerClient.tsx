@@ -97,7 +97,7 @@ const TypeTags: React.FC<{ types: PersonTypeId[] }> = ({ types }) =>
 const actionButton =
   "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[12px] font-semibold text-outline transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 const pagerButton =
-  "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+  "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
 // A profile's days as short tags, the one the filter is on picked out, every day named in full for a screen reader
 const DayTags: React.FC<{ days: WeekDayId[]; highlight: WeekDayId | "" }> = ({ days, highlight }) => (
@@ -398,7 +398,7 @@ export default function ProfileSchedulerClient() {
               <p className="mt-1 text-sm text-on-surface-variant">The people you comment on, why each is on your list, and the days you look at their posts.</p>
             </div>
 
-            <form onSubmit={add} noValidate className="flex flex-col gap-4 short:gap-2 rounded-2xl border border-outline-variant bg-white p-4 short:p-3 shadow-sm sm:p-5">
+            <form onSubmit={add} noValidate className="flex flex-col gap-4 short:gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 short:p-3 shadow-sm sm:p-5">
               <h2 className="text-[15px] font-bold text-on-surface">Add a person</h2>
               {/* The eleven fields are the tallest thing on this page. On a short laptop window they
                   scroll inside the form, so the heading, the Add person button and the list of people
@@ -434,7 +434,7 @@ export default function ProfileSchedulerClient() {
                 <button
                   type="submit"
                   disabled={isAdding}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
                 >
                   {isAdding ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
                   Add person
@@ -532,7 +532,7 @@ export default function ProfileSchedulerClient() {
                 )}
 
                 {/* The table from xl, where it fits beside the open sidebar; cards below, two to a row on a tablet */}
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm xl:block">
                   <table className="w-full min-w-[880px] border-collapse text-left">
                     <caption className="sr-only">Scheduled profiles, page {page} of {totalPages}</caption>
                     <thead className="bg-surface-container-lowest">
@@ -568,7 +568,7 @@ export default function ProfileSchedulerClient() {
 
                 <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {items.map((schedule) => (
-                    <li key={schedule.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                    <li key={schedule.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-sm">
                       <div className="flex items-start gap-2">
                         {pickBox(schedule, "mt-0.5 shrink-0")}
                         {profileCell(schedule)}
@@ -594,7 +594,7 @@ export default function ProfileSchedulerClient() {
                         setRowsPerPage(Number(event.target.value))
                         setPage(1)
                       }}
-                      className="h-8 rounded-lg border border-outline-variant bg-white px-2 text-[12px] font-semibold text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+                      className="h-8 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 text-[12px] font-semibold text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
                     >
                       {PROFILE_PAGE_SIZES.map((size) => (
                         <option key={size} value={size}>

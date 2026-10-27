@@ -18,7 +18,7 @@ export const StatCard: React.FC<{ icon: LucideIcon; label: string; value: number
 }) => {
   const tile = { primary: "bg-primary-fixed text-on-primary-fixed-variant", success: "bg-success-container text-on-success-container", error: "bg-error-container text-error" }[tone]
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+    <div className="flex items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
       <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tile}`}>
         <Icon size={20} aria-hidden="true" />
       </span>

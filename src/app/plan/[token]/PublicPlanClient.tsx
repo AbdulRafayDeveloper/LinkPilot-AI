@@ -268,7 +268,7 @@ export default function PublicPlanClient({ token }: { token: string }) {
       <div className={node.depth === 1 ? "" : "mt-2"}>
         <div
           className={`flex items-start gap-1.5 rounded-xl border py-1.5 pr-3 transition-colors ${handle ? "pl-1" : "pl-3"} ${
-            item.done ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-surface-container-lowest hover:bg-white"
+            item.done ? "border-success/40 bg-success-container/40" : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container-lowest"
           }`}
         >
           {handle && <span className="mt-1.5">{handle}</span>}
@@ -319,7 +319,7 @@ export default function PublicPlanClient({ token }: { token: string }) {
 
   return (
     <div className="min-h-dvh bg-background text-on-surface">
-      <header className="border-b border-outline-variant/80 bg-white">
+      <header className="border-b border-outline-variant/80 bg-surface-container-lowest">
         <div className="flex w-full items-center gap-2.5 px-4 py-3 sm:px-6 lg:px-8">
           <Image src={SITE_LOGO_PNG} alt="" width={32} height={32} className="h-8 w-8" priority />
           <span className="text-[15px] font-bold tracking-tight">{SITE_SHORT_NAME}</span>
@@ -330,7 +330,7 @@ export default function PublicPlanClient({ token }: { token: string }) {
       {/* The whole width, so a task reads on one line on a laptop instead of wrapping in a narrow column */}
       <main className="flex w-full flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {error && !plan ? (
-          <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-white px-6 py-12 short:py-4 text-center">
+          <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest px-6 py-12 short:py-4 text-center">
             <AlertCircle size={24} className="text-error" aria-hidden="true" />
             <p className="max-w-sm text-sm text-on-surface-variant">{error}</p>
             <button
@@ -360,7 +360,7 @@ export default function PublicPlanClient({ token }: { token: string }) {
               )}
             </div>
 
-            <section aria-label="Today's tasks" className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
+            <section aria-label="Today's tasks" className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-[15px] font-bold">{isBehindToday ? "Your day" : "Today"}</h2>
                 <div className="flex flex-wrap items-center gap-2">
@@ -388,7 +388,7 @@ export default function PublicPlanClient({ token }: { token: string }) {
                     <button
                       type="button"
                       onClick={() => setIsNewDayOpen(true)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover"
                     >
                       <SunMedium size={13} aria-hidden="true" />
                       Start new day
@@ -465,7 +465,7 @@ export default function PublicPlanClient({ token }: { token: string }) {
                 type="button"
                 onClick={() => void reset()}
                 disabled={isResetting}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-on-primary-fixed-variant disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
               >
                 {isResetting && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
                 Reset day
@@ -536,7 +536,7 @@ export default function PublicPlanClient({ token }: { token: string }) {
                 type="button"
                 onClick={() => void startNewDay()}
                 disabled={isStartingDay}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-on-primary-fixed-variant disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
               >
                 {isStartingDay && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
                 Start new day

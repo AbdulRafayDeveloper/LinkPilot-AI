@@ -134,7 +134,7 @@ export default function PostImageCreatorClient() {
               <div className="flex flex-wrap gap-2 xl:shrink-0">
                 <Link
                   href={POST_IMAGES_HISTORY_HREF}
-                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
+                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
                 >
                   <GalleryHorizontalEnd size={16} aria-hidden="true" />
                   Generated Posts
@@ -142,7 +142,7 @@ export default function PostImageCreatorClient() {
                 <button
                   type="button"
                   onClick={() => setIsSettingsOpen(true)}
-                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
+                  className="inline-flex flex-1 items-center justify-center whitespace-nowrap gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:flex-none"
                 >
                   <Settings2 size={16} aria-hidden="true" />
                   Default Settings
@@ -157,7 +157,7 @@ export default function PostImageCreatorClient() {
             )}
 
             <div className="grid grid-cols-1 gap-5 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              <section className="flex flex-col gap-4 rounded-2xl lg:self-start border border-outline-variant bg-white p-5 shadow-sm">
+              <section className="flex flex-col gap-4 rounded-2xl lg:self-start border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
                 {/* The defaults this image will use */}
                 <div className="flex flex-col gap-2 rounded-xl bg-surface-container-lowest p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -182,7 +182,7 @@ export default function PostImageCreatorClient() {
                           <span className="text-[12px] text-outline">No colours yet, so the design picks neutrals.</span>
                         ) : (
                           colors.map((color) => (
-                            <span key={color} className="flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[11px] font-code text-on-surface-variant">
+                            <span key={color} className="flex items-center gap-1 rounded-lg bg-surface-container-lowest px-2 py-1 text-[11px] font-code text-on-surface-variant">
                               <span
                                 style={{ backgroundColor: color }}
                                 className="h-3 w-3 rounded-full border border-outline-variant"
@@ -242,7 +242,7 @@ export default function PostImageCreatorClient() {
                           className={`h-20 w-20 rounded-xl border-2 text-[11px] font-semibold transition-colors ${
                             assetId === null
                               ? "border-primary bg-primary-container text-on-primary-container"
-                              : "border-outline-variant bg-white text-on-surface-variant hover:border-primary/40"
+                              : "border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-primary/40"
                           }`}
                         >
                           No photo
@@ -266,7 +266,7 @@ export default function PostImageCreatorClient() {
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={asset.previewUrl} alt={asset.name} className="h-full w-full object-cover" />
                             )}
-                            <span className="absolute inset-x-0 bottom-0 truncate bg-on-surface/60 px-1 py-0.5 text-[10px] font-semibold text-white">
+                            <span className="absolute inset-x-0 bottom-0 truncate bg-ink/60 px-1 py-0.5 text-[10px] font-semibold text-white">
                               {asset.name}
                             </span>
                           </button>
@@ -306,7 +306,7 @@ export default function PostImageCreatorClient() {
                   type="button"
                   onClick={submit}
                   disabled={isGenerating}
-                  className="mt-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Sparkles size={16} aria-hidden="true" />
                   {isGenerating ? "Drawing your image..." : "Create Image"}

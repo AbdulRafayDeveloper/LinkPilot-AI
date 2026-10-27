@@ -1,8 +1,73 @@
 import type { Config } from "tailwindcss"
 import plugin from "tailwindcss/plugin"
 
+/**
+ * Every colour token of the "Signal Violet & Gold" scheme. **Each one is a CSS variable**
+ * (`--c-<name>` in globals.css, as space-separated RGB channels), set once for the light scheme and
+ * once for the dark one, so the same class (`bg-surface-container-lowest`, `text-primary`) is right
+ * in both and no component needs a `dark:` variant. Opacity still works (`bg-primary/10`) because
+ * Tailwind fills in `<alpha-value>`. Add a colour here and in both blocks of globals.css together.
+ */
+const THEME_COLORS = [
+  "secondary",
+  "success",
+  "error",
+  "primary-hover",
+  "primary",
+  "on-primary",
+  "on-primary-fixed-variant",
+  "primary-container",
+  "on-primary-container",
+  "primary-fixed",
+  "primary-fixed-dim",
+  "inverse-primary",
+  "surface-tint",
+  "on-primary-fixed",
+  "on-secondary",
+  "secondary-container",
+  "on-secondary-container",
+  "secondary-fixed",
+  "secondary-fixed-dim",
+  "on-secondary-fixed",
+  "on-secondary-fixed-variant",
+  "tertiary",
+  "on-tertiary",
+  "tertiary-container",
+  "on-tertiary-container",
+  "tertiary-fixed",
+  "tertiary-fixed-dim",
+  "on-tertiary-fixed",
+  "on-tertiary-fixed-variant",
+  "background",
+  "on-background",
+  "surface",
+  "surface-bright",
+  "surface-dim",
+  "surface-container-lowest",
+  "surface-container-low",
+  "surface-container",
+  "surface-container-high",
+  "surface-container-highest",
+  "surface-variant",
+  "on-surface",
+  "on-surface-variant",
+  "outline",
+  "outline-variant",
+  "inverse-surface",
+  "inverse-on-surface",
+  "ink",
+  "on-success",
+  "success-container",
+  "on-success-container",
+  "on-error",
+  "error-container",
+  "on-error-container",
+] as const
+
 const config: Config = {
-  darkMode: "class",
+  // The dark scheme is `data-theme="dark"` on <html>, set before the page paints (app/layout.tsx), so a
+  // rare `dark:` variant follows the person's own choice rather than only the system setting
+  darkMode: ["selector", '[data-theme="dark"]'],
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -10,72 +75,15 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      // Premium "Signal Violet & Gold" scheme: one violet brand family, violet-tinted porcelain
-      // neutrals, a gold accent for warmth (Hot/Warm, warnings, moderate scores) and a red for errors.
-      colors: {
-        // Brand: violet
-        primary: "#5b21b6",
-        "on-primary": "#ffffff",
-        "on-primary-fixed-variant": "#4c1d95",
-        "primary-container": "#6d28d9",
-        "on-primary-container": "#ede9fe",
-        "primary-fixed": "#ddd6fe",
-        "primary-fixed-dim": "#c4b5fd",
-        "inverse-primary": "#c4b5fd",
-        "surface-tint": "#6d28d9",
-        "on-primary-fixed": "#2e1065",
-
-        // Accent: gold
-        secondary: "#b45309",
-        "on-secondary": "#ffffff",
-        "secondary-container": "#f59e0b",
-        "on-secondary-container": "#451a03",
-        "secondary-fixed": "#fef3c7",
-        "secondary-fixed-dim": "#fde68a",
-        "on-secondary-fixed": "#451a03",
-        "on-secondary-fixed-variant": "#92400e",
-
-        // Supporting: violet-gray
-        tertiary: "#57536a",
-        "on-tertiary": "#ffffff",
-        "tertiary-container": "#6f6a82",
-        "on-tertiary-container": "#efecf6",
-        "tertiary-fixed": "#e6e2f0",
-        "tertiary-fixed-dim": "#c9c4d6",
-        "on-tertiary-fixed": "#1e1a29",
-        "on-tertiary-fixed-variant": "#484457",
-
-        // Neutrals: porcelain with a violet undertone
-        background: "#f7f6fa",
-        "on-background": "#1c1826",
-        surface: "#fcfbfe",
-        "surface-bright": "#fcfbfe",
-        "surface-dim": "#d9d4e3",
-        "surface-container-lowest": "#ffffff",
-        "surface-container-low": "#f6f4fa",
-        "surface-container": "#efecf5",
-        "surface-container-high": "#e8e4f0",
-        "surface-container-highest": "#e1dcea",
-        "surface-variant": "#e4e0ec",
-        "on-surface": "#1c1826",
-        "on-surface-variant": "#4a4658",
-        outline: "#686477",
-        "outline-variant": "#d6d2df",
-        "inverse-surface": "#2b2636",
-        "inverse-on-surface": "#f4f1f9",
-
-        // Done: the green a ticked task turns
-        success: "#15803d",
-        "on-success": "#ffffff",
-        "success-container": "#dcfce7",
-        "on-success-container": "#14532d",
-
-        // Errors
-        error: "#ba1a1a",
-        "on-error": "#ffffff",
-        "error-container": "#ffdad6",
-        "on-error-container": "#93000a",
-      },
+      // One violet brand family, neutral surfaces, a gold accent (Hot/Warm, warnings, moderate scores),
+      // green for something finished and red for errors; the values live in globals.css
+      colors: Object.fromEntries(THEME_COLORS.map((name) => [name, `rgb(var(--c-${name}) / <alpha-value>)`])),
+      // As text, these four have a colour of their own: in the dark scheme a fill that carries white
+      // text has to be deep and the same colour as text on black has to be light, and no one value is
+      // both. In the light scheme each is the same as its fill (globals.css)
+      textColor: Object.fromEntries(
+        ["primary", "secondary", "success", "error"].map((name) => [name, `rgb(var(--c-${name}-text) / <alpha-value>)`])
+      ),
       // The new-version notice rises into place (components/ui/UpdateToast.tsx), only where motion is welcome
       keyframes: {
         "toast-in": {

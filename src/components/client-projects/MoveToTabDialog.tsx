@@ -62,7 +62,7 @@ export const MoveToTabDialog: React.FC<MoveToTabDialogProps> = ({ task, onMove, 
                   className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[13px] font-semibold transition-colors disabled:cursor-not-allowed ${
                     isHere
                       ? "border-outline-variant bg-surface-container-low text-outline"
-                      : "border-outline-variant bg-white text-on-surface hover:border-primary/50 hover:bg-primary-fixed/30"
+                      : "border-outline-variant bg-surface-container-lowest text-on-surface hover:border-primary/50 hover:bg-primary-fixed/30"
                   }`}
                 >
                   <span className="min-w-0 truncate">{kind.label}</span>

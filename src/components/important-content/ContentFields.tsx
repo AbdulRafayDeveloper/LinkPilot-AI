@@ -22,7 +22,7 @@ import type { RecordFolder } from "@/types/folders"
 export type ContentForm = Required<ImportantContentInput>
 
 export const fieldClass =
-  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
+  "w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] text-on-surface focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
 const labelClass = "text-[13px] font-semibold text-on-surface"
 
 /** The form an entry opens with, or an empty one: no name, no type, no folder, the default size. */

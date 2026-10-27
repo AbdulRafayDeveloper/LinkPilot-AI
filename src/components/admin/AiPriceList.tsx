@@ -18,7 +18,7 @@ type PriceKey = keyof ModelPrices
 type Draft = Record<PriceKey, string>
 
 const fieldClass =
-  "h-9 w-full rounded-lg border border-outline-variant bg-white px-2 text-[13px] text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+  "h-9 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-2 text-[13px] text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
 const buttonClass =
   "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
 
@@ -106,7 +106,7 @@ const PriceRow: React.FC<PriceRowProps> = ({ row, onSaved }) => {
   }
 
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-outline-variant bg-white p-3">
+    <li className="flex flex-col gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="min-w-0 text-[13px]">
           <span className="font-semibold text-on-surface">{row.providerLabel}</span>
@@ -134,7 +134,7 @@ const PriceRow: React.FC<PriceRowProps> = ({ row, onSaved }) => {
           type="button"
           onClick={() => send("PUT")}
           disabled={state === "saving" || !isChanged}
-          className={`${buttonClass} bg-primary text-white hover:bg-on-primary-fixed-variant`}
+          className={`${buttonClass} bg-primary text-white hover:bg-primary-hover`}
         >
           {state === "saving" ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : null}
           {AI_COST_MESSAGES.save}
@@ -242,7 +242,7 @@ const AddModel: React.FC<{ rows: ModelPriceRow[]; onSaved: (rows: ModelPriceRow[
       </div>
       <PriceFields draft={draft} idPrefix="price-new" onChange={(key, value) => setDraft((current) => ({ ...current, [key]: value }))} />
       <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" disabled={isSaving} className={`${buttonClass} bg-primary text-white hover:bg-on-primary-fixed-variant`}>
+        <button type="submit" disabled={isSaving} className={`${buttonClass} bg-primary text-white hover:bg-primary-hover`}>
           {isSaving ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Plus size={13} aria-hidden="true" />}
           {AI_COST_MESSAGES.save}
         </button>

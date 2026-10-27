@@ -388,7 +388,7 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
                 <ChevronDown size={14} className={`transition-transform ${isFolded ? "-rotate-90" : ""}`} aria-hidden="true" />
               </button>
             ) : (
-              <CornerDownRight size={13} className="mt-2.5 shrink-0 text-outline/70" aria-hidden="true" />
+              <CornerDownRight size={13} className="mt-2.5 shrink-0 text-outline" aria-hidden="true" />
             ))}
           <input
             type="checkbox"
@@ -435,12 +435,12 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
                   }}
                   aria-label={`${addLabel} under "${item.text}"`}
                   placeholder={`${TASK_ATTACHMENT_MESSAGES.subtaskPlaceholder} (Enter to add)`}
-                  className="h-9 min-w-0 flex-1 rounded-xl border border-outline-variant bg-white px-3 text-[13px] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+                  className="h-9 min-w-0 flex-1 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[13px] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
                 />
                 <button
                   type="submit"
                   disabled={!subtaskText.trim() || items.length >= PLAN_MAX_ITEMS}
-                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl bg-primary px-3 text-[12px] font-semibold text-white hover:bg-on-primary-fixed-variant disabled:opacity-50"
+                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl bg-primary px-3 text-[12px] font-semibold text-white hover:bg-primary-hover disabled:opacity-50"
                 >
                   <Plus size={14} aria-hidden="true" />
                   Add
@@ -524,7 +524,7 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
   const failed = loadError?.key === key ? loadError.message : null
 
   return (
-    <section aria-label={`${employee.name}'s plans`} className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm sm:p-5">
+    <section aria-label={`${employee.name}'s plans`} className="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-[15px] font-bold text-on-surface">Daily plan</h2>
@@ -630,12 +630,12 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
               disabled={items.length >= PLAN_MAX_ITEMS}
               placeholder={items.length >= PLAN_MAX_ITEMS ? EMPLOYEE_MESSAGES.tooManyItems : "Add a task to the daily plan and press Enter"}
               aria-label="New plan item"
-              className="h-10 min-w-0 flex-1 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
+              className="h-10 min-w-0 flex-1 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[14px] focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
             />
             <button
               type="submit"
               disabled={!newItem.trim() || items.length >= PLAN_MAX_ITEMS}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
             >
               <Plus size={15} aria-hidden="true" />
               Add
@@ -650,7 +650,7 @@ export const PlanEditor: React.FC<{ employee: Employee }> = ({ employee }) => {
               onChange={(event) => edit((latest) => ({ items: latest.items, notes: event.target.value }))}
               rows={3}
               placeholder="Anything to remember about this plan"
-              className="w-full resize-y rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-[14px] leading-relaxed focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
+              className="w-full resize-y rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-[14px] leading-relaxed focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
             />
           </label>
         </>

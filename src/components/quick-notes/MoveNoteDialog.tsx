@@ -93,7 +93,7 @@ export const MoveNoteDialog: React.FC<MoveNoteDialogProps> = ({ note, onMoved, o
             type="submit"
             form="move-note-form"
             disabled={isSaving}
-            className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+            className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
             {isSaving ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <FileKey2 size={15} aria-hidden="true" />}
             {isSaving ? "Moving..." : "Move to Important Content"}

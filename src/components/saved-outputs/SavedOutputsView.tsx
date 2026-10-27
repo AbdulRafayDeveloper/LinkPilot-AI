@@ -132,7 +132,7 @@ const FLASH_MS = 2000
 const actionButton =
   "inline-flex min-h-8 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-outline xl:min-h-0 transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
 const toolbarButton =
-  "inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+  "inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
 /** What a record waits for, and whether that leaves it ready or blocked. */
 const waitingState = (item: SavedOutput) => {
@@ -909,7 +909,7 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                       setNotice(null)
                       setIsAdding(true)
                     }}
-                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                   >
                     <FilePlus2 size={16} aria-hidden="true" />
                     {tool.addByHand.label}
@@ -917,7 +917,7 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                 )}
                 <Link
                   href={tool.toolHref}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
                 >
                   <SquarePlus size={16} aria-hidden="true" />
                   {tool.createTitle}
@@ -1031,7 +1031,7 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                 <button
                   type="button"
                   onClick={() => setReloadAttempt((attempt) => attempt + 1)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <RefreshCw size={15} aria-hidden="true" />
                   Try again
@@ -1139,7 +1139,7 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                 )}
 
                 {/* The table from xl, where it fits beside the open sidebar without scrolling sideways; cards below */}
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm xl:block">
                   <table className="w-full min-w-[900px] border-collapse text-left [overflow-wrap:anywhere]">
                     <caption className="sr-only">
                       {tool.heading}, page {page} of {totalPages}
@@ -1201,7 +1201,7 @@ export const SavedOutputsView: React.FC<{ toolId: SavedOutputToolId }> = ({ tool
                     <li
                       key={item.id}
                       className={`flex min-w-0 flex-col gap-2 rounded-2xl border p-3 shadow-sm ${
-                        item.appliedAt ? "border-success/60 bg-success-container" : "border-outline-variant bg-white"
+                        item.appliedAt ? "border-success/60 bg-success-container" : "border-outline-variant bg-surface-container-lowest"
                       }`}
                     >
                       <div className="flex items-center gap-1.5">

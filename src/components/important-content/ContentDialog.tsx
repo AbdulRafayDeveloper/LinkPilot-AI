@@ -227,7 +227,7 @@ export const ContentDialog: React.FC<ContentDialogProps> = ({ entry, knownTypes,
               type="submit"
               form="important-content-form"
               disabled={isSaving}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
             >
               {isSaving && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
               {isEdit ? "Save changes" : "Save content"}

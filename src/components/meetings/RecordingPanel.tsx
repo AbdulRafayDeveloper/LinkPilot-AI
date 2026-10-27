@@ -117,7 +117,7 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
   const uploaded = recording.uploadedBytes.screen + recording.uploadedBytes.camera + recording.uploadedBytes.audio
 
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+    <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
       <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
         <Video size={16} className="text-primary" aria-hidden="true" />
         Recording
@@ -146,7 +146,7 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
               type="button"
               onClick={() => void finishPartial()}
               disabled={isFinishing}
-              className="inline-flex w-fit items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+              className="inline-flex w-fit items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
             >
               {isFinishing && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
               Finish with what was uploaded
@@ -180,7 +180,7 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
             type="button"
             onClick={transcribe}
             disabled={isRunning}
-            className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant disabled:opacity-60"
+            className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
             {isRunning ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <FileText size={15} aria-hidden="true" />}
             {RECORDING_MESSAGES.transcribe}
@@ -201,7 +201,7 @@ export const RecordingPanel: React.FC<RecordingPanelProps> = ({ meetingId, recor
               // can only have been in the writing out that was already asked for, so that carries on
               onClick={() => void run(meetingId, { transcribe: recording.joined.done >= recording.joined.total })}
               disabled={isRunning}
-              className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-error/40 bg-white px-3 py-1.5 font-semibold text-error hover:bg-error/5 disabled:opacity-60"
+              className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-error/40 bg-surface-container-lowest px-3 py-1.5 font-semibold text-error hover:bg-error/5 disabled:opacity-60"
             >
               <RefreshCw size={13} aria-hidden="true" />
               Try again

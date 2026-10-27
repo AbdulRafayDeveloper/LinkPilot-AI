@@ -12,6 +12,7 @@ import {
   SITE_THEME_COLOR,
 } from "@/config/site"
 import { HOME_SEO } from "@/constants/seo"
+import { COLOR_SCHEME_SCRIPT } from "@/lib/colorScheme"
 import { fullTitle, socialMetadata } from "@/lib/metadata"
 import { ServiceWorkerRegistration } from "@/components/ui/ServiceWorkerRegistration"
 import { TimeZoneBoundary } from "@/components/ui/TimeZoneBoundary"
@@ -64,7 +65,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: SITE_THEME_COLOR,
-  colorScheme: "light",
+  // Both schemes are real (globals.css); which one shows is the person's choice, set before paint below
+  colorScheme: "light dark",
 }
 
 export default function RootLayout({
@@ -75,6 +77,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.className} suppressHydrationWarning>
       <head>
+        {/* First, before anything paints: the colour scheme this browser last used (lib/colorScheme.ts),
+            so a dark page never flashes white. A fixed script with no data in it */}
+        <script dangerouslySetInnerHTML={{ __html: COLOR_SCHEME_SCRIPT }} />
         {/* Structured Schema Data */}
         <script
           type="application/ld+json"

@@ -27,7 +27,7 @@ interface ProjectFiltersProps {
 }
 
 const selectClass =
-  "h-9 rounded-xl border border-outline-variant bg-white px-2.5 text-[12px] font-semibold text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+  "h-9 rounded-xl border border-outline-variant bg-surface-container-lowest px-2.5 text-[12px] font-semibold text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
 
 /**
  * Narrowing one tab down to what is being looked for, on both surfaces.
@@ -48,7 +48,7 @@ export const ProjectFilters: React.FC<ProjectFiltersProps> = ({ kind, values, on
   const set = (part: Partial<ProjectFilterValues>) => onChange({ ...values, ...part })
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-outline-variant bg-white px-3 py-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest px-3 py-2">
       <label className="flex h-9 min-w-[12rem] flex-1 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-2.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25">
         <Search size={14} className="shrink-0 text-outline" aria-hidden="true" />
         <input

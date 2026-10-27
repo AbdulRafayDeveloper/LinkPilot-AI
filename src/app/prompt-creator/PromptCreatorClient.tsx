@@ -244,7 +244,7 @@ export default function PromptCreatorClient() {
               {/* What the user wants done */}
               {/* gap-5 between the blocks, so the targets, the project and the choice below the text box
                   are not crowded together now that the form has the wider side */}
-              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 short:p-3 flex flex-col gap-5 short:gap-4 lg:self-start">
+              <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-5 short:p-3 flex flex-col gap-5 short:gap-4 lg:self-start">
                 <div className="flex flex-col gap-2 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label htmlFor="prompt-request" className="text-[10px] font-bold text-outline uppercase tracking-wider">
@@ -354,7 +354,7 @@ export default function PromptCreatorClient() {
                         <Link
                           href={CLIENTS_TOOL.href}
                           title={PROMPT_PROJECT_MESSAGES.manageHint}
-                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2.5 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                         >
                           <FolderKanban size={14} aria-hidden="true" />
                           {PROMPT_PROJECT_MESSAGES.manage}
@@ -412,7 +412,7 @@ export default function PromptCreatorClient() {
                     type="button"
                     onClick={() => submit()}
                     disabled={isBusy}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Sparkles size={16} aria-hidden="true" />
                     {isGenerating ? "Writing your prompt..." : "Create Prompt"}
@@ -421,7 +421,7 @@ export default function PromptCreatorClient() {
                     type="button"
                     onClick={readInEnglish}
                     disabled={isBusy}
-                    className="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Languages size={16} aria-hidden="true" />
                     {isReadingEnglish ? PROMPT_CREATOR_MESSAGES.englishWorking : PROMPT_CREATOR_MESSAGES.englishButton}

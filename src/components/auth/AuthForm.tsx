@@ -46,7 +46,7 @@ const Field: React.FC<FieldProps> = ({ label, icon: Icon, trailing, inputRef, in
           aria-invalid={invalid || undefined}
           aria-describedby={hint ? hintId : undefined}
           {...input}
-          className={`h-11 w-full rounded-xl border bg-surface-container-lowest pl-10 pr-11 text-[14px] text-on-surface transition-colors placeholder:text-outline focus:bg-white focus:outline-none focus:ring-2 ${
+          className={`h-11 w-full rounded-xl border bg-surface-container-lowest pl-10 pr-11 text-[14px] text-on-surface transition-colors placeholder:text-outline focus:bg-surface-container-lowest focus:outline-none focus:ring-2 ${
             invalid ? "border-error focus:border-error focus:ring-error/25" : "border-outline-variant focus:border-primary focus:ring-primary/25"
           }`}
         />
@@ -226,7 +226,7 @@ export const AuthForm: React.FC<{ mode: Mode; signupEnabled: boolean }> = ({ mod
       <button
         type="submit"
         disabled={isSubmitting}
-        className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
+        className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {isSubmitting ? <Loader2 size={17} className="animate-spin" aria-hidden="true" /> : null}
         {isSubmitting ? (isSignup ? "Creating your account..." : "Signing in...") : isSignup ? "Create account" : "Sign in"}

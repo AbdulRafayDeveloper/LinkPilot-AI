@@ -35,7 +35,7 @@ const words = MEETING_PLAN_LINK_MESSAGES
 const shortDay = (date: string) => dayLabel(date, { weekday: "short", day: "numeric", month: "short" })
 const plainDay = (date: string) => dayLabel(date, { weekday: undefined, day: "numeric", month: "short", year: undefined })
 const fieldClass =
-  "h-10 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[13px] text-on-surface focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+  "h-10 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[13px] text-on-surface focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
 
 /** Back, the page it is on, and Next: the same strip under both lists. */
 const Pager: React.FC<{ page: number; pages: number; total: number; onPage: (page: number) => void; busy: boolean }> = ({
@@ -219,7 +219,7 @@ export const LinkToPlanDialog: React.FC<LinkToPlanDialogProps> = ({ count, isSav
               type="button"
               onClick={() => chosen && onSubmit(chosen.id)}
               disabled={isSaving || !chosen}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Link2 size={15} aria-hidden="true" />}
               {words.link}
@@ -303,7 +303,7 @@ export const LinkToPlanDialog: React.FC<LinkToPlanDialogProps> = ({ count, isSav
             <button
               type="button"
               onClick={() => setOpenGroup(null)}
-              className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-2.5 py-1 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+              className="inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-1 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
             >
               <ChevronLeft size={13} aria-hidden="true" />
               {words.backToList}

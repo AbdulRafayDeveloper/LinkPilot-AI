@@ -82,7 +82,7 @@ export const FoldersDialog: React.FC<FoldersDialogProps> = ({ folders, onCreate,
           <button
             type="submit"
             disabled={!newName.trim() || busy !== null}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy === "new" ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <FolderPlus size={15} aria-hidden="true" />}
             Add
@@ -172,7 +172,7 @@ export const FoldersDialog: React.FC<FoldersDialogProps> = ({ folders, onCreate,
                       Delete &quot;{folder.name}&quot;? {copy.deleteExplains}
                     </p>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setConfirming(null)} disabled={busy !== null} className="rounded-lg border border-outline-variant bg-white px-3 py-1 text-[12px] font-semibold">
+                      <button type="button" onClick={() => setConfirming(null)} disabled={busy !== null} className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1 text-[12px] font-semibold">
                         Cancel
                       </button>
                       <button

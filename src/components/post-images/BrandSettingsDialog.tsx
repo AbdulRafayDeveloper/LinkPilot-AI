@@ -188,7 +188,7 @@ export const BrandSettingsDialog: React.FC<BrandSettingsDialogProps> = ({ settin
               type="button"
               onClick={save}
               disabled={isSaving}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
               {isSaving ? "Saving..." : "Save defaults"}
@@ -259,7 +259,7 @@ export const BrandSettingsDialog: React.FC<BrandSettingsDialogProps> = ({ settin
             type="button"
             onClick={addColor}
             disabled={isSaving || colors.length >= MAX_BRAND_COLORS}
-            className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus size={13} aria-hidden="true" />
             Add colour
@@ -329,7 +329,7 @@ export const BrandSettingsDialog: React.FC<BrandSettingsDialogProps> = ({ settin
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={isSaving || assets.length >= MAX_BRAND_ASSETS}
-            className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus size={13} aria-hidden="true" />
             Add photos

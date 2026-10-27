@@ -147,7 +147,7 @@ export default function DummyDataClient() {
   }
 
   const buttonClass =
-    "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+    "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
   // The headings the chips are grouped under, in the sidebar's own order
   const headings = TOOLS.reduce<string[]>((all, tool) => (all.includes(tool.heading) ? all : [...all, tool.heading]), [])
   const shared = chosen ? chosen.kinds.map((kind) => sharedWith(kind, chosen.href)).filter(Boolean) : []
@@ -175,7 +175,7 @@ export default function DummyDataClient() {
             </div>
 
             {/* One chip per tool, under its sidebar heading, each saying how much sample data it has */}
-            <div className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+            <div className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-sm">
               <div className="flex flex-col gap-2" role="group" aria-label="Which tool to show the sample data of">
                 {headings.map((heading) => (
                   <div key={heading} className="flex flex-wrap items-center gap-1.5">
@@ -247,7 +247,7 @@ export default function DummyDataClient() {
                 Loading the sample data...
               </p>
             ) : rows.length === 0 ? (
-              <p className="rounded-2xl border border-outline-variant bg-white px-4 py-10 text-center text-sm text-on-surface-variant">
+              <p className="rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 py-10 text-center text-sm text-on-surface-variant">
                 {search.trim() ? DUMMY_DATA_MESSAGES.noResults : DUMMY_DATA_MESSAGES.empty}
               </p>
             ) : (
@@ -256,7 +256,7 @@ export default function DummyDataClient() {
                     own buttons, which pushed a card 45px past the right edge of a phone */}
                 {rows.map((row) => (
                   <li key={`${row.kind}:${row.item.id}`}>
-                    <div className="flex h-full flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                    <div className="flex h-full flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-sm">
                       <button type="button" onClick={() => setReading(row)} className="group min-w-0 text-left" aria-label={`Read ${row.item.name}`}>
                         <span className="block truncate text-[13px] font-semibold text-on-surface group-hover:text-primary">{row.item.name}</span>
                         <span className="mt-0.5 block text-[11px] text-outline">
@@ -271,7 +271,7 @@ export default function DummyDataClient() {
                           type="button"
                           onClick={() => use(row, chosen?.href ?? DUMMY_DATA_KINDS[row.kind].uses[0])}
                           title={`Open ${chosen?.title ?? "the tool"} with this filled in`}
-                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover"
                         >
                           <Play size={12} aria-hidden="true" />
                           Use in {chosen?.title ?? "the tool"}

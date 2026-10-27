@@ -41,7 +41,7 @@ export const ModulePromptsView: React.FC<{ module: PromptModuleEntry }> = ({ mod
 
   return (
     <section aria-labelledby="prompt-module-heading" className="flex min-w-0 flex-col gap-5">
-      <header className="flex items-start gap-3 rounded-2xl border border-outline-variant bg-white px-4 py-3 shadow-sm">
+      <header className="flex items-start gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 py-3 shadow-sm">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Icon size={19} aria-hidden="true" />
         </span>

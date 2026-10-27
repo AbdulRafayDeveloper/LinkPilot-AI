@@ -43,7 +43,7 @@ const HistoryDay: React.FC<{ day: PlanHistoryDay; onTick?: HistoryTick; onReason
   // How deep each task sits, so a subtask shows under its task as it did in the plan that day
   const depths = depthsOf(day.items, { idOf: (item) => item.id, parentOf: (item) => item.parentId })
   return (
-    <li className="rounded-xl border border-outline-variant/80 bg-white">
+    <li className="rounded-xl border border-outline-variant/80 bg-surface-container-lowest">
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
@@ -158,7 +158,7 @@ export const PlanHistory: React.FC<PlanHistoryProps> = ({ history, error, isLoad
             type="button"
             onClick={onLoadMore}
             disabled={isLoadingMore}
-            className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-60"
           >
             {isLoadingMore && <Loader2 size={13} className="animate-spin" aria-hidden="true" />}
             Show older days

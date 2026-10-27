@@ -25,7 +25,7 @@ import type { ProjectFileView } from "@/types/clientProjectTasks"
  * keeps it out of "Open in a new tab", and an `<img>` never runs what is inside it.
  */
 
-const FRAME = "h-full w-full rounded-xl border border-outline-variant bg-white"
+const FRAME = "h-full w-full rounded-xl border border-outline-variant bg-surface-container-lowest"
 
 /** What is shown when the browser cannot decode a type the app accepts. */
 const CannotShow: React.FC<{ message: string }> = ({ message }) => (
@@ -97,7 +97,7 @@ export const FilePreviewDialog: React.FC<{ file: ProjectFileView; onClose: () =>
         <a
           href={file.url}
           download={file.name}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
         >
           <Download size={15} aria-hidden="true" />
           {PROJECT_FILE_MESSAGES.download}

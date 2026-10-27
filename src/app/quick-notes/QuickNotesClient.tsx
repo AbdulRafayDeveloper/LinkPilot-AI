@@ -311,7 +311,7 @@ export default function QuickNotesClient() {
               {/* Save something new */}
               <section
                 aria-label="Save content"
-                className="flex flex-col gap-3 rounded-2xl lg:self-start border border-outline-variant bg-white p-5 short:p-3 shadow-sm"
+                className="flex flex-col gap-3 rounded-2xl lg:self-start border border-outline-variant bg-surface-container-lowest p-5 short:p-3 shadow-sm"
               >
                 <h2 className="text-sm font-bold text-on-surface">Save Content</h2>
                 {/* The name is the `title` field in the API; it is the word Important Content uses, where a note may go next */}
@@ -396,7 +396,7 @@ export default function QuickNotesClient() {
                   type="button"
                   onClick={save}
                   disabled={isSaving || isOverLimit}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Save size={16} aria-hidden="true" />
                   {isSaving ? "Saving..." : "Save Note"}

@@ -36,7 +36,7 @@ interface SectionProps {
 }
 
 const Section: React.FC<SectionProps> = ({ icon, title, copyText, copyLabel, isEmpty, emptyText, children }) => (
-  <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+  <section className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
     <div className="flex items-center justify-between gap-2">
       <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
         <span className="text-primary" aria-hidden="true">

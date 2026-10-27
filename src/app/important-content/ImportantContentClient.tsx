@@ -50,7 +50,7 @@ const preview = (description: string) => {
 // const copyText = (entry: ImportantContent) => entry.description || entry.name
 
 const pagerButton =
-  "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+  "inline-flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
 const actionButton =
   "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-outline transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
@@ -294,7 +294,7 @@ export default function ImportantContentClient() {
                 <button
                   type="button"
                   onClick={() => setIsManagingFolders(true)}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                 >
                   <Folders size={16} aria-hidden="true" />
                   Folders
@@ -303,7 +303,7 @@ export default function ImportantContentClient() {
                 <button
                   type="button"
                   onClick={() => setDialog({ entry: null })}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
                 >
                   <Plus size={16} aria-hidden="true" />
                   Add New Content
@@ -401,7 +401,7 @@ export default function ImportantContentClient() {
                 )}
 
                 {/* The table from xl, where it fits beside the open sidebar; cards below, two to a row on a tablet */}
-                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+                <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm xl:block">
                   <table className="w-full min-w-[820px] border-collapse text-left">
                     <caption className="sr-only">Important content, page {page} of {totalPages}</caption>
                     <thead className="bg-surface-container-lowest">
@@ -455,7 +455,7 @@ export default function ImportantContentClient() {
 
                 <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:hidden">
                   {items.map((entry) => (
-                    <li key={entry.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+                    <li key={entry.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-sm">
                       <input
                         type="checkbox"
                         checked={selection.isPicked(entry.id)}

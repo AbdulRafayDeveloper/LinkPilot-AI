@@ -3,6 +3,7 @@ import { UserFacingError } from "@/lib/errors"
 import { hashPassword, verifyPassword } from "@/lib/passwords"
 import { UserModel } from "@/models/User"
 import { ACCOUNT_MESSAGES } from "@/constants/account"
+import { DEFAULT_COLOR_SCHEME, isColorScheme, type ColorScheme } from "@/constants/colorScheme"
 import { recordLoginEvent, type ClientInfo } from "@/services/auth/audit"
 import type { ChangePasswordInput } from "@/lib/validation/account"
 import type { Viewer } from "@/types/auth"
@@ -20,15 +21,20 @@ import type { Viewer } from "@/types/auth"
  */
 export async function updateAccountProfile(
   viewer: Viewer,
-  change: { name?: string; timeZone?: string | null }
-): Promise<{ name: string; timeZone: string | null }> {
+  change: { name?: string; timeZone?: string | null; colorScheme?: ColorScheme }
+): Promise<{ name: string; timeZone: string | null; colorScheme: ColorScheme }> {
   await connectDatabase()
   const set: Record<string, unknown> = {}
   if (change.name !== undefined) set.name = change.name
   if (change.timeZone !== undefined) set.timeZone = change.timeZone
-  const saved = await UserModel.findOneAndUpdate({ _id: viewer.id }, { $set: set }, { new: true, projection: { name: 1, timeZone: 1 } }).lean()
+  if (change.colorScheme !== undefined) set.colorScheme = change.colorScheme
+  const saved = await UserModel.findOneAndUpdate(
+    { _id: viewer.id },
+    { $set: set },
+    { new: true, projection: { name: 1, timeZone: 1, colorScheme: 1 } }
+  ).lean()
   if (!saved) throw new UserFacingError(ACCOUNT_MESSAGES.gone)
-  return { name: saved.name, timeZone: saved.timeZone ?? null }
+  return { name: saved.name, timeZone: saved.timeZone ?? null, colorScheme: isColorScheme(saved.colorScheme) ? saved.colorScheme : DEFAULT_COLOR_SCHEME }
 }
 
 /**

@@ -170,7 +170,7 @@ export const SavedNotesList: React.FC<SavedNotesListProps> = ({
   return (
     <section
       aria-label="Saved notes"
-      className="flex min-h-[240px] flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
+      className="flex min-h-[240px] flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm"
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-on-surface">Saved Notes</h2>
@@ -186,7 +186,7 @@ export const SavedNotesList: React.FC<SavedNotesListProps> = ({
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+            className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
           >
             <RefreshCw size={15} aria-hidden="true" />
             Try again

@@ -1,4 +1,5 @@
 import type { UserRole } from "@/constants/auth"
+import type { ColorScheme } from "@/constants/colorScheme"
 
 /** The signed-in account, as the server and the page both see it. Never carries the password hash. */
 export interface Viewer {
@@ -14,6 +15,9 @@ export interface Viewer {
    * It is the person's own, so a child account keeps its own rather than its parent's
    */
   timeZone: string | null
+  // How the app looks for this person (Account Settings → Preferences); "system" follows the device.
+  // The person's own, like the timezone, so a child account keeps its own
+  colorScheme: ColorScheme
   role: UserRole
   // The tools this account may not use. Always empty for an admin, who keeps every tool
   disabledTools: string[]

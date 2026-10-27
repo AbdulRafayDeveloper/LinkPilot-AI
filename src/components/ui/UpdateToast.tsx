@@ -74,7 +74,7 @@ export function UpdateToast() {
             type="button"
             onClick={refresh}
             disabled={isRefreshing}
-            className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary transition-colors hover:bg-on-primary-fixed-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-80"
+            className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-80"
           >
             <RefreshCw aria-hidden="true" className="h-4 w-4" />
             {isRefreshing ? APP_UPDATE_MESSAGES.refreshing : APP_UPDATE_MESSAGES.refresh}

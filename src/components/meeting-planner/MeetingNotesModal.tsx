@@ -186,7 +186,7 @@ export const MeetingNotesModal: React.FC<MeetingNotesModalProps> = ({ meeting, n
               type="button"
               onClick={() => void save()}
               disabled={isClosing || !isDirty || tooLong}
-              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isClosing ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
               Save notes
@@ -225,7 +225,7 @@ export const MeetingNotesModal: React.FC<MeetingNotesModalProps> = ({ meeting, n
             fill
           />
         ) : text.trim() ? (
-          <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-outline-variant bg-white p-4 sm:p-6">
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-outline-variant bg-surface-container-lowest p-4 sm:p-6">
             <RichTextView text={text} />
           </div>
         ) : (
@@ -238,7 +238,7 @@ export const MeetingNotesModal: React.FC<MeetingNotesModalProps> = ({ meeting, n
             <button
               type="button"
               onClick={() => setTab("write")}
-              className="mt-1 inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant"
+              className="mt-1 inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-primary-hover"
             >
               <Pencil size={13} aria-hidden="true" />
               Write notes

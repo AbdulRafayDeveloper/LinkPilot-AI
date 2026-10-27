@@ -39,7 +39,7 @@ interface TaskComposerProps {
 
 const labelClass = "mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-outline"
 const fieldClass =
-  "h-10 w-full rounded-xl border border-outline-variant bg-white px-3 text-[13px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+  "h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[13px] text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
 
 /**
  * Writing one item, on any tab and on either surface.
@@ -274,7 +274,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         <button
           type="submit"
           disabled={!canSave}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSaving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
           {isEdit ? "Save" : words.addLabel}

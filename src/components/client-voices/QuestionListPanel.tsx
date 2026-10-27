@@ -23,7 +23,7 @@ export const QuestionListPanel: React.FC<QuestionListPanelProps> = ({ questions,
   const plainText = (questions ?? []).map((entry) => `- ${entry.question}`).join("\n")
 
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm">
+    <section className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">
           <HelpCircle size={16} className="text-primary" aria-hidden="true" />

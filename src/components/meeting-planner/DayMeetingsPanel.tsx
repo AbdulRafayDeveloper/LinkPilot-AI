@@ -53,7 +53,7 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
 }) => (
   <section
     aria-label={`Meetings on ${date}`}
-    className="flex min-h-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-5 shadow-sm"
+    className="flex min-h-0 flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm"
   >
     <div className="flex flex-wrap items-baseline justify-between gap-2">
       <h2 className="text-sm font-bold text-on-surface">{date ? dayLabel(date) : "Select a day"}</h2>

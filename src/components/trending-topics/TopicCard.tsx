@@ -56,7 +56,7 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, researchOpen = fals
   const eventDate = formatEventDate(topic.event_date)
 
   return (
-    <article className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-w-0">
+    <article className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 min-w-0">
       {/* Freshness & category */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span

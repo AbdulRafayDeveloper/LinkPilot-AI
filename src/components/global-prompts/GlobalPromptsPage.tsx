@@ -37,7 +37,7 @@ export const PromptCards: React.FC<PromptCardsProps> = ({ note, prompts, endpoin
         <button
           type="button"
           onClick={() => setEditor(null)}
-          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:shrink-0"
+          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high sm:shrink-0"
         >
           <FilePenLine size={16} aria-hidden="true" />
           Update Prompt

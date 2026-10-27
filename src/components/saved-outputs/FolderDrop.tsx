@@ -40,12 +40,12 @@ const FolderDropTarget: React.FC<{ id: string; name: string; count: number | nul
     <li
       ref={setNodeRef}
       className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-        isOver ? "border-primary bg-primary text-white shadow-sm" : "border-outline-variant bg-white text-on-surface"
+        isOver ? "border-primary bg-primary text-white shadow-sm" : "border-outline-variant bg-surface-container-lowest text-on-surface"
       }`}
     >
       {id === UNFILED_DROP ? <FileText size={13} aria-hidden="true" /> : isOver ? <FolderOpen size={13} aria-hidden="true" /> : <Folder size={13} aria-hidden="true" />}
       <span className="max-w-[180px] truncate">{name}</span>
-      {count !== null && <span className={isOver ? "text-white/80" : "text-outline"}>{count}</span>}
+      {count !== null && <span className={isOver ? "text-white/90" : "text-outline"}>{count}</span>}
     </li>
   )
 }
@@ -83,7 +83,7 @@ export const FolderDropBar: React.FC<FolderDropBarProps> = ({ folders, overId, m
 
 /** What travels under the pointer: the row's own name, or how many are moving together. */
 export const DragPreview: React.FC<{ title: string; count: number; noun: { one: string; many: string } }> = ({ title, count, noun }) => (
-  <div className="pointer-events-none inline-flex items-center gap-2 rounded-xl border border-primary bg-white px-3 py-2 text-[13px] font-semibold text-on-surface shadow-lg">
+  <div className="pointer-events-none inline-flex items-center gap-2 rounded-xl border border-primary bg-surface-container-lowest px-3 py-2 text-[13px] font-semibold text-on-surface shadow-lg">
     <GripVertical size={14} className="text-primary" aria-hidden="true" />
     <span className="max-w-[240px] truncate">{count > 1 ? `${count} ${noun.many}` : title}</span>
   </div>

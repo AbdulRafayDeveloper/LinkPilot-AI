@@ -125,12 +125,12 @@ const AssetCard: React.FC<{
   return (
     <li
       ref={setNodeRef}
-      className={`relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-opacity ${
+      className={`relative flex flex-col overflow-hidden rounded-2xl border bg-surface-container-lowest shadow-sm transition-opacity ${
         isPicked ? "border-primary" : "border-outline-variant"
       } ${isBusy || isDragging ? "opacity-50" : ""}`}
     >
       {/* Ticking a file picks it for deleting or moving several at once */}
-      <label className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-white/90 shadow-sm">
+      <label className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-surface-container-lowest/90 shadow-sm">
         <input
           type="checkbox"
           checked={isPicked}
@@ -148,7 +148,7 @@ const AssetCard: React.FC<{
         {...listeners}
         aria-label={`Drag ${asset.name} onto a folder`}
         title={DRIVE_FOLDER_MESSAGES.dropHint}
-        className={`absolute right-2 top-2 z-10 flex h-6 w-6 cursor-grab touch-none items-center justify-center rounded-md bg-white/90 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+        className={`absolute right-2 top-2 z-10 flex h-6 w-6 cursor-grab touch-none items-center justify-center rounded-md bg-surface-container-lowest/90 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
           isDragging ? "cursor-grabbing text-primary" : "text-outline hover:text-primary"
         }`}
       >
@@ -175,7 +175,7 @@ const AssetCard: React.FC<{
             <span className="text-[11px] font-semibold text-outline">{getCategoryLabel(asset.category)}</span>
           </div>
         )}
-        <span className="absolute inset-0 hidden items-center justify-center bg-on-surface/40 text-[12px] font-semibold text-white group-hover:flex group-focus-visible:flex">
+        <span className="absolute inset-0 hidden items-center justify-center bg-ink/40 text-[12px] font-semibold text-white group-hover:flex group-focus-visible:flex">
           <Eye size={16} className="mr-1.5" aria-hidden="true" />
           View
         </span>
@@ -355,7 +355,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
         <button
           type="button"
           onClick={onRetry}
-          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+          className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
         >
           <RefreshCw size={15} aria-hidden="true" />
           Try again

@@ -120,7 +120,7 @@ const LinkedPlan: React.FC<{ meeting: MeetingSummary; onUnlink?: (meeting: Meeti
 
 export const MeetingsTable: React.FC<MeetingsTableProps> = ({ meetings, deletingId, pickedIds, onPick, onDelete, onUnlink }) => (
   <>
-    <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+    <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm xl:block">
       <table className="w-full min-w-[880px] border-collapse text-left [overflow-wrap:anywhere]">
         <caption className="sr-only">Every meeting saved, newest first</caption>
         <thead className="bg-surface-container-lowest">
@@ -182,7 +182,7 @@ export const MeetingsTable: React.FC<MeetingsTableProps> = ({ meetings, deleting
     {/* Cards on a phone, two to a row on a tablet or a narrow laptop */}
     <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:hidden">
       {meetings.map((meeting) => (
-        <li key={meeting.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+        <li key={meeting.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
           <label className="-m-1 flex h-6 w-6 cursor-pointer items-center justify-center self-start p-1">
             <input
               type="checkbox"

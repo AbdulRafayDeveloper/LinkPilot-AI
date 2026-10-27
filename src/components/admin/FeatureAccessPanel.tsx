@@ -108,7 +108,7 @@ export const FeatureAccessPanel: React.FC<{ userId: string; isAdminAccount: bool
                 type="button"
                 onClick={() => send({ reset: true }, [...ownOff, ...ownOn], { ...access, disabledTools: [], enabledTools: [], effective: access.defaults })}
                 title="Drop this account's own choices, so it gets exactly what every user gets"
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-white px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-1 text-[11px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
               >
                 <RotateCcw size={12} aria-hidden="true" />
                 Follow all users

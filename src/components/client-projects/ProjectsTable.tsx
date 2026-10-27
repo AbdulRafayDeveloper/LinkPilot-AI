@@ -47,7 +47,7 @@ const Standing: React.FC<{ project: ProjectWithTasks }> = ({ project }) => {
 }
 
 const manageButton =
-  "inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+  "inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 
 const Manage: React.FC<{ project: ProjectWithTasks }> = ({ project }) => (
   <Link href={`/client-projects/${project.id}`} aria-label={PROJECT_TASK_MESSAGES.manageOne(project.name)} className={manageButton}>
@@ -75,7 +75,7 @@ const Shared: React.FC<{ project: ProjectWithTasks }> = ({ project }) =>
  */
 export const ProjectsTable: React.FC<ProjectsTableProps> = ({ projects }) => (
   <>
-    <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-white shadow-sm xl:block">
+    <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm xl:block">
       <table className="w-full min-w-[880px] border-collapse text-left [overflow-wrap:anywhere]">
         <caption className="sr-only">Every client project</caption>
         <thead className="bg-surface-container-lowest">
@@ -121,7 +121,7 @@ export const ProjectsTable: React.FC<ProjectsTableProps> = ({ projects }) => (
     {/* Cards on a phone, two to a row on a tablet or a narrow laptop */}
     <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:hidden">
       {projects.map((project) => (
-        <li key={project.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+        <li key={project.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
           <div className="flex items-start justify-between gap-2">
             <Link
               href={`/client-projects/${project.id}`}

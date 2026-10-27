@@ -12,7 +12,7 @@ import { SAVED_FILTERS_MESSAGES } from "@/constants/savedFilters"
  */
 
 const fieldClass =
-  "h-9 w-full rounded-lg border border-outline-variant bg-white px-2.5 text-[13px] text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+  "h-9 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 text-[13px] text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
 export const historyLabelClass = "text-[10px] font-bold uppercase tracking-wider text-outline"
 
 interface FilterPanelProps {
@@ -41,7 +41,7 @@ export const ClearFiltersButton: React.FC<{ onClear: () => void; className?: str
 )
 
 export const FilterPanel: React.FC<FilterPanelProps> = ({ columnsClassName, summary, canClear, onClear, children }) => (
-  <section aria-label="Filters" className="rounded-2xl border border-outline-variant bg-white p-3 shadow-sm">
+  <section aria-label="Filters" className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-sm">
     <div className={`grid grid-cols-2 gap-3 ${columnsClassName}`}>{children}</div>
     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
       <p className="text-[12px] text-on-surface-variant" aria-live="polite">
@@ -222,7 +222,7 @@ export const SearchableSelectFilter: React.FC<SearchableSelectFilterProps> = ({
         {isOpen && (
           <div
             onKeyDown={onKeyDown}
-            className="absolute left-0 right-0 top-full z-20 mt-1 flex min-w-[220px] flex-col gap-1 rounded-xl border border-outline-variant bg-white p-2 shadow-lg"
+            className="absolute left-0 right-0 top-full z-20 mt-1 flex min-w-[220px] flex-col gap-1 rounded-xl border border-outline-variant bg-surface-container-lowest p-2 shadow-lg"
           >
             <span className="relative">
               <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-outline" aria-hidden="true" />

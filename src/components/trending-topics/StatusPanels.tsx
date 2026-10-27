@@ -5,7 +5,7 @@ import { AlertTriangle, Flame, RefreshCw } from "lucide-react"
 import { TRENDING_TOPIC_COUNT } from "@/constants/trending"
 
 const panelClass =
-  "flex flex-col items-center justify-center text-center gap-3 p-8 bg-white border border-outline-variant rounded-2xl shadow-sm min-h-[260px]"
+  "flex flex-col items-center justify-center text-center gap-3 p-8 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm min-h-[260px]"
 
 export const TrendingEmptyState: React.FC<{ onSearch: () => void }> = ({ onSearch }) => (
   <div className={panelClass}>
@@ -19,7 +19,7 @@ export const TrendingEmptyState: React.FC<{ onSearch: () => void }> = ({ onSearc
     <button
       type="button"
       onClick={onSearch}
-      className="mt-1 inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-semibold shadow-sm active:scale-95 transition-all"
+      className="mt-1 inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-semibold shadow-sm active:scale-95 transition-all"
     >
       <Flame size={16} aria-hidden="true" />
       Find Latest Trends
@@ -37,7 +37,7 @@ export const TrendingErrorState: React.FC<{ message: string; onRetry: () => void
     <button
       type="button"
       onClick={onRetry}
-      className="mt-1 inline-flex items-center gap-2 px-5 py-2.5 border border-outline-variant bg-white text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high active:scale-95 transition-all"
+      className="mt-1 inline-flex items-center gap-2 px-5 py-2.5 border border-outline-variant bg-surface-container-lowest text-on-surface rounded-xl text-sm font-semibold hover:bg-surface-container-high active:scale-95 transition-all"
     >
       <RefreshCw size={16} aria-hidden="true" />
       Try again

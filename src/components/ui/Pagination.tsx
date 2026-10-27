@@ -30,7 +30,7 @@ export function pageSlots(page: number, totalPages: number): PageSlot[] {
 
 const baseButton =
   "inline-flex h-8 items-center justify-center rounded-lg border text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
-const idleButton = "border-outline-variant bg-white text-on-surface hover:bg-surface-container-high"
+const idleButton = "border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-high"
 
 interface PaginationProps {
   page: number

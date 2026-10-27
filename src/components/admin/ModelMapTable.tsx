@@ -67,7 +67,7 @@ export const ModelMapTable: React.FC<{ map: ModelMap }> = ({ map }) => {
   }, [])
 
   return (
-    <section aria-labelledby="model-map" className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+    <section aria-labelledby="model-map" className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
       <div>
         <h2 id="model-map" className="flex items-center gap-2 text-[15px] font-bold text-on-surface">
           <Table2 size={17} className="text-primary" aria-hidden="true" />

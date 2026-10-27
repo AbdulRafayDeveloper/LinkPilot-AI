@@ -205,7 +205,7 @@ export default function PublicProjectClient({ token }: { token: string }) {
 
   return (
     <div className="font-body-md text-body-md min-h-screen bg-background text-on-surface">
-      <header className="border-b border-outline-variant bg-white">
+      <header className="border-b border-outline-variant bg-surface-container-lowest">
         <div className="flex w-full items-center gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <Image src={SITE_LOGO_PNG} alt="" width={24} height={24} className="rounded-md" />
           <span className="text-[13px] font-semibold text-on-surface">{SITE_NAME}</span>
@@ -218,7 +218,7 @@ export default function PublicProjectClient({ token }: { token: string }) {
 
       <main className="flex w-full flex-col gap-4 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {error ? (
-          <div role="alert" className="flex flex-col items-center gap-2 rounded-2xl border border-outline-variant bg-white px-4 py-16 short:py-5 text-center">
+          <div role="alert" className="flex flex-col items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 py-16 short:py-5 text-center">
             <FolderKanban size={22} className="text-outline" aria-hidden="true" />
             <p className="text-sm text-on-surface-variant">{error}</p>
           </div>
@@ -229,7 +229,7 @@ export default function PublicProjectClient({ token }: { token: string }) {
           </p>
         ) : (
           <>
-            <section className="rounded-2xl border border-outline-variant bg-white p-4">
+            <section className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="min-w-0 break-words text-xl font-bold text-on-surface">{project.name}</h1>
                 <span

@@ -175,7 +175,7 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ label, groups, isBusy = 
             onKeyDown={onMenuKeyDown}
             onPointerDown={stop}
             style={{ top: menuAt.top, left: menuAt.left, width: MENU_WIDTH, maxHeight: "calc(100dvh - 16px)" }}
-            className="custom-scrollbar fixed z-[70] overflow-y-auto overflow-x-hidden rounded-xl border border-outline-variant bg-white py-1 shadow-lg"
+            className="custom-scrollbar fixed z-[70] overflow-y-auto overflow-x-hidden rounded-xl border border-outline-variant bg-surface-container-lowest py-1 shadow-lg"
           >
             {groups.map((group, index) => (
               <div key={group.id} className={index > 0 ? "mt-1 border-t border-outline-variant/70 pt-1" : ""}>

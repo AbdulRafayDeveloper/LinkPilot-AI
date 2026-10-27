@@ -105,7 +105,7 @@ export const PromptEditorCard: React.FC<PromptEditorCardProps> = ({ prompt, labe
   const fieldId = `prompt-${key}`
 
   return (
-    <article className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-white p-4 shadow-sm">
+    <article className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
       <header className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1">
           <label htmlFor={fieldId} className="flex flex-wrap items-center gap-2 text-[14px] font-semibold text-on-surface">

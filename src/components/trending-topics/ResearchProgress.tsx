@@ -13,7 +13,7 @@ interface ResearchProgressProps {
  */
 export const ResearchProgress: React.FC<ResearchProgressProps> = ({ stages }) => (
   <div className="space-y-4">
-    <div role="status" aria-live="polite" className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5">
+    <div role="status" aria-live="polite" className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-5">
       <div className="flex items-center gap-3">
         <Loader2 size={20} className="animate-spin text-primary shrink-0" aria-hidden="true" />
         <div>
@@ -45,7 +45,7 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({ stages }) =>
       {[0, 1, 2].map((index) => (
         <div
           key={index}
-          className={`bg-white border border-outline-variant rounded-2xl p-5 space-y-4 animate-pulse ${
+          className={`bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 space-y-4 animate-pulse ${
             index === 2 ? "md:col-span-2 2xl:col-span-1" : ""
           }`}
         >

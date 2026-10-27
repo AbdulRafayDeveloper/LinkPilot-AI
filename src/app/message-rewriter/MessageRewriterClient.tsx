@@ -131,7 +131,7 @@ export default function MessageRewriterClient() {
 
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 lg:flex-1">
               {/* The message to rewrite */}
-              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 lg:self-start">
+              <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 lg:self-start">
                 <div className="flex flex-col gap-2 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label htmlFor="original-message" className="text-[10px] font-bold text-outline uppercase tracking-wider">
@@ -187,7 +187,7 @@ export default function MessageRewriterClient() {
                   type="button"
                   onClick={submit}
                   disabled={isGenerating}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Sparkles size={16} aria-hidden="true" />
                   {isGenerating ? "Rewriting your message..." : "Rewrite Message"}

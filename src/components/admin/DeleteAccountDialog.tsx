@@ -177,7 +177,7 @@ export const DeleteAccountDialog: React.FC<DeleteAccountDialogProps> = ({ user, 
             disabled={isDeleting}
             aria-describedby={hintId}
             placeholder={user.email}
-            className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[13px] text-on-surface placeholder:text-outline/60 focus:border-error focus:outline-none focus:ring-2 focus:ring-error/25 disabled:opacity-60"
+            className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[13px] text-on-surface placeholder:text-outline focus:border-error focus:outline-none focus:ring-2 focus:ring-error/25 disabled:opacity-60"
           />
           <p id={hintId} className={`text-[12px] ${typed && !matches ? "text-error" : "text-outline"}`}>
             {typed && !matches ? "That doesn't match the account's email yet." : "Delete turns on once the email matches."}

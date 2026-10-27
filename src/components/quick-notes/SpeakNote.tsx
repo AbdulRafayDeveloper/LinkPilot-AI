@@ -172,7 +172,7 @@ export const SpeakNote: React.FC<SpeakNoteProps> = ({ addToNote, disabled = fals
                 type="button"
                 onClick={() => void writeInEnglish(state.heard, state.heardBy, addToNote)}
                 disabled={disabled}
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-primary/40 bg-white px-3 py-1.5 font-semibold text-primary hover:bg-primary-fixed/40 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-primary/40 bg-surface-container-lowest px-3 py-1.5 font-semibold text-primary hover:bg-primary-fixed/40 disabled:opacity-60"
               >
                 <RotateCcw size={13} aria-hidden="true" />
                 Try again
@@ -181,7 +181,7 @@ export const SpeakNote: React.FC<SpeakNoteProps> = ({ addToNote, disabled = fals
                 type="button"
                 onClick={addAsSaid}
                 disabled={disabled}
-                className="inline-flex items-center whitespace-nowrap rounded-lg border border-outline-variant bg-white px-3 py-1.5 font-semibold text-on-surface hover:border-primary/40 disabled:opacity-60"
+                className="inline-flex items-center whitespace-nowrap rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 font-semibold text-on-surface hover:border-primary/40 disabled:opacity-60"
               >
                 {QUICK_NOTES_MESSAGES.speechAddAsSaid}
               </button>
@@ -194,7 +194,7 @@ export const SpeakNote: React.FC<SpeakNoteProps> = ({ addToNote, disabled = fals
 }
 
 const HeardText: React.FC<{ text: string }> = ({ text }) => (
-  <div className="mt-1 flex items-start gap-2 rounded-lg bg-white/80 px-2 py-1.5">
+  <div className="mt-1 flex items-start gap-2 rounded-lg bg-surface-container-lowest/80 px-2 py-1.5">
     <p className="max-h-32 flex-1 overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] text-on-surface-variant">
       {text}
     </p>

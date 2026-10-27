@@ -35,7 +35,7 @@ export const ACCOUNT_PHOTO_ACCEPT = "image/png,image/jpeg,image/webp,.png,.jpg,.
  */
 export const ACCOUNT_TABS = [
   { id: "profile", label: "Profile", hint: "Name, photo and account" },
-  { id: "preferences", label: "Preferences", hint: "Time zone" },
+  { id: "preferences", label: "Preferences", hint: "Appearance and time zone" },
   { id: "security", label: "Security", hint: "Password and sign-in" },
 ] as const
 export type AccountTabId = (typeof ACCOUNT_TABS)[number]["id"]

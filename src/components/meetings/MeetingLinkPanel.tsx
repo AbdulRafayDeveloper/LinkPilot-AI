@@ -45,7 +45,7 @@ export const MeetingLinkPanel: React.FC<MeetingLinkPanelProps> = ({ meetingId, t
   }
 
   const buttonClass =
-    "inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
+    "inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
 
   return (
     <section aria-label="The link for this meeting" className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3">
@@ -78,7 +78,7 @@ export const MeetingLinkPanel: React.FC<MeetingLinkPanelProps> = ({ meetingId, t
         )}
       </div>
 
-      {url && <p className="break-all rounded-xl bg-white px-3 py-2 text-[12px] text-on-surface-variant">{url}</p>}
+      {url && <p className="break-all rounded-xl bg-surface-container-lowest px-3 py-2 text-[12px] text-on-surface-variant">{url}</p>}
       <p className="text-[11px] text-outline">{MEETING_LINK_MESSAGES.explains}</p>
       {error && (
         <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">

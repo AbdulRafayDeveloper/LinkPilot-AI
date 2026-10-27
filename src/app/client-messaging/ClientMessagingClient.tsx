@@ -158,7 +158,7 @@ export default function ClientMessagingClient() {
                 channels are already a list rather than cards and stacking would cost the page its
                 whole second half in height. */}
             <div className="grid grid-cols-1 short:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 xl:flex-1 short:flex-1 short:gap-4">
-              <section className="bg-white border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 short:p-3 short:gap-2 lg:self-start">
+              <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-5 flex flex-col gap-4 short:p-3 short:gap-2 lg:self-start">
                 {/* Who the message is for, and on a short laptop window the channel beside it */}
                 <div className="flex flex-col gap-4 short:grid short:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] short:items-start short:gap-3">
                 <div className="flex flex-col gap-1.5 shrink-0">
@@ -308,7 +308,7 @@ export default function ClientMessagingClient() {
                   type="button"
                   onClick={submit}
                   disabled={isGenerating}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Send size={16} aria-hidden="true" />
                   {isGenerating ? "Writing the message..." : "Write Message"}
