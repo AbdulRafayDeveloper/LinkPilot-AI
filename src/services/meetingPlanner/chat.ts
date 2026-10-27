@@ -1,6 +1,7 @@
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { streamTextWithFallback, type ModelProvider } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
+import { loadPromptBook } from "@/services/promptBook"
 import { searchMeeting, syncMeetingVectors, type MeetingMatch } from "@/services/meetingPlanner/vectors"
 import { meetingChunks } from "@/lib/meetingChunks"
 import { ANSWER_MAX_TOKENS, CHAT_CONTEXT_MESSAGES, MEETING_CHAT_MESSAGES } from "@/constants/meetingChat"
@@ -40,19 +41,18 @@ const asContext = (matches: MeetingMatch[]) =>
   matches.map((match, index) => `[${index + 1}] ${match.label}\n${match.text}`).join("\n\n")
 
 export async function askMeeting({ meeting, ownerId, question, history, signal, onToken }: AskOptions): Promise<MeetingAnswer> {
-  const { pieces } = await syncMeetingVectors(meeting.id, meetingChunks(meeting), ownerId, signal)
+  // Every word besides the chat's system prompt (each piece's labels included) is the instructions prompt's
+  const book = await loadPromptBook("meeting-planner-instructions")
+  const { pieces } = await syncMeetingVectors(meeting.id, meetingChunks(meeting, book), ownerId, signal)
   if (pieces === 0) throw new UserFacingError(MEETING_CHAT_MESSAGES.notReady)
 
   const matches = await searchMeeting(meeting.id, question, signal)
   const system = renderPrompt(await loadPrompt("meeting-chat-system"), {
     MEETING_NAME: meeting.name,
-    PERSON_NAME: meeting.personName || "the person",
-    MEETING_WHEN: `${meeting.meetingDate} at ${meeting.meetingTime}`,
+    PERSON_NAME: meeting.personName || book.text("chat.person-unknown"),
+    MEETING_WHEN: book.text("when", { date: meeting.meetingDate, time: meeting.meetingTime }),
   })
-  const notes =
-    matches.length > 0
-      ? `Pieces of this meeting, closest to the question first:\n\n${asContext(matches)}`
-      : "Nothing saved on this meeting matches the question."
+  const notes = matches.length > 0 ? `${book.text("chat.pieces-heading")}\n\n${asContext(matches)}` : book.text("chat.nothing-matches")
 
   const messages = [
     new SystemMessage(system),
@@ -61,7 +61,7 @@ export async function askMeeting({ meeting, ownerId, question, history, signal, 
       .map((message) => (message.role === "you" ? new HumanMessage(message.text) : new AIMessage(message.text))),
     // The reminder rides with every question, so a chat that already holds answers in another language,
     // or a question written in one, still gets an English answer
-    new HumanMessage(`<meeting_notes>\n${notes}\n</meeting_notes>\n\nQuestion: ${question}\n\nWrite your answer in English.`),
+    new HumanMessage(book.text("chat.question", { notes, question })),
   ]
 
   const { text, provider } = await streamTextWithFallback({ messages, onToken, maxTokens: ANSWER_MAX_TOKENS, signal })

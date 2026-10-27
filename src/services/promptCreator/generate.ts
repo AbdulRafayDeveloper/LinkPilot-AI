@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { UserFacingError } from "@/lib/errors"
 import {
   CREATED_NAME_MAX_LENGTH,
@@ -23,14 +24,13 @@ const NAME_WORDS = { min: 3, max: 6 }
  * The name comes first on purpose: the model settles what the prompt is about before it
  * writes the prompt itself.
  */
-const CreatedPromptSchema = z.object({
-  name: z.string().describe("A 4-5 word title for this prompt, in plain words, no quotes and no file extension"),
-  prompt: z
-    .string()
-    .describe("The complete, ready-to-paste prompt in clear English, written to the AI that will carry out the task"),
-})
+const createdPromptSchema = (book: PromptBook) =>
+  z.object({
+    name: z.string().describe(book.text("field.name")),
+    prompt: z.string().describe(book.text("field.prompt")),
+  })
 
-type CreatedPromptOutput = z.infer<typeof CreatedPromptSchema>
+type CreatedPromptOutput = z.infer<ReturnType<typeof createdPromptSchema>>
 
 interface GenerateOptions {
   request: string
@@ -78,7 +78,8 @@ function findUnusableReason(output: CreatedPromptOutput): string | null {
  * is treated as the subject of the work and never as instructions to follow.
  */
 export async function createPrompt({ request, target, requestSource, signal }: GenerateOptions): Promise<GeneratedPrompt> {
-  const targetPrompt = await getActiveTargetPrompt(target)
+  // Every word besides the system and target prompts is the module's instructions prompt
+  const [targetPrompt, book] = await Promise.all([getActiveTargetPrompt(target), loadPromptBook("prompt-creator-instructions")])
   const system = renderPrompt(await loadPrompt("prompt-creator-system"), {
     TARGET: getPromptTargetLabel(target),
     MAX_CHARS: CREATED_PROMPT_MAX_LENGTH,
@@ -89,7 +90,7 @@ export async function createPrompt({ request, target, requestSource, signal }: G
       {
         variable: "request",
         tag: "task_request",
-        label: "What the user wants done",
+        label: book.text("label.request"),
         content: request,
       },
     ],
@@ -97,7 +98,7 @@ export async function createPrompt({ request, target, requestSource, signal }: G
   )
 
   const { data, provider } = await generateStructuredWithFallback({
-    schema: CreatedPromptSchema,
+    schema: createdPromptSchema(book),
     name: "created_prompt",
     messages: [new SystemMessage(system), new HumanMessage(user)],
     temperature: WRITING_TEMPERATURE,

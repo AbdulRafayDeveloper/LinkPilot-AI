@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { UserFacingError } from "@/lib/errors"
 import { NOTE_SPEECH_MAX_LENGTH, QUICK_NOTES_MESSAGES } from "@/constants/quickNotes"
 import type { SpokenNoteEnglish } from "@/types/quickNotes"
@@ -20,10 +21,11 @@ import type { SpokenNoteEnglish } from "@/types/quickNotes"
  * rules live in `quick-notes-english-system` and the wording the owner may change in `quick-notes-english`.
  */
 
-const EnglishSchema = z.object({
-  english: z.string().describe("The same note in clear, simple English, keeping every detail"),
-  sourceLanguage: z.string().describe("The language the note was spoken in, named in English (for example Urdu, Roman Urdu, English)"),
-})
+const englishSchema = (book: PromptBook) =>
+  z.object({
+    english: z.string().describe(book.text("field.english")),
+    sourceLanguage: z.string().describe(book.text("field.source-language")),
+  })
 
 /**
  * Writes what was spoken in English. Throws a `UserFacingError` when there is nothing to read or
@@ -37,13 +39,17 @@ export async function spokenNoteToEnglish(text: string, signal?: AbortSignal): P
   if (!spoken) throw new UserFacingError(QUICK_NOTES_MESSAGES.speechMissing)
   if (spoken.length > NOTE_SPEECH_MAX_LENGTH) throw new UserFacingError(QUICK_NOTES_MESSAGES.speechTooLong)
 
-  const [system, instructions] = await Promise.all([loadPrompt("quick-notes-english-system"), loadPrompt("quick-notes-english")])
+  const [system, instructions, book] = await Promise.all([
+    loadPrompt("quick-notes-english-system"),
+    loadPrompt("quick-notes-english"),
+    loadPromptBook("quick-notes-instructions"),
+  ])
   const message = await composePromptMessage(instructions, [
-    { variable: "note", tag: "spoken_note", label: "What the user said", content: spoken },
+    { variable: "note", tag: "spoken_note", label: book.text("label.note"), content: spoken },
   ])
 
   const { data } = await generateStructuredWithFallback({
-    schema: EnglishSchema,
+    schema: englishSchema(book),
     name: "spoken_note_in_english",
     messages: [new SystemMessage(system), new HumanMessage(message)],
     // A faithful reading, not a new note: a low temperature keeps it close to what was said

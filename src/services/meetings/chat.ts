@@ -1,6 +1,7 @@
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { streamTextWithFallback, type ModelProvider } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
+import { loadPromptBook } from "@/services/promptBook"
 import { searchMeeting, syncMeetingVectors, type MeetingMatch } from "@/services/meetingPlanner/vectors"
 import { notesChunks } from "@/lib/meetingChunks"
 import { ANSWER_MAX_TOKENS, CHAT_CONTEXT_MESSAGES, MEETING_CHAT_MESSAGES } from "@/constants/meetingChat"
@@ -44,7 +45,9 @@ const asContext = (matches: MeetingMatch[]) =>
   matches.map((match, index) => `[${index + 1}] ${match.label}\n${match.text}`).join("\n\n")
 
 export async function askMeetingNotes({ meeting, ownerId, question, history, signal, onToken }: AskOptions): Promise<MeetingNotesAnswer> {
-  const { pieces } = await syncMeetingVectors(meeting.id, notesChunks(meeting), ownerId, signal)
+  // Every word besides the chat's system prompt (each piece's labels included) is the instructions prompt's
+  const book = await loadPromptBook("meetings-instructions")
+  const { pieces } = await syncMeetingVectors(meeting.id, notesChunks(meeting, book), ownerId, signal)
   if (pieces === 0) throw new UserFacingError(MEETING_CHAT_MESSAGES.notesNotReady)
 
   const matches = await searchMeeting(meeting.id, question, signal)
@@ -52,16 +55,9 @@ export async function askMeetingNotes({ meeting, ownerId, question, history, sig
     MEETING_NAME: meeting.title,
     MEETING_WHEN: meeting.createdAt.slice(0, 10),
     // The analysis may be missing or out of date, and an answer must not pretend otherwise
-    ANALYSIS_STATE: meeting.analysis
-      ? meeting.isAnalysisStale
-        ? "The analysis was built from an earlier version of this transcript, so trust the transcript itself where they disagree."
-        : "The analysis is up to date with the transcript."
-      : "This meeting has not been analysed yet, so only the transcript is available.",
+    ANALYSIS_STATE: book.text(meeting.analysis ? (meeting.isAnalysisStale ? "chat.analysis.stale" : "chat.analysis.current") : "chat.analysis.none"),
   })
-  const notes =
-    matches.length > 0
-      ? `Pieces of this meeting, closest to the question first:\n\n${asContext(matches)}`
-      : "Nothing in this meeting's notes matches the question."
+  const notes = matches.length > 0 ? `${book.text("chat.pieces-heading")}\n\n${asContext(matches)}` : book.text("chat.nothing-matches")
 
   const messages = [
     new SystemMessage(system),
@@ -69,7 +65,7 @@ export async function askMeetingNotes({ meeting, ownerId, question, history, sig
       .slice(-CHAT_CONTEXT_MESSAGES)
       .map((message) => (message.role === "you" ? new HumanMessage(message.text) : new AIMessage(message.text))),
     // The reminder rides with every question, so a meeting held in another language still gets an English answer
-    new HumanMessage(`<meeting_notes>\n${notes}\n</meeting_notes>\n\nQuestion: ${question}\n\nWrite your answer in English.`),
+    new HumanMessage(book.text("chat.question", { notes, question })),
   ]
 
   const { text, provider } = await streamTextWithFallback({ messages, onToken, maxTokens: ANSWER_MAX_TOKENS, signal })

@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { humanizeTexts } from "@/services/humanizer"
 import { asUserFacingError } from "@/lib/errors"
 import { cleanGeneratedText, findPlaceholders, stripMarkdownMarks } from "@/lib/generatedText"
@@ -17,14 +18,13 @@ const MIN_MESSAGE_LENGTH = 2
 // The humanizer may reword, not lengthen: a little room covers a sentence it had to split
 const HUMANIZE_TOLERANCE = 1.1
 
-const RewrittenMessageSchema = z.object({
-  source_language: z
-    .string()
-    .describe("The language the original message is written in, named in English, for example Urdu, Spanish or English"),
-  message: z.string().describe("The rewritten message in clear, simple English, ready to send, and nothing else"),
-})
+const rewrittenMessageSchema = (book: PromptBook) =>
+  z.object({
+    source_language: z.string().describe(book.text("field.source-language")),
+    message: z.string().describe(book.text("field.message")),
+  })
 
-type RewrittenMessageOutput = z.infer<typeof RewrittenMessageSchema>
+type RewrittenMessageOutput = z.infer<ReturnType<typeof rewrittenMessageSchema>>
 
 interface RewriteOptions {
   message: string
@@ -46,9 +46,9 @@ function findUnusableReason(output: RewrittenMessageOutput, original: string): s
   return null
 }
 
-function shortenRequest(message: string, maxChars: number): HumanMessage {
+function shortenRequest(message: string, maxChars: number, book: PromptBook): HumanMessage {
   return new HumanMessage(
-    `Your message below is ${message.length.toLocaleString()} characters, and it has to be at most ${maxChars.toLocaleString()}. Say the same thing in fewer words. Keep every point, every name, number and date, and the same meaning and tone. Take out repetition and anything that adds nothing.\n\n<draft_message>\n${message}\n</draft_message>`
+    book.text("shorten", { length: message.length.toLocaleString(), max: maxChars.toLocaleString(), draft: message })
   )
 }
 
@@ -62,7 +62,8 @@ function shortenRequest(message: string, maxChars: number): HumanMessage {
  * what the user sends does not read as though a model wrote it.
  */
 export async function rewriteMessage({ message: original, source, signal }: RewriteOptions): Promise<RewrittenMessage> {
-  const { prompt } = await getMessageRewriterPrompt()
+  // Every word besides the system and rewrite prompts is the module's instructions prompt
+  const [{ prompt }, book] = await Promise.all([getMessageRewriterPrompt(), loadPromptBook("message-rewriter-instructions")])
   const maxChars = rewrittenMaxChars(original.length)
   const system = renderPrompt(await loadPrompt("message-rewriter-system"), { MAX_CHARS: maxChars })
   const user = await composePromptMessage(
@@ -71,7 +72,7 @@ export async function rewriteMessage({ message: original, source, signal }: Rewr
       {
         variable: "message",
         tag: "original_message",
-        label: "The message to rewrite",
+        label: book.text("label.message"),
         content: original,
       },
     ],
@@ -81,7 +82,7 @@ export async function rewriteMessage({ message: original, source, signal }: Rewr
   const messages = [new SystemMessage(system), new HumanMessage(user)]
   const write = (turn: (SystemMessage | HumanMessage)[]) =>
     generateStructuredWithFallback({
-      schema: RewrittenMessageSchema,
+      schema: rewrittenMessageSchema(book),
       name: "rewritten_message",
       messages: turn,
       temperature: REWRITE_TEMPERATURE,
@@ -100,7 +101,7 @@ export async function rewriteMessage({ message: original, source, signal }: Rewr
 
   // Shortening is the whole job, so a rewrite that came back longer gets one more go
   if (draft.length > maxChars) {
-    const shorter = await write([...messages, shortenRequest(draft, maxChars)]).catch((error: unknown) => {
+    const shorter = await write([...messages, shortenRequest(draft, maxChars, book)]).catch((error: unknown) => {
       if (signal.aborted) throw error
       console.warn("⚠️ Shortening pass failed, keeping the first draft:", error instanceof Error ? error.message : error)
       return null
@@ -115,10 +116,10 @@ export async function rewriteMessage({ message: original, source, signal }: Rewr
     fields: [
       {
         id: "message",
-        kind: "short English message the user is about to send to someone",
+        kind: book.text("humanize.kind"),
         text: draft,
         maxChars: humanizeCap,
-        rule: "keep the same meaning, every fact and the same tone. Plain everyday English, no longer than the draft, and no greeting or sign-off the draft does not have",
+        rule: book.text("humanize.rule"),
       },
     ],
     signal,

@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { SITE_AUTHOR } from "@/config/site"
 import { MEETING_MESSAGES, MEETING_TITLE_MAX_LENGTH, MEETING_ANSWER_MAX_TOKENS, TOPICS_MAX } from "@/constants/meetings"
 import { foldParticipants, mergeTopics, participantsFromPeople, withKnownOwners, workDecisions } from "@/lib/meetingPeople"
@@ -24,49 +25,50 @@ const REDUCE_INPUT_MAX_CHARS = 30_000
 // 45 seconds a single call is otherwise given
 const SYNTHESIS_TIMEOUT_MS = 120_000
 
-const EvidenceSchema = z
-  .enum(["stated", "inferred"])
-  .describe('"stated" when the transcript says it outright, "inferred" when it clearly follows from what was said')
+/**
+ * Adds a field's description, read from the module's instructions prompt, or nothing at all. The
+ * same shapes serve two purposes: with descriptions they are what the model is asked for, and with
+ * none they read back the results already stored (`ChunkResultSchema`), which need no words.
+ */
+type Describe = <T extends z.ZodType>(schema: T, id: string) => T
+const withoutWords: Describe = (schema) => schema
+const describedBy = (book: PromptBook): Describe => (schema, id) => schema.describe(book.text(id))
 
-const ParticipantSchema = z.object({
-  name: z.string().describe('The speaker name as the transcript gives it, or "Unnamed speaker 1" when they speak but are never named'),
-  role: z.string().nullable().describe("What they do, only when the transcript says so, otherwise null"),
-  is_named: z.boolean().describe("True when the transcript actually gives their name"),
-  evidence: EvidenceSchema,
-})
-
-const ActionItemSchema = z.object({
-  task: z.string().describe("The task exactly as it was agreed, in one line"),
-  owner: z.string().nullable().describe("Who took it on, or null when the transcript does not say"),
-  deadline: z.string().nullable().describe("Only a date or timeframe that was actually said, otherwise null"),
-  evidence: EvidenceSchema,
-})
-
-const DecisionSchema = z.object({
-  decision: z.string().describe("The decision as it was settled, in one line"),
-  evidence: EvidenceSchema,
-})
+function chunkResultShape(d: Describe) {
+  const evidence = d(z.enum(["stated", "inferred"]), "field.evidence")
+  const participant = z.object({
+    name: d(z.string(), "field.participant.name"),
+    role: d(z.string().nullable(), "field.participant.role"),
+    is_named: d(z.boolean(), "field.participant.is-named"),
+    evidence,
+  })
+  const actionItem = z.object({
+    task: d(z.string(), "field.action.task"),
+    owner: d(z.string().nullable(), "field.action.owner"),
+    deadline: d(z.string().nullable(), "field.action.deadline"),
+    evidence,
+  })
+  const decision = z.object({ decision: d(z.string(), "field.decision"), evidence })
+  return z.object({
+    purpose: d(z.string().nullable(), "field.chunk.purpose"),
+    participants: d(z.array(participant), "field.chunk.participants"),
+    topics: d(z.array(z.string()), "field.chunk.topics"),
+    decisions: d(z.array(decision), "field.chunk.decisions"),
+    action_items: d(z.array(actionItem), "field.chunk.action-items"),
+    my_tasks: d(z.array(actionItem), "field.chunk.my-tasks"),
+    my_decisions: d(z.array(decision), "field.chunk.my-decisions"),
+    client_requests: d(z.array(z.string()), "field.chunk.client-requests"),
+    unknowns: d(z.array(z.string()), "field.chunk.unknowns"),
+  })
+}
 
 /**
  * What one chunk of the meeting gives up. The same shape carries a fold of several chunk results,
- * so folding is just reading a shorter meeting.
+ * so folding is just reading a shorter meeting. This one has no descriptions: it reads stored results.
  */
-export const ChunkResultSchema = z.object({
-  purpose: z
-    .string()
-    .nullable()
-    .describe("Why the meeting is being held, but only when this part actually says so, otherwise null"),
-  participants: z
-    .array(ParticipantSchema)
-    .describe("Only people who actually speak or are addressed as being in this part; never someone merely talked about"),
-  topics: z.array(z.string()).describe("What this part of the meeting was about, a few words each"),
-  decisions: z.array(DecisionSchema).describe("Decisions settled in this part; a suggestion nobody agreed to is not a decision"),
-  action_items: z.array(ActionItemSchema).describe("Tasks anyone agreed to do in this part"),
-  my_tasks: z.array(ActionItemSchema).describe("Tasks the user himself agreed to or was asked to do"),
-  my_decisions: z.array(DecisionSchema).describe("Decisions that involve the user or change his work"),
-  client_requests: z.array(z.string()).describe("What the client asked the user for, in their own terms"),
-  unknowns: z.array(z.string()).describe("Things this part raises but leaves open, such as a date nobody set"),
-})
+export const ChunkResultSchema = chunkResultShape(withoutWords)
+// The same shape as the model is asked for it, each field described by the instructions prompt
+const chunkResultSchema = (book: PromptBook) => chunkResultShape(describedBy(book))
 
 export type ChunkResult = z.infer<typeof ChunkResultSchema>
 
@@ -76,12 +78,13 @@ export type ChunkResult = z.infer<typeof ChunkResultSchema>
  * fact from the middle of a long meeting can never be summarised away. The model is left with the
  * parts that need judgement.
  */
-const SynthesisSchema = z.object({
-  title: z.string().describe("A 4 to 8 word name for this meeting, in plain words"),
-  purpose: z.string().nullable().describe("Why the meeting happened, in one or two sentences, or null when the notes never say"),
-  topics: z.array(z.string()).describe("The main subjects of the whole meeting, most important first, in a few words each"),
-  minutes: z.string().describe("3 to 4 lines summarising the meeting, ready to send the client as it is"),
-})
+const synthesisSchema = (book: PromptBook) =>
+  z.object({
+    title: z.string().describe(book.text("field.synthesis.title")),
+    purpose: z.string().nullable().describe(book.text("field.synthesis.purpose")),
+    topics: z.array(z.string()).describe(book.text("field.synthesis.topics")),
+    minutes: z.string().describe(book.text("field.synthesis.minutes")),
+  })
 
 const trimTitle = (title: string) => title.replace(/["'`*#]/g, "").replace(/\s+/g, " ").trim().slice(0, MEETING_TITLE_MAX_LENGTH)
 
@@ -97,18 +100,8 @@ const trimTitle = (title: string) => title.replace(/["'`*#]/g, "").replace(/\s+/
  * is the app's own record of who the conversation was with, which is why it may be put to a speaker
  * the recording never names; it is marked `inferred`, never `stated`, because nobody said it aloud.
  */
-const calendarBlock = (calendar: string | null) =>
-  calendar
-    ? [
-        {
-          variable: "calendar",
-          tag: "what_the_calendar_says",
-          label:
-            "What the user's own calendar says this meeting was. A name here may be given to a speaker the recording never names, as a participant marked inferred; never invent any other name",
-          content: calendar,
-        },
-      ]
-    : []
+const calendarBlock = (calendar: string | null, book: PromptBook) =>
+  calendar ? [{ variable: "calendar", tag: "what_the_calendar_says", label: book.text("label.calendar"), content: calendar }] : []
 
 export async function analyzeChunk(
   chunk: TranscriptChunk,
@@ -119,32 +112,36 @@ export async function analyzeChunk(
   // What the calendar says this meeting was, when the user has not said who was in it
   calendar: string | null = null
 ): Promise<ChunkResult> {
-  const [system, instructions] = await Promise.all([loadPrompt("meeting-system"), loadPrompt("meeting-chunk")])
+  const [system, instructions, book] = await Promise.all([
+    loadPrompt("meeting-system"),
+    loadPrompt("meeting-chunk"),
+    loadPromptBook("meetings-instructions"),
+  ])
   const user = await composePromptMessage(
     instructions,
     [
       {
         variable: "previous_context",
         tag: "previous_context",
-        label: "The end of the previous part, for context only",
+        label: book.text("label.previous-context"),
         content: chunk.context || null,
-        emptyText: "This is the start of the meeting.",
+        emptyText: book.text("empty.previous-context"),
       },
-      { variable: "transcript_part", tag: "transcript_part", label: "The part of the meeting to read", content: chunk.text },
+      { variable: "transcript_part", tag: "transcript_part", label: book.text("label.transcript-part"), content: chunk.text },
       {
         variable: "people",
         tag: "people_in_the_meeting",
-        label: "Who was in this meeting, as the user themselves named them",
+        label: book.text("label.people"),
         content: people.length > 0 ? people.join("\n") : null,
-        emptyText: "Nobody has said who was in this meeting, so go only by what the transcript shows.",
+        emptyText: book.text("empty.people"),
       },
-      ...calendarBlock(people.length > 0 ? null : calendar),
+      ...calendarBlock(people.length > 0 ? null : calendar, book),
     ],
     { part_number: String(chunk.index + 1), total_parts: String(totalChunks), my_name: SITE_AUTHOR }
   )
 
   const { data } = await generateStructuredWithFallback({
-    schema: ChunkResultSchema,
+    schema: chunkResultSchema(book),
     name: "meeting_chunk_analysis",
     messages: [
       new SystemMessage(renderPrompt(system, { MY_NAME: SITE_AUTHOR, PART_NUMBER: chunk.index + 1, TOTAL_PARTS: totalChunks })),
@@ -159,9 +156,9 @@ export async function analyzeChunk(
 }
 
 // Chunk results as compact text for a reduce call, each labelled with the part it came from
-function describeResults(results: { index: number; result: ChunkResult }[]): string {
+function describeResults(results: { index: number; result: ChunkResult }[], book: PromptBook): string {
   return results
-    .map(({ index, result }) => `Part ${index + 1}:\n${JSON.stringify(result)}`)
+    .map(({ index, result }) => `${book.text("part-heading", { number: index + 1 })}\n${JSON.stringify(result)}`)
     .join("\n\n")
 }
 
@@ -171,17 +168,18 @@ function describeResults(results: { index: number; result: ChunkResult }[]): str
  */
 async function foldResults(
   results: { index: number; result: ChunkResult }[],
-  signal: AbortSignal
+  signal: AbortSignal,
+  book: PromptBook
 ): Promise<ChunkResult> {
   const [system, instructions] = await Promise.all([loadPrompt("meeting-system"), loadPrompt("meeting-chunk")])
   const user = await composePromptMessage(
-    `${instructions}\n\nThese are the notes already taken from consecutive parts of one meeting, in order. Merge them into one set of notes for this stretch of the meeting: keep every distinct fact, drop exact repeats, and never add anything that is not in the notes.`,
-    [{ variable: "transcript_part", tag: "meeting_notes", label: "Notes from the parts", content: describeResults(results) }],
+    book.text("fold.request", { instructions }),
+    [{ variable: "transcript_part", tag: "meeting_notes", label: book.text("label.notes-from-parts"), content: describeResults(results, book) }],
     { part_number: "merged", total_parts: String(results.length), my_name: SITE_AUTHOR }
   )
 
   const { data } = await generateStructuredWithFallback({
-    schema: ChunkResultSchema,
+    schema: chunkResultSchema(book),
     name: "meeting_notes_merge",
     messages: [
       new SystemMessage(renderPrompt(system, { MY_NAME: SITE_AUTHOR, PART_NUMBER: "merged", TOTAL_PARTS: results.length })),
@@ -203,15 +201,16 @@ async function foldResults(
 async function reduceToFitting(
   results: { index: number; result: ChunkResult }[],
   signal: AbortSignal,
+  book: PromptBook,
   onFold?: (remaining: number) => void
 ): Promise<{ index: number; result: ChunkResult }[]> {
   let current = [...results].sort((a, b) => a.index - b.index)
-  while (describeResults(current).length > REDUCE_INPUT_MAX_CHARS && current.length > 1) {
+  while (describeResults(current, book).length > REDUCE_INPUT_MAX_CHARS && current.length > 1) {
     const groups: { index: number; result: ChunkResult }[][] = []
     let group: { index: number; result: ChunkResult }[] = []
     for (const entry of current) {
       group.push(entry)
-      if (describeResults(group).length >= REDUCE_INPUT_MAX_CHARS / 2) {
+      if (describeResults(group, book).length >= REDUCE_INPUT_MAX_CHARS / 2) {
         groups.push(group)
         group = []
       }
@@ -227,7 +226,7 @@ async function reduceToFitting(
     for (const entries of groups) {
       folded.push({
         index: entries[0].index,
-        result: entries.length === 1 ? entries[0].result : await foldResults(entries, signal),
+        result: entries.length === 1 ? entries[0].result : await foldResults(entries, signal, book),
       })
     }
     current = folded
@@ -249,32 +248,32 @@ export async function synthesizeMeeting(
 ): Promise<{ analysis: MeetingAnalysis; title: string }> {
   const facts = aggregateChunkResults(results)
   const substance = hasMeetingSubstance(facts)
+  // Every word besides the system and synthesis prompts is the module's instructions prompt
+  const book = await loadPromptBook("meetings-instructions")
   // The model reads the merged facts, which are far smaller than every raw note and already free
   // of repeats. Only a meeting so long that even those do not fit is folded first, and only for
   // the model: what is stored always keeps every merged fact.
   let digest = JSON.stringify(facts)
   if (digest.length > REDUCE_INPUT_MAX_CHARS) {
-    const folded = await reduceToFitting(results, options.signal, options.onFold)
+    const folded = await reduceToFitting(results, options.signal, book, options.onFold)
     digest = JSON.stringify(aggregateChunkResults(folded))
   }
   const [system, instructions] = await Promise.all([loadPrompt("meeting-system"), loadPrompt("meeting-synthesis")])
   const user = await composePromptMessage(
     instructions,
     [
-      { variable: "meeting_notes", tag: "meeting_notes", label: "Everything the parts of the meeting gave up, merged and in order", content: digest },
-      ...calendarBlock((options.people ?? []).length > 0 ? null : (options.calendar ?? null)),
+      { variable: "meeting_notes", tag: "meeting_notes", label: book.text("label.merged-notes"), content: digest },
+      ...calendarBlock((options.people ?? []).length > 0 ? null : (options.calendar ?? null), book),
     ],
     {
       my_name: SITE_AUTHOR,
       total_parts: String(results.length),
-      title_instruction: options.userTitle
-        ? `The meeting already has the name "${options.userTitle}". Repeat it exactly as the title.`
-        : "Give the meeting a name of 4 to 8 words, taken from what it was actually about.",
+      title_instruction: options.userTitle ? book.text("title.keep", { title: options.userTitle }) : book.text("title.write"),
     }
   )
 
   const { data } = await generateStructuredWithFallback({
-    schema: SynthesisSchema,
+    schema: synthesisSchema(book),
     name: "meeting_synthesis",
     messages: [
       new SystemMessage(renderPrompt(system, { MY_NAME: SITE_AUTHOR, PART_NUMBER: "all", TOTAL_PARTS: results.length })),

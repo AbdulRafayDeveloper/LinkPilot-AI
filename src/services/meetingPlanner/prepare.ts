@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage, type PromptDataBlock } from "@/services/promptComposer"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { getFullSenderProfile } from "@/services/senderProfile"
 import { findUnsupportedFigures } from "@/lib/figures"
 import { dayLabel, formatTime } from "@/lib/meetingDates"
@@ -23,112 +24,83 @@ const PREP_TEMPERATURE = 0.4
 // seconds a single call is otherwise given
 const PREP_TIMEOUT_MS = 120_000
 
-const EvidenceSchema = z
-  .enum(["stated", "inferred"])
-  .describe('"stated" when the supplied information says it outright, "inferred" when it only follows from it')
-
-const ObservationSchema = z.object({
-  point: z.string().describe("One specific observation about the person, in one sentence"),
-  evidence: EvidenceSchema,
-})
-
-const PrepSchema = z.object({
-  // Decided first, because everything after it depends on why the meeting exists
-  meeting_context: z.object({
-    situation: z
-      .enum(["they_asked_for_a_project", "you_reached_out", "unclear"])
-      .describe(
-        '"they_asked_for_a_project" when the conversation shows they came to me with a specific project or need, "you_reached_out" when I started the conversation to offer working together and they have not named a project, "unclear" when the supplied information does not show which'
+const prepSchema = (book: PromptBook) => {
+  const d = <T extends z.ZodType>(schema: T, id: string): T => schema.describe(book.text(id))
+  const evidence = d(z.enum(["stated", "inferred"]), "field.evidence")
+  const observation = z.object({ point: d(z.string(), "field.observation"), evidence })
+  return z.object({
+    // Decided first, because everything after it depends on why the meeting exists
+    meeting_context: z.object({
+      situation: d(z.enum(["they_asked_for_a_project", "you_reached_out", "unclear"]), "field.situation"),
+      what_it_is_about: d(z.string(), "field.what-it-is-about"),
+    }),
+    lead_analysis: z.object({
+      who_they_are: d(z.string(), "field.who-they-are"),
+      background: d(z.string(), "field.background"),
+      interests: d(z.array(observation), "field.interests"),
+      needs_and_opportunities: d(z.array(observation), "field.needs"),
+      how_you_can_help: d(z.array(z.string()), "field.how-you-can-help"),
+      before_you_join: d(z.array(z.string()), "field.before-you-join"),
+      open_questions: d(z.array(z.string()), "field.open-questions"),
+    }),
+    discussion_topics: d(
+      z
+        .array(
+          z.object({
+            topic: d(z.string(), "field.topic"),
+            why_it_matters: d(z.string(), "field.why-it-matters"),
+            evidence,
+          })
+        )
+        .min(2),
+      "field.topics"
+    ),
+    projects_to_show: d(
+      z.array(
+        z.object({
+          project: d(z.string(), "field.project"),
+          why_it_will_land: d(z.string(), "field.why-it-will-land"),
+        })
       ),
-    what_it_is_about: z
-      .string()
-      .describe("One or two sentences: the specific project they brought, in their words, or the collaboration I proposed and what they have said back"),
-  }),
-  lead_analysis: z.object({
-    who_they_are: z.string().describe("Who this person is, from the supplied information only. Say plainly what is unknown"),
-    background: z.string().describe("Their professional background as the supplied information gives it"),
-    interests: z.array(ObservationSchema).describe("What they pay attention to professionally"),
-    needs_and_opportunities: z
-      .array(ObservationSchema)
-      .describe("Problems, goals or gaps this meeting could help with, each tied to something supplied"),
-    how_you_can_help: z
-      .array(z.string())
-      .describe("Where the user's own stated skills and past work meet those needs. Never claim work the user's profile does not state"),
-    before_you_join: z.array(z.string()).describe("What the user should keep in mind walking into this meeting"),
-    open_questions: z
-      .array(z.string())
-      .describe("What is genuinely unknown about this person or their situation, to ask instead of assuming"),
-  }),
-  discussion_topics: z
-    .array(
-      z.object({
-        topic: z.string().describe("A topic worth spending time on in this meeting"),
-        why_it_matters: z.string().describe("Why it matters to this person, from the supplied information"),
-        evidence: EvidenceSchema,
-      })
-    )
-    .min(2)
-    .describe(
-      "The topics this particular meeting should cover, most relevant first: the details of their project when they brought one, or where my work fits their business when I reached out"
+      "field.projects"
     ),
-  projects_to_show: z
-    .array(
-      z.object({
-        project: z.string().describe("One of my own projects or products, named exactly as my profile names it"),
-        why_it_will_land: z.string().describe("Why this person in particular will care about it, tied to their project, need or interest"),
-      })
-    )
-    .describe("2 to 4 of my own projects to have open and show them, most convincing first. Only work my profile states; empty when my profile has none"),
-  your_intro: z
-    .string()
-    .describe(
-      "My introduction, said near the start, in first person: who I am and what I build, in my profile's words, shaped to what this person cares about. 3 to 5 spoken sentences"
+    your_intro: d(z.string(), "field.your-intro"),
+    conversation: d(
+      z
+        .array(
+          z.object({
+            title: d(z.string(), "field.stage-title"),
+            goal: d(z.string(), "field.stage-goal"),
+            steps: d(
+              z
+                .array(
+                  z.object({
+                    kind: d(z.enum(SCRIPT_STEP_KIND_IDS), "field.step-kind"),
+                    text: d(z.string(), "field.step-text"),
+                    project: d(z.string(), "field.step-project"),
+                    minutes: d(z.number().int(), "field.step-minutes"),
+                    features: d(z.array(z.string()), "field.step-features"),
+                  })
+                )
+                .min(2),
+              "field.steps"
+            ),
+            move_on_when: d(z.string(), "field.move-on-when"),
+          })
+        )
+        .min(5),
+      "field.conversation"
     ),
-  conversation: z
-    .array(
-      z.object({
-        title: z.string().describe("The stage name, e.g. Opening and rapport"),
-        goal: z.string().describe("What this stage is for, in one line"),
-        steps: z
-          .array(
-            z.object({
-              kind: z
-                .enum(SCRIPT_STEP_KIND_IDS)
-                .describe(
-                  '"say": words I say aloud, statements only. "ask": exactly one question I ask. "listen": I stop talking and let them speak; the text says what to listen for. "show_project": I open one of my projects and show it. "note": a short reminder for me, not said aloud'
-                ),
-              text: z
-                .string()
-                .describe(
-                  "say: the exact first-person words, 1 to 4 sentences. ask: the one question. listen: what to listen for and how to react. show_project: the words I say while showing it. note: the reminder"
-                ),
-              project: z.string().describe("show_project only: the project, named exactly as in projects_to_show; empty for every other kind"),
-              minutes: z.number().int().describe("show_project only: roughly how many minutes to spend showing it, 2 to 10; 0 for every other kind"),
-              features: z
-                .array(z.string())
-                .describe("show_project only: 2 to 5 features or screens of that project to show, the ones this person will care about most; empty for every other kind"),
-            })
-          )
-          .min(2)
-          .describe("What happens in this stage, in order: usually say, then ask and listen in turn, and a closing say that leads into the next stage"),
-        move_on_when: z.string().describe("What I need to have heard or agreed before this stage is done, in one line"),
-      })
-    )
-    .min(5)
-    .describe("The meeting from hello to goodbye, in the order it happens"),
-  deal_path: z.object({
-    signals_to_listen_for: z
-      .array(z.string())
-      .describe("What in their answers would show there is a real project here, and what would show there isn't"),
-    how_to_raise_scope: z.string().describe("How to move to scope, budget or timing only once the fit is clear"),
-    natural_next_step: z.string().describe("The next step to suggest at the end, sized to how the meeting went"),
-  }),
-  cautions: z
-    .array(z.string())
-    .describe("Things the user must not claim or assume in this meeting because no source supports them"),
-})
+    deal_path: z.object({
+      signals_to_listen_for: d(z.array(z.string()), "field.signals"),
+      how_to_raise_scope: d(z.string(), "field.raise-scope"),
+      natural_next_step: d(z.string(), "field.next-step"),
+    }),
+    cautions: d(z.array(z.string()), "field.cautions"),
+  })
+}
 
-type PrepOutput = z.infer<typeof PrepSchema>
+type PrepOutput = z.infer<ReturnType<typeof prepSchema>>
 
 /** Everything the model wrote, as one text, for the checks below. */
 function prepText(prep: PrepOutput): string {
@@ -231,14 +203,14 @@ function dropUnsupportedFeatures(prep: PrepOutput, profile: string): PrepOutput 
   return { ...prep, conversation }
 }
 
-function findPlanProblems(prep: PrepOutput, senderProfile: string | null, chosen: ProjectToShow[]): string[] {
+function findPlanProblems(prep: PrepOutput, senderProfile: string | null, chosen: ProjectToShow[], book: PromptBook): string[] {
   const problems: string[] = []
   const shown = new Set(
     prep.conversation.flatMap((stage) => stage.steps.filter((step) => step.kind === "show_project").map((step) => step.project.trim().toLowerCase()))
   )
   const notShown = chosen.filter((entry) => !shown.has(entry.project.trim().toLowerCase())).map((entry) => entry.project.trim())
   if (notShown.length > 0) {
-    problems.push(`the conversation never shows the projects I chose (${notShown.join(", ")}); give each a show_project step where it fits best, named exactly that way`)
+    problems.push(book.text("problem.chosen-not-shown", { projects: notShown.join(", ") }))
   }
   const profile = (senderProfile ?? "").toLowerCase()
   const stages = prep.conversation
@@ -246,40 +218,38 @@ function findPlanProblems(prep: PrepOutput, senderProfile: string | null, chosen
     const isLast = index === stages.length - 1
     const kinds = stage.steps.map((step) => step.kind)
     if (stage.steps.some((step) => step.kind === "say" && step.text.includes("?"))) {
-      problems.push(`stage "${stage.title}" has a question inside a say step; make each question its own ask step`)
+      problems.push(book.text("problem.question-in-say", { stage: stage.title }))
     }
     if (!isLast && !kinds.includes("ask")) {
-      problems.push(`stage "${stage.title}" has no ask step; give it 1 to 3`)
+      problems.push(book.text("problem.no-ask", { stage: stage.title }))
     }
     if (kinds.includes("ask") && !kinds.includes("listen")) {
-      problems.push(`stage "${stage.title}" asks questions but has no listen step saying when to stop and hear them out`)
+      problems.push(book.text("problem.no-listen", { stage: stage.title }))
     }
     if (!isLast && kinds[kinds.length - 1] !== "say") {
-      problems.push(`stage "${stage.title}" doesn't end with a say step that leads into the next stage`)
+      problems.push(book.text("problem.no-closing-say", { stage: stage.title }))
     }
     for (const step of stage.steps.filter((entry) => entry.kind === "show_project")) {
       if (!step.project.trim() || !profile.includes(step.project.trim().toLowerCase())) {
-        problems.push(`stage "${stage.title}" shows "${step.project}", which is not a project named in my profile`)
+        problems.push(book.text("problem.unknown-project", { stage: stage.title, project: step.project }))
       }
       const invented = unsupportedFeatures(step.project, step.features, senderProfile ?? "")
       if (invented.length > 0) {
-        problems.push(
-          `the features listed for "${step.project}" (${invented.join(", ")}) are not what my profile describes for that project; list only features my profile gives it, and describe it in the text only by those`
-        )
+        problems.push(book.text("problem.invented-features", { project: step.project, features: invented.join(", ") }))
       }
       if (step.features.length === 0) {
-        problems.push(`the show_project step for "${step.project}" in stage "${stage.title}" names no features to show`)
+        problems.push(book.text("problem.no-features", { project: step.project, stage: stage.title }))
       }
     }
   })
   if (prep.projects_to_show.length > 0 && !stages.some((stage) => stage.steps.some((step) => step.kind === "show_project"))) {
-    problems.push("the conversation never has a show_project step; add one where showing my most relevant project fits best")
+    problems.push(book.text("problem.no-show-step"))
   }
   const spoken = [prep.your_intro, ...stages.flatMap((stage) => stage.steps.filter((step) => step.kind === "say").map((step) => step.text))].join("\n")
   for (const match of spoken.matchAll(MIRRORED_SPECIALTY)) {
     const field = (match[1] ?? match[2]).toLowerCase()
     if (!profile.includes(field)) {
-      problems.push(`"${match[0]}" claims a specialty my profile never names; connect a real project of mine instead`)
+      problems.push(book.text("problem.mirrored-specialty", { phrase: match[0] }))
     }
   }
   return problems
@@ -372,7 +342,11 @@ function toScript(output: PrepOutput["conversation"]): ScriptStage[] {
  * an invented result, so the model is asked once to write it again without it.
  */
 export async function prepareMeeting(meeting: MeetingPlanDetail, signal: AbortSignal): Promise<MeetingPrep> {
-  const [template, senderProfile] = await Promise.all([getActivePreparationPrompt(), getFullSenderProfile()])
+  const [template, senderProfile, book] = await Promise.all([
+    getActivePreparationPrompt(),
+    getFullSenderProfile(),
+    loadPromptBook("meeting-planner-instructions"),
+  ])
   // The projects the user added or edited on the earlier preparation are theirs to show: the model
   // is told about them, and what the user wrote about each counts as their own words
   const chosen = (meeting.prep?.projects_to_show ?? []).filter((entry) => entry.added_by_user && entry.project.trim())
@@ -389,48 +363,47 @@ export async function prepareMeeting(meeting: MeetingPlanDetail, signal: AbortSi
     {
       variable: "profile_info",
       tag: "lead_profile",
-      label: "Profile information about the person",
+      label: book.text("label.profile"),
       content: meeting.profileInfo,
       pasted: true,
     },
     {
       variable: "conversation_history",
       tag: "conversation_history",
-      label: "The conversation with them so far",
+      label: book.text("label.conversation"),
       content: meeting.conversationHistory,
       pasted: true,
     },
     {
       variable: "additional_info",
       tag: "meeting_notes",
-      label: "Anything else that matters for this meeting",
+      label: book.text("label.notes"),
       content: meeting.additionalInfo,
     },
     {
       variable: "sender_profile",
       tag: "sender_profile",
-      label: "About me, the person taking this meeting",
+      label: book.text("label.about-me"),
       content: senderProfile,
-      emptyText:
-        "Not provided. You know nothing about the user's background, services or results. Do not put any claim about their work, experience or past results into the plan; keep the meeting on the other person and on questions.",
+      emptyText: book.text("empty.about-me"),
     },
     {
       variable: "chosen_projects",
       tag: "projects_i_chose",
-      label: "Projects I have already chosen to show in this meeting, in order",
+      label: book.text("label.chosen-projects"),
       content: chosenList || null,
-      emptyText: "None chosen yet. Choose them from my profile.",
+      emptyText: book.text("empty.chosen-projects"),
     },
   ]
   const user = await composePromptMessage(template, blocks, {
     meeting_name: meeting.name,
-    meeting_when: `${dayLabel(meeting.meetingDate)} at ${formatTime(meeting.meetingTime)}`,
-    person_name: meeting.personName ?? "not given",
+    meeting_when: book.text("when", { date: dayLabel(meeting.meetingDate), time: formatTime(meeting.meetingTime) }),
+    person_name: meeting.personName ?? book.text("person-unknown"),
   })
 
   const messages = [new SystemMessage(system), new HumanMessage(user)]
   const generation = {
-    schema: PrepSchema,
+    schema: prepSchema(book),
     name: "meeting_preparation",
     temperature: PREP_TEMPERATURE,
     timeoutMs: PREP_TIMEOUT_MS,
@@ -444,26 +417,18 @@ export async function prepareMeeting(meeting: MeetingPlanDetail, signal: AbortSi
   const first = await generateStructuredWithFallback({ ...generation, messages })
   let prep = first.data
   let invented = findUnsupportedFigures(prepText(prep), sourceText)
-  let problems = findPlanProblems(prep, userFacts, chosen)
+  let problems = findPlanProblems(prep, userFacts, chosen, book)
 
   if (invented.length > 0 || problems.length > 0) {
     const fixes = [
-      ...(invented.length > 0
-        ? [
-            `It states figures that neither the information about them nor my own profile contains: ${invented.join(
-              ", "
-            )}. Those are invented; never put a number in my mouth that my profile does not state.`,
-          ]
-        : []),
+      ...(invented.length > 0 ? [book.text("problem.invented-figures", { figures: invented.join(", ") })] : []),
       ...problems,
     ]
     const rewrite = await generateStructuredWithFallback({
       ...generation,
       messages: [
         ...messages,
-        new HumanMessage(
-          `Write the preparation again, keeping everything else, and fix exactly these problems:\n- ${fixes.join("\n- ")}`
-        ),
+        new HumanMessage(book.text("rewrite", { problems: fixes.map((fix) => `- ${fix}`).join("\n") })),
       ],
     }).catch((error: unknown) => {
       if (signal.aborted) throw error
@@ -472,7 +437,7 @@ export async function prepareMeeting(meeting: MeetingPlanDetail, signal: AbortSi
     })
     if (rewrite) {
       const nextInvented = findUnsupportedFigures(prepText(rewrite.data), sourceText)
-      const nextProblems = findPlanProblems(rewrite.data, userFacts, chosen)
+      const nextProblems = findPlanProblems(rewrite.data, userFacts, chosen, book)
       // An invented figure outweighs a formatting slip, so a rewrite is kept only when it is no worse
       if (nextInvented.length <= invented.length && nextInvented.length + nextProblems.length < invented.length + problems.length) {
         prep = rewrite.data
@@ -481,7 +446,7 @@ export async function prepareMeeting(meeting: MeetingPlanDetail, signal: AbortSi
       }
     }
     prep = dropUnsupportedFeatures(moveQuestionsOutOfSpeech(prep), userFacts ?? "")
-    problems = findPlanProblems(prep, userFacts, chosen)
+    problems = findPlanProblems(prep, userFacts, chosen, book)
   }
 
   console.info(

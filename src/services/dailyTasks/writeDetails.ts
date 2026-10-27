@@ -3,6 +3,7 @@ import { z } from "zod"
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { composePromptMessage } from "@/services/promptComposer"
 import { asUserFacingError, toUserFacingMessage } from "@/lib/errors"
 import { WriteDetailsSchema } from "@/lib/validation/taskAttachment"
@@ -31,9 +32,7 @@ import { AI_DESCRIPTION_MAX_CHARS, TASK_ATTACHMENT_MESSAGES } from "@/constants/
 const TARGET_CHARS = Math.floor(AI_DESCRIPTION_MAX_CHARS * 0.6)
 const WRITING_TEMPERATURE = 0.3
 
-const DetailsSchema = z.object({
-  details: z.string().describe("The task's details as short formatted text: one line on what done looks like, then the steps as a list"),
-})
+const detailsSchema = (book: PromptBook) => z.object({ details: z.string().describe(book.text("field.details")) })
 
 export interface WriteDetailsInput {
   // The task's own line
@@ -57,25 +56,27 @@ function problemWith(details: string): string | null {
 }
 
 export async function writeTaskDetails({ title, parents, description, signal }: WriteDetailsInput): Promise<{ details: string }> {
-  const system = renderPrompt(await loadPrompt("task-details-system"), { MAX_CHARS: TARGET_CHARS })
+  // Every word besides the system prompt (the labels, the empty texts, the field) is the instructions prompt's
+  const [template, book] = await Promise.all([loadPrompt("task-details-system"), loadPromptBook("task-details-instructions")])
+  const system = renderPrompt(template, { MAX_CHARS: TARGET_CHARS })
   const user = await composePromptMessage("", [
-    { variable: "task", tag: "task", label: "The task", content: title },
-    { variable: "parents", tag: "parent_tasks", label: "The tasks it sits under, the top one first", content: parents.join("\n"), emptyText: "None: it is a task of its own." },
+    { variable: "task", tag: "task", label: book.text("label.task"), content: title },
+    { variable: "parents", tag: "parent_tasks", label: book.text("label.parents"), content: parents.join("\n"), emptyText: book.text("empty.parents") },
     {
       variable: "written",
       tag: "written_so_far",
-      label: "What is already written about it",
+      label: book.text("label.written"),
       /**
        * Clipped, never refused. A daily task's description is a plain text box now, and a model's
        * context window is paid for by the token, so a long one is handed over from the start, where
        * what the task is about is written, and the rest stays with the user.
        */
       content: description.slice(0, AI_DESCRIPTION_MAX_CHARS),
-      emptyText: "Nothing yet.",
+      emptyText: book.text("empty.written"),
     },
   ])
   const { data } = await generateStructuredWithFallback({
-    schema: DetailsSchema,
+    schema: detailsSchema(book),
     name: "task_details",
     messages: [new SystemMessage(system), new HumanMessage(user)],
     temperature: WRITING_TEMPERATURE,

@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { asUserFacingError } from "@/lib/errors"
 import { cleanGeneratedText, findPlaceholders, stripMarkdownMarks } from "@/lib/generatedText"
 import {
@@ -24,12 +25,13 @@ const MAX_REWRITES = 2
 // A rewrite is asked for only when the message is this much past the channel's length
 const LENGTH_TOLERANCE = 1.15
 
-const ClientMessageSchema = z.object({
-  subject: z.string().nullable().describe("The email subject line, or null for every channel that has no subject"),
-  message: z.string().describe("The complete message text, ready to paste, and nothing else"),
-})
+const clientMessageSchema = (book: PromptBook) =>
+  z.object({
+    subject: z.string().nullable().describe(book.text("field.subject")),
+    message: z.string().describe(book.text("field.message")),
+  })
 
-type ClientMessageOutput = z.infer<typeof ClientMessageSchema>
+type ClientMessageOutput = z.infer<ReturnType<typeof clientMessageSchema>>
 
 interface GenerateOptions {
   client: Client
@@ -72,12 +74,12 @@ function removeNames(name: string, text: string): string {
     .trim()
 }
 
-function describeProblems({ names, length }: MessageProblems, maxChars: number): string[] {
+// What is wrong with a draft, in the words of the module's instructions prompt
+function describeProblems({ names, length }: MessageProblems, maxChars: number, book: PromptBook): string[] {
   return [
-    names.length > 0 &&
-      `It uses the client's name (${names.join(", ")}). Take every part of their name out, including in the greeting, and greet them without a name.`,
+    names.length > 0 && book.text("problem.names", { names: names.join(", ") }),
     length > maxChars * LENGTH_TOLERANCE &&
-      `It is ${length.toLocaleString()} characters, but it should be at most ${maxChars.toLocaleString()} for this channel. Keep every point of the update and cut the wording back.`,
+      book.text("problem.too-long", { length: length.toLocaleString(), max: maxChars.toLocaleString() }),
   ].filter((problem): problem is string => typeof problem === "string")
 }
 
@@ -119,10 +121,8 @@ async function writeFirstDraft<T>(
   }
 }
 
-function problemRewrite(message: string, problems: string[]): HumanMessage {
-  return new HumanMessage(
-    `Rewrite your draft message below. ${problems.join(" ")} Keep everything else exactly as it is: the same facts, the same order, the same format and plain text.\n\n<draft_message>\n${message}\n</draft_message>`
-  )
+function problemRewrite(message: string, problems: string[], book: PromptBook): HumanMessage {
+  return new HumanMessage(book.text("rewrite", { problems: problems.join(" "), draft: message }))
 }
 
 /**
@@ -137,14 +137,13 @@ function problemRewrite(message: string, problems: string[]): HumanMessage {
 export async function generateClientMessage({ client, update, channel, signal }: GenerateOptions): Promise<
   Omit<GeneratedClientMessage, "id">
 > {
-  const { prompt } = await getClientMessagePrompt()
+  // Every word besides the system and message prompts is the module's instructions prompt
+  const [{ prompt }, book] = await Promise.all([getClientMessagePrompt(), loadPromptBook("client-message-instructions")])
   const { maxChars, hasSubject } = messageChannel(channel)
   const system = renderPrompt(await loadPrompt("client-message-system"), {
     CHANNEL: getChannelLabel(channel),
     MAX_CHARS: maxChars,
-    SUBJECT_RULE: hasSubject
-      ? `This channel has a subject line. Write one of at most ${SUBJECT_MAX_LENGTH} characters that says what the message is about.`
-      : "This channel has no subject line, so subject must be null.",
+    SUBJECT_RULE: hasSubject ? book.text("subject-rule.with-subject", { max: SUBJECT_MAX_LENGTH }) : book.text("subject-rule.no-subject"),
   })
 
   const user = await composePromptMessage(
@@ -153,19 +152,19 @@ export async function generateClientMessage({ client, update, channel, signal }:
       {
         variable: "message_format",
         tag: "message_format",
-        label: "The format this client's messages follow",
+        label: book.text("label.format"),
         content: client.messageFormat,
       },
       {
         variable: "sample_messages",
         tag: "sample_messages",
-        label: "Earlier messages to this client, for the shape only",
+        label: book.text("label.samples"),
         content: client.sampleMessages
           .filter((sample) => sample.trim())
-          .map((sample, index) => `Sample ${index + 1}:\n${sample}`)
+          .map((sample, index) => `${book.text("sample-heading", { number: index + 1 })}\n${sample}`)
           .join("\n\n"),
       },
-      { variable: "update", tag: "update", label: "What to tell them this time", content: update },
+      { variable: "update", tag: "update", label: book.text("label.update"), content: update },
     ],
     { channel: getChannelLabel(channel), country: client.country, max_chars: String(maxChars) }
   )
@@ -175,7 +174,7 @@ export async function generateClientMessage({ client, update, channel, signal }:
   const sources = [client.messageFormat, ...client.sampleMessages, update].join(" ")
   const write = (turn: (SystemMessage | HumanMessage)[]) =>
     generateStructuredWithFallback({
-      schema: ClientMessageSchema,
+      schema: clientMessageSchema(book),
       name: "client_message",
       messages: turn,
       temperature: WRITING_TEMPERATURE,
@@ -192,12 +191,12 @@ export async function generateClientMessage({ client, update, channel, signal }:
     names: nameMentions(client.name, `${text}\n${line ?? ""}`),
     length: text.length,
   })
-  let problems = describeProblems(findProblems(message, subject), maxChars)
+  let problems = describeProblems(findProblems(message, subject), maxChars, book)
   const draftProblems = problems.length
 
   // A rewrite can bring a problem back, so each one is checked again and the cleanest version wins
   for (let attempt = 0; attempt < MAX_REWRITES && problems.length > 0; attempt++) {
-    const rewrite = await write([...messages, problemRewrite(message, problems)]).catch((error: unknown) => {
+    const rewrite = await write([...messages, problemRewrite(message, problems, book)]).catch((error: unknown) => {
       if (signal.aborted) throw error
       console.warn("⚠️ Client message rewrite failed; keeping the current draft:", error instanceof Error ? error.message : error)
       return null
@@ -205,7 +204,7 @@ export async function generateClientMessage({ client, update, channel, signal }:
     if (!rewrite) break
     const rewritten = clean(rewrite.data.message)
     const rewrittenSubject = hasSubject ? clean(rewrite.data.subject ?? "").slice(0, SUBJECT_MAX_LENGTH) || null : null
-    const rewrittenProblems = describeProblems(findProblems(rewritten, rewrittenSubject), maxChars)
+    const rewrittenProblems = describeProblems(findProblems(rewritten, rewrittenSubject), maxChars, book)
     if (!rewritten || rewrittenProblems.length > problems.length) continue
     message = rewritten
     subject = rewrittenSubject

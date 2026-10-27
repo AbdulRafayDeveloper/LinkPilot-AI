@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { UserFacingError } from "@/lib/errors"
 import { PROMPT_CREATOR_MESSAGES, REQUEST_MAX_LENGTH } from "@/constants/promptCreator"
 import type { SimpleEnglish } from "@/types/promptCreator"
@@ -19,10 +20,11 @@ import type { SimpleEnglish } from "@/types/promptCreator"
  * to send: a description is instructions for a prompt, so every detail in it has to survive.
  */
 
-const EnglishSchema = z.object({
-  english: z.string().describe("The same description in clear, simple English, keeping every detail"),
-  sourceLanguage: z.string().describe("The language the description was written in, in English (for example Urdu, Roman Urdu, English)"),
-})
+const englishSchema = (book: PromptBook) =>
+  z.object({
+    english: z.string().describe(book.text("english.field.english")),
+    sourceLanguage: z.string().describe(book.text("english.field.source-language")),
+  })
 
 /**
  * Converts one description into clear, simple English. Throws a `UserFacingError` when the text is
@@ -37,15 +39,19 @@ export async function toSimpleEnglish(text: string, signal?: AbortSignal): Promi
   if (!description) throw new UserFacingError(PROMPT_CREATOR_MESSAGES.missingRequest)
   if (description.length > REQUEST_MAX_LENGTH) throw new UserFacingError(PROMPT_CREATOR_MESSAGES.requestTooLong)
 
-  const [system, instructions] = await Promise.all([loadPrompt("prompt-creator-english-system"), loadPrompt("prompt-creator-english")])
+  const [system, instructions, book] = await Promise.all([
+    loadPrompt("prompt-creator-english-system"),
+    loadPrompt("prompt-creator-english"),
+    loadPromptBook("prompt-creator-instructions"),
+  ])
   // The description is data inside its own tags, never instructions: a line in it that says
   // "ignore the above" is read back in English like the rest of it
   const message = await composePromptMessage(instructions, [
-    { variable: "request", tag: "task_request", label: "What the user wrote", content: description },
+    { variable: "request", tag: "task_request", label: book.text("english.label.request"), content: description },
   ])
 
   const { data } = await generateStructuredWithFallback({
-    schema: EnglishSchema,
+    schema: englishSchema(book),
     name: "simple_english_description",
     messages: [new SystemMessage(system), new HumanMessage(message)],
     // A reading, not a rewrite: the lowest useful temperature keeps it close to what was written

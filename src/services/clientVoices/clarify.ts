@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { cleanGeneratedText, stripMarkdownMarks } from "@/lib/generatedText"
 import { CLEAR_POINTS_MAX, CLEAR_POINT_MAX_LENGTH, VOICE_BATCH_MAX } from "@/constants/clientVoices"
 import type { ClearVoice, TranscriptInput } from "@/types/clientVoices"
@@ -28,20 +29,17 @@ import type { ClearVoice, TranscriptInput } from "@/types/clientVoices"
 const CLARIFY_TEMPERATURE = 0.2
 const MIN_POINT_LENGTH = 3
 
-const ClearSchema = z.object({
-  voices: z
-    .array(
-      z.object({
-        voice: z.number().int().describe("Which voice this is, 1-based, exactly as it was labelled"),
-        points: z
-          .array(z.string())
-          .describe(
-            "What this one voice said, as short plain lines in the order they said it. One thing per line, in clear simple English, adding nothing they did not say"
-          ),
-      })
-    )
-    .describe("One entry per voice given, in the same order"),
-})
+const clearSchema = (book: PromptBook) =>
+  z.object({
+    voices: z
+      .array(
+        z.object({
+          voice: z.number().int().describe(book.text("clear.field.voice")),
+          points: z.array(z.string()).describe(book.text("clear.field.points")),
+        })
+      )
+      .describe(book.text("clear.field.voices")),
+  })
 
 /**
  * One point, tidied: the bullet or number the model wrote in front of it taken off, and a capital
@@ -69,7 +67,7 @@ export async function clarifyVoicesSafely({ voices, signal }: ClarifyOptions): P
   if (voices.length === 0) return []
   try {
     // Both are fixed prompts, like the app's other rules: they are changed in the database
-    const prompt = await loadPrompt("client-voice-clear")
+    const [prompt, book] = await Promise.all([loadPrompt("client-voice-clear"), loadPromptBook("client-voices-instructions")])
     const system = renderPrompt(await loadPrompt("client-voice-clear-system"), {
       VOICE_COUNT: voices.length,
       MAX_POINTS: CLEAR_POINTS_MAX,
@@ -78,7 +76,7 @@ export async function clarifyVoicesSafely({ voices, signal }: ClarifyOptions): P
     const transcripts = voices
       .slice()
       .sort((a, b) => a.voice - b.voice)
-      .map((entry) => `Voice ${entry.voice}:\n${entry.transcript.trim()}`)
+      .map((entry) => `${book.text("voice-heading", { number: entry.voice })}\n${entry.transcript.trim()}`)
       .join("\n\n")
 
     const user = await composePromptMessage(
@@ -87,7 +85,7 @@ export async function clarifyVoicesSafely({ voices, signal }: ClarifyOptions): P
         {
           variable: "transcripts",
           tag: "client_voice_transcripts",
-          label: "What the client said, one block per voice message",
+          label: book.text("label.transcripts"),
           content: transcripts,
         },
       ],
@@ -95,7 +93,7 @@ export async function clarifyVoicesSafely({ voices, signal }: ClarifyOptions): P
     )
 
     const { data, provider } = await generateStructuredWithFallback({
-      schema: ClearSchema,
+      schema: clearSchema(book),
       name: "client_voice_clear",
       messages: [new SystemMessage(system), new HumanMessage(user)],
       temperature: CLARIFY_TEMPERATURE,

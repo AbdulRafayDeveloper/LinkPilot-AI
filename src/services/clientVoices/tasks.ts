@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { UserFacingError, asUserFacingError } from "@/lib/errors"
 import { cleanGeneratedText, stripMarkdownMarks } from "@/lib/generatedText"
 import { BATCH_TITLE_MAX_LENGTH, CLIENT_VOICES_MESSAGES, QUESTION_LIST_MAX, TASK_LIST_MAX, VOICE_BATCH_MAX } from "@/constants/clientVoices"
@@ -26,41 +27,29 @@ import { getClientVoicesPrompt } from "./prompts"
 const EXTRACTION_TEMPERATURE = 0.2
 const MIN_TASK_LENGTH = 8
 
-const TaskListSchema = z.object({
-  title: z
-    .string()
-    .describe(
-      "A short name for this batch, four to eight words, naming what the client's messages were about. Written from what they actually said, never a date and never a greeting"
-    ),
-  tasks: z
-    .array(
-      z.object({
-        task: z
-          .string()
-          .describe("One thing the client asked for, written as an instruction to carry out, in clear English"),
-        voices: z
-          .array(z.number().int())
-          .describe("The voice numbers this was asked in, 1-based. More than one when the same thing was asked twice"),
-      })
-    )
-    .describe("Every distinct thing the client asked for, in the order they first asked for it"),
-  questions: z
-    .array(
-      z.object({
-        question: z
-          .string()
-          .describe("One thing the client asked about and wants an answer to, written as a clear question in English"),
-        voices: z
-          .array(z.number().int())
-          .describe("The voice numbers it was asked in, 1-based. More than one when the same thing was asked twice"),
-      })
-    )
-    .describe(
-      "Every question the client asked that is waiting for an answer, in the order they first asked it. A question is never also a task"
-    ),
-})
+// What each field means is the module's instructions prompt, so the schema is built from it
+const taskListSchema = (book: PromptBook) =>
+  z.object({
+    title: z.string().describe(book.text("tasks.field.title")),
+    tasks: z
+      .array(
+        z.object({
+          task: z.string().describe(book.text("tasks.field.task")),
+          voices: z.array(z.number().int()).describe(book.text("tasks.field.task-voices")),
+        })
+      )
+      .describe(book.text("tasks.field.tasks")),
+    questions: z
+      .array(
+        z.object({
+          question: z.string().describe(book.text("tasks.field.question")),
+          voices: z.array(z.number().int()).describe(book.text("tasks.field.question-voices")),
+        })
+      )
+      .describe(book.text("tasks.field.questions")),
+  })
 
-type TaskListOutput = z.infer<typeof TaskListSchema>
+type TaskListOutput = z.infer<ReturnType<typeof taskListSchema>>
 
 const clean = (raw: string) => stripMarkdownMarks(cleanGeneratedText(raw)).replace(/^[-*\d.\s]+/, "").trim()
 
@@ -99,7 +88,8 @@ interface ExtractOptions {
 export async function extractTasks({ voices, missingVoices, signal }: ExtractOptions): Promise<TaskExtraction> {
   if (voices.length === 0) throw new UserFacingError(CLIENT_VOICES_MESSAGES.noTranscripts)
 
-  const { prompt } = await getClientVoicesPrompt()
+  // Every word besides the system and task prompts is the module's instructions prompt
+  const [{ prompt }, book] = await Promise.all([getClientVoicesPrompt(), loadPromptBook("client-voices-instructions")])
   const system = renderPrompt(await loadPrompt("client-voice-tasks-system"), {
     VOICE_COUNT: voices.length,
     MAX_TASKS: TASK_LIST_MAX,
@@ -107,7 +97,7 @@ export async function extractTasks({ voices, missingVoices, signal }: ExtractOpt
   })
   const transcripts = voices
     .sort((a, b) => a.voice - b.voice)
-    .map((entry) => `Voice ${entry.voice}:\n${entry.transcript.trim()}`)
+    .map((entry) => `${book.text("voice-heading", { number: entry.voice })}\n${entry.transcript.trim()}`)
     .join("\n\n")
 
   const user = await composePromptMessage(
@@ -116,7 +106,7 @@ export async function extractTasks({ voices, missingVoices, signal }: ExtractOpt
       {
         variable: "transcripts",
         tag: "client_voice_transcripts",
-        label: "What the client said, one block per voice message",
+        label: book.text("label.transcripts"),
         content: transcripts,
       },
     ],
@@ -124,7 +114,7 @@ export async function extractTasks({ voices, missingVoices, signal }: ExtractOpt
   )
 
   const { data, provider } = await generateStructuredWithFallback({
-    schema: TaskListSchema,
+    schema: taskListSchema(book),
     name: "client_voice_tasks",
     messages: [new SystemMessage(system), new HumanMessage(user)],
     temperature: EXTRACTION_TEMPERATURE,

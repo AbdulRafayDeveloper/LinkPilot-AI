@@ -1,8 +1,12 @@
-// Adds each LinkedIn tool's instructions prompt, and the one every tool shares, to the prompts
-// collection (src/services/promptBook.ts):
+// Adds each module's instructions prompt, and the one every tool shares, to the prompts
+// collection (src/services/promptBook.ts). The LinkedIn tools and the shared one first:
 //   connection-note-instructions, comment-writer-instructions, post-comment-reply-instructions,
 //   follow-up-instructions, first-message-instructions, inmail-instructions,
 //   conversation-reply-instructions, trending-instructions, post-image-instructions, shared-instructions
+// then Workspace: prompt-creator-instructions, message-rewriter-instructions, quick-notes-instructions,
+//   task-details-instructions (Daily Tasks and an employee's plan)
+// then Client Work: client-message-instructions, client-voices-instructions, meetings-instructions,
+//   meeting-planner-instructions
 //
 // Everything a tool sends a model besides the prompts its users choose (the rewrite requests, each
 // problem its checks find, block labels, empty texts, what each field of an answer means) used to be
@@ -35,6 +39,16 @@ const PROMPTS = [
   { key: "trending-instructions", tool: "trending-topics" },
   { key: "post-image-instructions", tool: "post-image-creator" },
   { key: "shared-instructions", tool: "shared" },
+  // Workspace
+  { key: "prompt-creator-instructions", tool: "prompt-creator" },
+  { key: "message-rewriter-instructions", tool: "message-rewriter" },
+  { key: "quick-notes-instructions", tool: "quick-notes" },
+  { key: "task-details-instructions", tool: "daily-tasks" },
+  // Client Work
+  { key: "client-message-instructions", tool: "client-messaging" },
+  { key: "client-voices-instructions", tool: "client-voices" },
+  { key: "meetings-instructions", tool: "meetings" },
+  { key: "meeting-planner-instructions", tool: "meeting-planner" },
 ]
 
 function fail(message) {

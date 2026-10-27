@@ -4,6 +4,7 @@ import { MeetingPlan } from "@/models/MeetingPlan"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { MAX_LINKED_AT_ONCE, MEETING_PLAN_LINK_MESSAGES } from "@/constants/meetings"
 import { UserFacingError } from "@/lib/errors"
+import { loadPromptBook } from "@/services/promptBook"
 import type { LinkedMeeting, MeetingPlanRef } from "@/types/meetings"
 import type { Viewer } from "@/types/auth"
 
@@ -82,10 +83,12 @@ export async function planContextOf(planId: string | null | undefined, ownerId: 
     | { name?: string; personName?: string | null; meetingDate?: string }
     | null
   if (!record) return null
+  // Its words are Meeting Notes' instructions prompt's, since this is what the analysis reads
+  const book = await loadPromptBook("meetings-instructions")
   const lines = [
-    record.name ? `It was scheduled as "${record.name}".` : null,
-    record.personName?.trim() ? `It was with ${record.personName.trim()}.` : null,
-    record.meetingDate ? `It was planned for ${record.meetingDate}.` : null,
+    record.name ? book.text("calendar.scheduled-as", { name: record.name }) : null,
+    record.personName?.trim() ? book.text("calendar.with", { person: record.personName.trim() }) : null,
+    record.meetingDate ? book.text("calendar.planned-for", { date: record.meetingDate }) : null,
   ].filter(Boolean)
   return lines.length > 0 ? lines.join(" ") : null
 }
