@@ -104,6 +104,7 @@ export async function generateFollowUp({
     { variable: "profile_data", tag: "profile_data", label: book.text("label.profile"), content: profileData, pasted: true },
   ]
   const signalsPromise = assessLeadSignalsSafely({
+    tool: "follow-up",
     signalsPrompt,
     dataBlocks: [
       ...conversationBlocks,

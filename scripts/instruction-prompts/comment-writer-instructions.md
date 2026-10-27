@@ -79,3 +79,18 @@ comment copies the post
 
 ## problem.unsupported-experience
 claimed experience is not supported by the About Me profile
+
+## screenshot.request
+Transcribe the LinkedIn post in this screenshot.
+
+## screenshot.field.contains-post
+True only if the image shows a readable social media post
+
+## screenshot.field.author
+The post author's name as shown, or an empty string
+
+## screenshot.field.post-text
+The post's full visible text, transcribed exactly
+
+## screenshot.author
+Author: {{author}}

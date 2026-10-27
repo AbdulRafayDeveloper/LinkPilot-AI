@@ -81,3 +81,18 @@ adds a first-person experience claim
 
 ## humanize.problem.punctuation
 adds colons, semicolons, dashes or commas
+
+## screenshot.request
+Transcribe the LinkedIn post in this screenshot.
+
+## screenshot.field.contains-post
+True only if the image shows a readable social media post
+
+## screenshot.field.author
+The post author's name as shown, or an empty string
+
+## screenshot.field.post-text
+The post's full visible text, transcribed exactly
+
+## screenshot.author
+Author: {{author}}

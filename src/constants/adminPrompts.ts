@@ -36,15 +36,15 @@ export const MODULE_PROMPT_TOOLS: Record<string, string> = {
   "quick-notes": "quick-notes",
 }
 
-// The prompts that belong to no one module: the global ones (Humanization, Profile Info) and the ones
-// every tool shares (the humanizer's rules, lead signals, reading a screenshot, About Me). They head
-// the page's list, before the areas.
+// The prompts that belong to no one module: Humanization and the ones every LinkedIn tool shares (the
+// humanizer's rules, the shared wording, About Me). They head the page's list, before the areas.
+// Profile Info is not here: it is each person's own, on My AI Profile.
 export const GLOBAL_PROMPT_TOOL = "global-prompts"
 export const SHARED_PROMPT_TOOL = "shared"
 export const GLOBAL_SECTION_ID = "global"
 export const GLOBAL_SECTION_TOOLS = [GLOBAL_PROMPT_TOOL, SHARED_PROMPT_TOOL] as const
 export const GLOBAL_SECTION_LABEL = "Global & shared"
-export const GLOBAL_SECTION_DESCRIPTION = "Humanization, Profile Info, About Me and the rules every tool shares"
+export const GLOBAL_SECTION_DESCRIPTION = "Humanization, About Me and the rules every LinkedIn tool shares"
 
 // The heading the modules no area names are listed under
 export const OTHER_PROMPTS_LABEL = "Other"
@@ -55,7 +55,6 @@ export const PROMPT_AUTOSAVE_DELAY_MS = 1500
 // The prompts whose key says too little on its own, by the name the app gives them elsewhere
 const NAMED_PROMPTS: Record<string, string> = {
   "global-humanization": "Humanization Prompt",
-  "global-rafay-profile": "Profile Info",
   "sender-profile": "About Me",
 }
 
@@ -91,7 +90,7 @@ export const ADMIN_PROMPT_MESSAGES = {
   systemHint: "The rules and wording this module always sends the AI. Users never see these.",
   userHeading: "User instructions",
   userHint: "The prompts users choose between on the page: its tones, tunes, styles and targets.",
-  globalUserHint: "The prompts every tool reads: the rewrite every result goes through, and the facts about you.",
+  globalUserHint: "The prompts every LinkedIn tool reads: the rewrite every result goes through, and About Me.",
   noneStored: "This module has no prompts stored.",
   promptCount: (total: number) => `${total} ${total === 1 ? "prompt" : "prompts"}`,
   systemBadge: "System",

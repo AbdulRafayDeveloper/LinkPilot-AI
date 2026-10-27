@@ -134,3 +134,24 @@ LinkedIn message reply in an ongoing conversation
 
 ## humanize.problem.adds-problems
 adds unsupported specifics or claims about the user
+
+## lead-signals.field.score
+Whole number from 0 to 100
+
+## lead-signals.field.reason
+At most 12 words
+
+## lead-signals.field.country
+Country as stated in the profile or conversation, or {{unknown}}
+
+## lead-signals.field.industry
+At most 4 words, or {{unknown}}
+
+## lead-signals.field.main-need
+The need or pain point they showed, at most 8 words, or {{none}}
+
+## lead-signals.field.main-objection
+Their main objection or hesitation, at most 8 words, or {{none}}
+
+## lead-signals.field.next-step
+The best next step for the user, at most 12 words

@@ -17,6 +17,10 @@ export interface IUser {
   photoFile: string | null
   // The timezone this person sees every time in (an IANA name, "Asia/Karachi"); null follows their browser
   timeZone: string | null
+  // This person's own Profile Info (My AI Profile): their background, projects and numbers, the facts
+  // every tool that writes as them quotes from. Empty until they write it; never another account's
+  profileInfo: string
+  profileInfoUpdatedAt: Date | null
   // How the app looks for this person: "system" (follows the device, the default), "light" or "dark"
   colorScheme: ColorScheme
   passwordHash: string
@@ -60,6 +64,8 @@ const UserSchema = new Schema<IUser>(
     name: { type: String, required: true, trim: true },
     photoFile: { type: String, default: null },
     timeZone: { type: String, default: null },
+    profileInfo: { type: String, default: "" },
+    profileInfoUpdatedAt: { type: Date, default: null },
     colorScheme: { type: String, enum: COLOR_SCHEME_IDS, default: DEFAULT_COLOR_SCHEME },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: USER_ROLES, required: true, default: "user" },

@@ -84,7 +84,7 @@ export default function GlobalPromptsClient() {
       <div id={`profile-panel-${tab}`} role="tabpanel" aria-labelledby={`profile-tab-${tab}`} className="min-w-0">
         {tab === "profile" ? (
           <PromptCards
-            note="Your profile is what the tools quote when they write about you, such as your experience, your projects and your numbers. It is shared by every account for now, so a change here changes it for everyone."
+            note="Your profile is what the tools quote when they write about you, such as your experience, your projects and your numbers. It is yours alone: only your results use it, and no other account or admin sees or changes it."
             prompts={SHARED_GLOBAL_PROMPTS}
             endpoint={GLOBAL_PROMPTS_ENDPOINT}
           />

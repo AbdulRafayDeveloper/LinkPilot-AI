@@ -39,9 +39,11 @@ export type PromptName =
   | `connection-note-${ConnectionNoteToneId}`
   | "follow-up-system"
   | `follow-up-${FollowUpPromptId}`
-  | "lead-signals-system"
+  | "follow-up-lead-signals-system"
+  | "conversation-reply-lead-signals-system"
   | "comment-writer-system"
-  | "post-image-extraction"
+  | "comment-writer-post-image-extraction"
+  | "post-comment-reply-post-image-extraction"
   | "comment-writer-research"
   | "comment-writer-research-lenses"
   | `comment-writer-${CommentTuneId}`

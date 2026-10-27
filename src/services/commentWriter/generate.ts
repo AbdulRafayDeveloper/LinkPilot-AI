@@ -105,7 +105,7 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
   let extractedPost: string | null = null
   if (post.type === "image") {
     onStage("READING_IMAGE", "Reading the post from your screenshot")
-    const extraction = await extractPostFromImage({ image: post.image, providers, signal, onFallback: announceFallback("reading your screenshot") })
+    const extraction = await extractPostFromImage({ tool: "comment-writer", image: post.image, providers, signal, onFallback: announceFallback("reading your screenshot") })
     postText = extraction.postText
     extractedPost = extraction.postText
     // A provider that just failed isn't called again within the same request

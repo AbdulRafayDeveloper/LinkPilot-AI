@@ -8,5 +8,5 @@ export const dynamic = "force-dynamic"
 export async function GET() {
   const auth = await requireViewer({ role: "admin" })
   if (auth.denied) return auth.denied
-  return respondWithGlobalPrompts(ADMIN_GLOBAL_PROMPT_IDS)
+  return respondWithGlobalPrompts(auth.viewer.id, ADMIN_GLOBAL_PROMPT_IDS)
 }

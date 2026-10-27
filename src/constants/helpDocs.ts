@@ -102,7 +102,7 @@ export const HELP_START_TOPICS: HelpTopic[] = [
         "Save, and the next thing you generate uses the new wording.",
       ],
       notes: [
-        "These prompts are shared by every account in the workspace, so a change here changes them for everyone.",
+        "Your Profile Info is yours alone: each account keeps its own, only the results you generate use it, and nobody else, an admin included, sees or changes it.",
         "Your background also comes from About Me, which an admin edits under Administration → Global AI Prompts, since every account shares it.",
         "Leave the facts honest: the tools check what they write against these words and rewrite anything they cannot support.",
       ],

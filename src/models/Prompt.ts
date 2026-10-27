@@ -12,6 +12,8 @@ export interface IPrompt {
   editable: boolean
   content: string
   defaultContent: string
+  // What the prompt is for and where it is used, in plain words, for the admin page; never sent to a model
+  description: string
   createdAt: Date
   updatedAt: Date
 }
@@ -23,6 +25,7 @@ const PromptSchema = new Schema<IPrompt>(
     editable: { type: Boolean, required: true },
     content: { type: String, required: true },
     defaultContent: { type: String, required: true },
+    description: { type: String, default: "" },
   },
   { timestamps: true, collection: "prompts" }
 )

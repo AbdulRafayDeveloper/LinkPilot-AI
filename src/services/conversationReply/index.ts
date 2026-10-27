@@ -48,7 +48,7 @@ export async function analyzeAndReply({
     },
   ]
 
-  const leadSignalsPromise = assessLeadSignalsSafely({ signalsPrompt, dataBlocks, signal })
+  const leadSignalsPromise = assessLeadSignalsSafely({ tool: "conversation-reply", signalsPrompt, dataBlocks, signal })
   const { analysis, brief, userHasSpoken } = await analyzeConversation({ dataBlocks, signal, book, shared })
   const { reply, strategyNote, provider, humanized, unsupportedSpecifics, unsupportedClaims, unsupportedSenderClaim } = await writeReply({
     typePrompt,

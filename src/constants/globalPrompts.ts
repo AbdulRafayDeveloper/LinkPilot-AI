@@ -13,11 +13,12 @@ import { UserRound, type LucideIcon } from "lucide-react"
  */
 export const GLOBAL_PROMPTS = [
   {
+    // Each person's own, kept on their account rather than in the prompts collection (services/profileInfo.ts)
     id: "rafay-profile",
-    // Generic, since every account fills in its own (the prompt key stays global-rafay-profile, so saved text is kept)
     label: "Profile Info",
-    description: "Your background, experience, projects and skills, written as a reusable prompt the tools quote from.",
-    usage: "Used by Post Comment Replies as the source of your experience, projects and numbers",
+    description: "Your background, experience, projects and skills, written as a reusable prompt the tools quote from. Only you see it, and only your results use it.",
+    usage:
+      "Used whenever a tool writes as you: Post Comment Replies, Connection Note (Recently Funded, Hiring Startup), First Message and InMail tones that speak about you, and Meeting Planner's preparation",
     adminOnly: false,
   },
   {
@@ -30,6 +31,9 @@ export const GLOBAL_PROMPTS = [
 ] as const
 
 export type GlobalPromptId = (typeof GLOBAL_PROMPTS)[number]["id"]
+
+// Profile Info's id: the one global prompt that is each person's own rather than shared
+export const PROFILE_INFO_ID = "rafay-profile" satisfies GlobalPromptId
 
 export const GLOBAL_PROMPT_IDS = GLOBAL_PROMPTS.map((prompt) => prompt.id) as [GlobalPromptId, ...GlobalPromptId[]]
 

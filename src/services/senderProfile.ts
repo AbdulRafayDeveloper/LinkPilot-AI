@@ -1,6 +1,7 @@
 import type { PromptName } from "@/services/prompts"
-import { getActiveGlobalPrompt } from "@/services/globalPrompts"
 import { getStoredPrompt } from "@/services/promptStore"
+import { getProfileInfo } from "@/services/profileInfo"
+import { currentAiRequest } from "@/lib/modelOrder"
 import type { StoredPrompt } from "@/types/prompts"
 
 /**
@@ -26,12 +27,13 @@ export async function getSenderProfile(): Promise<string | null> {
 }
 
 /**
- * Everything the user has written about themselves: the About me profile plus Rafay Profile
- * Info (Global AI Prompts), or null when neither has anything. For tools that need the
- * user's full background, projects and numbers.
+ * Everything written about the person the result is for: the shared About me profile plus **their
+ * own** Profile Info (My AI Profile), or null when neither has anything. Profile Info is read for the
+ * account the AI request runs as, so every tool quotes the facts of the person asking and never
+ * another account's. For tools that need the user's full background, projects and numbers.
  */
 export async function getFullSenderProfile(): Promise<string | null> {
-  const [aboutMe, rafayProfile] = await Promise.all([getSenderProfile(), getActiveGlobalPrompt("rafay-profile")])
-  const parts = [aboutMe?.trim(), rafayProfile.trim()].filter((part): part is string => Boolean(part))
+  const [aboutMe, profileInfo] = await Promise.all([getSenderProfile(), getProfileInfo(currentAiRequest().ownerId)])
+  const parts = [aboutMe?.trim(), profileInfo?.trim()].filter((part): part is string => Boolean(part))
   return parts.join("\n\n") || null
 }

@@ -315,7 +315,7 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
   let extractedPost: string | null = null
   if (input.post?.type === "image") {
     onStage("READING_POST")
-    const extraction = await extractPostFromImage({ image: input.post.image, providers, signal })
+    const extraction = await extractPostFromImage({ tool: "post-comment-replies", image: input.post.image, providers, signal })
     extractedPost = extraction.postText
     // A provider that just failed isn't called again within the same request
     providers = providers.slice(providers.indexOf(extraction.provider))

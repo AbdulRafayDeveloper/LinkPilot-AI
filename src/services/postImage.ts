@@ -2,7 +2,7 @@ import { z } from "zod"
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
 import { currentModelOrder } from "@/lib/modelOrder"
-import { loadPrompt } from "@/services/prompts"
+import { loadPrompt, type PromptName } from "@/services/prompts"
 import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { UserFacingError } from "@/lib/errors"
 import type { VerifiedImage } from "@/lib/imageType"
@@ -13,6 +13,18 @@ import type { FallbackNotice } from "@/constants/aiProviders"
 const EXTRACTION_TEMPERATURE = 0
 const MIN_POST_TEXT_LENGTH = 15
 
+/**
+ * Each tool that reads a screenshot has its own rules prompt and reads the request and the fields'
+ * wording from its own instructions prompt, so an admin can change how one tool reads a screenshot
+ * without changing the other. They started as copies of one shared prompt (`post-image-extraction`).
+ */
+const SCREENSHOT_PROMPTS = {
+  "comment-writer": { system: "comment-writer-post-image-extraction", book: "comment-writer-instructions" },
+  "post-comment-replies": { system: "post-comment-reply-post-image-extraction", book: "post-comment-reply-instructions" },
+} as const satisfies Record<string, { system: PromptName; book: PromptName }>
+
+export type ScreenshotTool = keyof typeof SCREENSHOT_PROMPTS
+
 const postTranscriptionSchema = (book: PromptBook) =>
   z.object({
     contains_post: z.boolean().describe(book.text("screenshot.field.contains-post")),
@@ -21,6 +33,8 @@ const postTranscriptionSchema = (book: PromptBook) =>
   })
 
 interface ExtractionOptions {
+  // Which tool is reading it, which decides the rules prompt and the wording read
+  tool: ScreenshotTool
   image: VerifiedImage
   signal: AbortSignal
   // Defaults to the request's order; only providers with a vision model are tried
@@ -34,17 +48,19 @@ interface ExtractionOptions {
  * when the image doesn't show a readable post.
  */
 export async function extractPostFromImage({
+  tool,
   image,
   signal,
   providers = currentModelOrder(),
   onFallback,
 }: ExtractionOptions): Promise<{ postText: string; provider: ModelProvider }> {
-  const book = await loadPromptBook("shared-instructions")
+  const prompts = SCREENSHOT_PROMPTS[tool]
+  const [book, system] = await Promise.all([loadPromptBook(prompts.book), loadPrompt(prompts.system)])
   const { data, provider } = await generateStructuredWithFallback({
     schema: postTranscriptionSchema(book),
     name: "linkedin_post_transcription",
     messages: [
-      new SystemMessage(await loadPrompt("post-image-extraction")),
+      new SystemMessage(system),
       new HumanMessage({
         content: [
           { type: "text", text: book.text("screenshot.request") },

@@ -17,15 +17,16 @@ import type { AdminPrompt, PromptModuleStats } from "@/types/adminPrompts"
  * is what the next result anyone writes uses, on every server and every device.
  */
 
-type StoredPrompt = Pick<IPrompt, "key" | "editable" | "content" | "defaultContent" | "updatedAt">
+type StoredPrompt = Pick<IPrompt, "key" | "editable" | "content" | "defaultContent" | "updatedAt"> & { description?: string }
 
-const FIELDS = { key: 1, editable: 1, content: 1, defaultContent: 1, updatedAt: 1 } as const
+const FIELDS = { key: 1, editable: 1, content: 1, defaultContent: 1, description: 1, updatedAt: 1 } as const
 
-const toAdminPrompt = ({ key, editable, content, defaultContent, updatedAt }: StoredPrompt): AdminPrompt => {
+const toAdminPrompt = ({ key, editable, content, defaultContent, description, updatedAt }: StoredPrompt): AdminPrompt => {
   const isCustom = content !== defaultContent
   return {
     key,
     editable,
+    description: description ?? "",
     prompt: content,
     defaultPrompt: defaultContent,
     isCustom,

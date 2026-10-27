@@ -142,8 +142,15 @@ export const PromptEditorCard: React.FC<PromptEditorCardProps> = ({ prompt, labe
         </div>
       </header>
 
+      {prompt.description && (
+        <p id={`${fieldId}-about`} className="rounded-xl bg-surface-container-low px-3 py-2 text-[13px] leading-relaxed text-on-surface-variant">
+          {prompt.description}
+        </p>
+      )}
+
       <textarea
         id={fieldId}
+        aria-describedby={prompt.description ? `${fieldId}-about` : undefined}
         value={text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={onKeyDown}

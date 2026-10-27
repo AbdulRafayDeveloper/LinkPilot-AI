@@ -65,21 +65,6 @@ mentions
 ## humanize.token.numbers
 numbers
 
-## screenshot.request
-Transcribe the LinkedIn post in this screenshot.
-
-## screenshot.field.contains-post
-True only if the image shows a readable social media post
-
-## screenshot.field.author
-The post author's name as shown, or an empty string
-
-## screenshot.field.post-text
-The post's full visible text, transcribed exactly
-
-## screenshot.author
-Author: {{author}}
-
 ## sender-context.about-me
 About me (written by the user):
 {{profile}}
@@ -93,27 +78,6 @@ Cover each of these angles:
 
 ## pasted.left-out
 [The rest of this pasted text was left out so the request fits.]
-
-## lead-signals.field.score
-Whole number from 0 to 100
-
-## lead-signals.field.reason
-At most 12 words
-
-## lead-signals.field.country
-Country as stated in the profile or conversation, or {{unknown}}
-
-## lead-signals.field.industry
-At most 4 words, or {{unknown}}
-
-## lead-signals.field.main-need
-The need or pain point they showed, at most 8 words, or {{none}}
-
-## lead-signals.field.main-objection
-Their main objection or hesitation, at most 8 words, or {{none}}
-
-## lead-signals.field.next-step
-The best next step for the user, at most 12 words
 
 ## conversation.field.user-name
 Name of the user (the person you work for) as shown in the conversation, e.g. as the sender of their messages or as the name the other person greets. Null if not shown
