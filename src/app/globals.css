@@ -155,6 +155,29 @@ body {
   color: rgb(var(--c-on-primary-fixed));
 }
 
+/*
+ * A native dropdown's open list. The browser draws it from the <select>'s own colours and font, so
+ * without this every list took after its select: a priority or a "who does it" chip opened a list in
+ * that chip's amber or violet, in 10px capitals, and a select with no background of its own left the
+ * browser to guess, which in the dark scheme gave dark text on a dark list. Every list is now the card
+ * colour with ordinary text, in both schemes, whatever the closed select looks like.
+ */
+select option,
+select optgroup {
+  background-color: rgb(var(--c-surface-container-lowest));
+  color: rgb(var(--c-on-surface));
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+select optgroup {
+  font-weight: 600;
+}
+select option:disabled {
+  color: rgb(var(--c-outline));
+}
+
 .ambient-card-shadow {
   box-shadow: 0 4px 24px 0 rgba(28, 24, 38, 0.05);
 }
