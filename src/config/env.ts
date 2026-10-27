@@ -39,7 +39,7 @@ const envSchema = z.object({
   OPEN_SOURCE_BASE_URL: z.url({ protocol: /^https?$/, error: "must be an http(s) URL" }).optional(),
   OPEN_SOURCE_MODEL: z.string().optional(),
   OPEN_SOURCE_API_KEY: z.string().optional(),
-  // The image model that draws post images (OpenAI Images), e.g. gpt-image-1. Without it the
+  // The image model that draws post images (OpenAI Images), e.g. gpt-image-2. Without it the
   // Post Image Creator says so and every other module carries on
   OPENAI_IMAGE_MODEL: z.string().optional(),
   // S3 storage for Important Files and Post Image Creator. All four are needed before anything can be stored, and the
