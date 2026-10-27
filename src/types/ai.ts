@@ -1,4 +1,4 @@
-import type { AiProviderId } from "@/constants/aiProviders"
+import type { AiProviderId, UsageProviderId } from "@/constants/aiProviders"
 
 /**
  * Which AI provider a response came from. Every AI route attaches it to what it returns
@@ -24,7 +24,8 @@ export type AiUsageKind = "text" | "screenshot" | "web-search" | "speech" | "ima
 
 /** What one successful AI call used, as recorded for budget tracking (services/aiUsage.ts). */
 export interface AiUsage {
-  provider: AiProviderId
+  // A provider that writes, or one that only embeds (Gemini)
+  provider: UsageProviderId
   model: string
   kind: AiUsageKind
   inputTokens: number | null
@@ -32,6 +33,6 @@ export interface AiUsage {
   totalTokens: number | null
   // Speech only: how long the recording was, when the provider says
   audioSeconds: number | null
-  // Groq only: the number of the GROQ_API_KEY_<n> that answered
+  // Groq and Gemini: the number of the GROQ_API_KEY_<n> or GEMINI_API_KEY_<n> that answered
   keyNumber: number | null
 }

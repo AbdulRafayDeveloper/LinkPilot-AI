@@ -3,9 +3,10 @@ import { connectDatabase } from "@/lib/db"
 import { addTotals, costOf, emptyTotals, providerLabelOf, type UsageAmounts } from "@/lib/aiCost"
 import { AiUsageModel } from "@/models/AiUsage"
 import { ModelPriceModel } from "@/models/ModelPrice"
-import { AI_PROVIDER_LABELS } from "@/constants/aiProviders"
+import { USAGE_PROVIDER_LABELS } from "@/constants/aiProviders"
 import { AI_KIND_LABELS, NO_MODULE, NO_MODULE_LABEL } from "@/constants/aiCosts"
 import { APP_TOOLS } from "@/constants/linkedinTools"
+import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 import type { Viewer } from "@/types/auth"
 import type { CostReport, CostTotals, ModelCost, ModelPriceRow, ModelPrices } from "@/types/aiCosts"
 
@@ -19,9 +20,11 @@ import type { CostReport, CostTotals, ModelCost, ModelPriceRow, ModelPrices } fr
  * price at all counts as nothing and is reported as unpriced, so a total is never quietly too low.
  */
 
-const labels: Record<string, string> = AI_PROVIDER_LABELS
+const labels: Record<string, string> = USAGE_PROVIDER_LABELS
 const keyOf = (provider: string, model: string) => `${provider}\u0000${model}`
-const moduleTitle = (module: string) => (module === NO_MODULE ? NO_MODULE_LABEL : (APP_TOOLS.find((tool) => tool.id === module)?.title ?? module))
+// My AI Profile is not a tool, so its embeddings are named from the page it belongs to
+const moduleTitle = (module: string) =>
+  module === NO_MODULE ? NO_MODULE_LABEL : module === GLOBAL_PROMPTS_LINK.id ? GLOBAL_PROMPTS_LINK.title : (APP_TOOLS.find((tool) => tool.id === module)?.title ?? module)
 const kindLabel = (kind: string) => (AI_KIND_LABELS as Record<string, string>)[kind] ?? kind
 
 const pricesOf = (doc: ModelPrices): ModelPrices => ({

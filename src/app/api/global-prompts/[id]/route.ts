@@ -13,5 +13,5 @@ export const dynamic = "force-dynamic"
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireViewer()
   if (auth.denied) return auth.denied
-  return saveGlobalPromptFrom(req, auth.viewer.id, (await params).id, SHARED_GLOBAL_PROMPT_IDS)
+  return saveGlobalPromptFrom(req, auth.viewer, (await params).id, SHARED_GLOBAL_PROMPT_IDS)
 }

@@ -14,7 +14,17 @@ export const DEFAULT_MODEL_ORDER: readonly AiProviderId[] = MODEL_PROVIDERS
 
 export const AI_PROVIDER_LABELS: Record<AiProviderId, string> = { groq: "Groq", "open-source": "Open-source model", openai: "OpenAI" }
 
+/**
+ * Providers that only turn text into vectors (Gemini embeds My AI Profile). They are never in a
+ * module's order and never write a word, so they are kept apart from MODEL_PROVIDERS; they appear only
+ * where calls are counted and priced.
+ */
+export const EMBEDDING_ONLY_PROVIDERS = ["gemini"] as const
+export type UsageProviderId = AiProviderId | (typeof EMBEDDING_ONLY_PROVIDERS)[number]
+export const USAGE_PROVIDER_LABELS: Record<UsageProviderId, string> = { ...AI_PROVIDER_LABELS, gemini: "Gemini" }
+
 const isProviderId = (value: string): value is AiProviderId => value in AI_PROVIDER_LABELS
+export { isProviderId as isModelProvider }
 
 /**
  * The providers that did a job, named for the page: the first provider in the order by its name,

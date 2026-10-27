@@ -7,7 +7,8 @@ import {
   missingConfiguration,
   providerNames,
 } from "@/services/ai"
-import { GROQ_API_KEYS } from "@/config/env"
+import { GEMINI_API_KEYS, GROQ_API_KEYS } from "@/config/env"
+import { activeGeminiKeyNumber, missingGeminiConfiguration } from "@/services/embeddings/gemini"
 import { activeGroqKeyNumber } from "@/services/groqKeyState"
 import { isImageModelConfigured } from "@/services/imageGeneration"
 import { isStorageConfigured } from "@/services/storage/s3"
@@ -55,6 +56,12 @@ export async function GET() {
         groqKeys: GROQ_API_KEYS.length,
         // The number of the Groq key calls start from now (GROQ_API_KEY_<n>), never its value
         groqActiveKey: await activeGroqKeyNumber(),
+        // My AI Profile saved for search (Gemini embeddings), and what is missing for it, by name
+        profileSearch: missingGeminiConfiguration().length === 0,
+        profileSearchMissing: missingGeminiConfiguration(),
+        // How many Gemini keys are set, never which, and the number the next call starts on
+        geminiKeys: GEMINI_API_KEYS.length,
+        geminiActiveKey: await activeGeminiKeyNumber(),
         // Post Image Creator
         imageGeneration: isImageModelConfigured(),
         // Important Files and Post Image Creator

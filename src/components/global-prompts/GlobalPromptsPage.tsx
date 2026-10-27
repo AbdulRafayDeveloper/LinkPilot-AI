@@ -18,6 +18,8 @@ interface PromptCardsProps {
   prompts: readonly { id: GlobalPromptId; label: string; description: string }[]
   // Where they are read and saved, which is what decides who may change them
   endpoint: string
+  // Told when the editor closes, so a page can read again what a save changed (My AI Profile's search line)
+  onEditorClosed?: () => void
 }
 
 /**
@@ -25,7 +27,7 @@ interface PromptCardsProps {
  * saying who they reach and an Update Prompt button. My AI Profile shows its own under the Profile
  * Info tab; Administration → Global AI Prompts shows the ones only an admin may change.
  */
-export const PromptCards: React.FC<PromptCardsProps> = ({ note, prompts, endpoint }) => {
+export const PromptCards: React.FC<PromptCardsProps> = ({ note, prompts, endpoint, onEditorClosed }) => {
   const [editor, setEditor] = useState<EditorState>(undefined)
   return (
     <div className="flex flex-col gap-4">
@@ -48,7 +50,17 @@ export const PromptCards: React.FC<PromptCardsProps> = ({ note, prompts, endpoin
           <GlobalPromptCard key={prompt.id} id={prompt.id} label={prompt.label} description={prompt.description} onEdit={setEditor} />
         ))}
       </div>
-      {editor !== undefined && <GlobalPromptsModal prompts={prompts} endpoint={endpoint} initialPrompt={editor} onClose={() => setEditor(undefined)} />}
+      {editor !== undefined && (
+        <GlobalPromptsModal
+          prompts={prompts}
+          endpoint={endpoint}
+          initialPrompt={editor}
+          onClose={() => {
+            setEditor(undefined)
+            onEditorClosed?.()
+          }}
+        />
+      )}
     </div>
   )
 }

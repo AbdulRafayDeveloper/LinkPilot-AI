@@ -26,6 +26,11 @@ const envSchema = z.object({
   // Turns text into vectors for the meeting chat (e.g. text-embedding-3-small). Groq has no embedding
   // model, so this is OpenAI's; without it a meeting cannot be asked questions
   OPENAI_EMBEDDING_MODEL: z.string().optional(),
+  // Turns each person's My AI Profile into vectors (Gemini embeddings, e.g. gemini-embedding-2), on the
+  // keys GEMINI_API_KEY_1, _2 … read below as GEMINI_API_KEYS. Gemini only ever embeds: it writes no text
+  GEMINI_EMBEDDING_MODEL: z.string().optional(),
+  // How long each vector is (e.g. 768): shorter is smaller and faster to search, with almost no loss
+  GEMINI_EMBEDDING_DIMENSIONS: z.coerce.number({ error: "must be a number" }).int().min(128).max(3072).optional(),
   // Groq, the first provider everywhere. Its keys (GROQ_API_KEY_1, _2, _3 … as many as are set) are read
   // below as GROQ_API_KEYS rather than listed here, so adding a key never needs a code change
   // Writes every text and runs live web research (Groq's browser search), e.g. openai/gpt-oss-120b
@@ -76,6 +81,10 @@ export const GROQ_API_KEYS = numberedKeys(process.env, "GROQ_API_KEY_")
 
 // How the Groq keys are named in a message that says what to set
 export const GROQ_KEY_VARIABLES = "GROQ_API_KEY_1, GROQ_API_KEY_2 …"
+
+// Every Gemini key that is set, GEMINI_API_KEY_1, _2 … however many, in number order, each from its own
+// Google account. They embed My AI Profile and go round the same way Groq's do (services/embeddings)
+export const GEMINI_API_KEYS = numberedKeys(process.env, "GEMINI_API_KEY_")
 
 // The public site origin without a trailing slash, for canonical links, the sitemap and JSON-LD
 export const SITE_URL = env.NEXT_PUBLIC_BASE_URL.replace(/\/+$/, "")

@@ -21,6 +21,8 @@ export interface IUser {
   // every tool that writes as them quotes from. Empty until they write it; never another account's
   profileInfo: string
   profileInfoUpdatedAt: Date | null
+  // Why Profile Info could not be saved for search the last time it was tried (services/myProfile/vectors.ts); null once it is
+  profileInfoSearchError: string | null
   // How the app looks for this person: "system" (follows the device, the default), "light" or "dark"
   colorScheme: ColorScheme
   passwordHash: string
@@ -66,6 +68,7 @@ const UserSchema = new Schema<IUser>(
     timeZone: { type: String, default: null },
     profileInfo: { type: String, default: "" },
     profileInfoUpdatedAt: { type: Date, default: null },
+    profileInfoSearchError: { type: String, default: null },
     colorScheme: { type: String, enum: COLOR_SCHEME_IDS, default: DEFAULT_COLOR_SCHEME },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: USER_ROLES, required: true, default: "user" },

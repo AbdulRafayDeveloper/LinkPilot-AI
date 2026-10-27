@@ -92,12 +92,12 @@ export const HELP_START_TOPICS: HelpTopic[] = [
     title: "My AI Profile",
     href: "/global-prompts",
     doc: {
-      summary: "Everything about you that the tools use to write as you: your profile, and the projects you can point to.",
+      summary: "Everything about you that the tools use to write as you: your profile, your experience, projects, skills, services, education, certificates and reviews.",
       steps: [
         "Open My AI Profile at the bottom of the sidebar.",
         "On the Profile Info tab, press Update Prompt. Profile Info holds your real experience, projects and numbers. Tools quote from it and never invent anything beyond it.",
-        "On the Projects tab, press Add project and fill in the name, a summary, what stands out, the Upwork jobs it matches, what to emphasize for each kind of client need and its search keywords. For now projects are kept in your browser only and no tool reads them yet.",
-        "Experience, Skills, Services, Education, Certifications and Reviews are coming soon. Their tabs are already there and say what each will keep.",
+        "On Experience, Projects, Skills, Services, Education, Certifications and Reviews, press Add and fill in the form. Add as many as you like, edit or delete any, and drag them into the order you want.",
+        "Each card says whether it is searchable yet. The line above the tabs says how much of your profile can be found, and Test search shows which parts match a question.",
         "Humanization is the last step of every LinkedIn tool. Only an admin can change it, from Administration, then Global AI Prompts.",
         "Save, and the next thing you generate uses the new wording.",
       ],
@@ -105,6 +105,7 @@ export const HELP_START_TOPICS: HelpTopic[] = [
         "Your Profile Info is yours alone: each account keeps its own, only the results you generate use it, and nobody else, an admin included, sees or changes it.",
         "Your background also comes from About Me, which an admin edits under Administration → Global AI Prompts, since every account shares it.",
         "Leave the facts honest: the tools check what they write against these words and rewrite anything they cannot support.",
+        "Everything you save is also saved for search, so the tools can later pick the parts of your profile that fit each job. If that step fails, your entry is still saved, and the reason is shown with a Try again.",
       ],
     },
   },

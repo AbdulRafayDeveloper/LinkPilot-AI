@@ -2,7 +2,7 @@ import { connectDatabase } from "@/lib/db"
 import { currentSource, resolveModelOrder, withModelOrder } from "@/lib/modelOrder"
 import { ModelPriority, type IModelPriority } from "@/models/ModelPriority"
 import { AI_PROVIDER_LABELS, DEFAULT_MODEL_ORDER, MODEL_PROVIDERS, type AiProviderId } from "@/constants/aiProviders"
-import { AI_MODULE_IDS, AI_MODULE_NEEDS, type AiModuleId, type UsageOnlyModuleId } from "@/constants/modelPriority"
+import { AI_MODULE_IDS, AI_MODULE_NEEDS, isUsageOnlyModule, type AiModuleId, type UsageOnlyModuleId } from "@/constants/modelPriority"
 import { APP_TOOLS } from "@/constants/linkedinTools"
 import { isGroqTranscriptionConfigured, isProviderConfigured, isTranscriptionConfigured } from "@/services/ai"
 import { accountNames } from "@/services/auth/accounts"
@@ -38,7 +38,7 @@ export async function runAiRequest<T>(
   // Providers this request must never use, whatever the order says (a recorded meeting leaves OpenAI out)
   options: { without?: readonly string[] } = {}
 ): Promise<{ result: T; source: AiSource }> {
-  const resolved = module === "post-image-creator" ? DEFAULT_MODEL_ORDER : await modelOrderFor(viewer, module)
+  const resolved = isUsageOnlyModule(module) ? DEFAULT_MODEL_ORDER : await modelOrderFor(viewer, module)
   const order = options.without ? resolved.filter((provider) => !options.without?.includes(provider)) : resolved
   return withModelOrder(
     order,

@@ -62,6 +62,8 @@ export const SHARED_API_PATHS = [
   "/api/ai-status",
   "/api/dummy-data",
   "/api/global-prompts",
+  // My AI Profile's entries and their vectors: the person's own, and the page can never be turned off
+  "/api/my-profile",
   "/api/transcribe",
   // One image, stored and named back; it writes no record and belongs to no one tool, since Daily
   // Tasks, an employee's plan and a client project's tasks all attach images the same way

@@ -29,6 +29,9 @@ import { ClientVoiceModel } from "@/models/ClientVoice"
 import { ClientVoiceTasksModel } from "@/models/ClientVoiceTasks"
 import { ProfileScheduleModel } from "@/models/ProfileSchedule"
 import { TrendingSearch } from "@/models/TrendingSearch"
+import { ProfileEntryModel } from "@/models/ProfileEntry"
+import { ProfileVectorModel } from "@/models/ProfileVector"
+import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
 import { APP_TOOLS } from "@/constants/linkedinTools"
 import { PERSONAL_DRIVE_HREF } from "@/constants/importantFiles"
 import type { ToolUsage } from "@/types/admin"
@@ -88,11 +91,14 @@ export const SOURCES: ActivitySource[] = [
   { href: "/prompt-creator", label: "folders", collection: () => PromptFolderModel.collection },
   { href: "/employees", label: "employees", collection: () => EmployeeModel.collection },
   { href: "/employees", label: "plans", collection: () => EmployeePlanModel.collection },
+  // My AI Profile: the person's own entries and the vectors Gemini wrote for them and their Profile Info
+  { href: GLOBAL_PROMPTS_LINK.href, label: "entries", collection: () => ProfileEntryModel.collection },
+  { href: GLOBAL_PROMPTS_LINK.href, label: "search vectors", collection: () => ProfileVectorModel.collection },
 ]
 
 // The tool's own name from the navigation list, so the breakdown and the sidebar never disagree
 export const titleOf = (source: ActivitySource) => {
-  const tool = APP_TOOLS.find((entry) => entry.href === source.href)?.title ?? source.href
+  const tool = APP_TOOLS.find((entry) => entry.href === source.href)?.title ?? (source.href === GLOBAL_PROMPTS_LINK.href ? GLOBAL_PROMPTS_LINK.title : source.href)
   return source.label ? `${tool} (${source.label})` : tool
 }
 

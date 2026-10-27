@@ -3,7 +3,7 @@ import { currentAiRequest, noteProviderAnswered } from "@/lib/modelOrder"
 import { readTokenUsage } from "@/lib/aiUsage"
 import { AiUsageModel } from "@/models/AiUsage"
 import { priceOfCall } from "@/services/aiCosts"
-import type { AiProviderId } from "@/constants/aiProviders"
+import { isModelProvider, type UsageProviderId } from "@/constants/aiProviders"
 import type { AiUsage, AiUsageKind } from "@/types/ai"
 
 /**
@@ -18,7 +18,7 @@ import type { AiUsage, AiUsageKind } from "@/types/ai"
  */
 
 export interface UsageReport {
-  provider: AiProviderId
+  provider: UsageProviderId
   model: string
   kind: AiUsageKind
   // Whatever the SDK put on its answer (lib/aiUsage.ts reads every shape)
@@ -28,7 +28,8 @@ export interface UsageReport {
 }
 
 export async function recordAiUsage({ provider, model, kind, usage, keyNumber = null, audioSeconds = null }: UsageReport): Promise<AiUsage> {
-  noteProviderAnswered(provider)
+  // Only a provider that writes is named as a result's source; an embedding is counted, not credited
+  if (isModelProvider(provider)) noteProviderAnswered(provider)
   const counts = readTokenUsage(usage)
   const entry: AiUsage = { provider, model, kind, ...counts, audioSeconds: audioSeconds ?? counts.audioSeconds, keyNumber }
   const { module, ownerId } = currentAiRequest()

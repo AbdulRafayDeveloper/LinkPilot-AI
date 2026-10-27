@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { PromptUpdateSchema } from "@/lib/validation/prompt"
-import { getGlobalPromptLabel, type GlobalPromptId } from "@/constants/globalPrompts"
+import { getGlobalPromptLabel, PROFILE_INFO_ID, type GlobalPromptId } from "@/constants/globalPrompts"
 import { getGlobalPrompts, saveGlobalPrompt } from "@/services/globalPrompts"
+import { runAiRequest } from "@/services/modelPriority"
+import { indexProfileInfo } from "@/services/myProfile/vectors"
+import type { Viewer } from "@/types/auth"
 
 /**
  * What both Global AI Prompts routes do, each over its own list: every account's prompts at
@@ -21,7 +24,12 @@ export async function respondWithGlobalPrompts(accountId: string, ids: readonly 
   }
 }
 
-export async function saveGlobalPromptFrom(req: NextRequest, accountId: string, id: string, ids: readonly GlobalPromptId[]): Promise<NextResponse> {
+/**
+ * Saves one prompt for the account asking. Profile Info is then saved for search as well (Gemini
+ * vectors, services/myProfile/vectors.ts), once the text itself is safely kept: that step never fails
+ * the save, and one that could not run is tried again the next time My AI Profile opens.
+ */
+export async function saveGlobalPromptFrom(req: NextRequest, viewer: Viewer, id: string, ids: readonly GlobalPromptId[]): Promise<NextResponse> {
   const known = ids.find((entry) => entry === id)
   if (!known) return NextResponse.json({ success: false, message: "Unknown global prompt" }, { status: 404 })
   const parsed = PromptUpdateSchema.safeParse(await req.json().catch(() => null))
@@ -29,7 +37,8 @@ export async function saveGlobalPromptFrom(req: NextRequest, accountId: string, 
     return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || "Invalid prompt" }, { status: 400 })
   }
   try {
-    const saved = await saveGlobalPrompt(accountId, known, parsed.data.prompt)
+    const saved = await saveGlobalPrompt(viewer.id, known, parsed.data.prompt)
+    if (known === PROFILE_INFO_ID) await runAiRequest(viewer, "global-prompts", () => indexProfileInfo(viewer.id, saved.prompt, req.signal))
     return NextResponse.json({ success: true, message: `${getGlobalPromptLabel(known)} saved.`, data: saved })
   } catch (error: unknown) {
     console.error("PUT Global Prompt Exception:", error)

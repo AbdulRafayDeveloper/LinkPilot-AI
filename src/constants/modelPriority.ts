@@ -28,8 +28,11 @@ export const AI_MODULE_IDS = [
 ] as const
 export type AiModuleId = (typeof AI_MODULE_IDS)[number]
 
-// Modules whose AI calls are counted and attributed but have only one provider, so no order to choose (OpenAI images)
-export type UsageOnlyModuleId = "post-image-creator"
+// Modules whose AI calls are counted and attributed but have only one provider, so no order to choose:
+// OpenAI images, and My AI Profile (its id is the page's, "global-prompts"), whose vectors only Gemini writes
+export const USAGE_ONLY_MODULE_IDS = ["post-image-creator", "global-prompts"] as const
+export type UsageOnlyModuleId = (typeof USAGE_ONLY_MODULE_IDS)[number]
+export const isUsageOnlyModule = (module: string): module is UsageOnlyModuleId => (USAGE_ONLY_MODULE_IDS as readonly string[]).includes(module)
 
 // What each module asks of a provider beyond writing text, so the page can say which providers can't help it
 export type AiNeed = "web-search" | "screenshots" | "speech"

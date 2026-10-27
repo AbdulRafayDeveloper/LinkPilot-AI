@@ -6,7 +6,7 @@ import { requestApi } from "@/lib/apiClient"
 import { formatInstant } from "@/lib/timeZone"
 import { NO_PRICES } from "@/lib/aiCost"
 import { AI_COST_MESSAGES, AI_PRICES_ENDPOINT, MODEL_ID_MAX_LENGTH, PRICE_FIELDS, PRICE_MAX, PROVIDER_ID_MAX_LENGTH } from "@/constants/aiCosts"
-import { AI_PROVIDER_LABELS, MODEL_PROVIDERS } from "@/constants/aiProviders"
+import { EMBEDDING_ONLY_PROVIDERS, MODEL_PROVIDERS, USAGE_PROVIDER_LABELS } from "@/constants/aiProviders"
 import { MODEL_PRIORITY_MESSAGES } from "@/constants/modelPriority"
 import { FilterPanel, SearchFilter, SelectFilter } from "@/components/history/HistoryFilters"
 import { useSavedFilters } from "@/hooks/useSavedFilters"
@@ -178,7 +178,7 @@ const AddModel: React.FC<{ rows: ModelPriceRow[]; onSaved: (rows: ModelPriceRow[
   const [draft, setDraft] = useState<Draft>(() => draftOf(null))
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const knownProviders = [...new Set([...MODEL_PROVIDERS, ...rows.map((row) => row.provider)])]
+  const knownProviders = [...new Set([...MODEL_PROVIDERS, ...EMBEDDING_ONLY_PROVIDERS, ...rows.map((row) => row.provider)])]
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -223,7 +223,7 @@ const AddModel: React.FC<{ rows: ModelPriceRow[]; onSaved: (rows: ModelPriceRow[
           <datalist id="ai-cost-providers">
             {knownProviders.map((id) => (
               <option key={id} value={id}>
-                {(AI_PROVIDER_LABELS as Record<string, string>)[id] ?? id}
+                {(USAGE_PROVIDER_LABELS as Record<string, string>)[id] ?? id}
               </option>
             ))}
           </datalist>
