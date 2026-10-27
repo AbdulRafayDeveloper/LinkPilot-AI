@@ -96,6 +96,9 @@ export const ADMIN_PROMPT_MESSAGES = {
   systemBadge: "System",
   userBadge: "User",
   customBadge: "Edited",
+  lostPlaceholders: (names: string) =>
+    `The original has ${names}, and this text does not. That is where the tool puts live data (the post, its research, your experience), and some of them are what turn a feature on, so without it that data is left out.`,
+  putPlaceholdersBack: "Put it back",
   restoreDefault: "Restore default",
   autosaveNote: "Saves itself as you type. A saved change is used by the next result anyone writes, on every device.",
   saving: "Saving...",

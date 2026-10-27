@@ -5,6 +5,7 @@ import { AlertTriangle, Check, Loader2, RotateCcw } from "lucide-react"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { requestApi } from "@/lib/apiClient"
 import { formatInstant } from "@/lib/timeZone"
+import { lostPlaceholders, withPlaceholdersBack } from "@/lib/promptPlaceholders"
 import { canKeepalive } from "@/constants/textLimits"
 import { PROMPT_MAX_LENGTH, PROMPT_MIN_LENGTH } from "@/constants/prompts"
 import { ADMIN_PROMPTS_ENDPOINT, ADMIN_PROMPT_MESSAGES, PROMPT_AUTOSAVE_DELAY_MS } from "@/constants/adminPrompts"
@@ -101,6 +102,9 @@ export const PromptEditorCard: React.FC<PromptEditorCardProps> = ({ prompt, labe
   }
 
   const isDefault = text.trim() === saved.defaultPrompt.trim()
+  // A placeholder the original had is where the tool puts live data, and for some it is what turns a
+  // feature on, so losing one in an edit is said at once rather than discovered as a missing feature
+  const lost = lostPlaceholders(text, saved.defaultPrompt)
   const isCustom = !isDefault
   const fieldId = `prompt-${key}`
 
@@ -141,6 +145,20 @@ export const PromptEditorCard: React.FC<PromptEditorCardProps> = ({ prompt, labe
           <CopyButton text={text} label={`Copy ${label}`} showLabel />
         </div>
       </header>
+
+      {lost.length > 0 && (
+        <div role="alert" className="flex flex-wrap items-start gap-2 rounded-xl border border-secondary/40 bg-secondary-fixed px-3 py-2 text-[13px] text-on-secondary-fixed-variant">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1">{ADMIN_PROMPT_MESSAGES.lostPlaceholders(lost.map((name) => `{{${name}}}`).join(", "))}</span>
+          <button
+            type="button"
+            onClick={() => setText(withPlaceholdersBack(text, saved.defaultPrompt))}
+            className="inline-flex min-h-6 shrink-0 items-center rounded-md border border-current px-2 py-0.5 text-[12px] font-semibold transition-colors hover:bg-surface-container-lowest/50"
+          >
+            {ADMIN_PROMPT_MESSAGES.putPlaceholdersBack}
+          </button>
+        </div>
+      )}
 
       {prompt.description && (
         <p id={`${fieldId}-about`} className="rounded-xl bg-surface-container-low px-3 py-2 text-[13px] leading-relaxed text-on-surface-variant">
