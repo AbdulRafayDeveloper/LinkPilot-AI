@@ -1,5 +1,4 @@
 import { Megaphone, type LucideIcon } from "lucide-react"
-import { FiverrIcon, HubstaffIcon, UpworkIcon } from "@/components/ui/BrandIcons"
 
 /**
  * Areas of the app that are on their way: each has its own icon on the sidebar's rail, between the
@@ -20,9 +19,6 @@ export interface UpcomingArea {
 }
 
 export const UPCOMING_AREAS: readonly UpcomingArea[] = [
-  { id: "upwork", label: "Upwork Tools", icon: UpworkIcon, hint: "Proposals and clients on Upwork" },
-  { id: "fiverr", label: "Fiverr Tools", icon: FiverrIcon, hint: "Gigs and buyers on Fiverr" },
-  { id: "hubstaff-talent", label: "Hubstaff Talent Tools", icon: HubstaffIcon, hint: "Your Hubstaff Talent profile" },
   { id: "ads", label: "Ads Tools", icon: Megaphone, hint: "Ads and campaigns" },
 ]
 

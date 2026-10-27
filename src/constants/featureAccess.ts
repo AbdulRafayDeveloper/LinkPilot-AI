@@ -80,7 +80,7 @@ export const MAX_FEATURE_IDS = 100
  * never one of them, so nobody can be locked out of it, and neither is a primary-only tool (managing
  * child accounts), which exists for a primary account alone and is nobody's to give away.
  */
-export const manageableFeatures = (): LinkedInTool[] => APP_TOOLS.filter((tool) => !tool.adminOnly && !tool.primaryOnly)
+export const manageableFeatures = (): LinkedInTool[] => APP_TOOLS.filter((tool) => !tool.adminOnly && !tool.primaryOnly && !tool.comingSoon)
 
 /** The tools only a primary account may open, so a child account is refused them wherever it asks. */
 export const primaryOnlyFeatures = (): LinkedInTool[] => APP_TOOLS.filter((tool) => tool.primaryOnly)

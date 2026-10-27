@@ -183,7 +183,7 @@ export const SEO_PAGES: SeoPage[] = [
     keywords: TOOL_SEO[tool.id]?.keywords ?? [],
     heading: tool.title,
     subheading: tool.description,
-    indexable: !tool.adminOnly,
+    indexable: !tool.adminOnly && !tool.comingSoon,
   })),
   // A tool's other pages (its "view all" list), read from the same dropdown links the sidebar shows
   ...APP_TOOLS.flatMap((tool) =>

@@ -458,14 +458,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
   }
 
   /**
-   * The rows of one area. An area that is a **single tool with its own pages** lists those pages
-   * (Administration: Audit Management, User Management and the rest), because a dropdown there
-   * would only repeat the name the panel's heading already carries. While searching it stays a
-   * dropdown, so a page found in another area still says which tool it belongs to.
+   * The rows of one area. **Administration**, a single tool with its own pages, lists those pages
+   * (Audit Management, User Management and the rest), because a dropdown there would only repeat
+   * the name the panel's heading already carries. Any other area keeps its tools' dropdowns even
+   * when it has one tool (Fiverr's Conversation with Client), because there the tool's name is not
+   * the area's and is what says what its pages are for. While searching it stays a dropdown, so a
+   * page found in another area still says which tool it belongs to.
    */
   const renderArea = (areaTools: LinkedInTool[]) => {
     const [only] = areaTools
-    if (!isSearching && areaTools.length === 1 && only.links) return only.links.map((link) => renderLink(link))
+    if (!isSearching && areaTools.length === 1 && only.adminOnly && only.links) return only.links.map((link) => renderLink(link))
     return areaTools.map(renderTool)
   }
 
@@ -489,7 +491,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
       <aside
         data-app-sidebar=""
         data-collapsed={isCollapsed ? "true" : undefined}
-        className={`fixed inset-y-0 left-0 z-[45] flex h-screen w-[min(92vw,352px)] flex-shrink-0 border-r border-outline-variant/80 bg-white transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-[45] flex h-screen w-[min(92vw,352px)] flex-shrink-0 border-r border-outline-variant/80 bg-surface-container-lowest transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
           isOpen ? "translate-x-0 shadow-xl lg:shadow-none" : "-translate-x-full"
         } ${isCollapsed ? "lg:w-[72px]" : "lg:w-[320px] xl:w-[352px]"}`}
       >
@@ -568,7 +570,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
                   className={`relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                     isChosen
                       ? "bg-primary text-on-primary shadow-sm"
-                      : "bg-white text-on-surface-variant hover:bg-surface-container-high hover:text-primary"
+                      : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high hover:text-primary"
                   }`}
                 >
                   <Icon size={19} aria-hidden="true" />
@@ -604,7 +606,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
         </div>
 
         {/* The panel: the area's own tools, on white */}
-        <div className={`flex min-w-0 flex-1 flex-col bg-white ${whenCollapsed(isCollapsed, "lg:hidden")}`}>
+        <div className={`flex min-w-0 flex-1 flex-col bg-surface-container-lowest ${whenCollapsed(isCollapsed, "lg:hidden")}`}>
           {/* As tall as the header, so both bottom borders line up */}
           <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-outline-variant/80 px-4">
             {/* The rail already carries the mark, so the panel shows the name alone rather than both */}
@@ -658,7 +660,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
                 autoComplete="off"
                 spellCheck={false}
                 aria-controls={panelId}
-                className="h-10 tight:h-9 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-8 pr-7 text-[14px] text-on-surface placeholder:text-outline transition-colors focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 [&::-webkit-search-cancel-button]:hidden"
+                className="h-10 tight:h-9 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-8 pr-7 text-[14px] text-on-surface placeholder:text-outline transition-colors focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25 [&::-webkit-search-cancel-button]:hidden"
               />
               {query && (
                 <button

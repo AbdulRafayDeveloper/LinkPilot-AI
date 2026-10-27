@@ -455,6 +455,55 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
   },
 
   // ---------------------------------------------------------------- Administration
+  "upwork-proposal-analyzer": {
+    summary: "Coming soon: reads a proposal the way an Upwork client would, and says what to make stronger before you send it.",
+    steps: [
+      "Open Upwork Tools on the sidebar's rail and choose Proposal Analyzer.",
+      "For now its page says Coming soon: the tool is under development and will appear there when it is ready.",
+    ],
+  },
+  "upwork-proposal-writer": {
+    summary: "Coming soon: writes a proposal for one Upwork job post, in your own words and from your own profile.",
+    steps: [
+      "Open Upwork Tools on the sidebar's rail and choose Proposal Writer.",
+      "For now its page says Coming soon: the tool is under development and will appear there when it is ready.",
+    ],
+  },
+  "upwork-client-conversation": {
+    summary: "Coming soon: suggests the next reply in a conversation with an Upwork client, from what has been said so far.",
+    steps: [
+      "Open Upwork Tools on the sidebar's rail and choose Conversation with Client.",
+      "For now its page says Coming soon: the tool is under development and will appear there when it is ready.",
+    ],
+  },
+  "fiverr-client-conversation": {
+    summary: "Coming soon: suggests the next reply in a conversation with a Fiverr buyer, from what has been said so far.",
+    steps: [
+      "Open Fiverr Tools on the sidebar's rail and choose Conversation with Client.",
+      "For now its page says Coming soon: the tool is under development and will appear there when it is ready.",
+    ],
+  },
+  "hubstaff-apply-on-job": {
+    summary: "Coming soon: writes your application for one Hubstaff Talent job, from the job post and your own profile.",
+    steps: [
+      "Open Hubstaff Talent Tools on the sidebar's rail and choose Apply on Job.",
+      "For now its page says Coming soon: the tool is under development and will appear there when it is ready.",
+    ],
+  },
+  "hubstaff-client-conversation": {
+    summary: "Coming soon: suggests the next reply in a conversation with a Hubstaff Talent client, from what has been said so far.",
+    steps: [
+      "Open Hubstaff Talent Tools on the sidebar's rail and choose Conversation with Client.",
+      "For now its page says Coming soon: the tool is under development and will appear there when it is ready.",
+    ],
+  },
+  "hubstaff-related-video": {
+    summary: "Coming soon: finds the video of your work that fits what a Hubstaff Talent client asked about, ready to send.",
+    steps: [
+      "Open Hubstaff Talent Tools on the sidebar's rail and choose Send the Related Video.",
+      "For now its page says Coming soon: the tool is under development and will appear there when it is ready.",
+    ],
+  },
   administration: {
     summary: "The admin area: who signed in, what every account made, which AI model each module uses, the backups, and the sample data.",
     steps: [

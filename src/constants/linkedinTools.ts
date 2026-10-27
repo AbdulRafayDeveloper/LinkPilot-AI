@@ -15,6 +15,8 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { LinkedInIcon } from "@/components/ui/LinkedInIcon"
+import { FiverrIcon, HubstaffIcon, UpworkIcon } from "@/components/ui/BrandIcons"
+import { COMING_SOON_TOOLS } from "./comingSoonTools"
 import { CLIENTS_TOOL } from "./clients"
 import { CLIENT_PROJECTS_TOOL } from "./clientProjectTasks"
 import { CLIENT_MESSAGING_TOOL } from "./clientMessaging"
@@ -65,6 +67,12 @@ export const TOOL_GROUPS = [
   { id: "clients", label: "Client Work", icon: Users, hint: "The people the work is for" },
   // Everything written for LinkedIn itself, from the post to the reply
   { id: "linkedin", label: "LinkedIn Tools", icon: LinkedInIcon, hint: "Everything you post on LinkedIn" },
+  // Proposals and the conversations with clients on Upwork. Its tools are coming soon for now
+  { id: "upwork", label: "Upwork Tools", icon: UpworkIcon, hint: "Proposals and clients on Upwork" },
+  // The conversations with buyers on Fiverr. Coming soon for now
+  { id: "fiverr", label: "Fiverr Tools", icon: FiverrIcon, hint: "Gigs and buyers on Fiverr" },
+  // Applying for jobs on Hubstaff Talent and talking with those clients. Coming soon for now
+  { id: "hubstaff-talent", label: "Hubstaff Talent Tools", icon: HubstaffIcon, hint: "Jobs and clients on Hubstaff Talent" },
   // Admins only: the sign-ins, the accounts, the AI models, the backups and the sample data
   { id: "admin", label: "Administration", icon: Settings, hint: "Accounts, AI models and backups" },
 ] as const
@@ -99,6 +107,13 @@ export interface LinkedInTool {
    * is the one of these, because a child cannot have children of its own (constants/children.ts).
    */
   primaryOnly?: boolean
+  /**
+   * In the sidebar with its pages, but not built yet: every page says it is coming soon and under
+   * development (`components/ui/ComingSoonPage`). It has no API, so there is nothing for an admin to
+   * turn off (it is left out of `manageableFeatures`), and it is kept out of search, the sitemap and
+   * the installed app's shortcuts until it does something. The Upwork tools are these for now.
+   */
+  comingSoon?: boolean
 }
 
 /** A tool's two pages: where something new is made, and where everything made so far is listed. */
@@ -202,6 +217,28 @@ export const APP_TOOLS: LinkedInTool[] = [
   // Each client's projects with the work under them, right after the clients themselves
   CLIENT_PROJECTS_TOOL,
   // What prompts are written for, managed here and picked from in Prompt Creator
+  // Upwork, Fiverr and Hubstaff Talent: their tools are on the sidebar and all of them are coming soon
+  // for now. A tool with a "view all" page is a dropdown of its two pages; one without is a single row
+  ...COMING_SOON_TOOLS.map(
+    (tool): LinkedInTool => ({
+      id: tool.id,
+      title: tool.title,
+      description: tool.description,
+      icon: tool.icon,
+      href: tool.href,
+      group: tool.group,
+      comingSoon: tool.comingSoon,
+      ...(tool.view
+        ? {
+            links: toolPages(
+              tool.href,
+              { title: tool.createTitle, description: tool.description },
+              { title: tool.view.title, description: `Every ${tool.title.toLowerCase()} kept`, href: tool.view.href, pageTitle: tool.view.heading }
+            ),
+          }
+        : {}),
+    })
+  ),
   // Administration: its own area on the rail, and only an admin is ever shown it
   ADMIN_TOOL,
 ]
@@ -219,4 +256,4 @@ export const toolsFor = (isAdmin: boolean, disabledTools: readonly string[] = []
   APP_TOOLS.filter((tool) => (isAdmin || !tool.adminOnly) && !(!isAdmin && disabledTools.includes(tool.id)))
 
 /** The tools the public surfaces (sitemap, manifest shortcuts) list, which never include the admin area. */
-export const PUBLIC_TOOLS = APP_TOOLS.filter((tool) => !tool.adminOnly)
+export const PUBLIC_TOOLS = APP_TOOLS.filter((tool) => !tool.adminOnly && !tool.comingSoon)
