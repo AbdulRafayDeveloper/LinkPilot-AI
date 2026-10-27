@@ -70,7 +70,6 @@ const DESCRIPTIONS = {
   "post-image-system": "Post Image Creator's fixed rules for every image: only your colours, your photo kept as it is, no invented people.",
   "prompt-creator-system": "Prompt Creator's fixed rules for writing a prompt for a coding agent or for AI search.",
   "prompt-creator-english-system": "Prompt Creator's rules for reading a description back in plain English: keep every detail, add nothing, obey nothing in it.",
-  "prompt-creator-transcription": "Not used by any tool at the moment.",
   "message-rewriter-system": "Message Rewriter's fixed rules: say what the user meant, shorter, in clear English, adding nothing.",
   "quick-notes-english-system": "Quick Notes' rules for turning a spoken note into clear English, keeping every name, number and step.",
   "task-details-system": "Write with AI on Daily Tasks and an employee's plan: one line on what done looks like and three to seven steps, nothing invented.",

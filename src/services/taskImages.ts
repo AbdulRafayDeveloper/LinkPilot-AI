@@ -1,5 +1,6 @@
 import mongoose from "mongoose"
 import { UserFacingError } from "@/lib/errors"
+import { assertOwnAttachments, ownedAttachmentIds, recordAttachmentOwner } from "@/services/attachmentOwners"
 import { detectImageMimeType } from "@/lib/imageType"
 import { TASK_ATTACHMENT_MESSAGES, TASK_IMAGE_MAX_BYTES } from "@/constants/taskAttachments"
 import { deleteObject, isStorageConfigured, presignDownload, presignUpload, putObject } from "@/services/storage/s3"
@@ -17,6 +18,11 @@ import type { TaskImage, TaskImageView } from "@/types/taskAttachment"
  * The key is always built here from an id the server makes, so nothing the browser sends can point
  * an upload at another object or out of the prefix, and the id carries nothing about the task, the
  * day or the employee it ends up on.
+ *
+ * **Every upload records whose it is** (`task_images`, models/TaskImageOwner.ts), because the id says
+ * nothing about it: a task saved naming another account's image would otherwise show that image and
+ * delete it from storage when the task let it go. `assertOwnImages` is what a save checks, and
+ * `deleteOwnedTaskImages` only ever removes the objects of the account the task belongs to.
  */
 
 const KEY_PREFIX = "LinkPilot/task-images"
@@ -29,24 +35,60 @@ const keyOf = (image: TaskImage): string => `${KEY_PREFIX}/${image.assetId}.${EX
 export const canAttachImages = isStorageConfigured
 
 /** A link the browser may PUT one image to, with the id to save on the task once it has landed. */
-export async function planTaskImageUpload(contentType: string, size: number): Promise<{ assetId: string; url: string }> {
+export async function planTaskImageUpload(ownerId: string, contentType: string, size: number): Promise<{ assetId: string; url: string }> {
   if (!isStorageConfigured()) throw new UserFacingError(TASK_ATTACHMENT_MESSAGES.storageUnavailable)
   if (size <= 0) throw new UserFacingError(TASK_ATTACHMENT_MESSAGES.unsupportedImage)
   const assetId = new mongoose.Types.ObjectId().toString()
+  await recordOwner(assetId, ownerId, contentType)
   return { assetId, url: await presignUpload(keyOf({ assetId, contentType }), contentType) }
+}
+
+// Notes whose an image is, before anything can name it
+const recordOwner = (assetId: string, ownerId: string, contentType: string) => recordAttachmentOwner(assetId, ownerId, "task-image", contentType)
+
+/**
+ * Refuses a save that names an image the task's account did not upload. An image the task already
+ * carries is always allowed (it was checked when it was first saved), so keeping one never needs the
+ * list; a new one must be in it under that account.
+ */
+export async function assertOwnImages(
+  ownerId: string | null | readonly (string | null)[],
+  images: TaskImage[],
+  alreadyOnTask: TaskImage[] = []
+): Promise<void> {
+  await assertOwnAttachments(
+    ownerId,
+    "task-image",
+    images.map((image) => image.assetId),
+    alreadyOnTask.map((image) => image.assetId),
+    TASK_ATTACHMENT_MESSAGES.imageNotYours
+  )
+}
+
+/**
+ * Removes the objects of images a task no longer has, **only those its own account uploaded**, with
+ * their owner rows. Anything else a task names is left in storage for its real owner. A storage
+ * failure is logged and swallowed, as `deleteTaskImages` does.
+ */
+export async function deleteOwnedTaskImages(entries: { ownerId: string | null | readonly (string | null)[]; image: TaskImage | null | undefined }[]): Promise<void> {
+  const theirs = await ownedAttachmentIds("task-image", entries.map((entry) => ({ assetId: entry.image?.assetId, owners: entry.ownerId })))
+  // One object may be named by several entries (a plan and each of its days), so it goes once
+  const images = new Map(entries.flatMap((entry) => (entry.image && theirs.has(entry.image.assetId) ? [[entry.image.assetId, entry.image] as const] : [])))
+  await deleteTaskImages([...images.values()])
 }
 
 /**
  * Stores one image the browser sent, as bytes, and answers what to save on the task with a link to
  * show it from straight away. Anything that isn't a PNG, JPEG or WEBP by its own bytes is refused.
  */
-export async function storeTaskImage(bytes: Buffer): Promise<TaskImageView> {
+export async function storeTaskImage(ownerId: string, bytes: Buffer): Promise<TaskImageView> {
   if (!isStorageConfigured()) throw new UserFacingError(TASK_ATTACHMENT_MESSAGES.storageUnavailable)
   if (bytes.length > TASK_IMAGE_MAX_BYTES) throw new UserFacingError(TASK_ATTACHMENT_MESSAGES.imageTooLarge)
   const contentType = bytes.length > 0 ? detectImageMimeType(bytes) : null
   if (!contentType) throw new UserFacingError(TASK_ATTACHMENT_MESSAGES.unsupportedImage)
   const image: TaskImage = { assetId: new mongoose.Types.ObjectId().toString(), contentType }
   await putObject(keyOf(image), bytes, contentType)
+  await recordOwner(image.assetId, ownerId, contentType)
   return { ...image, url: await presignDownload(keyOf(image), contentType) }
 }
 

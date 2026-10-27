@@ -17,9 +17,9 @@ import type {
   PublicPlan,
 } from "@/types/employees"
 import type { Viewer } from "@/types/auth"
-import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import { storedImagesOf, type TaskImage, type TaskImageView } from "@/types/taskAttachment"
-import { deleteTaskImages, taskImageLists } from "@/services/taskImages"
+import { assertOwnImages, deleteOwnedTaskImages, taskImageLists } from "@/services/taskImages"
 import { buildTree, completedLast, flattenTree } from "@/lib/taskTree"
 import { accountNames } from "@/services/auth/accounts"
 
@@ -90,7 +90,7 @@ export async function createEmployee(viewer: Viewer, input: EmployeeInput): Prom
   await connectDatabase()
   // A new employee goes to the top of the team, above anyone already placed there
   const first = await EmployeeModel.findOne(visibleTo(viewer), { position: 1 }).sort({ position: 1 }).lean()
-  const record = await EmployeeModel.create({ ownerId: viewer.dataOwnerId, ...input, position: first ? first.position - 1 : 0 })
+  const record = await EmployeeModel.create({ ownerId: viewer.id, ...input, position: first ? first.position - 1 : 0 })
   return (await withOwners(viewer, [record.toObject() as unknown as StoredEmployee]))[0]
 }
 
@@ -128,26 +128,26 @@ export async function updateEmployee(viewer: Viewer, id: string, input: Employee
  * each day's own copy in `employee_plans`, which is what the history keeps after the plan has
  * moved on. Both are read, so nothing is left in storage with nothing pointing at it.
  *
- * Call it BEFORE the records are deleted, then pass what it returns to `deleteTaskImages`: the
+ * Call it BEFORE the records are deleted, then pass what it returns to `deleteOwnedTaskImages`: the
  * records go first and the objects after, the same order Daily Tasks uses, so a storage problem
- * leaves an unreachable object rather than a task showing an image that is already gone.
+ * leaves an unreachable object rather than a task showing an image that is already gone. Each image
+ * comes with the account it is on, so only that account's own objects are removed.
  */
-export async function planTaskImagesOf(employeeIds: string[]): Promise<TaskImage[]> {
+export async function planTaskImagesOf(employeeIds: string[]): Promise<{ ownerId: string | null; image: TaskImage }[]> {
   if (employeeIds.length === 0) return []
   await connectDatabase()
   const [employees, days] = await Promise.all([
-    EmployeeModel.find({ _id: { $in: employeeIds.map((id) => new mongoose.Types.ObjectId(id)) } }, { planItems: 1 }).lean(),
-    EmployeePlanModel.find({ employeeId: { $in: employeeIds } }, { items: 1 }).lean(),
+    EmployeeModel.find({ _id: { $in: employeeIds.map((id) => new mongoose.Types.ObjectId(id)) } }, { ownerId: 1, planItems: 1 }).lean(),
+    EmployeePlanModel.find({ employeeId: { $in: employeeIds } }, { ownerId: 1, items: 1 }).lean(),
   ])
-  const images: TaskImage[] = []
-  for (const employee of employees as unknown as { planItems?: IPlanTask[] }[]) {
-    for (const task of employee.planItems ?? []) images.push(...storedImagesOf(task))
+  const images: { ownerId: string | null; image: TaskImage }[] = []
+  for (const employee of employees as unknown as { ownerId?: string | null; planItems?: IPlanTask[] }[]) {
+    for (const task of employee.planItems ?? []) images.push(...storedImagesOf(task).map((image) => ({ ownerId: employee.ownerId ?? null, image })))
   }
-  for (const day of days as unknown as { items?: IPlanItem[] }[]) {
-    for (const item of day.items ?? []) images.push(...storedImagesOf(item))
+  for (const day of days as unknown as { ownerId?: string | null; items?: IPlanItem[] }[]) {
+    for (const item of day.items ?? []) images.push(...storedImagesOf(item).map((image) => ({ ownerId: day.ownerId ?? null, image })))
   }
-  // One object may be on the plan and on every day it has run, so each is only removed once
-  return [...new Map(images.map((image) => [image.assetId, image])).values()]
+  return images
 }
 
 /** Of these images, the ones no day of this employee still points at, so they are safe to remove. */
@@ -170,7 +170,7 @@ export async function deleteEmployee(viewer: Viewer, id: string): Promise<boolea
   const { deletedCount } = await EmployeeModel.deleteOne(filter)
   if (deletedCount > 0) {
     await EmployeePlanModel.deleteMany({ employeeId: id })
-    await deleteTaskImages(images)
+    await deleteOwnedTaskImages(images)
   }
   return deletedCount > 0
 }
@@ -188,7 +188,7 @@ export async function deleteEmployees(
   await connectDatabase()
   // Ticked rows follow the per-record delete; a whole filter never reaches another account's team
   const matching = allOf([
-    ids ? visibleTo(viewer) : ownedForClearing(viewer),
+    ids ? visibleTo(viewer) : ownedBy(viewer),
     searchCondition(filters.search, ["name", "city", "role"]),
     filters.status ? { status: filters.status } : null,
     ids ? { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } } : null,
@@ -199,7 +199,7 @@ export async function deleteEmployees(
   const images = await planTaskImagesOf(doomed)
   const { deletedCount } = await EmployeeModel.deleteMany({ _id: { $in: doomed.map((id) => new mongoose.Types.ObjectId(id)) } })
   await EmployeePlanModel.deleteMany({ employeeId: { $in: doomed } })
-  await deleteTaskImages(images)
+  await deleteOwnedTaskImages(images)
   return { deleted: deletedCount ?? 0 }
 }
 
@@ -429,13 +429,20 @@ export async function savePlan(viewer: Viewer, employeeId: string, input: Employ
   if (!employee) return null
   const date = await currentDay(employee, input.today)
   const tasks = planTasksFrom(input.items)
+  /**
+   * An image the plan did not carry before must be one the employee's account uploaded, or the
+   * person saving it (an admin working on someone's team), so naming another account's image id can
+   * neither show it nor, once taken off, delete it.
+   */
+  const owners = [employee.ownerId ?? null, viewer.id]
+  await assertOwnImages(owners, tasks.flatMap((task) => task.images), (employee.planItems ?? []).flatMap(storedImagesOf))
   // An image taken off a task, or a task removed outright, leaves nothing behind in storage (a copied
   // task shares its original's images, so one only goes when no task in the plan has it any more)
   const kept = new Set(tasks.flatMap((task) => task.images.map((image) => image.assetId)))
   const dropped = (employee.planItems ?? []).flatMap(storedImagesOf).filter((image) => !kept.has(image.assetId))
   await EmployeeModel.updateOne({ _id: employee._id }, { $set: { planItems: tasks, planNotes: input.notes, planStartedAt: employee.planStartedAt ?? new Date() } })
   // Days already in the history keep their own copy, so only an image no day still points at goes
-  if (dropped.length > 0) await deleteTaskImages(await unusedImages(employee._id.toString(), dropped))
+  if (dropped.length > 0) await deleteOwnedTaskImages((await unusedImages(employee._id.toString(), dropped)).map((image) => ({ ownerId: owners, image })))
   return toPlan(employeeId, date, await syncToday({ ...employee, planItems: tasks, planNotes: input.notes, planStartedAt: employee.planStartedAt ?? new Date() }, date))
 }
 

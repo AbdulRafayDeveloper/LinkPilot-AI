@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { toUserFacingMessage } from "@/lib/errors"
 import { OrderSchema, PlanQuerySchema, PlanSchema, TickSchema } from "@/lib/validation/employees"
 import { EMPLOYEE_MESSAGES } from "@/constants/employees"
+import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
 import { getPlan, reorderPlan, savePlan, tickPlanHistoryItem, tickPlanItem } from "@/services/employees/employees"
 import { requireViewer } from "@/services/auth/viewer"
 
@@ -38,7 +39,8 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     return plan ? NextResponse.json({ success: true, message: "Plan saved", data: plan }) : notFound()
   } catch (error: unknown) {
     console.error("PUT Employee Plan Exception:", error instanceof Error ? error.message : error)
-    return NextResponse.json({ success: false, message: toUserFacingMessage(error, EMPLOYEE_MESSAGES.planSaveFailed) }, { status: 500 })
+    const message = toUserFacingMessage(error, EMPLOYEE_MESSAGES.planSaveFailed)
+    return NextResponse.json({ success: false, message }, { status: message === TASK_ATTACHMENT_MESSAGES.imageNotYours ? 400 : 500 })
   }
 }
 

@@ -3,6 +3,7 @@ import { UserFacingError } from "@/lib/errors"
 import { detectAudioMimeType } from "@/lib/audioType"
 import { PROJECT_TASK_MESSAGES, VOICE_NOTE_MAX_BYTES } from "@/constants/clientProjectTasks"
 import { deleteObject, isStorageConfigured, presignDownload, putObject } from "@/services/storage/s3"
+import { recordAttachmentOwner } from "@/services/attachmentOwners"
 import type { VoiceNote, VoiceNoteView } from "@/types/clientProjectTasks"
 
 /**
@@ -36,13 +37,15 @@ export const canRecordVoiceNotes = isStorageConfigured
  * Stores one recording and answers what to save on the task, with a link to play it from straight
  * away. Anything that isn't audio by its own bytes is refused, as is anything over the ceiling.
  */
-export async function storeVoiceNote(bytes: Buffer, seconds: number): Promise<VoiceNoteView> {
+export async function storeVoiceNote(ownerId: string, bytes: Buffer, seconds: number): Promise<VoiceNoteView> {
   if (!isStorageConfigured()) throw new UserFacingError(PROJECT_TASK_MESSAGES.voiceStorageUnavailable)
   if (bytes.length > VOICE_NOTE_MAX_BYTES) throw new UserFacingError(PROJECT_TASK_MESSAGES.voiceTooLarge)
   const contentType = bytes.length > 0 ? detectAudioMimeType(bytes) : null
   if (!contentType) throw new UserFacingError(PROJECT_TASK_MESSAGES.voiceUnsupported)
   const note: VoiceNote = { assetId: new mongoose.Types.ObjectId().toString(), contentType, seconds: Math.max(0, Math.round(seconds)) }
   await putObject(keyOf(note), bytes, contentType)
+  // Whose it is, so an item can only ever be saved naming a recording its own owners made
+  await recordAttachmentOwner(note.assetId, ownerId, "voice-note", contentType)
   return { ...note, url: await presignDownload(keyOf(note), contentType) }
 }
 

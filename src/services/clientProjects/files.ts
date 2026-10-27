@@ -12,6 +12,7 @@ import {
 } from "@/constants/clientProjectTasks"
 import { ASSET_CATEGORY_IDS, categoryForContentType } from "@/constants/importantFiles"
 import { groupIntoParts } from "@/lib/recordingParts"
+import { recordAttachmentOwner } from "@/services/attachmentOwners"
 import {
   abortMultipartUpload,
   completeMultipartUpload,
@@ -256,6 +257,8 @@ export async function finishProjectFile(projectId: string, assetId: string, dead
     size: totalBytes,
   }
   const finished = async (): Promise<ProjectFileProgress> => {
+    // Whose the file is, so an item can only ever be saved naming files uploaded for its own project
+    if (upload.ownerId) await recordAttachmentOwner(assetId, upload.ownerId, "project-file", upload.contentType)
     await removeChunks(upload)
     await ProjectFileUploadModel.deleteOne({ assetId, projectId })
     const view = await projectFileView(file)
@@ -334,6 +337,7 @@ export async function writeProjectDocument(
   await connectDatabase()
   const assetId = new mongoose.Types.ObjectId().toString()
   await putObject(finalKeyFor(assetId, name), bytes, contentType)
+  if (project.ownerId) await recordAttachmentOwner(assetId, project.ownerId, "project-file", contentType)
   return { assetId, name, contentType, category, size: bytes.byteLength }
 }
 

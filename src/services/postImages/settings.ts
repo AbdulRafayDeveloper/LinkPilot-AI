@@ -3,6 +3,7 @@ import { connectDatabase } from "@/lib/db"
 import { UserFacingError } from "@/lib/errors"
 import { BrandSettingsModel, type IBrandAsset, type IBrandSettings } from "@/models/PostImage"
 import { presignDownload, presignUpload } from "@/services/storage/s3"
+import { assertOwnAttachments, recordAttachmentOwner } from "@/services/attachmentOwners"
 import {
   ASSET_CONTENT_TYPES,
   ASSET_MAX_BYTES,
@@ -22,7 +23,7 @@ import type { Viewer } from "@/types/auth"
  */
 
 const ADMIN_SCOPE = "default"
-const scopeFor = (viewer: Viewer) => (viewer.role === "admin" ? ADMIN_SCOPE : `user:${viewer.dataOwnerId}`)
+const scopeFor = (viewer: Viewer) => (viewer.role === "admin" ? ADMIN_SCOPE : `user:${viewer.id}`)
 // Photos sit beside the generated images, under the app's own folder in the bucket
 const ASSET_PREFIX = "LinkPilot/post-images/assets"
 
@@ -78,6 +79,8 @@ export async function planAssetUpload(viewer: Viewer, contentType: string, size:
   if ((current?.assets.length ?? 0) >= MAX_BRAND_ASSETS) throw new UserFacingError(POST_IMAGES_MESSAGES.tooManyAssets)
 
   const assetId = new mongoose.Types.ObjectId().toString()
+  // Whose photo it is, by the same scope the settings are kept under, so only these defaults can name it
+  await recordAttachmentOwner(assetId, scopeFor(viewer), "brand-photo", contentType)
   return { assetId, url: await presignUpload(assetKey(assetId, contentType), contentType) }
 }
 
@@ -96,6 +99,18 @@ export async function saveBrandSettings(
   await connectDatabase()
   const current = await getStoredSettings(viewer)
   const known = new Map((current?.assets ?? []).map((asset) => [asset.id, asset]))
+  /**
+   * A photo the defaults did not have before must be one uploaded for these same defaults: a photo
+   * is named by its id alone, so without this a user's defaults could name another account's photo
+   * and draw that person into their own images.
+   */
+  await assertOwnAttachments(
+    scopeFor(viewer),
+    "brand-photo",
+    input.assets.map((entry) => entry.id),
+    [...known.keys()],
+    POST_IMAGES_MESSAGES.assetGone
+  )
 
   const assets: IBrandAsset[] = input.assets.slice(0, MAX_BRAND_ASSETS).map((entry) => {
     const existing = known.get(entry.id)

@@ -39,7 +39,7 @@ async function handlePost(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const { name, text, folderId } = parsed.data
-    const file = await writeProjectDocument({ id, ownerId: project.ownerId ?? auth.viewer.dataOwnerId }, { name, text })
+    const file = await writeProjectDocument({ id, ownerId: project.ownerId ?? auth.viewer.id }, { name, text })
     try {
       const item = await addProjectTask(auth.viewer, id, { content: name, kind: "document", files: [file], folderId })
       if (!item) throw new UserFacingError(PROJECT_TASK_MESSAGES.projectNotFound)

@@ -96,8 +96,8 @@ export const HELP_START_TOPICS: HelpTopic[] = [
       steps: [
         "Open My AI Profile at the bottom of the sidebar.",
         "On the Profile Info tab, press Update Prompt. Profile Info holds your real experience, projects and numbers. Tools quote from it and never invent anything beyond it.",
-        "On Experience, Projects, Skills, Services, Education, Certifications and Reviews, press Add and fill in the form. Add as many as you like, edit or delete any, and drag them into the order you want.",
-        "Each card says whether it is searchable yet. The line above the tabs says how much of your profile can be found, and Test search shows which parts match a question.",
+        "On the Projects tab, press Add project and fill in the name, a summary, what stands out, the Upwork jobs it matches, what to emphasize for each kind of client need and its search keywords. For now projects are kept in your browser only and no tool reads them yet.",
+        "Experience, Skills, Services, Education, Certifications and Reviews are coming soon. Their tabs are already there and say what each will keep.",
         "Humanization is the last step of every LinkedIn tool. Only an admin can change it, from Administration, then Global AI Prompts.",
         "Save, and the next thing you generate uses the new wording.",
       ],
@@ -215,19 +215,6 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
       "Limits per kind: video and archives 500 MB, audio 200 MB, PDF and Word 100 MB, images and text 25 MB.",
       "Nothing is public: every preview and download is a link that stops working after a few minutes.",
       "Deleting a folder keeps its files and puts them where the folder was.",
-    ],
-  },
-  "child-accounts": {
-    summary: "Accounts for other people that sign in themselves and work inside your workspace, on the tools you grant them.",
-    steps: [
-      "Press New account, give the person a name, an email and a first password.",
-      "Turn on the tools they may open, one at a time or a whole area at once. They start with none.",
-      "Change their password or delete the account from the same panel.",
-    ],
-    notes: [
-      "They see the same prompts and the same records you do in every tool you grant, and anything they save is saved to your workspace.",
-      "A child account can never be an admin, cannot make accounts of its own, and can never hold a tool you do not have.",
-      "Deleting one deletes no records: it only takes the way in.",
     ],
   },
 
@@ -456,6 +443,20 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
   },
 
   // ---------------------------------------------------------------- Administration
+  "finance-budget-management": {
+    summary: "Coming soon: keeps your monthly budget, what comes in and where it goes.",
+    steps: [
+      "Open Finance on the sidebar's rail and choose Budget Management.",
+      "For now its page says Coming soon: the tool is under development and will appear there when it is ready.",
+    ],
+  },
+  "finance-investment-plans": {
+    summary: "Coming soon: keeps your investment plans, what you mean to invest in and how much.",
+    steps: [
+      "Open Finance on the sidebar's rail and choose Investment Plans.",
+      "For now its page says Coming soon: the tool is under development and will appear there when it is ready.",
+    ],
+  },
   "upwork-proposal-analyzer": {
     summary: "Coming soon: reads a proposal the way an Upwork client would, and says what to make stronger before you send it.",
     steps: [

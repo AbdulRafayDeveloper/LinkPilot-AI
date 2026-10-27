@@ -1,13 +1,13 @@
-import { FileSearch, MessageCircleMore, PenLine, Send, Video, type LucideIcon } from "lucide-react"
+import { Calculator, FileSearch, MessageCircleMore, PenLine, Send, TrendingUp, Video, type LucideIcon } from "lucide-react"
 
 /**
- * The tools that are on the sidebar but not built yet, under the areas the owner asked for: Upwork,
- * Fiverr and Hubstaff Talent. Each opens its own page, and most also have a "view all" page in a
+ * The tools that are on the sidebar but not built yet, under the areas the owner asked for: Finance,
+ * Upwork, Fiverr and Hubstaff Talent. Each opens its own page, and most also have a "view all" page in a
  * dropdown, like a LinkedIn tool; every one of those pages says it is coming soon and under
  * development (`components/ui/ComingSoonPage`) until the tool is built (`comingSoon` on the tool).
  * When one is built it leaves this list and becomes an ordinary tool.
  */
-export type ComingSoonGroup = "upwork" | "fiverr" | "hubstaff-talent"
+export type ComingSoonGroup = "finance" | "upwork" | "fiverr" | "hubstaff-talent"
 
 export interface ComingSoonTool {
   id: string
@@ -24,6 +24,27 @@ export interface ComingSoonTool {
 }
 
 export const COMING_SOON_TOOLS: readonly ComingSoonTool[] = [
+  // Finance
+  {
+    id: "finance-budget-management",
+    title: "Budget Management",
+    description: "Where your money goes each month",
+    icon: Calculator,
+    href: "/finance/budget-management",
+    group: "finance",
+    comingSoon: true,
+    createTitle: "Budget Management",
+  },
+  {
+    id: "finance-investment-plans",
+    title: "Investment Plans",
+    description: "Your plans for what to invest in",
+    icon: TrendingUp,
+    href: "/finance/investment-plans",
+    group: "finance",
+    comingSoon: true,
+    createTitle: "Investment Plans",
+  },
   // Upwork
   {
     id: "upwork-proposal-analyzer",

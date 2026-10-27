@@ -53,8 +53,6 @@ export const ACCOUNT_MESSAGES = {
   detailsHint: "Who this account is. The email and the role are set by an admin.",
   signInTitle: "Sign-in",
   signInHint: "How long this browser stays signed in.",
-  // Whose records this account works with, for a child account
-  childWorkspace: "You work in the workspace of the account that made yours, so what you save is saved there too.",
   staysSignedIn: "This browser stays signed in for a year, and the year starts again every time you use the app.",
 
   // The timezone every time in the app is shown in

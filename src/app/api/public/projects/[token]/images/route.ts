@@ -3,7 +3,7 @@ import { UserFacingError, toUserFacingMessage } from "@/lib/errors"
 import { TASK_ATTACHMENT_MESSAGES, TASK_IMAGE_MAX_BYTES } from "@/constants/taskAttachments"
 import { PUBLIC_PROJECT_MESSAGES } from "@/constants/clientProjectTasks"
 import { storeTaskImage } from "@/services/taskImages"
-import { publicProjectExists } from "@/services/clientProjects/publicTasks"
+import { projectFromToken } from "@/services/clientProjects/projects"
 
 export const dynamic = "force-dynamic"
 
@@ -30,13 +30,15 @@ const noStore = { "Cache-Control": "no-store" }
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   try {
-    if (!(await publicProjectExists(token))) {
+    // Recorded as the project owner's image, since the shared link writes on the owner's project
+    const project = await projectFromToken(token)
+    if (!project?.ownerId) {
       return NextResponse.json({ success: false, message: PUBLIC_PROJECT_MESSAGES.invalid }, { status: 404, headers: noStore })
     }
     if (Number(req.headers.get("content-length") ?? 0) > TASK_IMAGE_MAX_BYTES) {
       return NextResponse.json({ success: false, message: TASK_ATTACHMENT_MESSAGES.imageTooLarge }, { status: 413, headers: noStore })
     }
-    const image = await storeTaskImage(Buffer.from(await req.arrayBuffer()))
+    const image = await storeTaskImage(project.ownerId, Buffer.from(await req.arrayBuffer()))
     return NextResponse.json({ success: true, message: "Image stored", data: image }, { status: 201, headers: noStore })
   } catch (error: unknown) {
     if (error instanceof UserFacingError) {

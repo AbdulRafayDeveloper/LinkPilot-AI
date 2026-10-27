@@ -13,9 +13,6 @@ import type { Viewer } from "@/types/auth"
  * the file's name (`photoFile`). The bytes come through the app, one request, type read from the
  * bytes and the key built here, exactly as the images inside a description are.
  *
- * It is the **person's** photo, so everything is keyed by `viewer.id` and not by `dataOwnerId`: a
- * child account has its own photo rather than wearing its parent's.
- *
  * A photo is an attachment, not a record: when it is replaced or removed, the object it leaves
  * behind is deleted afterwards and a storage failure there is logged rather than failing the change.
  */

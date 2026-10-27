@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useSyncExternalStore } from "react"
-import { Building2, Loader2, LogIn, Mail, ShieldCheck, SlidersHorizontal, UserCog, UserRound } from "lucide-react"
+import { Loader2, LogIn, Mail, ShieldCheck, SlidersHorizontal, UserCog, UserRound } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { AccountAvatar } from "@/components/ui/AccountAvatar"
@@ -137,14 +137,6 @@ export default function AccountClient() {
                               {ROLE_LABELS[user.role]}
                             </span>
                           </SettingsRow>
-                          {user.parentId && (
-                            <SettingsRow label="Workspace">
-                              <span className="flex items-start gap-2 text-[13px] text-on-surface-variant">
-                                <Building2 size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
-                                {ACCOUNT_MESSAGES.childWorkspace}
-                              </span>
-                            </SettingsRow>
-                          )}
                         </dl>
                       </SettingsCard>
                     </>

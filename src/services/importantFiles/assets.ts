@@ -15,7 +15,7 @@ import {
 } from "@/constants/importantFiles"
 import type { Asset, AssetMetadataInput, AssetsPage, UploadPlan, UploadRequest } from "@/types/importantFiles"
 import type { Viewer } from "@/types/auth"
-import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import { folderBranch } from "@/lib/folderTree"
 import { folderForAsset, listDriveFolders } from "@/services/importantFiles/folders"
 import {
@@ -204,7 +204,7 @@ export async function planUpload(viewer: Viewer, { name, description, originalNa
   await connectDatabase()
 
   const record = await AssetFile.create({
-    ownerId: viewer.dataOwnerId,
+    ownerId: viewer.id,
     name: name.trim(),
     description: description.trim(),
     folderId: folder,
@@ -396,7 +396,7 @@ export async function deleteAssets(
 ): Promise<{ deleted: number; failed: number }> {
   await connectDatabase()
   const matchingFiles = [
-    ids ? visibleTo(viewer) : ownedForClearing(viewer),
+    ids ? visibleTo(viewer) : ownedBy(viewer),
     ...matching(filters.search),
     ...inCategory(filters.type),
     // The same folder the list was showing, so "delete all matching" can never reach a file the page

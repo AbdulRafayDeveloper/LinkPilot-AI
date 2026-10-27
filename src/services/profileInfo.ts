@@ -10,8 +10,7 @@ import type { EditablePrompt } from "@/types/prompts"
  * which an admin could change for everyone; it is the person's own now, so a tool writing as someone
  * only ever quotes that person's facts, and no admin page offers it.
  *
- * Read by the account id the AI request runs as (`currentAiRequest().ownerId`, which is `viewer.id`),
- * so a child account writes with its own Profile Info, never its parent's.
+ * Read by the account id the AI request runs as (`currentAiRequest().ownerId`, which is `viewer.id`).
  */
 
 const NOT_FOUND = "That account no longer exists."

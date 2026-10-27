@@ -3,7 +3,7 @@ import { UserFacingError, toUserFacingMessage } from "@/lib/errors"
 import { PROJECT_TASK_MESSAGES, PUBLIC_PROJECT_MESSAGES, VOICE_NOTE_MAX_BYTES } from "@/constants/clientProjectTasks"
 import { VoiceUploadQuerySchema } from "@/lib/validation/clientProjectTasks"
 import { storeVoiceNote } from "@/services/clientProjects/voiceNotes"
-import { publicProjectExists } from "@/services/clientProjects/publicTasks"
+import { projectFromToken } from "@/services/clientProjects/projects"
 
 export const dynamic = "force-dynamic"
 
@@ -26,14 +26,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const { token } = await params
   const { seconds } = VoiceUploadQuerySchema.parse(Object.fromEntries(req.nextUrl.searchParams))
   try {
-    if (!(await publicProjectExists(token))) {
+    // Recorded as the project owner's, since the shared link writes on the owner's project
+    const project = await projectFromToken(token)
+    if (!project?.ownerId) {
       return NextResponse.json({ success: false, message: PUBLIC_PROJECT_MESSAGES.invalid }, { status: 404, headers: noStore })
     }
     const bytes = Buffer.from(await req.arrayBuffer())
     if (bytes.length === 0) return NextResponse.json({ success: false, message: PROJECT_TASK_MESSAGES.voiceUnsupported }, { status: 400, headers: noStore })
     if (bytes.length > VOICE_NOTE_MAX_BYTES) return NextResponse.json({ success: false, message: PROJECT_TASK_MESSAGES.voiceTooLarge }, { status: 400, headers: noStore })
 
-    const note = await storeVoiceNote(bytes, seconds)
+    const note = await storeVoiceNote(project.ownerId, bytes, seconds)
     return NextResponse.json({ success: true, message: "Voice note saved", data: note }, { status: 201, headers: noStore })
   } catch (error: unknown) {
     if (error instanceof UserFacingError) return NextResponse.json({ success: false, message: error.message }, { status: 400, headers: noStore })

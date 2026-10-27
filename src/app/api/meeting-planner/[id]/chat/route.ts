@@ -60,18 +60,18 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   return createEventStream<MeetingChatEvent>(async (send) => {
     try {
       const history = (await getMeetingChat(id)).messages
-      await saveChatMessage(id, auth.viewer.dataOwnerId, { role: "you", text: parsed.data.question })
+      await saveChatMessage(id, auth.viewer.id, { role: "you", text: parsed.data.question })
       const { result: answer } = await runAiRequest(auth.viewer, "meeting-planner", () =>
         askMeeting({
           meeting,
-          ownerId: auth.viewer.dataOwnerId,
+          ownerId: auth.viewer.id,
           question: parsed.data.question,
           history,
           signal: req.signal,
           onToken: (text) => send({ status: "TOKEN", text }),
         })
       )
-      const saved = await saveChatMessage(id, auth.viewer.dataOwnerId, {
+      const saved = await saveChatMessage(id, auth.viewer.id, {
         role: "assistant",
         text: answer.text,
         sources: answer.sources,

@@ -68,7 +68,7 @@ export async function saveVoice(viewer: Viewer, input: SaveVoiceInput): Promise<
   const storageKey = canStore ? `${VOICE_STORAGE_PREFIX}/${id.toString()}-${cleanName(input.name)}` : ""
   const record = await ClientVoiceModel.create({
     _id: id,
-    ownerId: viewer.dataOwnerId,
+    ownerId: viewer.id,
     taskGroupId: input.batchId,
     clientId: input.clientId,
     clientName: input.clientName,

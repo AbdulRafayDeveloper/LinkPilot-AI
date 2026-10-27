@@ -9,9 +9,7 @@ import type { ChangePasswordInput } from "@/lib/validation/account"
 import type { Viewer } from "@/types/auth"
 
 /**
- * What an account may change about itself: its name and its password. Everything here is scoped by
- * `viewer.id`, never `dataOwnerId` — this is the person, not the workspace — so a child account
- * changes its own name and its own password and never its parent's.
+ * What an account may change about itself: its name and its password, scoped by `viewer.id`.
  */
 
 /**

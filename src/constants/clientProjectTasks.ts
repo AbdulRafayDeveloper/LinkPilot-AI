@@ -566,6 +566,7 @@ export const PROJECT_FILTER_MESSAGES = {
 } as const
 
 export const PROJECT_TASK_MESSAGES = {
+  attachmentNotYours: "One of these files or recordings wasn't uploaded for this project, so it can't be attached. Upload it again.",
   loadFailed: "Couldn't load the projects. Please try again.",
   projectNotFound: "That project no longer exists.",
   taskNotFound: "That item no longer exists.",

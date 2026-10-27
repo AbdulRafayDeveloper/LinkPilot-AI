@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { toUserFacingMessage } from "@/lib/errors"
+import { UserFacingError, toUserFacingMessage } from "@/lib/errors"
 import { DAILY_TASKS_MESSAGES, MAX_TASKS_PER_SUBMIT, TASK_MAX_LENGTH } from "@/constants/dailyTasks"
 import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
 import { DoerSchema, IsoDate, PrioritySchema, RepeatSchema, TodaySchema } from "@/lib/validation/dailyTasks"
@@ -143,7 +143,8 @@ async function handlePost(req: NextRequest) {
     console.error("POST Daily Tasks Exception:", error)
     return NextResponse.json(
       { success: false, message: toUserFacingMessage(error, DAILY_TASKS_MESSAGES.saveFailed) },
-      { status: 500 }
+      // An image this account didn't upload is the request's own problem, not the server's
+      { status: error instanceof UserFacingError ? 400 : 500 }
     )
   }
 }

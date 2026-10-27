@@ -45,7 +45,7 @@ export async function saveCreatedPrompt(
 ): Promise<CreatedPrompt> {
   await connectDatabase()
   const record = await CreatedPromptModel.create({
-    ownerId: viewer.dataOwnerId,
+    ownerId: viewer.id,
     name: created.name,
     prompt: created.prompt,
     target: created.target,
@@ -76,7 +76,7 @@ export async function addCreatedPrompt(
   await connectDatabase()
   const dependencyIds = await dependenciesToSave(viewer, null, added.dependencyIds)
   const record = await CreatedPromptModel.create({
-    ownerId: viewer.dataOwnerId,
+    ownerId: viewer.id,
     name: added.name,
     prompt: added.prompt,
     target: added.target,

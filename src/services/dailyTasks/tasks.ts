@@ -10,9 +10,9 @@ import { HISTORY_DAYS_PER_PAGE, VISIBLE_DAYS } from "@/constants/dailyTasks"
 import { TASK_MAX_DEPTH } from "@/constants/taskAttachments"
 import type { DailyTask, DailyTaskDay, DailyTasksPage, NewDailyTask } from "@/types/dailyTasks"
 import { storedImagesOf, type TaskImage, type TaskImageView } from "@/types/taskAttachment"
-import { deleteTaskImages, taskImageLists } from "@/services/taskImages"
+import { assertOwnImages, deleteOwnedTaskImages, taskImageLists } from "@/services/taskImages"
 import type { Viewer } from "@/types/auth"
-import { ownedBy, ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * Tasks live in the daily_tasks collection. Each task belongs to the account that wrote it: a user
@@ -215,10 +215,12 @@ export async function createTasks(viewer: Viewer, taskDate: string, tasks: NewDa
     day = record.taskDate
     parent = record._id
   }
+  // Only images this account uploaded may go on its tasks (an id alone says nothing about whose it is)
+  await assertOwnImages(viewer.id, tasks.flatMap((task) => task.images ?? []))
   const start = await nextPosition(viewer, parent ? { parentTaskId: parent } : { taskDate: day, ...TOP_LEVEL })
   const records = await DailyTaskModel.insertMany(
     tasks.map((task, index) => ({
-      ownerId: viewer.dataOwnerId,
+      ownerId: viewer.id,
       content: task.content,
       description: task.description,
       image: null,
@@ -327,9 +329,13 @@ export async function setTaskCompletion(viewer: Viewer, id: string, isCompleted:
  *
  * An image that is replaced or taken off goes from storage only after the task is saved without
  * it, never before, so the task can never point at an image that is already gone; a storage
- * failure there is logged and swallowed (`deleteTaskImages`), because the change the user asked
- * for has already been made and the worst case is an object nothing points at. A task saved with one
- * `image` moves it into `images` on its first save.
+ * failure there is logged and swallowed, because the change the user asked for has already been made
+ * and the worst case is an object nothing points at. A task saved with one `image` moves it into
+ * `images` on its first save.
+ *
+ * An image it did not carry before must be one the task's own account uploaded (`assertOwnImages`),
+ * and an image it lets go is removed from storage only when it is that account's
+ * (`deleteOwnedTaskImages`), so naming another account's image id can neither show it nor delete it.
  */
 export async function setTaskDetails(
   viewer: Viewer,
@@ -340,14 +346,16 @@ export async function setTaskDetails(
   if (!filter) return null
   await connectDatabase()
   // The images it carries now, read first so the ones this change drops can be cleared from storage
-  const before = (await DailyTaskModel.findOne(filter, "image images").lean()) as unknown as Pick<StoredTask, "image" | "images"> | null
+  const before = (await DailyTaskModel.findOne(filter, "ownerId image images").lean()) as unknown as (Pick<StoredTask, "image" | "images"> & { ownerId?: string | null }) | null
   if (!before) return null
+  const owner = before.ownerId ?? viewer.id
+  await assertOwnImages(owner, details.images, storedImagesOf(before))
   const changes: Record<string, unknown> = { description: details.description, images: details.images, image: null }
   if (details.content !== undefined) changes.content = details.content
   const record = await DailyTaskModel.findOneAndUpdate(filter, { $set: changes }, { returnDocument: "after", projection: TASK_FIELDS, lean: true })
   if (!record) return null
   const kept = new Set(details.images.map((image) => image.assetId))
-  await deleteTaskImages(storedImagesOf(before).filter((image) => !kept.has(image.assetId)))
+  await deleteOwnedTaskImages(storedImagesOf(before).filter((image) => !kept.has(image.assetId)).map((image) => ({ ownerId: owner, image })))
   return (await toTasks([record as unknown as StoredTask]))[0]
 }
 
@@ -554,12 +562,13 @@ export async function moveOverdueToToday(viewer: Viewer, today: string, ids?: st
  * Every path that removes a task goes through this: one task, the picked tasks, and the week-old
  * cleanup. Without it a deleted task would leave its objects in storage with nothing pointing at
  * them. The records are removed first and the objects after, so a storage problem leaves an object
- * nobody can reach rather than a task showing an image that is already gone; `deleteTaskImages`
- * logs that and never fails the delete the user asked for.
+ * nobody can reach rather than a task showing an image that is already gone; a storage failure is
+ * logged and never fails the delete the user asked for. Each image travels with the account its task
+ * belongs to, so only that account's own objects are removed (`deleteOwnedTaskImages`).
  */
-async function imagesOf(filter: Record<string, unknown>): Promise<TaskImage[]> {
-  const records = (await DailyTaskModel.find(filter, "image images").lean()) as unknown as Pick<StoredTask, "image" | "images">[]
-  return records.flatMap(storedImagesOf)
+async function imagesOf(filter: Record<string, unknown>): Promise<{ ownerId: string | null; image: TaskImage }[]> {
+  const records = (await DailyTaskModel.find(filter, "ownerId image images").lean()) as unknown as (Pick<StoredTask, "image" | "images"> & { ownerId?: string | null })[]
+  return records.flatMap((record) => storedImagesOf(record).map((image) => ({ ownerId: record.ownerId ?? null, image })))
 }
 
 /**
@@ -576,7 +585,7 @@ export async function deleteTask(viewer: Viewer, id: string): Promise<boolean> {
   // Read first, so the images can go with the tasks rather than being left in storage
   const images = await imagesOf(all)
   const { deletedCount } = await DailyTaskModel.deleteMany(all)
-  if (deletedCount > 0) await deleteTaskImages(images)
+  if (deletedCount > 0) await deleteOwnedTaskImages(images)
   return deletedCount > 0
 }
 
@@ -587,10 +596,10 @@ export async function deleteTask(viewer: Viewer, id: string): Promise<boolean> {
  */
 export async function deleteTasksBeforeWindow(viewer: Viewer, today: string): Promise<number> {
   await connectDatabase()
-  const filter = { taskDate: { $lt: windowStartFor(today) }, ...ownedForClearing(viewer) }
+  const filter = { taskDate: { $lt: windowStartFor(today) }, ...ownedBy(viewer) }
   const images = await imagesOf(filter)
   const { deletedCount } = await DailyTaskModel.deleteMany(filter)
-  await deleteTaskImages(images)
+  await deleteOwnedTaskImages(images)
   return deletedCount
 }
 
@@ -601,6 +610,6 @@ export async function deleteTasks(viewer: Viewer, ids: string[]): Promise<number
   const filter = { ...ownedBy(viewer), _id: { $in: [...named, ...(await descendantsOf(viewer, named))] } }
   const images = await imagesOf(filter)
   const { deletedCount } = await DailyTaskModel.deleteMany(filter)
-  await deleteTaskImages(images)
+  await deleteOwnedTaskImages(images)
   return deletedCount ?? 0
 }

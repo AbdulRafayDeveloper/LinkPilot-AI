@@ -24,7 +24,8 @@ import {
 } from "@/constants/clientProjectTasks"
 import { itemName, itemProblem, projectItemUrl } from "@/lib/projectItems"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
-import { deleteTaskImages, taskImageView } from "@/services/taskImages"
+import { assertOwnImages, deleteOwnedTaskImages, taskImageView } from "@/services/taskImages"
+import { assertOwnAttachments, ownedAttachmentIds } from "@/services/attachmentOwners"
 import { deleteVoiceNotes, voiceNoteView } from "./voiceNotes"
 import { deleteProjectFiles, projectFileView, storedProjectFile } from "./files"
 import type { ProjectEstimate, ProjectTask, ProjectTaskInput } from "@/types/clientProjectTasks"
@@ -45,6 +46,57 @@ import type { Viewer } from "@/types/auth"
 
 type StoredTask = IClientProjectTask & { _id: { toString: () => string } }
 type StoredProject = IClientProject & { _id: { toString: () => string } }
+
+/**
+ * The accounts whose uploads an item may name: the project's owner (the shared link uploads for
+ * them) and whoever is writing it. An image, a file or a voice note is named by an id alone, so
+ * without this an item could be saved naming another account's id, show it, and delete it from
+ * storage once the item let it go (services/attachmentOwners.ts).
+ */
+type Owners = readonly (string | null)[]
+
+type Attachments = Pick<ProjectTaskInput, "images" | "files" | "voiceNote">
+
+/** Refuses an item naming an image, a file or a recording none of its owners uploaded. */
+async function assertOwnItemAttachments(owners: Owners, next: Partial<Attachments>, current?: Attachments): Promise<void> {
+  await assertOwnImages(owners, next.images ?? [], current?.images ?? [])
+  await assertOwnAttachments(
+    owners,
+    "project-file",
+    (next.files ?? []).map((file) => file.assetId),
+    (current?.files ?? []).map((file) => file.assetId),
+    PROJECT_TASK_MESSAGES.attachmentNotYours
+  )
+  await assertOwnAttachments(
+    owners,
+    "voice-note",
+    next.voiceNote ? [next.voiceNote.assetId] : [],
+    current?.voiceNote ? [current.voiceNote.assetId] : [],
+    PROJECT_TASK_MESSAGES.attachmentNotYours
+  )
+}
+
+interface ItemAttachments {
+  owners: Owners
+  images?: StoredTask["images"]
+  files?: StoredTask["files"]
+  voiceNote?: StoredTask["voiceNote"]
+}
+
+/**
+ * Removes from storage what items no longer name, **only the objects one of that item's owners
+ * uploaded**: anything else an item names (saved before the check existed) is left for its owner.
+ * The records are already gone or saved, so a storage problem leaves an orphan at worst.
+ */
+async function removeAttachments(entries: readonly ItemAttachments[]): Promise<void> {
+  await deleteOwnedTaskImages(entries.flatMap((entry) => (entry.images ?? []).map((image) => ({ ownerId: entry.owners, image }))))
+  const files = entries.flatMap((entry) => (entry.files ?? []).map((file) => ({ owners: entry.owners, file: storedProjectFile(file) })))
+  const ownFiles = await ownedAttachmentIds("project-file", files.map((entry) => ({ assetId: entry.file.assetId, owners: entry.owners })))
+  await deleteProjectFiles(files.filter((entry) => ownFiles.has(entry.file.assetId)).map((entry) => entry.file))
+  const notes = entries.flatMap((entry) => (entry.voiceNote?.assetId ? [{ owners: entry.owners, note: entry.voiceNote }] : []))
+  const ownNotes = await ownedAttachmentIds("voice-note", notes.map((entry) => ({ assetId: entry.note.assetId, owners: entry.owners })))
+  await deleteVoiceNotes(notes.filter((entry) => ownNotes.has(entry.note.assetId)).map((entry) => entry.note))
+}
 
 const ID_PATTERN = /^[0-9a-f]{24}$/
 
@@ -231,6 +283,7 @@ export async function createProjectTask({ project, projectId, ownerId, addedBy, 
   // What this tab needs, asked again here: the schema asks it of a request, this asks it of the item
   const problem = itemProblem(kind, input)
   if (problem) throw new UserFacingError(problem)
+  await assertOwnItemAttachments([project.ownerId ?? null, ownerId], input)
   await connectDatabase()
   const inTab = { ...scope, projectId, kind }
   const count = await ClientProjectTaskModel.countDocuments(inTab)
@@ -263,12 +316,14 @@ export async function createProjectTask({ project, projectId, ownerId, addedBy, 
  * once the record no longer names it, because nothing else can ever point at it.
  *
  * The filter decides who may change what: an account's own scope, or one project when the write
- * came from that project's shared link.
+ * came from that project's shared link. `owners` are whose uploads it may newly name: the project's
+ * owner and whoever is writing.
  */
 export async function changeProjectTask(
   filter: Record<string, unknown>,
   projectId: string,
-  input: Partial<ProjectTaskInput>
+  input: Partial<ProjectTaskInput>,
+  owners: Owners
 ): Promise<ProjectTask | null> {
   await connectDatabase()
   const current = (await ClientProjectTaskModel.findOne({ ...filter, projectId }).lean()) as unknown as StoredTask | null
@@ -299,6 +354,11 @@ export async function changeProjectTask(
   }
   const problem = itemProblem(kind, merged)
   if (problem) throw new UserFacingError(problem)
+  await assertOwnItemAttachments(owners, input, {
+    images: current.images ?? [],
+    files: (current.files ?? []).map(storedProjectFile),
+    voiceNote: current.voiceNote,
+  })
 
   const cleaned = cleanInput(merged, kind)
   const changes: Record<string, unknown> = {}
@@ -358,28 +418,25 @@ export async function changeProjectTask(
   if (!record) return null
 
   // What the item no longer names can go: the record is already saved, so an orphan is the worst case
-  if (input.images !== undefined) {
-    const kept = new Set(cleaned.images.map((image) => image.assetId))
-    await deleteTaskImages((current.images ?? []).filter((image) => !kept.has(image.assetId)))
-  }
-  if (input.files !== undefined) {
-    const kept = new Set(cleaned.files.map((file) => file.assetId))
-    await deleteProjectFiles((current.files ?? []).filter((file) => !kept.has(file.assetId)).map(storedProjectFile))
-  }
-  if (input.voiceNote !== undefined && current.voiceNote && current.voiceNote.assetId !== cleaned.voiceNote?.assetId) {
-    await deleteVoiceNotes([current.voiceNote])
-  }
+  const keptImages = new Set(cleaned.images.map((image) => image.assetId))
+  const keptFiles = new Set(cleaned.files.map((file) => file.assetId))
+  await removeAttachments([
+    {
+      owners: [current.ownerId ?? null, ...owners],
+      images: input.images !== undefined ? (current.images ?? []).filter((image) => !keptImages.has(image.assetId)) : [],
+      files: input.files !== undefined ? (current.files ?? []).filter((file) => !keptFiles.has(file.assetId)) : [],
+      voiceNote: input.voiceNote !== undefined && current.voiceNote?.assetId !== cleaned.voiceNote?.assetId ? current.voiceNote : null,
+    },
+  ])
   return toTask(record)
 }
 
-/** Removes one item, then its images and its voice note (the record goes first). */
-export async function removeProjectTask(filter: Record<string, unknown>, projectId: string): Promise<boolean> {
+/** Removes one item, then its images, its files and its voice note (the record goes first). */
+export async function removeProjectTask(filter: Record<string, unknown>, projectId: string, owners: Owners): Promise<boolean> {
   await connectDatabase()
   const record = (await ClientProjectTaskModel.findOneAndDelete({ ...filter, projectId }).lean()) as unknown as StoredTask | null
   if (!record) return false
-  await deleteTaskImages(record.images ?? [])
-  await deleteProjectFiles((record.files ?? []).map(storedProjectFile))
-  await deleteVoiceNotes([record.voiceNote])
+  await removeAttachments([{ owners: [record.ownerId ?? null, ...owners], images: record.images, files: record.files, voiceNote: record.voiceNote }])
   return true
 }
 
@@ -439,21 +496,25 @@ export async function orderProjectTasks(viewer: Viewer, projectId: string, kind:
 export async function addProjectTask(viewer: Viewer, projectId: string, input: ProjectTaskInput): Promise<ProjectTask | null> {
   const project = await projectOrNull(viewer, projectId)
   if (!project) return null
-  return createProjectTask({ project, projectId, ownerId: viewer.dataOwnerId, addedBy: "owner", scope: visibleTo(viewer) }, input)
+  return createProjectTask({ project, projectId, ownerId: viewer.id, addedBy: "owner", scope: visibleTo(viewer) }, input)
 }
+
+const ownersFor = (viewer: Viewer, project: StoredProject): Owners => [project.ownerId ?? null, viewer.id]
 
 /** Changes one item as the signed-in owner. Null when the item or the project is out of reach. */
 export async function updateProjectTask(viewer: Viewer, projectId: string, taskId: string, input: Partial<ProjectTaskInput>): Promise<ProjectTask | null> {
   const filter = visibleById(viewer, taskId)
-  if (!filter || !(await projectOrNull(viewer, projectId))) return null
-  return changeProjectTask(filter, projectId, input)
+  const project = filter ? await projectOrNull(viewer, projectId) : null
+  if (!filter || !project) return null
+  return changeProjectTask(filter, projectId, input, ownersFor(viewer, project))
 }
 
 /** Removes one item as the signed-in owner. False when the item or the project is out of reach. */
 export async function deleteProjectTask(viewer: Viewer, projectId: string, taskId: string): Promise<boolean> {
   const filter = visibleById(viewer, taskId)
-  if (!filter || !(await projectOrNull(viewer, projectId))) return false
-  return removeProjectTask(filter, projectId)
+  const project = filter ? await projectOrNull(viewer, projectId) : null
+  if (!filter || !project) return false
+  return removeProjectTask(filter, projectId, ownersFor(viewer, project))
 }
 
 /**
@@ -465,9 +526,16 @@ export async function deleteTasksOfProjects(scope: Record<string, unknown>, proj
   await connectDatabase()
   const records = (await ClientProjectTaskModel.find({ ...scope, projectId: { $in: [...projectIds] } }).lean()) as unknown as StoredTask[]
   if (records.length === 0) return 0
+  const projects = (await ClientProjectModel.find({ _id: { $in: [...new Set(records.map((record) => record.projectId))] } }, { ownerId: 1 }).lean()) as unknown as StoredProject[]
+  const projectOwner = new Map(projects.map((project) => [project._id.toString(), project.ownerId ?? null]))
   const { deletedCount } = await ClientProjectTaskModel.deleteMany({ _id: { $in: records.map((record) => new mongoose.Types.ObjectId(record._id.toString())) } })
-  await deleteTaskImages(records.flatMap((record) => record.images ?? []))
-  await deleteProjectFiles(records.flatMap((record) => (record.files ?? []).map(storedProjectFile)))
-  await deleteVoiceNotes(records.map((record) => record.voiceNote))
+  await removeAttachments(
+    records.map((record) => ({
+      owners: [record.ownerId ?? null, projectOwner.get(record.projectId) ?? null],
+      images: record.images,
+      files: record.files,
+      voiceNote: record.voiceNote,
+    }))
+  )
   return deletedCount ?? 0
 }

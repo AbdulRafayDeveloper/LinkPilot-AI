@@ -2,7 +2,7 @@ import { connectDatabase } from "@/lib/db"
 import { allOf, createdBetween, escapeForSearch } from "@/lib/listQuery"
 import { deleteObject, isStorageConfigured } from "@/services/storage/s3"
 import { getClient } from "@/services/clientMessaging/clients"
-import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import { ClientVoiceModel } from "@/models/ClientVoice"
 import { ClientVoiceTasksModel, type IClientVoiceTasks } from "@/models/ClientVoiceTasks"
 import { HISTORY_PAGE_SIZE } from "@/constants/historyFilters"
@@ -60,7 +60,7 @@ export async function startBatch(viewer: Viewer, input: { clientId: string; titl
   const client = await clientFor(viewer, input.clientId)
   await connectDatabase()
   const record = await ClientVoiceTasksModel.create({
-    ownerId: viewer.dataOwnerId,
+    ownerId: viewer.id,
     ...client,
     title: input.title?.trim() ?? "",
     voiceCount: input.voiceCount,
@@ -245,7 +245,7 @@ export async function deleteBatches(viewer: Viewer, filters: BatchFilters, ids?:
   if (named && named.length === 0) return { deleted: 0, failed: 0 }
   await connectDatabase()
   // Ticked rows are what the viewer can see; a whole filter only ever takes their own records
-  const matching = matchingFilter(viewer, filters, named ? visibleTo(viewer) : ownedForClearing(viewer))
+  const matching = matchingFilter(viewer, filters, named ? visibleTo(viewer) : ownedBy(viewer))
   const records = (await ClientVoiceTasksModel.find(
     named ? allOf([matching, { _id: { $in: named } }]) : matching,
     { _id: 1 }

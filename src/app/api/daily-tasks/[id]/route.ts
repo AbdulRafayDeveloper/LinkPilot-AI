@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { toUserFacingMessage } from "@/lib/errors"
+import { UserFacingError, toUserFacingMessage } from "@/lib/errors"
 import { DAILY_TASKS_MESSAGES } from "@/constants/dailyTasks"
+import { TASK_ATTACHMENT_MESSAGES } from "@/constants/taskAttachments"
 import {
   deleteTask,
   setTaskBlocked,
@@ -126,7 +127,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json(
       // A failure while writing with AI arrives as a message of its own and is passed on as it is
       { success: false, message: toUserFacingMessage(error, DAILY_TASKS_MESSAGES.updateFailed) },
-      { status: 500 }
+      { status: error instanceof UserFacingError && error.message === TASK_ATTACHMENT_MESSAGES.imageNotYours ? 400 : 500 }
     )
   }
 }

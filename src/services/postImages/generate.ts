@@ -121,7 +121,7 @@ export async function createPostImage({ viewer, postContent, assetId, pose, size
     await connectDatabase()
     const record = (await PostImageModel.create({
       _id: id,
-      ownerId: viewer.dataOwnerId,
+      ownerId: viewer.id,
       storageKey,
       contentType: image.contentType,
       size: image.data.length,

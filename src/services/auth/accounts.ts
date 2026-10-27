@@ -16,7 +16,7 @@ import { recordLoginEvent, type ClientInfo } from "./audit"
 type SignedIn = { viewer: Viewer; sessionVersion: number }
 
 // The same account the rest of the app sees, by the one shared rule, so signing in and every request
-// after it agree about the tools and about whose records a child account works with
+// after it agree about the tools it may use
 const toViewer = async (user: Account): Promise<Viewer> => viewerOf(user, await readFeatureDefaults())
 
 /**

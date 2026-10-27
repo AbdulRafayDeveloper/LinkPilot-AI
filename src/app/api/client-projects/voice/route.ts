@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (bytes.length > VOICE_NOTE_MAX_BYTES) return NextResponse.json({ success: false, message: PROJECT_TASK_MESSAGES.voiceTooLarge }, { status: 400 })
 
   try {
-    const note = await storeVoiceNote(bytes, seconds)
+    const note = await storeVoiceNote(auth.viewer.id, bytes, seconds)
     return NextResponse.json({ success: true, message: "Voice note saved", data: note }, { status: 201 })
   } catch (error: unknown) {
     if (error instanceof UserFacingError) return NextResponse.json({ success: false, message: error.message }, { status: 400 })

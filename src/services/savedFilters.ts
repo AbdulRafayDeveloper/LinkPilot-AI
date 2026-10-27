@@ -10,8 +10,7 @@ import type { Viewer } from "@/types/auth"
  * on any machine.
  *
  * It is the person's own state rather than the workspace's, which is why it is written against
- * `viewer.id` like the client last chosen on Client Voices: a child account narrowing its own list
- * never narrows its parent's.
+ * `viewer.id` like the client last chosen on Client Voices.
  *
  * **One view is written at a time** (`viewFilters.<view>`), so two tabs on two different pages never
  * overwrite each other's filters, and a page that has never been filtered simply has nothing stored.

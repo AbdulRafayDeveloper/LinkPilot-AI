@@ -9,7 +9,7 @@ import { plansOfMeetings } from "@/services/meetings/planLink"
 import { MEETINGS_PAGE_SIZE, type MeetingStatusId } from "@/constants/meetings"
 import type { Meeting, MeetingAnalysis, MeetingInput, MeetingSummary, MeetingsPage } from "@/types/meetings"
 import type { Viewer } from "@/types/auth"
-import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import type { AiSource } from "@/types/ai"
 import type { StoredRecording } from "@/types/meetingRecording"
 import { removeRecordingFiles, toRecordingSummary } from "@/services/meetings/recording"
@@ -178,7 +178,7 @@ export async function createMeeting(viewer: Viewer, { title, transcript, people 
   await connectDatabase()
   const named = (title ?? "").trim()
   const record = await MeetingModel.create({
-    ownerId: viewer.dataOwnerId,
+    ownerId: viewer.id,
     title: named || "Untitled meeting",
     isTitleGenerated: named === "",
     transcript,
@@ -271,7 +271,7 @@ export async function deleteMeetings(
   const term = search.trim()
   // Ticked rows follow the per-record delete; a whole filter never reaches another account's meetings
   const narrowing = [
-    ids ? visibleTo(viewer) : ownedForClearing(viewer),
+    ids ? visibleTo(viewer) : ownedBy(viewer),
     ...(term ? [{ title: new RegExp(escapeForSearch(term), "i") }] : []),
     ...(status ? [{ status }] : []),
     ...(ids ? [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] : []),

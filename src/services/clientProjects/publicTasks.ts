@@ -61,7 +61,8 @@ export async function updatePublicProjectTask(token: string, taskId: string, inp
   if (!filter) return failed("item")
   const project = await projectFromToken(token)
   if (!project) return failed("link")
-  const task = await changeProjectTask(filter, project._id.toString(), input)
+  // The shared link uploads for the project's owner, so those are the only uploads it may name
+  const task = await changeProjectTask(filter, project._id.toString(), input, [project.ownerId ?? null])
   return task ? { ok: true, value: task } : failed("item")
 }
 
@@ -71,7 +72,7 @@ export async function deletePublicProjectTask(token: string, taskId: string): Pr
   if (!filter) return failed("item")
   const project = await projectFromToken(token)
   if (!project) return failed("link")
-  return (await removeProjectTask(filter, project._id.toString())) ? { ok: true, value: true } : failed("item")
+  return (await removeProjectTask(filter, project._id.toString(), [project.ownerId ?? null])) ? { ok: true, value: true } : failed("item")
 }
 
 /**
@@ -83,9 +84,4 @@ export async function orderPublicProjectTasks(token: string, kind: ProjectItemKi
   const project = await projectFromToken(token)
   if (!project) return failed("link")
   return (await reorderProjectTasks(PUBLIC_WRITABLE_KINDS_ONLY, project._id.toString(), kind, orderedIds)) ? { ok: true, value: true } : failed("item")
-}
-
-/** Whether a token still opens a project, for the upload routes to check before storing anything. */
-export async function publicProjectExists(token: string): Promise<boolean> {
-  return (await projectFromToken(token)) !== null
 }

@@ -7,9 +7,6 @@ import { COLOR_SCHEME_IDS, DEFAULT_COLOR_SCHEME, type ColorScheme } from "@/cons
  * `sessionVersion` ends every sign-in the account has, since a session names the version it was made with.
  */
 export interface IUser {
-  // The account this one belongs to, when it is a child account (services/children.ts). A child reads
-  // and writes its parent's records, so the parent's id is what scopes its data; null on a primary account
-  parentId: string | null
   email: string
   name: string
   // The person's own profile photo, the file's name under their folder in storage (lib/accountPhoto.ts);
@@ -41,8 +38,7 @@ export interface IUser {
    * What each page is filtered on, one entry per page (`constants/savedFilters.ts`), so every list
    * opens the way its user left it: after a reload, after signing out and in, and on any machine.
    *
-   * It is **the person's own**, like the Client Voices choice above and unlike the work itself: a
-   * child account narrowing its own list never narrows its parent's. It is `unknown` here and read
+   * It is **the person's own**, like the Client Voices choice above. It is `unknown` here and read
    * through `cleanFilters`, which is the rule for anything nested in this repo: a page is only ever
    * handed the keys it really has.
    */
@@ -61,7 +57,6 @@ export interface IUser {
 const UserSchema = new Schema<IUser>(
   {
     // Stored lowercased, so the same address typed with capitals is the same account
-    parentId: { type: String, default: null, index: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, required: true, trim: true },
     photoFile: { type: String, default: null },

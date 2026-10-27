@@ -5,7 +5,7 @@ import { NOTES_BATCH_SIZE } from "@/constants/quickNotes"
 import type { QuickNote, QuickNotesFeed } from "@/types/quickNotes"
 import type { Viewer } from "@/types/auth"
 import type { QuickNoteFields } from "@/lib/validation/quickNotes"
-import { ownedBy, ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import { NAMES_AN_IMAGE, removeUnusedNoteImages } from "./images"
 
 /**
@@ -70,7 +70,7 @@ export async function listNotes(viewer: Viewer, cursor: string | null, limit = N
  */
 export async function saveNote(viewer: Viewer, { title, content }: QuickNoteFields): Promise<QuickNote> {
   await connectDatabase()
-  const record = await QuickNoteModel.create({ ownerId: viewer.dataOwnerId, title, content })
+  const record = await QuickNoteModel.create({ ownerId: viewer.id, title, content })
   return toNote(record as unknown as StoredNote)
 }
 
@@ -112,7 +112,7 @@ export async function deleteNote(viewer: Viewer, id: string): Promise<boolean> {
  */
 export async function clearNotes(viewer: Viewer): Promise<number> {
   await connectDatabase()
-  const clearing = ownedForClearing(viewer)
+  const clearing = ownedBy(viewer)
   const contents = await contentsWithImages(clearing)
   const { deletedCount } = await QuickNoteModel.deleteMany(clearing)
   await removeUnusedNoteImages(contents)

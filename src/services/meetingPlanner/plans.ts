@@ -135,7 +135,7 @@ export async function createMeeting(viewer: Viewer, input: NewMeetingPlan, recur
   await connectDatabase()
   const base = {
     ...input,
-    ownerId: viewer.dataOwnerId,
+    ownerId: viewer.id,
     status: "pending" as const,
     completedAt: null,
     prepError: null,
@@ -366,7 +366,7 @@ export async function extendSeries(
   const until = newDates[newDates.length - 1]
   await MeetingPlanModel.insertMany(
     newDates.map((meetingDate) => ({
-      ownerId: viewer.dataOwnerId,
+      ownerId: viewer.id,
       name: meeting.name,
       meetingDate,
       meetingTime: meeting.meetingTime,

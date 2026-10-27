@@ -49,7 +49,7 @@ async function handlePost(req: NextRequest, { params }: { params: Promise<{ id: 
         { status: 400 }
       )
     }
-    const folder = await createProjectFolder(id, project.ownerId ?? auth.viewer.dataOwnerId, parsed.data)
+    const folder = await createProjectFolder(id, project.ownerId ?? auth.viewer.id, parsed.data)
     return NextResponse.json({ success: true, message: `Folder "${folder.name}" made.`, data: folder }, { status: 201 })
   } catch (error: unknown) {
     // What the tree itself refuses (a name already there, too deep, too many) is the caller's to fix

@@ -9,7 +9,7 @@ import { folderForMove, folderNames } from "./folders"
 import { removeUnusedImages } from "./images"
 import type { ImportantContent, ImportantContentInput, ImportantContentPage } from "@/types/importantContent"
 import type { Viewer } from "@/types/auth"
-import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 import { accountNames } from "@/services/auth/accounts"
 
 /**
@@ -109,7 +109,7 @@ export async function createEntry(viewer: Viewer, input: ImportantContentInput):
   await connectDatabase()
   const folderId = await folderForMove(viewer, input.folderId ?? null)
   const record = await ImportantContentModel.create({
-    ownerId: viewer.dataOwnerId,
+    ownerId: viewer.id,
     name: input.name,
     description: input.description,
     type: input.type,
@@ -172,7 +172,7 @@ export async function deleteEntry(viewer: Viewer, id: string): Promise<boolean> 
 export async function deleteEntries(viewer: Viewer, filters: ContentFilters, ids?: string[]): Promise<{ deleted: number }> {
   await connectDatabase()
   // Ticked rows follow the per-record delete; a whole filter never reaches another account's entries
-  const matching = matchingFilter(viewer, filters, await folderNames(viewer), ids ? visibleTo(viewer) : ownedForClearing(viewer))
+  const matching = matchingFilter(viewer, filters, await folderNames(viewer), ids ? visibleTo(viewer) : ownedBy(viewer))
   const chosen = ids ? { $and: [matching, { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] } : matching
   // Their images are looked at first and removed after, once no entry left names them
   const withImages = (await ImportantContentModel.find({ $and: [chosen, { description: /\/api\/important-content\/images\// }] }, { description: 1 }).lean()) as {

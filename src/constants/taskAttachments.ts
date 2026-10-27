@@ -62,6 +62,7 @@ export const TASK_ATTACHMENT_MESSAGES = {
     `A description must be under ${max.toLocaleString()} characters.`,
   unsupportedImage: "Upload a PNG, JPG or WEBP image.",
   imageTooLarge: `Images must be ${TASK_IMAGE_MAX_BYTES / (1024 * 1024)} MB or smaller.`,
+  imageNotYours: "One of these images wasn't uploaded from this account, so it can't be attached. Upload it again.",
   uploadFailed: "Couldn't upload that image. Please try again.",
   storageUnavailable: "Images can't be uploaded here yet: file storage isn't set up.",
   invalidImage: "That image is no longer available.",

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const project = await projectOrNull(auth.viewer, id)
     if (!project) return NextResponse.json({ success: false, message: PROJECT_TASK_MESSAGES.projectNotFound }, { status: 404 })
-    const plan = await planProjectFile({ id, ownerId: project.ownerId ?? null }, parsed.data)
+    const plan = await planProjectFile({ id, ownerId: project.ownerId ?? auth.viewer.id }, parsed.data)
     return NextResponse.json({ success: true, message: "Upload ready", data: plan }, { status: 201 })
   } catch (error: unknown) {
     if (error instanceof UserFacingError) return NextResponse.json({ success: false, message: error.message }, { status: 400 })

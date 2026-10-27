@@ -82,13 +82,8 @@ export async function deleteAccount(admin: Viewer, id: string, confirmEmail: str
   // Meeting recordings are attachments of their meetings: removed here too, and a failure is only logged
   const recorded = (await Meeting.find({ ...owner, recording: { $ne: null } }, { _id: 1, recording: 1 }).lean()) as unknown as { _id: unknown; recording: unknown }[]
   await Promise.all(recorded.map((meeting) => removeRecordingFiles(String(meeting._id), meeting.recording)))
-  // So are the profile photos: this account's own and those of the accounts it made for other
-  // people, which go with it below. A failure leaves an image nothing names, never a half-deleted account
-  const childAccounts = await UserModel.find({ parentId: id }, { photoFile: 1 }).lean()
-  await Promise.all([
-    forgetAccountPhoto(id, account.photoFile),
-    ...childAccounts.map((child) => forgetAccountPhoto(String(child._id), child.photoFile)),
-  ])
+  // So is the profile photo. A failure leaves an image nothing names, never a half-deleted account
+  await forgetAccountPhoto(id, account.photoFile)
 
   // 2. What hangs off a record without an owner of its own
   const meetingIds = (await Meeting.find(owner, { _id: 1 }).lean()).map((meeting) => meeting._id)
@@ -106,12 +101,8 @@ export async function deleteAccount(admin: Viewer, id: string, confirmEmail: str
   await removeUnusedImages(withImages.map((record) => record.description ?? ""))
   await removeUnusedNoteImages(notesWithImages.map((record) => record.content ?? ""))
 
-  // 4. The accounts it made for other people to work in its workspace (services/children.ts). They
-  // own no records of their own, so there is nothing of theirs to delete, but an account left
-  // pointing at a parent that has gone could sign in with nothing to read, so it goes with it
-  const children = await UserModel.deleteMany({ parentId: id })
 
-  // 5. The account itself, last; its sessions stop working at once, because a session is checked against it
+  // 4. The account itself, last; its sessions stop working at once, because a session is checked against it
   await UserModel.deleteOne({ _id: id })
 
   await recordLoginEvent("account-deleted", { userId: id, email: account.email, name: account.name }, client, admin.email)
@@ -123,8 +114,7 @@ export async function deleteAccount(admin: Viewer, id: string, confirmEmail: str
     records: tools.reduce((sum, entry) => sum + entry.count, 0),
     files: files.length,
     tools,
-    children: children.deletedCount,
   }
-  console.info("Account deleted:", JSON.stringify({ id, by: admin.id, records: deletion.records, files: deletion.files, children: deletion.children }))
+  console.info("Account deleted:", JSON.stringify({ id, by: admin.id, records: deletion.records, files: deletion.files }))
   return deletion
 }

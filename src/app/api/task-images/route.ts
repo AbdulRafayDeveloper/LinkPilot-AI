@@ -29,13 +29,13 @@ export async function POST(req: NextRequest) {
       if (!parsed.success) {
         return NextResponse.json({ success: false, message: parsed.error.issues[0]?.message || TASK_ATTACHMENT_MESSAGES.uploadFailed }, { status: 400 })
       }
-      const plan = await planTaskImageUpload(parsed.data.contentType, parsed.data.size)
+      const plan = await planTaskImageUpload(auth.viewer.id, parsed.data.contentType, parsed.data.size)
       return NextResponse.json({ success: true, message: "Upload ready", data: plan })
     }
     if (Number(req.headers.get("content-length") ?? 0) > TASK_IMAGE_MAX_BYTES) {
       return NextResponse.json({ success: false, message: TASK_ATTACHMENT_MESSAGES.imageTooLarge }, { status: 413 })
     }
-    const image = await storeTaskImage(Buffer.from(await req.arrayBuffer()))
+    const image = await storeTaskImage(auth.viewer.id, Buffer.from(await req.arrayBuffer()))
     return NextResponse.json({ success: true, message: "Image stored", data: image }, { status: 201 })
   } catch (error: unknown) {
     console.error("POST Task Image Exception:", error instanceof Error ? error.message : error)

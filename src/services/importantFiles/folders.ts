@@ -146,7 +146,7 @@ export async function createDriveFolder(viewer: Viewer, input: DriveFolderInput)
   if (await AssetFolder.exists({ $and: [visibleTo(viewer), { parentId, name: sameName(name) }] })) {
     throw new FolderProblem(DRIVE_FOLDER_MESSAGES.duplicate)
   }
-  const record = (await AssetFolder.create({ ownerId: viewer.dataOwnerId, name, parentId })) as unknown as StoredFolder
+  const record = (await AssetFolder.create({ ownerId: viewer.id, name, parentId })) as unknown as StoredFolder
   return { id: record._id.toString(), name, parentId, depth, fileCount: 0, totalFileCount: 0 }
 }
 

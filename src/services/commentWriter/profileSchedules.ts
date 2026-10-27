@@ -14,7 +14,7 @@ import {
 } from "@/constants/profileScheduler"
 import type { ProfilePersonFields, ProfileSchedule, ProfileSchedulePage } from "@/types/profileScheduler"
 import type { Viewer } from "@/types/auth"
-import { ownedForClearing, visibleById, visibleTo } from "@/services/auth/viewer"
+import { ownedBy, visibleById, visibleTo } from "@/services/auth/viewer"
 
 /**
  * Comment Writer's Profile Scheduler: the people an account comments on (name, role, location,
@@ -82,7 +82,7 @@ async function assertNotSaved(viewer: Viewer, profileUrl: string | null | undefi
   // Any number of people may be waiting for their link
   if (!profileUrl) return
   const taken = await ProfileScheduleModel.exists({
-    ownerId: viewer.dataOwnerId,
+    ownerId: viewer.id,
     profileUrl,
     ...(exceptId ? { _id: { $ne: new mongoose.Types.ObjectId(exceptId) } } : {}),
   })
@@ -123,7 +123,7 @@ export async function createProfileSchedule(viewer: Viewer, input: ProfilePerson
   await assertNotSaved(viewer, input.profileUrl)
   try {
     const record = await ProfileScheduleModel.create({
-      ownerId: viewer.dataOwnerId,
+      ownerId: viewer.id,
       profileUrl: input.profileUrl ?? null,
       name: input.name ?? "",
       role: input.role ?? "",
@@ -185,7 +185,7 @@ export async function deleteProfileSchedule(viewer: Viewer, id: string): Promise
  */
 export async function deleteProfileSchedules(viewer: Viewer, filters: Filters, ids?: string[]): Promise<{ deleted: number }> {
   await connectDatabase()
-  const matching = matchingFilter(ids ? visibleTo(viewer) : ownedForClearing(viewer), filters)
+  const matching = matchingFilter(ids ? visibleTo(viewer) : ownedBy(viewer), filters)
   const chosen = ids ? { $and: [matching, { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }] } : matching
   const { deletedCount } = await ProfileScheduleModel.deleteMany(chosen)
   return { deleted: deletedCount ?? 0 }
