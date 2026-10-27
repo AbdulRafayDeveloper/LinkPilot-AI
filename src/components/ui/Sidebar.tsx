@@ -3,10 +3,11 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { ChevronDown, Loader2, Search, X } from "lucide-react"
+import { ChevronDown, Hammer, Loader2, Search, X } from "lucide-react"
 import { BrandLogo } from "./BrandLogo"
 import { TOOL_GROUPS, type LinkedInTool, type ToolGroupId, type ToolLink } from "@/constants/linkedinTools"
 import { GLOBAL_PROMPTS_LINK } from "@/constants/globalPrompts"
+import { UPCOMING_AREAS, UPCOMING_MESSAGES, type UpcomingArea } from "@/constants/upcomingAreas"
 import { markToolSeen, useToolActivity, type ActivityState } from "@/lib/toolActivity"
 import { groupOfPath, shownGroup } from "@/lib/sidebarGroups"
 import { useSidebarDropdowns } from "@/hooks/useSidebarDropdowns"
@@ -378,6 +379,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
   const area = areas.find((entry) => entry.group.id === current) ?? areas[0]
 
   /**
+   * An upcoming area chosen on the rail (Upwork, Fiverr, Hubstaff Talent, Ads): the panel says it is
+   * coming soon instead of listing tools. Like a click on a working area it holds only on the page it
+   * was made on, so moving to a tool shows that tool's list again, and a search always lists tools.
+   */
+  const [upcomingPick, setUpcomingPick] = useState<{ id: string; path: string } | null>(null)
+  const upcoming = !isSearching && upcomingPick?.path === pathname ? (UPCOMING_AREAS.find((entry) => entry.id === upcomingPick.id) ?? null) : null
+
+  // The rail, top to bottom: the working areas, then the upcoming ones, then Administration last
+  type RailEntry = { kind: "area"; entry: (typeof areas)[number] } | { kind: "upcoming"; entry: UpcomingArea }
+  const railEntries: RailEntry[] = [
+    ...areas.filter((entry) => entry.group.id !== "admin").map((entry) => ({ kind: "area" as const, entry })),
+    ...UPCOMING_AREAS.map((entry) => ({ kind: "upcoming" as const, entry })),
+    ...areas.filter((entry) => entry.group.id === "admin").map((entry) => ({ kind: "area" as const, entry })),
+  ]
+  const isChosenOnRail = (rail: RailEntry) => (rail.kind === "upcoming" ? upcoming?.id === rail.entry.id : !upcoming && rail.entry.group.id === area?.group.id)
+  const chooseOnRail = (rail: RailEntry) => {
+    setQuery("")
+    if (rail.kind === "upcoming") {
+      setUpcomingPick({ id: rail.entry.id, path: pathname })
+      return
+    }
+    setUpcomingPick(null)
+    pick(rail.entry.group.id as ToolGroupId, pathname)
+  }
+
+  /**
    * What the panel lists: the chosen area's tools, or, while searching, every match in every area
    * under its own name, so the rail never hides something that was looked for.
    */
@@ -483,19 +510,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
             aria-label="Areas of the app"
             className="flex w-full flex-col items-center gap-1.5 px-2 py-3"
           >
-            {areas.map(({ group, tools: areaTools }, index) => {
-              const isChosen = group.id === area?.group.id
-              const Icon = group.icon
+            {railEntries.map((rail, index) => {
+              const isChosen = isChosenOnRail(rail)
+              const label = rail.kind === "area" ? rail.entry.group.label : rail.entry.label
+              const Icon = rail.kind === "area" ? rail.entry.group.icon : rail.entry.icon
               // An area that is not on screen carries what its tools would have shown
-              const hiddenActivity = isChosen
-                ? undefined
-                : areaTools
-                    .flatMap(pagesOf)
-                    .map((href) => (href === pathname ? undefined : activityOf(href)))
-                    .find((state) => state !== undefined)
+              const hiddenActivity =
+                isChosen || rail.kind === "upcoming"
+                  ? undefined
+                  : rail.entry.tools
+                      .flatMap(pagesOf)
+                      .map((href) => (href === pathname ? undefined : activityOf(href)))
+                      .find((state) => state !== undefined)
               return (
                 <button
-                  key={group.id}
+                  key={rail.kind === "area" ? rail.entry.group.id : `upcoming-${rail.entry.id}`}
                   ref={(node) => {
                     tabRefs.current[index] = node
                   }}
@@ -505,27 +534,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
                   aria-controls={panelId}
                   // One stop for the whole rail: inside it the arrow keys move, as vertical tabs do
                   tabIndex={isChosen ? 0 : -1}
-                  title={`${group.label}: ${group.hint}`}
+                  title={rail.kind === "area" ? `${label}: ${rail.entry.group.hint}` : UPCOMING_MESSAGES.railTitle(label)}
                   onKeyDown={(event) => {
                     const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0
                     const to =
                       step !== 0
-                        ? (index + step + areas.length) % areas.length
+                        ? (index + step + railEntries.length) % railEntries.length
                         : event.key === "Home"
                           ? 0
                           : event.key === "End"
-                            ? areas.length - 1
+                            ? railEntries.length - 1
                             : -1
                     if (to < 0) return
                     event.preventDefault()
-                    setQuery("")
-                    pick(areas[to].group.id as ToolGroupId, pathname)
+                    chooseOnRail(railEntries[to])
                     tabRefs.current[to]?.focus()
                   }}
-                  onClick={() => {
-                    setQuery("")
-                    pick(group.id as ToolGroupId, pathname)
-                  }}
+                  onClick={() => chooseOnRail(rail)}
                   className={`relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                     isChosen
                       ? "bg-primary text-on-primary shadow-sm"
@@ -533,7 +558,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
                   }`}
                 >
                   <Icon size={19} aria-hidden="true" />
-                  <span className="sr-only">{group.label}</span>
+                  <span className="sr-only">{rail.kind === "area" ? label : UPCOMING_MESSAGES.railTitle(label)}</span>
                   {hiddenActivity && <ActivityMark state={hiddenActivity} className="absolute -right-0.5 -top-0.5" />}
                 </button>
               )
@@ -542,8 +567,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
 
           {/* Collapsed on desktop: the chosen area's tools as icons, where the panel would be */}
           {isCollapsed && (
-            <nav aria-label={area ? `${area.group.label} tools` : "Tools"} className="custom-scrollbar hidden min-h-0 w-full flex-1 overflow-y-auto border-t border-outline-variant/80 px-2 py-2 lg:block">
-              <ul className={listClass}>{renderArea(area?.tools ?? [])}</ul>
+            <nav
+              aria-label={upcoming ? upcoming.label : area ? `${area.group.label} tools` : "Tools"}
+              className="custom-scrollbar hidden min-h-0 w-full flex-1 overflow-y-auto border-t border-outline-variant/80 px-2 py-2 lg:block"
+            >
+              {upcoming ? (
+                <p className="mt-1 rounded-lg bg-secondary-fixed px-1 py-1 text-center text-[10px] font-bold uppercase leading-3 text-on-secondary-fixed-variant" title={UPCOMING_MESSAGES.explain(upcoming.label)}>
+                  Soon
+                </p>
+              ) : (
+                <ul className={listClass}>{renderArea(area?.tools ?? [])}</ul>
+              )}
             </nav>
           )}
 
@@ -570,14 +604,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
           </div>
 
           {/* Which area is on screen, so the rail's icon is never the only thing that says it */}
-          {area && !isSearching && (
+          {(upcoming || area) && !isSearching && (
             <div className="shrink-0 px-4 pt-3 tight:pt-2">
               <h2 className="truncate text-[12px] tight:text-[11px] font-bold uppercase leading-[18px] tight:leading-4 tracking-[0.11em] text-primary">
-                {area.group.label}
+                {upcoming ? upcoming.label : area?.group.label}
               </h2>
               {/* One line, always: the hints are short enough to fit the narrowest panel, and `truncate` is the guard */}
-              <p className="mt-0.5 truncate text-[12px] tight:text-[11px] leading-[18px] tight:leading-4 text-outline" title={area.group.hint}>
-                {area.group.hint}
+              <p className="mt-0.5 truncate text-[12px] tight:text-[11px] leading-[18px] tight:leading-4 text-outline" title={upcoming ? upcoming.hint : area?.group.hint}>
+                {upcoming ? upcoming.hint : area?.group.hint}
               </p>
             </div>
           )}
@@ -636,7 +670,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed =
             className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-2.5 tight:px-2 py-1.5"
           >
             {isSearching && matchCount === 0 && <p className="px-2 py-3 text-[13px] text-outline">No tool matches &ldquo;{query.trim()}&rdquo;.</p>}
-            {shownAreas.map(({ group, tools: areaTools }, index) => (
+            {/* An upcoming area has no tools yet: it says so, in words and with its own icon */}
+            {upcoming && (
+              <div className="mx-1 mt-2 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-outline-variant bg-surface-container-low px-4 py-6 text-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-on-primary shadow-sm">
+                  <upcoming.icon size={22} aria-hidden="true" />
+                </span>
+                <p className="text-[15px] font-bold text-on-surface">{UPCOMING_MESSAGES.comingSoon}</p>
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary-fixed px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-on-secondary-fixed-variant">
+                  <Hammer size={11} aria-hidden="true" />
+                  {UPCOMING_MESSAGES.underDevelopment}
+                </span>
+                <p className="text-[13px] leading-5 text-on-surface-variant">{UPCOMING_MESSAGES.explain(upcoming.label)}</p>
+              </div>
+            )}
+            {!upcoming && shownAreas.map(({ group, tools: areaTools }, index) => (
               <section key={group.id} aria-label={group.label} className={index > 0 ? "mt-2" : ""}>
                 {/* While searching the matches come from every area, so each one says where it is */}
                 {isSearching && (
