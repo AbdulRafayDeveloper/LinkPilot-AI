@@ -3,6 +3,8 @@ import { connectDatabase } from "@/lib/db"
 import { describeUserAgent } from "@/lib/userAgent"
 import { LoginEventModel } from "@/models/LoginEvent"
 import { USER_AGENT_MAX_LENGTH, type LoginEventType } from "@/constants/admin"
+import { recordActivity } from "@/services/activityLogs/record"
+import type { ActivityAction } from "@/constants/activityLogs"
 
 /**
  * Writes the audit trail Audit Management reads. A failure to write is logged and swallowed: an
@@ -36,4 +38,31 @@ export async function recordLoginEvent(
   } catch (error: unknown) {
     console.warn("⚠️ Couldn't write the audit event:", event, error instanceof Error ? error.message : error)
   }
+  // The account's own sign-ins, sign-outs and password changes are its activities too, so its log
+  // tells the whole story. An event an admin caused (a deletion) is the admin's activity, not this one
+  const action = ACCOUNT_ACTIONS[event]
+  if (who.userId && action) {
+    await recordActivity({
+      userId: who.userId,
+      action,
+      outcome: event === "failed" || event === "locked" ? "refused" : "allowed",
+      module: "account",
+      resource: "",
+      method: "",
+      path: "",
+      targetId: null,
+      userAgent: client.userAgent,
+      ipAddress: client.ipAddress,
+    })
+  }
+}
+
+// Each audit event as the activity it is in the account's own log; a deletion is not one of them
+const ACCOUNT_ACTIONS: Partial<Record<LoginEventType, ActivityAction>> = {
+  "sign-in": "sign-in",
+  "sign-up": "sign-up",
+  "sign-out": "sign-out",
+  failed: "failed-sign-in",
+  locked: "locked",
+  "password-changed": "password-changed",
 }

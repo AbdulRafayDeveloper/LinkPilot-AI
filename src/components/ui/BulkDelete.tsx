@@ -81,16 +81,20 @@ interface ConfirmBulkDeleteProps {
   noun: BulkNoun
   // What goes with each record, when deleting one takes more than the row itself
   alsoGoes?: string
+  // For a delete that is not final (a person hiding their own activities): the line under the title
+  // and the sentence in place of "removed for good". Left out, the delete is final and says so
+  description?: string
+  message?: string
   isDeleting: boolean
   onConfirm: () => void
   onClose: () => void
 }
 
 /** The one confirmation every bulk delete goes through, naming exactly how many records go. */
-export const ConfirmBulkDelete: React.FC<ConfirmBulkDeleteProps> = ({ count, noun, alsoGoes, isDeleting, onConfirm, onClose }) => (
+export const ConfirmBulkDelete: React.FC<ConfirmBulkDeleteProps> = ({ count, noun, alsoGoes, description, message, isDeleting, onConfirm, onClose }) => (
   <Modal
     title={`Delete ${countLabel(count, noun)}?`}
-    description="This cannot be undone."
+    description={description ?? "This cannot be undone."}
     onClose={onClose}
     isCloseDisabled={isDeleting}
     size="compact"
@@ -117,7 +121,7 @@ export const ConfirmBulkDelete: React.FC<ConfirmBulkDeleteProps> = ({ count, nou
     }
   >
     <p className="text-sm leading-relaxed text-on-surface-variant">
-      {count === 1 ? `This ${noun.one} is removed for good.` : `These ${count} ${noun.many} are removed for good.`}
+      {message ?? (count === 1 ? `This ${noun.one} is removed for good.` : `These ${count} ${noun.many} are removed for good.`)}
       {alsoGoes ? ` ${alsoGoes}` : ""}
     </p>
   </Modal>

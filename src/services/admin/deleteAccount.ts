@@ -18,6 +18,7 @@ import { recordLoginEvent, type ClientInfo } from "@/services/auth/audit"
 import type { Viewer } from "@/types/auth"
 import type { AccountDeletion } from "@/types/admin"
 import { SOURCES, titleOf } from "./activity"
+import { purgeAccountActivities } from "@/services/activityLogs/list"
 
 /**
  * Deleting an account and everything it made, for an admin.
@@ -101,6 +102,8 @@ export async function deleteAccount(admin: Viewer, id: string, confirmEmail: str
   await removeUnusedImages(withImages.map((record) => record.description ?? ""))
   await removeUnusedNoteImages(notesWithImages.map((record) => record.content ?? ""))
 
+  // Its activity log goes with it: the log is the account's own, and the audit trail keeps the record that it existed
+  await purgeAccountActivities(id)
 
   // 4. The account itself, last; its sessions stop working at once, because a session is checked against it
   await UserModel.deleteOne({ _id: id })

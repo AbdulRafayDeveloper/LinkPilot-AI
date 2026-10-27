@@ -148,6 +148,20 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
       "Nothing is deleted because it got old: the week-old cleanup is a button, and it always confirms first.",
     ],
   },
+  "activity-logs": {
+    summary: "Everything your account has done in the app, newest first: what you created, changed, deleted or generated, and every sign-in.",
+    steps: [
+      "Open Activity Logs from Workspace to see your own activities, 50 to a page.",
+      "Search by what was done, the tool, the address or the browser, and narrow by tool, action, outcome or dates.",
+      "Tick activities and press Delete, or delete everything the filters cover, to take them off your list.",
+    ],
+    notes: [
+      "Only your own activities are ever shown here, never another account's.",
+      "Opening a page or a list is not an activity; creating, editing, deleting, generating, uploading and moving are.",
+      "The same action repeated within a minute, such as an editor saving itself, is one line with a count beside it.",
+      "Deleting an activity removes it from your list. It is kept for the administrators, who see it marked as deleted.",
+    ],
+  },
   "message-rewriter": {
     summary: "Turns a message you type or speak, in any language, into one short, clear English message you can send.",
     steps: [

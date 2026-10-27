@@ -34,6 +34,7 @@ import { IMPORTANT_CONTENT_TOOL } from "./importantContent"
 import { REFERENCE_CONTENT_TOOL } from "./referenceContent"
 import { EMPLOYEES_TOOL } from "./employees"
 import { ADMIN_TOOL } from "./admin"
+import { ACTIVITY_LOGS_TOOL } from "./activityLogs"
 import { TRENDING_HISTORY_HREF } from "./trending"
 import { PROFILE_SCHEDULER_LINK } from "./profileScheduler"
 import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./savedOutputs"
@@ -187,6 +188,8 @@ export const APP_TOOLS: LinkedInTool[] = [
   QUICK_NOTES_TOOL,
   EMPLOYEES_TOOL,
   IMPORTANT_FILES_TOOL,
+  // Everything the account has done, last in Workspace
+  ACTIVITY_LOGS_TOOL,
   ...LINKEDIN_TOOLS,
   // Client Work: the meetings and what the clients send, then what is written back to them, then
   // the clients themselves and what their prompts are written for

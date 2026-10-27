@@ -35,6 +35,9 @@ export const FILTER_VIEWS: Record<string, readonly string[]> = {
   "admin-audit": ["search", "event", "from", "to"],
   "admin-backups": ["search", "status", "trigger", "from", "to"],
   "admin-users": ["search", "role"],
+  "activity-logs": ["search", "module", "action", "outcome", "from", "to"],
+  // One account's activities for an admin, with whether the person deleted them
+  "admin-user-activities": ["search", "module", "action", "outcome", "state", "from", "to"],
   // AI Model Priority, one view per tab: Models in use, Priority order, Usage & cost, Prices
   "admin-model-map": ["search", "module", "job", "provider", "show"],
   "admin-model-order": ["search", "order", "need", "skipped"],

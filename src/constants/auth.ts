@@ -51,6 +51,8 @@ export const LOGIN_LOCK_MINUTES = 15
 // Sent with every "sign in first" answer, so the browser can tell it from any other 401
 // The path the request came in on, put there by the proxy so a route guard can tell which tool it is
 export const REQUEST_PATH_HEADER = "x-linkpilot-path"
+// The method beside it, so the activity log can tell an action from a read without each route saying so
+export const REQUEST_METHOD_HEADER = "x-linkpilot-method"
 
 export const AUTH_REQUIRED_HEADER = "x-linkpilot-auth"
 

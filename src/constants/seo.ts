@@ -93,6 +93,11 @@ const TOOL_SEO: Record<string, { title: string; description: string; keywords: s
     description: "Every sign-in, sign-up and refused attempt, newest first, with the device and browser it came from.",
     keywords: [],
   },
+  "activity-logs": {
+    title: "Activity Logs",
+    description: "Every action your account has taken, newest first, with search, filters and the device it came from.",
+    keywords: [],
+  },
   "daily-tasks": {
     title: "Daily Tasks, a Simple Day Checklist",
     description:

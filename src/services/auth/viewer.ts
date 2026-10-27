@@ -10,6 +10,7 @@ import { FEATURE_ACCESS_MESSAGES } from "@/constants/featureAccess"
 import { isFeatureDisabled, toolIdForApiPath } from "@/lib/featureAccess"
 import { readFeatureDefaults } from "@/services/featureSettings"
 import { ACCOUNT_FIELDS, viewerOf } from "./accountViewer"
+import { logRequestActivity } from "@/services/activityLogs/record"
 import type { Viewer } from "@/types/auth"
 
 /**
@@ -60,12 +61,16 @@ export async function requireViewer(options: { role?: UserRole; feature?: string
     denied.headers.set(AUTH_REQUIRED_HEADER, "required")
     return { viewer: null, denied }
   }
+  // Every action is logged against the person who took it, a refused one too (services/activityLogs)
   if (options.role === "admin" && viewer.role !== "admin") {
+    await logRequestActivity(viewer.id, "refused")
     return { viewer: null, denied: NextResponse.json({ success: false, message: AUTH_MESSAGES.adminOnly }, { status: 403 }) }
   }
   if (await isDeniedFeature(viewer, options)) {
+    await logRequestActivity(viewer.id, "refused")
     return { viewer: null, denied: NextResponse.json({ success: false, message: FEATURE_ACCESS_MESSAGES.unavailable }, { status: 403 }) }
   }
+  await logRequestActivity(viewer.id, "allowed")
   return { viewer, denied: null }
 }
 

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { env } from "@/config/env"
 import { SESSION_COOKIE, readSession } from "@/lib/sessionToken"
-import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, HOME_PATH, LOGIN_PATH, REQUEST_PATH_HEADER, SIGNUP_PATH } from "@/constants/auth"
+import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, HOME_PATH, LOGIN_PATH, REQUEST_METHOD_HEADER, REQUEST_PATH_HEADER, SIGNUP_PATH } from "@/constants/auth"
 import { PUBLIC_PLAN_ENDPOINT, PUBLIC_PLAN_PATH } from "@/constants/employees"
 import { PUBLIC_PROJECT_ENDPOINT, PUBLIC_PROJECT_PATH } from "@/constants/clientProjectTasks"
 import { PUBLIC_MEETING_ENDPOINT, PUBLIC_MEETING_PATH } from "@/constants/meetings"
@@ -37,12 +37,14 @@ const safeNext = (path: string) => (path !== "/" && path.startsWith("/") && !pat
 
 /**
  * Carries the path the request came in on, so `requireViewer` can tell which tool a route belongs
- * to without every route having to name itself. It is set here and nowhere else; a header that
- * arrived from outside is replaced rather than trusted.
+ * to without every route having to name itself, and its method, so the activity log can tell an
+ * action from a read. Both are set here and nowhere else; a header that arrived from outside is
+ * replaced rather than trusted.
  */
 function withPath(request: NextRequest, pathname: string) {
   const headers = new Headers(request.headers)
   headers.set(REQUEST_PATH_HEADER, pathname)
+  headers.set(REQUEST_METHOD_HEADER, request.method)
   return NextResponse.next({ request: { headers } })
 }
 

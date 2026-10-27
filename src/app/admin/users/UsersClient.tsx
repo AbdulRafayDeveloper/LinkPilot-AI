@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, CalendarPlus, CheckCircle2, Loader2, Lock, RefreshCw, ShieldCheck, SlidersHorizontal, Trash2, UserCheck, Users, UsersRound, X } from "lucide-react"
+import { AlertTriangle, CalendarPlus, CheckCircle2, ListChecks, Loader2, Lock, RefreshCw, ShieldCheck, SlidersHorizontal, Trash2, UserCheck, Users, UsersRound, X } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
@@ -25,6 +25,7 @@ import { HISTORY_DEBOUNCE_MS } from "@/constants/historyFilters"
 import { ACTIVE_DAYS, ADMIN_ENDPOINTS, ADMIN_MESSAGES, AUDIT_HREF } from "@/constants/admin"
 import { ROLE_LABELS, USER_ROLES } from "@/constants/auth"
 import type { AccountDeletion, AdminUser, UserActivity, UsersPage } from "@/types/admin"
+import { adminActivitiesHref } from "@/constants/activityLogs"
 
 const idOf = (user: AdminUser) => user.id
 const ROLE_OPTIONS = USER_ROLES.map((role) => ({ id: role, label: ROLE_LABELS[role] }))
@@ -49,6 +50,10 @@ const RoleBadge: React.FC<{ user: AdminUser }> = ({ user }) => (
 )
 
 /** One account in detail: counts, the tools it used with when, and its latest sign-ins. */
+// Every action of one account, on a page of its own (constants/activityLogs.ts)
+const activitiesLinkClass =
+  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+
 const UserDetail: React.FC<{ user: AdminUser; canDelete: boolean; onDelete: () => void; onClose: () => void }> = ({ user, canDelete, onDelete, onClose }) => {
   const [activity, setActivity] = useState<UserActivity | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -73,8 +78,12 @@ const UserDetail: React.FC<{ user: AdminUser; canDelete: boolean; onDelete: () =
       onClose={onClose}
       size="large"
       footer={
-        canDelete ? (
-          <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          <Link href={adminActivitiesHref(user.id)} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high">
+            <ListChecks size={16} aria-hidden="true" />
+            All activities
+          </Link>
+          {canDelete && (
             <button
               type="button"
               onClick={onDelete}
@@ -83,8 +92,8 @@ const UserDetail: React.FC<{ user: AdminUser; canDelete: boolean; onDelete: () =
               <Trash2 size={16} aria-hidden="true" />
               Delete account
             </button>
-          </div>
-        ) : undefined
+          )}
+        </div>
       }
     >
       {error ? (
@@ -389,6 +398,10 @@ export default function UsersClient() {
                               >
                                 View activity
                               </button>
+                              <Link href={adminActivitiesHref(user.id)} className={activitiesLinkClass} title={`Every action of ${user.name}`}>
+                                <ListChecks size={14} aria-hidden="true" />
+                                Activities
+                              </Link>
                               {canDelete(user) && (
                                 <button
                                   type="button"
@@ -424,6 +437,10 @@ export default function UsersClient() {
                           {user.loginCount} sign-ins · {user.recordCount} records · active {timeAgo(user.lastActivityAt ?? user.lastLoginAt)}
                         </span>
                       </button>
+                      <Link href={adminActivitiesHref(user.id)} className={`${activitiesLinkClass} mt-1.5`}>
+                        <ListChecks size={14} aria-hidden="true" />
+                        Activities
+                      </Link>
                     </li>
                   ))}
                 </ul>
