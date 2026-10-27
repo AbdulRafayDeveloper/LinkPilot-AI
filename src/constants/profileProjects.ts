@@ -11,9 +11,20 @@
  * need, and the words it should be found by.
  */
 
+/**
+ * The tabs in the order a profile is read: who you are and what you have done, then what you know
+ * and offer, then what proves it. A tab with `comingSoon` is shown and can be opened, but holds only
+ * a line saying what it will keep; it has no storage yet.
+ */
 export const MY_PROFILE_TABS = [
   { id: "profile", label: "Profile Info", hint: "Who you are, your experience and your skills. Every tool quotes from this and never invents beyond it." },
+  { id: "experience", label: "Experience", hint: "The roles you have held: where, when and what you did there.", comingSoon: true },
   { id: "projects", label: "Projects", hint: "The work you can point to, so a tool can name the right project for each client." },
+  { id: "skills", label: "Skills", hint: "What you are good at, so a tool only claims what you can really do.", comingSoon: true },
+  { id: "services", label: "Services", hint: "What you offer clients, so a pitch names a service you really sell.", comingSoon: true },
+  { id: "education", label: "Education", hint: "Where you studied and what you studied there.", comingSoon: true },
+  { id: "certifications", label: "Certifications", hint: "The certificates you hold, with who issued them and when.", comingSoon: true },
+  { id: "reviews", label: "Reviews", hint: "What clients have said about your work, to quote word for word.", comingSoon: true },
 ] as const
 export type MyProfileTab = (typeof MY_PROFILE_TABS)[number]["id"]
 export const DEFAULT_MY_PROFILE_TAB: MyProfileTab = "profile"

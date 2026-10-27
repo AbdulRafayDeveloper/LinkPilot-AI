@@ -97,6 +97,7 @@ export const HELP_START_TOPICS: HelpTopic[] = [
         "Open My AI Profile at the bottom of the sidebar.",
         "On the Profile Info tab, press Update Prompt. Profile Info holds your real experience, projects and numbers. Tools quote from it and never invent anything beyond it.",
         "On the Projects tab, press Add project and fill in the name, a summary, what stands out, the Upwork jobs it matches, what to emphasize for each kind of client need and its search keywords. For now projects are kept in your browser only and no tool reads them yet.",
+        "Experience, Skills, Services, Education, Certifications and Reviews are coming soon. Their tabs are already there and say what each will keep.",
         "Humanization is the last step of every LinkedIn tool. Only an admin can change it, from Administration, then Global AI Prompts.",
         "Save, and the next thing you generate uses the new wording.",
       ],
