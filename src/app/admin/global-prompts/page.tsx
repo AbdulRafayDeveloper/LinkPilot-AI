@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { ADMIN_GLOBAL_PROMPTS_HREF } from "@/constants/globalPrompts"
@@ -10,5 +11,10 @@ export const dynamic = "force-dynamic"
 
 export default async function Page() {
   await requireAdminPage(ADMIN_GLOBAL_PROMPTS_HREF)
-  return <AdminGlobalPromptsClient />
+  // The module open is read from the address, which a client component may only do inside Suspense
+  return (
+    <Suspense>
+      <AdminGlobalPromptsClient />
+    </Suspense>
+  )
 }
