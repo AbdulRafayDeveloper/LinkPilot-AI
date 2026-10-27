@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage, type PromptDataBlock } from "@/services/promptComposer"
+import type { PromptBook } from "@/services/promptBook"
 import { containsSenderClaim } from "@/services/senderGuard"
 import { humanizeTexts } from "@/services/humanizer"
 import { findUnsupportedUserClaims } from "@/services/userClaims"
@@ -26,25 +27,21 @@ const UNDERMINING_PHRASE =
  * The questions come before the reply on purpose: the model records what the sources
  * actually say before it writes, so it can't answer "how long?" or "how much?" from thin air.
  */
-const ReplySchema = z.object({
-  questions_to_answer: z
-    .array(
-      z.object({
-        question: z.string().describe("A question or request from the other person the reply needs to address"),
-        known_answer: z
-          .string()
-          .nullable()
-          .describe("The answer exactly as stated in the sender profile or the user's own earlier messages, or null if they don't state it"),
-      })
-    )
-    .describe("Open questions from the other person, empty if there are none"),
-  strategy_note: z
-    .string()
-    .describe("One short sentence for the user on how the reply applies the reply type, or why it holds back"),
-  reply: z.string().describe("The complete reply text, nothing else"),
-})
+const replySchema = (book: PromptBook) =>
+  z.object({
+    questions_to_answer: z
+      .array(
+        z.object({
+          question: z.string().describe(book.text("reply.field.question")),
+          known_answer: z.string().nullable().describe(book.text("reply.field.known-answer")),
+        })
+      )
+      .describe(book.text("reply.field.questions")),
+    strategy_note: z.string().describe(book.text("reply.field.strategy-note")),
+    reply: z.string().describe(book.text("reply.field.reply")),
+  })
 
-type ReplyOutput = z.infer<typeof ReplySchema>
+type ReplyOutput = z.infer<ReturnType<typeof replySchema>>
 
 interface WriteReplyOptions {
   typePrompt: string
@@ -54,6 +51,8 @@ interface WriteReplyOptions {
   // True when nothing is known about the user: no About Me and no message of their own
   guardSenderClaims: boolean
   signal: AbortSignal
+  // The tool's instructions prompt, loaded once for the whole request
+  book: PromptBook
 }
 
 interface ReplyProblems {
@@ -100,21 +99,17 @@ function addsProblems(draft: ReplyProblems, rewrite: ReplyProblems): boolean {
   )
 }
 
-function describeProblems({
-  unsupportedSpecifics,
-  unsupportedClaims,
-  unsupportedSenderClaim,
-  underminingPhrase,
-}: ReplyProblems): string[] {
+// What is wrong with a draft, in the words of the tool's instructions prompt
+function describeProblems(
+  { unsupportedSpecifics, unsupportedClaims, unsupportedSenderClaim, underminingPhrase }: ReplyProblems,
+  book: PromptBook
+): string[] {
   return [
-    unsupportedSpecifics.length > 0 &&
-      `It states specifics that neither the conversation nor my About Me contains: ${unsupportedSpecifics.join(", ")}. Don't invent durations, prices, results, percentages or other figures; where they asked for one, acknowledge the question and offer a real way forward instead.`,
+    unsupportedSpecifics.length > 0 && book.text("problem.unsupported-specifics", { specifics: unsupportedSpecifics.join(", ") }),
     unsupportedClaims.length > 0 &&
-      `It says things about me that neither my About Me nor my own messages support: ${unsupportedClaims.map((claim) => `"${claim}"`).join("; ")}. Remove them. If they asked about my work, acknowledge the question warmly without describing specifics, and keep the focus on them.`,
-    unsupportedSenderClaim &&
-      "It says things about me (my work, services, experience or background), but neither my About Me nor my own messages state any of that. Make no claim about me; keep the focus on them and their request.",
-    underminingPhrase &&
-      `It undercuts me ("${underminingPhrase.trim()}"). Don't say what I can't speak to or do; simply make no claim about me and keep the reply confident and useful.`,
+      book.text("problem.unsupported-claims", { claims: unsupportedClaims.map((claim) => `"${claim}"`).join("; ") }),
+    unsupportedSenderClaim && book.text("problem.sender-claim"),
+    underminingPhrase && book.text("problem.undermining", { phrase: underminingPhrase.trim() }),
   ].filter((problem): problem is string => typeof problem === "string")
 }
 
@@ -132,16 +127,17 @@ export async function writeReply({
   analysisBrief,
   guardSenderClaims,
   signal,
+  book,
 }: WriteReplyOptions): Promise<WrittenReply> {
   const system = renderPrompt(await loadPrompt("conversation-reply-system"), { MAX_CHARS: LINKEDIN_MESSAGE_MAX_CHARS })
-  const user = composePromptMessage(
+  const user = await composePromptMessage(
     typePrompt,
     [
       ...dataBlocks,
       {
         variable: "conversation_analysis",
         tag: "conversation_analysis",
-        label: "Conversation analysis",
+        label: book.text("label.analysis"),
         content: analysisBrief,
       },
     ],
@@ -149,7 +145,7 @@ export async function writeReply({
   )
   const messages = [new SystemMessage(system), new HumanMessage(user)]
   const generation = {
-    schema: ReplySchema,
+    schema: replySchema(book),
     name: "conversation_reply",
     temperature: WRITING_TEMPERATURE,
     signal,
@@ -167,16 +163,14 @@ export async function writeReply({
   let { data, provider } = first
   let reply = cleanGeneratedText(data.reply)
   let problems = findProblems(reply)
-  const problemDescriptions = describeProblems(problems)
+  const problemDescriptions = describeProblems(problems, book)
 
   if (problemDescriptions.length > 0) {
     const rewrite = await generateStructuredWithFallback({
       ...generation,
       messages: [
         ...messages,
-        new HumanMessage(
-          `Rewrite your draft below. ${problemDescriptions.join(" ")} Keep everything else.\n\n<draft_reply>\n${reply}\n</draft_reply>`
-        ),
+        new HumanMessage(book.text("rewrite", { problems: problemDescriptions.join(" "), draft: reply })),
       ],
     }).catch((error: unknown) => {
       if (signal.aborted) throw error
@@ -196,14 +190,14 @@ export async function writeReply({
     fields: [
       {
         id: "reply",
-        kind: "LinkedIn message reply in an ongoing conversation",
+        kind: book.text("humanize.kind"),
         text: reply,
         maxChars: LINKEDIN_MESSAGE_MAX_CHARS,
       },
     ],
     signal,
     validate: (_id, text) =>
-      addsProblems(draftProblems, findProblems(text)) ? "adds unsupported specifics or claims about the user" : null,
+      addsProblems(draftProblems, findProblems(text)) ? book.text("humanize.problem.adds-problems") : null,
   })
   reply = humanization.texts.reply
   problems = findProblems(reply)

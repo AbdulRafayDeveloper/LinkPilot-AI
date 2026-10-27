@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import {
   cleanPostText,
   composeTrendingPost,
@@ -42,21 +43,13 @@ function findCliches(text: string): string[] {
   return [...new Set((text.match(CLICHES) ?? []).map((phrase) => phrase.toLowerCase()))]
 }
 
-const ExpandedPostSchema = z.object({
-  post_hook: z
-    .string()
-    .describe(`The first line, at most ${POST_HOOK_MAX_WORDS} words. Return it unchanged unless you were asked to change it`),
-  post_body: z
-    .string()
-    .describe(
-      "The rewritten body, 250 to 320 words, keeping the same facts and the same format shape, with blank lines between short paragraphs. No links, no hashtags"
-    ),
-  post_cta: z
-    .string()
-    .describe(
-      "The closing line, one sentence naming the specific choice this post is about, so a reader can answer it from their own work. No links, no hashtags"
-    ),
-})
+// What each field means is the Trending instructions prompt's, so the schema is built from it
+const expandedPostSchema = (book: PromptBook) =>
+  z.object({
+    post_hook: z.string().describe(book.text("expand.field.hook", { max: POST_HOOK_MAX_WORDS })),
+    post_body: z.string().describe(book.text("expand.field.body")),
+    post_cta: z.string().describe(book.text("expand.field.cta")),
+  })
 
 // Links and inline hashtags are taken out rather than thrown away with the whole rewrite
 const clean = (text: string) => stripPostHashtags(stripPostLinks(cleanPostText(text)))
@@ -109,67 +102,31 @@ function findProblems(
   return needsWork ? problems : null
 }
 
-const SYSTEM = [
-  "You rewrite one LinkedIn post that came out too thin to travel.",
-  "",
-  `Rewrite its body to 250 to 320 words, so the finished post lands between ${POST_TARGET_MIN_CHARS} and ${POST_TARGET_MAX_CHARS} characters. Most drafts are half that, so this is the main job.`,
-  "",
-  "Rules",
-  "- Add real substance, not padding. Use the detail in the research report, so what changed, what it costs, who it affects, what breaks and what to do about it.",
-  "- Give every block of the post's format its own 2 or 3 lines. That is where the missing length comes from.",
-  "- Never add a fact, a number, a date, a company or a result the research report does not state. Never invent the writer's own experience, clients or projects.",
-  "- Keep the shape of the post's own format.",
-  "- Short paragraphs of 1 or 2 lines with a blank line between them.",
-  "- The closing line asks one question that names the specific choice in this post, so a reader can answer it from their own work. Never end with what do you think, thoughts, do you agree, how do you see this, or what tools do you use.",
-  "- No links, no hashtags, and no source lines anywhere in the post.",
-  "- Never name LinkedIn in the post. The reader is already there.",
-  "- The body never ends on a question. The closing line is the only question in the post.",
-  "",
-  "HUMAN STYLE (STRICT, NEVER BREAK THIS)",
-  "- Never use an em dash, an en dash, a colon or a semicolon. End the sentence and start a new one instead.",
-  "- Never use AI-sounding words such as seamless, robust, leverage, utilize, delve, elevate, unlock, empower, streamline, game-changer, cutting-edge, revolutionize, synergy, realm, tapestry or fast-paced.",
-  "- Write like a real person typing on LinkedIn. Simple words, short sentences, no corporate buzzwords.",
-].join("\n")
-
-function buildRequest(topic: TrendingTopic, problems: PostProblems, researchNotes: string): string {
+// What to rewrite and why, in the words of the Trending instructions prompt
+function buildRequest(topic: TrendingTopic, problems: PostProblems, researchNotes: string, book: PromptBook): string {
   const format = getPostFormat(topic.post_format)
   const jobs = [
-    problems.wrongFormat
-      ? `This body was written in a different shape and now has to be a ${format.label}. Rebuild it to that shape, keeping the same facts.`
-      : null,
-    problems.isShort ? `The body is only ${postLength(topic)} characters long. Make it 250 to 320 words.` : null,
-    problems.hasGenericEnding ? "The closing line asks nothing specific. Replace it." : null,
-    problems.aiWords.length > 0
-      ? `Replace these AI-sounding words with plain ones. ${problems.aiWords.join(", ")}.`
-      : null,
-    problems.cliches.length > 0
-      ? `Cut these stock phrases and say the specific thing instead. ${problems.cliches.join(", ")}.`
-      : null,
-    problems.talksAboutLinkedIn
-      ? "The post talks about LinkedIn itself. The reader is already there, so write about the development and what it means for their work instead, and never name the platform."
-      : null,
-    problems.needsStatementHook
-      ? "Another post in this set already opens on a question, so rewrite this hook as a statement that makes the same point."
-      : null,
+    problems.wrongFormat ? book.text("expand.job.wrong-format", { format: format.label }) : null,
+    problems.isShort ? book.text("expand.job.short", { length: postLength(topic) }) : null,
+    problems.hasGenericEnding ? book.text("expand.job.generic-ending") : null,
+    problems.aiWords.length > 0 ? book.text("expand.job.ai-words", { words: problems.aiWords.join(", ") }) : null,
+    problems.cliches.length > 0 ? book.text("expand.job.cliches", { phrases: problems.cliches.join(", ") }) : null,
+    problems.talksAboutLinkedIn ? book.text("expand.job.linkedin") : null,
+    problems.needsStatementHook ? book.text("expand.job.statement-hook") : null,
     problems.takenOpeners.length > 0
-      ? [
-          `Another post in this set already opens with the same word, so this hook has to start somewhere else.`,
-          `These opening words are taken and none of them may be the first word. ${problems.takenOpeners.join(", ")}.`,
-          `Start on a verb, a number, the specific product or company name, or the thing at stake. Keep the same meaning and stay at most ${POST_HOOK_MAX_WORDS} words.`,
-        ].join(" ")
-      : "Return the hook exactly as it is.",
+      ? book.text("expand.job.taken-openers", { openers: problems.takenOpeners.join(", "), max: POST_HOOK_MAX_WORDS })
+      : book.text("expand.job.keep-hook"),
   ].filter(Boolean)
 
-  return [
-    `<research_report>\n${sanitizeForTag(researchNotes.slice(0, MAX_RESEARCH_CHARS))}\n</research_report>`,
-    `<post format="${format.label}">`,
-    `Format shape to follow. ${format.structure}`,
-    `Hook. ${sanitizeForTag(topic.post_hook)}`,
-    `Body. ${sanitizeForTag(topic.post_body)}`,
-    `Closing line. ${sanitizeForTag(topic.post_cta)}`,
-    "</post>",
-    `What to fix.\n${jobs.map((job) => `- ${job}`).join("\n")}`,
-  ].join("\n\n")
+  return book.text("expand.request", {
+    research: sanitizeForTag(researchNotes.slice(0, MAX_RESEARCH_CHARS)),
+    format: format.label,
+    structure: book.text(`format.${format.id}`),
+    hook: sanitizeForTag(topic.post_hook),
+    body: sanitizeForTag(topic.post_body),
+    cta: sanitizeForTag(topic.post_cta),
+    jobs: jobs.map((job) => `- ${job}`).join("\n"),
+  })
 }
 
 /**
@@ -180,12 +137,14 @@ async function rewritePost(
   topic: TrendingTopic,
   problems: PostProblems,
   researchNotes: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  book: PromptBook
 ): Promise<TrendingTopic | null> {
+  const system = book.text("expand.system", { min: POST_TARGET_MIN_CHARS, max: POST_TARGET_MAX_CHARS })
   const result = await generateStructuredWithFallback({
-    schema: ExpandedPostSchema,
+    schema: expandedPostSchema(book),
     name: "expanded_trending_post",
-    messages: [new SystemMessage(SYSTEM), new HumanMessage(buildRequest(topic, problems, researchNotes))],
+    messages: [new SystemMessage(system), new HumanMessage(buildRequest(topic, problems, researchNotes, book))],
     temperature: EXPAND_TEMPERATURE,
     timeoutMs: EXPAND_TIMEOUT_MS,
     signal,
@@ -243,6 +202,8 @@ export async function expandShortPosts(
 ): Promise<{ topics: TrendingTopic[]; expanded: number }> {
   const current = [...topics]
   const improved = new Set<number>()
+  // Read once for the whole run: the system prompt, the request and every line of what to fix
+  const book = await loadPromptBook("trending-instructions")
 
   for (let round = 0; round < maxRounds; round++) {
     // An opening word belongs to the first post that used it; later posts have to move
@@ -261,7 +222,7 @@ export async function expandShortPosts(
       const batch = pending.slice(start, start + MAX_PARALLEL_REWRITES)
       results.push(
         ...(await Promise.all(
-          batch.map(({ index, problems }) => rewritePost(current[index], problems, researchNotes, signal))
+          batch.map(({ index, problems }) => rewritePost(current[index], problems, researchNotes, signal, book))
         ))
       )
     }

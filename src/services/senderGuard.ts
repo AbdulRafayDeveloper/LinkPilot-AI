@@ -1,16 +1,10 @@
 import { HumanMessage } from "@langchain/core/messages"
+import { loadPromptBook } from "@/services/promptBook"
 import {
   generateStructuredWithFallback,
   type StructuredGeneration,
   type StructuredGenerationOptions,
 } from "@/services/ai"
-
-/**
- * Placed where {{sender_profile}} goes when the user hasn't filled in About Me. Stating it
- * at the point of use works far better than a system rule alone.
- */
-export const NO_SENDER_PROFILE_TEXT =
-  "Not provided. You know nothing about the sender. Don't write anything about their work, role, background, experience, skills, interests, services or offer, and don't claim any similarity or shared interest with the recipient."
 
 // First-person claims about the sender, which are fabrications when there is no sender profile.
 // ("caught my interest" is an expression, not a claim, so only "my interest in <topic>" counts.)
@@ -54,9 +48,7 @@ export async function generateWithoutSenderClaims<T extends Record<string, unkno
     ...generation,
     messages: [
       ...generation.messages,
-      new HumanMessage(
-        `Your draft below says things about me (the sender), but you know nothing about me. Rewrite it so it contains no statement about my work, role, background, experience, skills, interests, services or offer, and no claimed similarity or shared interest. Keep the personalization about them, the tune's intent and every output field.\n\n<draft>\n${describeDraft(first.data)}\n</draft>`
-      ),
+      new HumanMessage((await loadPromptBook("shared-instructions")).text("guard.rewrite", { draft: describeDraft(first.data) })),
     ],
   }).catch((error: unknown) => {
     if (generation.signal?.aborted) throw error

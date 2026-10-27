@@ -5,6 +5,7 @@ import { ChatGroq } from "@langchain/groq"
 import { Embeddings } from "@langchain/core/embeddings"
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages"
 import { shrinkPastedBlocks } from "@/lib/pastedText"
+import { loadPromptBook } from "@/services/promptBook"
 import type { InteropZodType } from "@langchain/core/utils/types"
 import { env, GROQ_API_KEYS, GROQ_KEY_VARIABLES } from "@/config/env"
 import { UserFacingError } from "@/lib/errors"
@@ -503,11 +504,11 @@ const lengthOf = (messages: BaseMessage[]) => messages.reduce((sum, message) => 
  * a conversation, a post), and nothing else touched: never the user's own profile, the tone's prompt
  * or the rules. Null when there is no pasted text left to shorten.
  */
-function withShorterPastedText(messages: BaseMessage[], removeChars: number): BaseMessage[] | null {
+function withShorterPastedText(messages: BaseMessage[], removeChars: number, leftOut: string): BaseMessage[] | null {
   let changed = false
   const shorter = messages.map((message) => {
     if (!(message instanceof HumanMessage) || typeof message.content !== "string") return message
-    const content = shrinkPastedBlocks(message.content, removeChars)
+    const content = shrinkPastedBlocks(message.content, removeChars, leftOut)
     if (content === null) return message
     changed = true
     return new HumanMessage(content)
@@ -523,7 +524,7 @@ function withShorterPastedText(messages: BaseMessage[], removeChars: number): Ba
  * on as it was, and a request that still cannot fit is a `RequestTooLargeError`: no key's fault, so the
  * next provider takes the work, with everything that was pasted.
  */
-function nextGroqAttempt(error: unknown, attempt: GroqAttempt): GroqAttempt {
+async function nextGroqAttempt(error: unknown, attempt: GroqAttempt): Promise<GroqAttempt> {
   const ceiling = tokenCeilingOf(error)
   if (!ceiling) throw error
   const inputTokens = ceiling.requested - attempt.answerTokens
@@ -534,7 +535,9 @@ function nextGroqAttempt(error: unknown, attempt: GroqAttempt): GroqAttempt {
   }
   const overTokens = inputTokens - (ceiling.limit - GROQ_SHORTENED_ANSWER_TOKENS - GROQ_FIT_MARGIN_TOKENS)
   const removeChars = Math.ceil(overTokens * (lengthOf(attempt.messages) / inputTokens) * SHORTEN_SLACK)
-  const messages = attempt.shortenings < GROQ_MAX_SHORTENINGS ? withShorterPastedText(attempt.messages, removeChars) : null
+  // The line that says the rest was left out is the shared instructions prompt's, read only when it is needed
+  const leftOut = attempt.shortenings < GROQ_MAX_SHORTENINGS ? (await loadPromptBook("shared-instructions")).text("pasted.left-out") : null
+  const messages = leftOut !== null ? withShorterPastedText(attempt.messages, removeChars, leftOut) : null
   if (!messages) throw new RequestTooLargeError(inputTokens, ceiling.limit)
   console.warn(`✂️ ${inputTokens} tokens of input leave Groq no room to answer under its limit of ${ceiling.limit}; shortening the pasted text by about ${removeChars} characters for Groq`)
   return { messages, answerTokens: GROQ_SHORTENED_ANSWER_TOKENS, fits: 0, shortenings: attempt.shortenings + 1 }
@@ -584,7 +587,7 @@ async function invokeStructured<T extends Record<string, unknown>>(
             console.warn(`🧠 Groq handed back no usable JSON within ${attempt.answerTokens} tokens; asking again with less reasoning`)
             continue
           }
-          attempt = nextGroqAttempt(error, attempt)
+          attempt = await nextGroqAttempt(error, attempt)
         }
       }
     }, signal)

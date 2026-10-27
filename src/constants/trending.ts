@@ -13,53 +13,41 @@ export const LINKEDIN_CONTENT_SEARCH_URL = "https://www.linkedin.com/search/resu
 export const linkedInSearchUrl = (query: string) => `${LINKEDIN_CONTENT_SEARCH_URL}?keywords=${encodeURIComponent(query)}`
 
 /**
- * The six post formats, one per topic, so a search never returns six posts that read alike.
- * `structure` is what the writing model must follow and what the reader sees on the card.
- * The synthesis prompt receives this list as {{POST_FORMATS}}, so this file is the only
- * place a format is defined.
+ * The six post formats, one per topic, so a search never returns six posts that read alike. The
+ * name and the line the card shows are here; **what the writing model is told to follow for each
+ * one is the Trending instructions prompt's** (`## format.<id>`), so an admin can change it from
+ * Administration and the synthesis prompt receives it as {{POST_FORMATS}}.
  */
 export const TRENDING_POST_FORMATS = [
   {
     id: "contrarian",
     label: "Contrarian take",
-    description: "Argues against the popular reaction",
-    structure:
-      "Take the opposite side of how people are reacting to this news, and stay honest about it. Line 1 states the stand. Then 2 or 3 short paragraphs give the reasons, each with a concrete detail from the research. Then one paragraph says what you would do instead.",
+    description: "Argues against the popular reaction",
   },
   {
     id: "story",
     label: "What happened story",
-    description: "Tells the news as a short story",
-    structure:
-      "Tell the development as a short story with a turn. First the situation before it. Then what happened, in 2 or 3 short paragraphs of 1 or 2 lines each. Then the moment it changes something for builders. Then the lesson in one line. Never invent the user's own experience, clients or results.",
+    description: "Tells the news as a short story",
   },
   {
     id: "playbook",
     label: "Playbook",
-    description: "Steps a founder can run this week",
-    structure:
-      "Turn the development into steps the reader can act on this week. One short paragraph of setup, then 4 to 6 numbered steps, each on its own line and one sentence long. Then one line on what changes if they do it.",
+    description: "Steps a founder can run this week",
   },
   {
     id: "numbers",
     label: "Number breakdown",
-    description: "Leads with a real figure",
-    structure:
-      "Build the post around one real number from the research, and never invent or round one. Open with the number and what it replaces. Then a short before and after comparison on separate lines. Then 2 short paragraphs on what it changes for cost, time or risk.",
+    description: "Leads with a real figure",
   },
   {
     id: "myth",
     label: "Myth vs reality",
-    description: "Corrects what people assume",
-    structure:
-      "Correct what people assume about this development. One line naming the belief. Then 3 short blocks, each a belief on one line and what the research actually shows on the next. Then one paragraph on what that means for people building right now.",
+    description: "Corrects what people assume",
   },
   {
     id: "prediction",
     label: "Prediction",
-    description: "Where this goes next",
-    structure:
-      "Say where this goes next and own the call. One line with the prediction and a rough timeframe. Then the signal behind it from the research, in 2 short paragraphs. Then one paragraph on what to do now to be ready, and admit what would prove you wrong.",
+    description: "Where this goes next",
   },
 ] as const
 

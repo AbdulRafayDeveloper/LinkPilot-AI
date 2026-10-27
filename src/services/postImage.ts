@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
 import { currentModelOrder } from "@/lib/modelOrder"
 import { loadPrompt } from "@/services/prompts"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { UserFacingError } from "@/lib/errors"
 import type { VerifiedImage } from "@/lib/imageType"
 import { POST_INPUT_MESSAGES } from "@/constants/postInput"
@@ -12,11 +13,12 @@ import type { FallbackNotice } from "@/constants/aiProviders"
 const EXTRACTION_TEMPERATURE = 0
 const MIN_POST_TEXT_LENGTH = 15
 
-const PostTranscriptionSchema = z.object({
-  contains_post: z.boolean().describe("True only if the image shows a readable social media post"),
-  author: z.string().describe("The post author's name as shown, or an empty string"),
-  post_text: z.string().describe("The post's full visible text, transcribed exactly"),
-})
+const postTranscriptionSchema = (book: PromptBook) =>
+  z.object({
+    contains_post: z.boolean().describe(book.text("screenshot.field.contains-post")),
+    author: z.string().describe(book.text("screenshot.field.author")),
+    post_text: z.string().describe(book.text("screenshot.field.post-text")),
+  })
 
 interface ExtractionOptions {
   image: VerifiedImage
@@ -37,14 +39,15 @@ export async function extractPostFromImage({
   providers = currentModelOrder(),
   onFallback,
 }: ExtractionOptions): Promise<{ postText: string; provider: ModelProvider }> {
+  const book = await loadPromptBook("shared-instructions")
   const { data, provider } = await generateStructuredWithFallback({
-    schema: PostTranscriptionSchema,
+    schema: postTranscriptionSchema(book),
     name: "linkedin_post_transcription",
     messages: [
       new SystemMessage(await loadPrompt("post-image-extraction")),
       new HumanMessage({
         content: [
-          { type: "text", text: "Transcribe the LinkedIn post in this screenshot." },
+          { type: "text", text: book.text("screenshot.request") },
           { type: "image_url", image_url: { url: `data:${image.mimeType};base64,${image.data.toString("base64")}` } },
         ],
       }),
@@ -63,5 +66,5 @@ export async function extractPostFromImage({
     throw new UserFacingError(POST_INPUT_MESSAGES.unreadableImage)
   }
   const author = data.author.trim()
-  return { postText: author ? `Author: ${author}\n\n${postText}` : postText, provider }
+  return { postText: author ? `${book.text("screenshot.author", { author })}\n\n${postText}` : postText, provider }
 }

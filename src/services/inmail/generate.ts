@@ -2,7 +2,8 @@ import { z } from "zod"
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
-import { NO_SENDER_PROFILE_TEXT, generateWithoutSenderClaims } from "@/services/senderGuard"
+import { generateWithoutSenderClaims } from "@/services/senderGuard"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { humanizeTexts } from "@/services/humanizer"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
 import { INMAIL_BODY_MAX_CHARS, INMAIL_SUBJECT_MAX_CHARS } from "@/constants/linkedinLimits"
@@ -22,29 +23,18 @@ const SUBJECT_LABEL = /^\s*subject\s*:\s*/i
  * Analysis first, then the subject, then the body: the model commits to the angle and
  * writes the subject deliberately before the message has to deliver on it.
  */
-const InMailSchema = z.object({
-  recipient_summary: z.string().describe("Who the recipient is and what they focus on now, from their profile only"),
-  key_detail: z.string().describe("The single highest-signal profile detail the InMail builds on"),
-  sender_link: z
-    .string()
-    .nullable()
-    .describe(
-      "The sender-recipient connection the InMail uses, taken from both profiles. Fill it whenever the InMail mentions the sender's work or a similarity; null only when it doesn't"
-    ),
-  subject_hook: z
-    .string()
-    .describe(
-      "The concrete element the subject will name, taken from key_detail: e.g. a project or product name, a number, a post's topic or their company. Never a broad theme"
-    ),
-  subject: z
-    .string()
-    .describe(
-      "The InMail subject line only. It includes subject_hook, uses sentence case and is written deliberately as a subject, not a shortened copy of the message"
-    ),
-  message: z.string().describe("The InMail body only, without the subject line"),
-})
+// What each field means is part of the tool's instructions prompt, so the schema is built from it
+const inMailSchema = (book: PromptBook) =>
+  z.object({
+    recipient_summary: z.string().describe(book.text("field.recipient-summary")),
+    key_detail: z.string().describe(book.text("field.key-detail")),
+    sender_link: z.string().nullable().describe(book.text("field.sender-link")),
+    subject_hook: z.string().describe(book.text("field.subject-hook")),
+    subject: z.string().describe(book.text("field.subject")),
+    message: z.string().describe(book.text("field.message")),
+  })
 
-type InMailOutput = z.infer<typeof InMailSchema>
+type InMailOutput = z.infer<ReturnType<typeof inMailSchema>>
 
 interface GenerateOptions {
   profileData: string
@@ -99,29 +89,34 @@ function buildWarnings(subject: string, message: string, unsupportedSenderClaim:
  * Humanization prompt. Profile text is untrusted data inside its own delimiter tags.
  */
 export async function generateInMail({ profileData, tune, signal }: GenerateOptions): Promise<GeneratedInMail> {
-  const { tunePrompt, senderProfile } = await getInMailGenerationInputs(tune)
+  // Every word besides the system and tune prompts is read from the instructions prompts
+  const [{ tunePrompt, senderProfile }, book, shared] = await Promise.all([
+    getInMailGenerationInputs(tune),
+    loadPromptBook("inmail-instructions"),
+    loadPromptBook("shared-instructions"),
+  ])
 
   const system = renderPrompt(await loadPrompt("inmail-system"), {
     SUBJECT_MAX_CHARS: INMAIL_SUBJECT_MAX_CHARS,
     BODY_MAX_CHARS: INMAIL_BODY_MAX_CHARS,
   })
-  const user = composePromptMessage(
+  const user = await composePromptMessage(
     tunePrompt,
     [
       {
         variable: "sender_profile",
         tag: "sender_profile",
-        label: "About me",
+        label: book.text("label.about-me"),
         content: senderProfile,
-        emptyText: NO_SENDER_PROFILE_TEXT,
+        emptyText: shared.text("empty.sender-profile"),
       },
-      { variable: "profile_data", tag: "profile_data", label: "Their profile", content: profileData, pasted: true },
+      { variable: "profile_data", tag: "profile_data", label: book.text("label.their-profile"), content: profileData, pasted: true },
     ],
     { tune: getInMailTuneLabel(tune) }
   )
 
   const { data, provider, senderClaimRewrite, unsupportedSenderClaim } = await generateWithoutSenderClaims({
-    schema: InMailSchema,
+    schema: inMailSchema(book),
     name: "inmail",
     messages: [new SystemMessage(system), new HumanMessage(user)],
     temperature: WRITING_TEMPERATURE,
@@ -129,7 +124,7 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
     validate: findUnusableReason,
     senderProfile,
     claimText: (output) => `${output.subject}\n${output.message}`,
-    describeDraft: (output) => `Subject: ${cleanSubject(output.subject)}\n\n${cleanGeneratedText(output.message)}`,
+    describeDraft: (output) => book.text("draft", { subject: cleanSubject(output.subject), message: cleanGeneratedText(output.message) }),
   })
 
   const draftSubject = cleanSubject(data.subject)
@@ -147,17 +142,17 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
     fields: [
       {
         id: "subject",
-        kind: "LinkedIn InMail subject line",
+        kind: book.text("humanize.kind.subject"),
         text: draftSubject,
         maxChars: INMAIL_SUBJECT_MAX_CHARS,
         singleLine: true,
       },
       {
         id: "message",
-        kind: "LinkedIn InMail message body (without the subject)",
+        kind: book.text("humanize.kind.message"),
         text: draft.text,
         maxChars: isVoice ? VOICE_NOTE_MAX_CHARS : INMAIL_BODY_MAX_CHARS,
-        ...(isVoice ? { rule: `At most ${VOICE_NOTE_MAX_WORDS} words, so it can be said in under 50 seconds. Keep it spoken English, short sentences, no corporate words.` } : {}),
+        ...(isVoice ? { rule: book.text("humanize.rule.voice", { max: VOICE_NOTE_MAX_WORDS }) } : {}),
       },
     ],
     // Each of these tones ends on one open question: the Curiosity Hook's open loop, or a soft offer of help
@@ -165,10 +160,10 @@ export async function generateInMail({ profileData, tune, signal }: GenerateOpti
       opener || isVoice || isAbcd
         ? (id, text) => {
             if (id !== "message") return null
-            if (opener && !hasOpeningLine(text, opener)) return `Keep the opening exactly "Hi <first name>, ${opener.sentence}"`
-            if (opener && !/\?\s*$/.test(text)) return "End the message with one open question, ending with a question mark"
-            if (isAbcd) return abcdProblem(text)
-            return isVoice ? voiceNoteProblem(text) : null
+            if (opener && !hasOpeningLine(text, opener)) return book.text("humanize.problem.opening", { sentence: opener.sentence })
+            if (opener && !/\?\s*$/.test(text)) return book.text("humanize.problem.question")
+            if (isAbcd) return abcdProblem(text, book)
+            return isVoice ? voiceNoteProblem(text, book) : null
           }
         : undefined,
     signal,

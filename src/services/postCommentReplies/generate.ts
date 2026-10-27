@@ -4,6 +4,7 @@ import { generateStructuredWithFallback } from "@/services/ai"
 import { currentModelOrder } from "@/lib/modelOrder"
 import { runLiveResearch } from "@/services/liveResearch"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { getFullSenderProfile } from "@/services/senderProfile"
 import { extractPostFromImage } from "@/services/postImage"
 import { humanizeTexts } from "@/services/humanizer"
@@ -30,10 +31,6 @@ const WRITING_TEMPERATURE = 0.7
 // Integrity ceiling only; each saved prompt sets the real length
 const REPLY_MAX_CHARS = 5000
 const RESEARCH_NOTES_MAX_CHARS = 12000
-const NO_SENDER_PROFILE_TEXT =
-  "Abdul hasn't filled in his profile, so nothing is known about his background, services or experience."
-const NO_POST_TEXT = "The original post wasn't provided."
-const LATEST_COMMENT_TEXT = "The other person's latest comment in the thread (the most recent one not written by Abdul Rafay)."
 // Targeted rewrites for made-up figures, unsupported claims, a reply that's too long or stiff punctuation
 const MAX_REWRITES = 2
 // One cited source is enough to support a single reply
@@ -72,13 +69,15 @@ const stripDataTags = createTagSanitizer([
   "draft_reply",
 ])
 
-const ReplySchema = z.object({
-  target_found: z.boolean().describe("False only when the pasted comments contain no comment to reply to"),
-  replying_to: z.string().describe("Name of the commenter being replied to, or an empty string if it isn't shown"),
-  reply: z.string().describe("The complete reply exactly as it should be posted; empty when target_found is false"),
-})
+// What each field means is part of the tool's instructions prompt, so the schema is built from it
+const replySchema = (book: PromptBook) =>
+  z.object({
+    target_found: z.boolean().describe(book.text("field.target-found")),
+    replying_to: z.string().describe(book.text("field.replying-to")),
+    reply: z.string().describe(book.text("field.reply")),
+  })
 
-type ReplyOutput = z.infer<typeof ReplySchema>
+type ReplyOutput = z.infer<ReturnType<typeof replySchema>>
 
 export interface ReplyInput {
   context: ReplyContextId
@@ -153,29 +152,29 @@ function resolveTargetComment(comments: string): TargetComment | null {
  * Info (Global AI Prompts). It is the only source of facts about his background, work,
  * results and numbers, and every reply style may draw on it.
  */
-async function loadSenderProfileSection(): Promise<string> {
-  return (await getFullSenderProfile()) ?? NO_SENDER_PROFILE_TEXT
+async function loadSenderProfileSection(book: PromptBook): Promise<string> {
+  return (await getFullSenderProfile()) ?? book.text("empty.sender-profile")
 }
 
 /**
  * Live web research through the shared Groq → OpenAI search. Never fails the reply: when
  * nothing verifiable is found, the writer is told not to state current facts.
  */
-async function researchConversation(conversation: Conversation, stylePrompt: string, signal: AbortSignal): Promise<string> {
+async function researchConversation(conversation: Conversation, stylePrompt: string, signal: AbortSignal, book: PromptBook): Promise<string> {
   const system = renderPrompt(await loadPrompt("post-comment-reply-research"), { CURRENT_DATETIME: new Date().toISOString() })
   const styleBrief = renderPrompt(stylePrompt, {
-    [VARIABLE.conversation]: "(the post and comments below)",
-    [VARIABLE.postContent]: "(the post below)",
-    [VARIABLE.latestComment]: "(the comment being answered, below)",
-    [VARIABLE.comment]: "(the comment being answered, below)",
-    [VARIABLE.senderProfile]: "(Abdul's profile)",
-    [VARIABLE.legacySenderProfile]: "(Abdul's profile)",
-    [VARIABLE.webResearch]: "(this research)",
+    [VARIABLE.conversation]: book.text("research.brief.conversation"),
+    [VARIABLE.postContent]: book.text("research.brief.post"),
+    [VARIABLE.latestComment]: book.text("research.brief.comment"),
+    [VARIABLE.comment]: book.text("research.brief.comment"),
+    [VARIABLE.senderProfile]: book.text("research.brief.sender-profile"),
+    [VARIABLE.legacySenderProfile]: book.text("research.brief.sender-profile"),
+    [VARIABLE.webResearch]: book.text("research.brief.research"),
   })
   const messages: BaseMessage[] = [
     new SystemMessage(system),
     new HumanMessage(
-      `${wrapSection("reply_instructions", styleBrief)}\n\n${conversationSection(conversation)}\n\nSearch the web now and reply only with the research report format from your instructions.`
+      book.text("research.request", { instructions: wrapSection("reply_instructions", styleBrief), conversation: conversationSection(conversation) })
     ),
   ]
 
@@ -188,11 +187,11 @@ async function researchConversation(conversation: Conversation, stylePrompt: str
       onFallback: () => undefined,
     })
     const sources = research.sources.map((source) => `- ${source.title} | ${source.url}`).join("\n")
-    return `${research.notes.slice(0, RESEARCH_NOTES_MAX_CHARS)}\n\nSources:\n${sources}`
+    return `${research.notes.slice(0, RESEARCH_NOTES_MAX_CHARS)}\n\n${book.text("research.sources-heading")}\n${sources}`
   } catch (error: unknown) {
     if (signal.aborted) throw error
     console.warn("⚠️ Post comment reply research unavailable:", error instanceof Error ? error.message : error)
-    return "Live web research was unavailable for this reply, so don't state current facts, figures or dates."
+    return book.text("research.unavailable")
   }
 }
 
@@ -209,7 +208,8 @@ async function buildMessages(
   conversation: Conversation,
   stylePrompt: string,
   senderProfile: string,
-  webResearch: string | null
+  webResearch: string | null,
+  book: PromptBook
 ): Promise<BaseMessage[]> {
   const [systemTemplate, postContext] = await Promise.all([
     loadPrompt("post-comment-reply-system"),
@@ -223,11 +223,11 @@ async function buildMessages(
   const uses = (...names: string[]) => names.some((name) => usesVariable(stylePrompt, name))
   const placesPost = uses(VARIABLE.postContent)
   const placesTarget = uses(VARIABLE.latestComment, VARIABLE.comment)
-  const target = targetSection(conversation.targetComment) ?? LATEST_COMMENT_TEXT
+  const target = targetSection(conversation.targetComment) ?? book.text("empty.latest-comment")
   const profile = wrapSection("sender_profile", senderProfile)
   const variables: Record<string, string> = {
     [VARIABLE.conversation]: conversationSection(conversation, { includePost: !placesPost, includeTarget: !placesTarget }),
-    [VARIABLE.postContent]: postSection(conversation.postText) ?? NO_POST_TEXT,
+    [VARIABLE.postContent]: postSection(conversation.postText) ?? book.text("empty.post"),
     [VARIABLE.latestComment]: target,
     [VARIABLE.comment]: target,
     [VARIABLE.senderProfile]: profile,
@@ -239,7 +239,7 @@ async function buildMessages(
     uses(VARIABLE.conversation)
       ? null
       : conversationSection(conversation, { includePost: !placesPost, includeTarget: !placesTarget }),
-    uses(VARIABLE.senderProfile, VARIABLE.legacySenderProfile) ? null : `About Abdul:\n${profile}`,
+    uses(VARIABLE.senderProfile, VARIABLE.legacySenderProfile) ? null : `${book.text("label.about-sender")}\n${profile}`,
   ].filter((section): section is string => section !== null)
   return [new SystemMessage(system), new HumanMessage([renderPrompt(stylePrompt, variables), ...appended].join("\n\n"))]
 }
@@ -270,18 +270,14 @@ function findProblemLabels({ claim, story, figures, length, punctuation }: Reply
   ].filter((label): label is string => typeof label === "string")
 }
 
-function describeProblems({ claim, story, figures, length, punctuation }: ReplyProblems): string[] {
+// What is wrong with a draft, in the words of the tool's instructions prompt
+function describeProblems({ claim, story, figures, length, punctuation }: ReplyProblems, book: PromptBook): string[] {
   return [
-    story &&
-      `It tells a story about "${story}" that isn't in Abdul's profile. Use a real project described in <sender_profile>, named as written there, or make the point without a story.`,
-    claim &&
-      `It says "${claim}". Keep a statement about what Abdul or his team does, did, uses or has experienced only if the post, Abdul's own comments or his profile in <sender_profile> states it; rewrite any other one as a general option (for example "one approach is...").`,
-    figures.length > 0 &&
-      `It states figures that neither Abdul's profile, the post nor the comments contain: ${figures.join(", ")}. Remove them, or use a real number from <sender_profile> instead. Never invent results.`,
-    length > REPLY_TARGET_MAX_CHARS &&
-      `It is ${length.toLocaleString()} characters, but it must be at most ${REPLY_TARGET_MAX_CHARS} including spaces. Keep the parts that carry the style's goal, drop the rest and aim for 200 to 270 characters.`,
-    punctuation &&
-      `It uses "${punctuation.trim()}". Use short plain sentences with no colons, semicolons, dashes or commas (a comma inside a number such as 10,000 is fine), and write the name without a comma.`,
+    story && book.text("problem.story", { story }),
+    claim && book.text("problem.claim", { claim }),
+    figures.length > 0 && book.text("problem.unsupported-figures", { figures: figures.join(", ") }),
+    length > REPLY_TARGET_MAX_CHARS && book.text("problem.too-long", { length: length.toLocaleString(), max: REPLY_TARGET_MAX_CHARS }),
+    punctuation && book.text("problem.punctuation", { punctuation: punctuation.trim() }),
   ].filter((problem): problem is string => typeof problem === "string")
 }
 
@@ -293,10 +289,8 @@ function findUnusableReason(output: ReplyOutput): string | null {
   return null
 }
 
-function problemRewrite(reply: string, problems: string[]): HumanMessage {
-  return new HumanMessage(
-    `Rewrite your draft reply below. ${problems.join(" ")} Keep everything else: the same style, the same target comment and plain text.\n\n${wrapSection("draft_reply", reply)}`
-  )
+function problemRewrite(reply: string, problems: string[], book: PromptBook): HumanMessage {
+  return new HumanMessage(book.text("rewrite", { problems: problems.join(" "), draft: wrapSection("draft_reply", reply) }))
 }
 
 function lengthWarning(length: number): string | null {
@@ -313,7 +307,8 @@ function lengthWarning(length: number): string | null {
  * user-facing error when the comments contain nothing to reply to.
  */
 export async function generatePostCommentReply({ input, signal, onStage }: GenerateOptions): Promise<GeneratedReply> {
-  const stylePrompt = await getActiveReplyPrompt(input.context, input.style)
+  // Every word besides the system, context, research and style prompts is read from the tool's instructions prompt
+  const [stylePrompt, book] = await Promise.all([getActiveReplyPrompt(input.context, input.style), loadPromptBook("post-comment-reply-instructions")])
   const needsResearch = usesVariable(stylePrompt, VARIABLE.webResearch)
   let providers = currentModelOrder()
 
@@ -333,15 +328,15 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
 
   if (needsResearch) onStage("ANALYZING")
   const [senderProfile, webResearch] = await Promise.all([
-    loadSenderProfileSection(),
-    needsResearch ? researchConversation(conversation, stylePrompt, signal) : null,
+    loadSenderProfileSection(book),
+    needsResearch ? researchConversation(conversation, stylePrompt, signal, book) : null,
   ])
 
   onStage("WRITING")
-  const messages = await buildMessages(input, conversation, stylePrompt, senderProfile, webResearch)
+  const messages = await buildMessages(input, conversation, stylePrompt, senderProfile, webResearch, book)
   const write = (thread: BaseMessage[]) =>
     generateStructuredWithFallback({
-      schema: ReplySchema,
+      schema: replySchema(book),
       name: "post_comment_reply",
       messages: thread,
       temperature: WRITING_TEMPERATURE,
@@ -369,17 +364,17 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
     punctuation: text.match(STIFF_PUNCTUATION)?.[0] ?? null,
   })
   const draftProblemState = findProblems(reply)
-  let problems = describeProblems(draftProblemState)
+  let problems = describeProblems(draftProblemState, book)
   // A rewrite can bring in new made-up figures, so each one is checked again; the cleanest version wins
   for (let attempt = 0; attempt < MAX_REWRITES && problems.length > 0; attempt++) {
-    const rewrite = await write([...messages, problemRewrite(reply, problems)]).catch((error: unknown) => {
+    const rewrite = await write([...messages, problemRewrite(reply, problems, book)]).catch((error: unknown) => {
       if (signal.aborted) throw error
       console.warn("⚠️ Post comment reply rewrite failed; keeping the current draft:", error)
       return null
     })
     if (!rewrite?.data.target_found) break
     const rewritten = cleanReply(rewrite.data.reply)
-    const rewrittenProblems = describeProblems(findProblems(rewritten))
+    const rewrittenProblems = describeProblems(findProblems(rewritten), book)
     if (rewrittenProblems.length > problems.length) continue
     reply = rewritten
     problems = rewrittenProblems
@@ -394,18 +389,18 @@ export async function generatePostCommentReply({ input, signal, onStage }: Gener
     fields: [
       {
         id: "reply",
-        kind: input.context === "my-post" ? "LinkedIn reply to a comment on my own post" : "LinkedIn reply in someone else's comment thread",
+        kind: book.text(`humanize.kind.${input.context}`),
         text: reply,
         // Stays within the target length, unless the draft couldn't be brought under it
         maxChars: Math.max(REPLY_TARGET_MAX_CHARS, reply.length),
-        rule: "short plain sentences; no colons, semicolons, dashes or commas (a comma inside a number is fine); the name without a comma",
+        rule: book.text("humanize.rule"),
       },
     ],
     providers: providers.slice(providers.indexOf(provider)),
     signal,
     validate: (_id, text) => {
-      if (!draftHasClaim && EXPERIENCE_CLAIM.test(text)) return "adds a first-person experience claim"
-      if (!draftHasStiffPunctuation && STIFF_PUNCTUATION.test(text)) return "adds colons, semicolons, dashes or commas"
+      if (!draftHasClaim && EXPERIENCE_CLAIM.test(text)) return book.text("humanize.problem.experience-claim")
+      if (!draftHasStiffPunctuation && STIFF_PUNCTUATION.test(text)) return book.text("humanize.problem.punctuation")
       return null
     },
   })

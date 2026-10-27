@@ -26,56 +26,45 @@ export const ASSET_MAX_LABEL = "8 MB"
 
 /**
  * How the person in the chosen photo should appear. Each one is written into the request as an
- * instruction, so the choice is a real part of the image rather than a label on a form.
+ * instruction, so the choice is a real part of the image rather than a label on a form; the words of
+ * that instruction are the Post Image instructions prompt's (`## pose.<id>`), editable by an admin.
  */
 export const ASSET_POSES = [
   {
     id: "standing",
     label: "Standing",
     description: "Upright, facing you",
-    instruction: "Show the person standing, upper body and above, facing the viewer.",
   },
   {
     id: "sitting",
     label: "Sitting",
     description: "At a desk or chair",
-    instruction: "Show the person sitting, upper body and above, in a relaxed working posture.",
   },
   {
     id: "side",
     label: "Side angle",
     description: "Turned away slightly",
-    instruction: "Show the person from a three quarter side angle, shoulders turned away from the viewer.",
   },
   {
     id: "looking-at-design",
     label: "Looking at the message",
     description: "Eyes on the headline",
-    instruction:
-      "Show the person on one side of the image, turned towards the text and looking at it, so the eye follows them to the words.",
   },
   {
     id: "dynamic",
     label: "Dynamic pose",
     description: "Mid gesture, talking",
-    instruction:
-      "Show the person mid gesture, as if making a point while speaking, with an open and natural posture.",
   },
   {
     id: "headshot",
     label: "Head and shoulders",
     description: "Close cut out",
-    instruction: "Show the person from the shoulders up, close to the camera, as a clean cut out against the design.",
   },
 ] as const
 
 export type AssetPoseId = (typeof ASSET_POSES)[number]["id"]
 export const ASSET_POSE_IDS = ASSET_POSES.map((pose) => pose.id) as [AssetPoseId, ...AssetPoseId[]]
 export const DEFAULT_POSE: AssetPoseId = "standing"
-
-export function poseInstruction(pose: AssetPoseId): string {
-  return ASSET_POSES.find((entry) => entry.id === pose)?.instruction ?? ASSET_POSES[0].instruction
-}
 
 export function getPoseLabel(pose: AssetPoseId): string {
   return ASSET_POSES.find((entry) => entry.id === pose)?.label ?? pose

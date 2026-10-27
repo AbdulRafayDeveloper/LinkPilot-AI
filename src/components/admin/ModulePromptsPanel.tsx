@@ -1,8 +1,10 @@
 "use client"
 
 import React, { useState } from "react"
-import { FilePenLine } from "lucide-react"
+import { FilePenLine, Layers, Settings2 } from "lucide-react"
 import { APP_TOOLS } from "@/constants/linkedinTools"
+import { ADMIN_PROMPT_MESSAGES, MODULE_PROMPT_TOOLS, SHARED_PROMPTS_DESCRIPTION, SHARED_PROMPTS_LABEL, SHARED_PROMPT_TOOL } from "@/constants/adminPrompts"
+import { SystemPromptsModal } from "@/components/admin/SystemPromptsModal"
 import { DEFAULT_REPLY_CONTEXT } from "@/constants/postCommentReplies"
 import { CONVERSATION_REPLY_PROMPT_TABS } from "@/constants/conversationReply"
 import { ConnectionNotePromptsModal } from "@/components/connection-note/ConnectionNotePromptsModal"
@@ -53,22 +55,36 @@ export const MODULE_PROMPT_EDITORS: Record<string, Editor> = {
   "client-messaging": (onClose) => <ClientMessagePromptModal onClose={onClose} />,
 }
 
-const MODULES = APP_TOOLS.filter((tool) => tool.id in MODULE_PROMPT_EDITORS)
+// Every module with prompts of its own (an editor, system prompts or both), in sidebar order, then
+// the prompts every tool shares
+const ROWS = [
+  ...APP_TOOLS.filter((tool) => tool.id in MODULE_PROMPT_EDITORS || tool.id in MODULE_PROMPT_TOOLS).map((tool) => ({
+    id: tool.id,
+    title: tool.title,
+    description: tool.description,
+    icon: tool.icon,
+    tool: MODULE_PROMPT_TOOLS[tool.id] ?? null,
+  })),
+  { id: SHARED_PROMPT_TOOL, title: SHARED_PROMPTS_LABEL, description: SHARED_PROMPTS_DESCRIPTION, icon: Layers, tool: SHARED_PROMPT_TOOL },
+]
 
 export const ModulePromptsPanel: React.FC = () => {
   const [openId, setOpenId] = useState<string | null>(null)
+  // The module whose system prompts are open
+  const [systemFor, setSystemFor] = useState<(typeof ROWS)[number] | null>(null)
 
   return (
     <section className="flex flex-col gap-3">
       <div>
         <h2 className="text-[15px] font-bold text-on-surface">Module prompts</h2>
         <p className="mt-0.5 text-[13px] text-on-surface-variant">
-          Each module&apos;s own prompts. A saved change applies to every account and every device from the next result written.
+          Update edits the prompts a module&apos;s users choose between (its tones, tunes and styles); System edits everything else it sends the
+          AI. A saved change applies to every account and every device from the next result written.
         </p>
       </div>
 
       <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-3">
-        {MODULES.map((tool) => {
+        {ROWS.map((tool) => {
           const Icon = tool.icon
           return (
             <li
@@ -82,21 +98,38 @@ export const ModulePromptsPanel: React.FC = () => {
                 <span className="block truncate text-[14px] font-semibold text-on-surface">{tool.title}</span>
                 <span className="block truncate text-[12px] text-on-surface-variant">{tool.description}</span>
               </span>
-              <button
-                type="button"
-                onClick={() => setOpenId(tool.id)}
-                aria-label={`Update the prompts of ${tool.title}`}
-                className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
-              >
-                <FilePenLine size={15} aria-hidden="true" />
-                Update
-              </button>
+              <span className="flex shrink-0 items-center gap-1.5">
+                {tool.tool && (
+                  <button
+                    type="button"
+                    onClick={() => setSystemFor(tool)}
+                    aria-label={`${ADMIN_PROMPT_MESSAGES.systemButton} of ${tool.title}`}
+                    title={ADMIN_PROMPT_MESSAGES.systemButton}
+                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant bg-white px-3 py-2 text-[13px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+                  >
+                    <Settings2 size={15} aria-hidden="true" />
+                    <span className="hidden sm:inline">System</span>
+                  </button>
+                )}
+                {tool.id in MODULE_PROMPT_EDITORS && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(tool.id)}
+                    aria-label={`Update the prompts of ${tool.title}`}
+                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-on-primary-fixed-variant"
+                  >
+                    <FilePenLine size={15} aria-hidden="true" />
+                    Update
+                  </button>
+                )}
+              </span>
             </li>
           )
         })}
       </ul>
 
       {openId && MODULE_PROMPT_EDITORS[openId]?.(() => setOpenId(null))}
+      {systemFor?.tool && <SystemPromptsModal title={systemFor.title} tool={systemFor.tool} onClose={() => setSystemFor(null)} />}
     </section>
   )
 }

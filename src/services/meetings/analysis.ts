@@ -120,7 +120,7 @@ export async function analyzeChunk(
   calendar: string | null = null
 ): Promise<ChunkResult> {
   const [system, instructions] = await Promise.all([loadPrompt("meeting-system"), loadPrompt("meeting-chunk")])
-  const user = composePromptMessage(
+  const user = await composePromptMessage(
     instructions,
     [
       {
@@ -174,7 +174,7 @@ async function foldResults(
   signal: AbortSignal
 ): Promise<ChunkResult> {
   const [system, instructions] = await Promise.all([loadPrompt("meeting-system"), loadPrompt("meeting-chunk")])
-  const user = composePromptMessage(
+  const user = await composePromptMessage(
     `${instructions}\n\nThese are the notes already taken from consecutive parts of one meeting, in order. Merge them into one set of notes for this stretch of the meeting: keep every distinct fact, drop exact repeats, and never add anything that is not in the notes.`,
     [{ variable: "transcript_part", tag: "meeting_notes", label: "Notes from the parts", content: describeResults(results) }],
     { part_number: "merged", total_parts: String(results.length), my_name: SITE_AUTHOR }
@@ -258,7 +258,7 @@ export async function synthesizeMeeting(
     digest = JSON.stringify(aggregateChunkResults(folded))
   }
   const [system, instructions] = await Promise.all([loadPrompt("meeting-system"), loadPrompt("meeting-synthesis")])
-  const user = composePromptMessage(
+  const user = await composePromptMessage(
     instructions,
     [
       { variable: "meeting_notes", tag: "meeting_notes", label: "Everything the parts of the meeting gave up, merged and in order", content: digest },

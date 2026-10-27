@@ -147,7 +147,7 @@ export async function generateClientMessage({ client, update, channel, signal }:
       : "This channel has no subject line, so subject must be null.",
   })
 
-  const user = composePromptMessage(
+  const user = await composePromptMessage(
     prompt,
     [
       {

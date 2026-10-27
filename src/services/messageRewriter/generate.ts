@@ -65,7 +65,7 @@ export async function rewriteMessage({ message: original, source, signal }: Rewr
   const { prompt } = await getMessageRewriterPrompt()
   const maxChars = rewrittenMaxChars(original.length)
   const system = renderPrompt(await loadPrompt("message-rewriter-system"), { MAX_CHARS: maxChars })
-  const user = composePromptMessage(
+  const user = await composePromptMessage(
     prompt,
     [
       {

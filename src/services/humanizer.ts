@@ -2,6 +2,7 @@ import { z } from "zod"
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback, type ModelProvider } from "@/services/ai"
 import { loadPrompt } from "@/services/prompts"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { composePromptMessage } from "@/services/promptComposer"
 import { getActiveGlobalPrompt } from "@/services/globalPrompts"
 import { containsSenderClaim } from "@/services/senderGuard"
@@ -33,16 +34,19 @@ const HASHTAG = /#[\p{L}\p{N}_]+/gu
 const MENTION = /(?<![\w.])@[\p{L}\p{N}_.-]+/gu
 const MARKUP = new RegExp(`<\\/?\\s*(?:${DRAFTS_TAG}|${DRAFT_TAG})\\b|\\{\\{\\w+\\}\\}`, "i")
 
-const HumanizedSchema = z.object({
-  texts: z
-    .array(
-      z.object({
-        id: z.string().describe("The draft's id, copied exactly"),
-        text: z.string().describe("The humanized text only"),
-      })
-    )
-    .describe("One entry per draft, in the same order"),
-})
+// What each field means is part of the shared instructions prompt, so the schema is built from it
+const humanizedSchema = (book: PromptBook) =>
+  z.object({
+    texts: z
+      .array(
+        z.object({
+          id: z.string().describe(book.text("humanize.field.id")),
+          text: z.string().describe(book.text("humanize.field.text")),
+        })
+      )
+      .describe(book.text("humanize.field.texts")),
+  })
+type HumanizedOutput = z.infer<ReturnType<typeof humanizedSchema>>
 
 export interface HumanizeField<Id extends string> {
   id: Id
@@ -73,36 +77,38 @@ export interface HumanizedTexts<Id extends string> {
 
 const tokens = (text: string, pattern: RegExp) => new Set((text.match(pattern) ?? []).map((token) => token.toLowerCase()))
 
-function describeTokenChange(draft: string, rewrite: string, pattern: RegExp, what: string): string | null {
+function describeTokenChange(id: string, draft: string, rewrite: string, pattern: RegExp, kind: string, book: PromptBook): string | null {
   const before = tokens(draft, pattern)
   const after = tokens(rewrite, pattern)
   const lost = [...before].filter((token) => !after.has(token))
   const added = [...after].filter((token) => !before.has(token))
-  if (lost.length > 0) return `dropped ${what} ${lost.join(", ")}`
-  if (added.length > 0) return `added ${what} ${added.join(", ")}`
+  const what = () => book.text(`humanize.token.${kind}`)
+  if (lost.length > 0) return book.text("humanize.problem.dropped", { id, what: what(), tokens: lost.join(", ") })
+  if (added.length > 0) return book.text("humanize.problem.added", { id, what: what(), tokens: added.join(", ") })
   return null
 }
 
 /**
  * Returns why a rewrite of one draft can't be used, or null when it can.
  */
-function findFieldProblem<Id extends string>(field: HumanizeField<Id>, rewrite: string): string | null {
-  if (!rewrite) return `${field.id}: empty`
+function findFieldProblem<Id extends string>(field: HumanizeField<Id>, rewrite: string, book: PromptBook): string | null {
+  const id = field.id
+  if (!rewrite) return book.text("humanize.problem.empty", { id })
   if (field.maxChars !== undefined && rewrite.length > field.maxChars) {
-    return `${field.id}: ${rewrite.length} characters, over the ${field.maxChars}-character limit`
+    return book.text("humanize.problem.too-long", { id, length: rewrite.length, max: field.maxChars })
   }
-  if (field.singleLine && /\n/.test(rewrite)) return `${field.id}: must be one line`
-  if (MARKUP.test(rewrite)) return `${field.id}: contains prompt markup`
-  if (containsPlaceholder(rewrite) && !containsPlaceholder(field.text)) return `${field.id}: contains a placeholder`
-  if (containsSenderClaim(rewrite) && !containsSenderClaim(field.text)) return `${field.id}: adds a claim about the user`
+  if (field.singleLine && /\n/.test(rewrite)) return book.text("humanize.problem.one-line", { id })
+  if (MARKUP.test(rewrite)) return book.text("humanize.problem.markup", { id })
+  if (containsPlaceholder(rewrite) && !containsPlaceholder(field.text)) return book.text("humanize.problem.placeholder", { id })
+  if (containsSenderClaim(rewrite) && !containsSenderClaim(field.text)) return book.text("humanize.problem.sender-claim", { id })
   const aiWords = findAiWords(rewrite).filter((word) => !findAiWords(field.text).includes(word))
-  if (aiWords.length > 0) return `${field.id}: uses AI-sounding words (${aiWords.join(", ")}); use plain everyday words`
-  const changed =
-    describeTokenChange(field.text, rewrite, URL, "links") ??
-    describeTokenChange(field.text, rewrite, HASHTAG, "hashtags") ??
-    describeTokenChange(field.text, rewrite, MENTION, "mentions") ??
-    describeTokenChange(field.text, rewrite, NUMBER, "numbers")
-  return changed ? `${field.id}: ${changed}` : null
+  if (aiWords.length > 0) return book.text("humanize.problem.ai-words", { id, words: aiWords.join(", ") })
+  return (
+    describeTokenChange(id, field.text, rewrite, URL, "links", book) ??
+    describeTokenChange(id, field.text, rewrite, HASHTAG, "hashtags", book) ??
+    describeTokenChange(id, field.text, rewrite, MENTION, "mentions", book) ??
+    describeTokenChange(id, field.text, rewrite, NUMBER, "numbers", book)
+  )
 }
 
 function describeDraft<Id extends string>(field: HumanizeField<Id>): string {
@@ -137,14 +143,14 @@ export async function humanizeTexts<Id extends string>({
   if (toHumanize.length === 0) return { texts: drafts, humanized: false, provider: null }
 
   // Each text is judged on its own: a rewrite that passes every check replaces its draft
-  const review = (subset: HumanizeField<Id>[], output: z.infer<typeof HumanizedSchema>) => {
+  const review = (subset: HumanizeField<Id>[], output: HumanizedOutput, book: PromptBook) => {
     const byId = new Map(output.texts.map((entry) => [entry.id.trim(), cleanGeneratedText(entry.text)]))
     const accepted: Partial<Record<Id, string>> = {}
     const failed: HumanizeField<Id>[] = []
     const problems: string[] = []
     for (const field of subset) {
       const rewrite = styleOf(field, byId.get(field.id) ?? "")
-      const problem = findFieldProblem(field, rewrite) ?? validate?.(field.id, rewrite) ?? null
+      const problem = findFieldProblem(field, rewrite, book) ?? validate?.(field.id, rewrite) ?? null
       if (problem) {
         failed.push(field)
         problems.push(problem)
@@ -156,21 +162,19 @@ export async function humanizeTexts<Id extends string>({
   }
 
   try {
-    const [instructions, systemPrompt] = await Promise.all([getActiveGlobalPrompt("humanization"), loadPrompt("humanizer-system")])
-    const rewrite = (subset: HumanizeField<Id>[], previousProblems: string[] = []) => {
-      const user = composePromptMessage(instructions, [
-        { variable: "text", tag: DRAFTS_TAG, label: "Texts to humanize", content: subset.map(describeDraft).join("\n\n") },
+    const [instructions, systemPrompt, book] = await Promise.all([
+      getActiveGlobalPrompt("humanization"),
+      loadPrompt("humanizer-system"),
+      loadPromptBook("shared-instructions"),
+    ])
+    const rewrite = async (subset: HumanizeField<Id>[], previousProblems: string[] = []) => {
+      const user = await composePromptMessage(instructions, [
+        { variable: "text", tag: DRAFTS_TAG, label: book.text("humanize.label"), content: subset.map(describeDraft).join("\n\n") },
       ])
       const messages = [new SystemMessage(systemPrompt), new HumanMessage(user)]
-      if (previousProblems.length > 0) {
-        messages.push(
-          new HumanMessage(
-            `Your previous rewrite of these drafts broke a rule: ${previousProblems.join("; ")}. Rewrite them again and fix that, keeping every number, link, hashtag and @mention exactly as the draft has it and staying within each draft's limits.`
-          )
-        )
-      }
+      if (previousProblems.length > 0) messages.push(new HumanMessage(book.text("humanize.retry", { problems: previousProblems.join("; ") })))
       return generateStructuredWithFallback({
-        schema: HumanizedSchema,
+        schema: humanizedSchema(book),
         name: "humanized_texts",
         messages,
         temperature: HUMANIZE_TEMPERATURE,
@@ -182,7 +186,7 @@ export async function humanizeTexts<Id extends string>({
         validate:
           previousProblems.length > 0
             ? (output) => {
-                const { failed, problems } = review(subset, output)
+                const { failed, problems } = review(subset, output, book)
                 return failed.length === subset.length ? problems.join("; ") : null
               }
             : undefined,
@@ -190,7 +194,7 @@ export async function humanizeTexts<Id extends string>({
     }
 
     const first = await rewrite(toHumanize)
-    const firstReview = review(toHumanize, first.data)
+    const firstReview = review(toHumanize, first.data, book)
     const texts: Record<Id, string> = { ...drafts, ...firstReview.accepted }
     let { failed, problems } = firstReview
 
@@ -201,7 +205,7 @@ export async function humanizeTexts<Id extends string>({
         return null
       })
       if (retry) {
-        const retryReview = review(failed, retry.data)
+        const retryReview = review(failed, retry.data, book)
         Object.assign(texts, retryReview.accepted)
         failed = retryReview.failed
         problems = retryReview.problems

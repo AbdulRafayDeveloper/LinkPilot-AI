@@ -58,7 +58,7 @@ function problemWith(details: string): string | null {
 
 export async function writeTaskDetails({ title, parents, description, signal }: WriteDetailsInput): Promise<{ details: string }> {
   const system = renderPrompt(await loadPrompt("task-details-system"), { MAX_CHARS: TARGET_CHARS })
-  const user = composePromptMessage("", [
+  const user = await composePromptMessage("", [
     { variable: "task", tag: "task", label: "The task", content: title },
     { variable: "parents", tag: "parent_tasks", label: "The tasks it sits under, the top one first", content: parents.join("\n"), emptyText: "None: it is a task of its own." },
     {

@@ -83,7 +83,7 @@ export async function createPrompt({ request, target, requestSource, signal }: G
     TARGET: getPromptTargetLabel(target),
     MAX_CHARS: CREATED_PROMPT_MAX_LENGTH,
   })
-  const user = composePromptMessage(
+  const user = await composePromptMessage(
     targetPrompt,
     [
       {

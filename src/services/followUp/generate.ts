@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage, type PromptDataBlock } from "@/services/promptComposer"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { humanizeTexts } from "@/services/humanizer"
 import { assessLeadSignalsSafely } from "@/services/leadSignals"
 import { findInventedProof, findUnsupportedUserClaims } from "@/services/userClaims"
@@ -26,18 +27,15 @@ const WRITING_TEMPERATURE = 0.7
  * so the follow-up is grounded in what was actually said. These fields steer the writing
  * and are logged; only the message is shown.
  */
-const FollowUpSchema = z.object({
-  ...conversationPeopleFields,
-  conversation_summary: z
-    .string()
-    .describe("1–2 sentences: what was discussed, who said what last and what is still open"),
-  follow_up_angle: z
-    .string()
-    .describe("The specific thread or profile detail this follow-up builds on, decided before writing the message"),
-  message: z.string().describe("The complete follow-up message text, nothing else"),
-})
+const followUpSchema = (book: PromptBook, shared: PromptBook) =>
+  z.object({
+    ...conversationPeopleFields(shared),
+    conversation_summary: z.string().describe(book.text("field.conversation-summary")),
+    follow_up_angle: z.string().describe(book.text("field.follow-up-angle")),
+    message: z.string().describe(book.text("field.message")),
+  })
 
-type FollowUpOutput = z.infer<typeof FollowUpSchema>
+type FollowUpOutput = z.infer<ReturnType<typeof followUpSchema>>
 
 interface GenerateOptions {
   conversation: string
@@ -63,14 +61,12 @@ function findUnusableReason(output: FollowUpOutput): string | null {
   return null
 }
 
-function describeProblems({ figures, claims, proof }: MessageProblems): string[] {
+// What is wrong with a draft, in the words of the tool's instructions prompt
+function describeProblems({ figures, claims, proof }: MessageProblems, book: PromptBook): string[] {
   return [
-    figures.length > 0 &&
-      `It states figures that neither the conversation nor the profile contains: ${figures.join(", ")}. These are invented results. Remove them and make the point without numbers.`,
-    claims.length > 0 &&
-      `It says things about me that my own messages don't support: ${claims.map((claim) => `"${claim}"`).join("; ")}. Remove them and keep the focus on them.`,
-    proof.length > 0 &&
-      `It backs the message with results or examples nobody mentioned (${proof.map((item) => `"${item}"`).join(", ")}). Don't invent case studies, other companies' results or outcomes. Offer something real instead, such as a question about how they handle it today or an offer to walk them through the idea.`,
+    figures.length > 0 && book.text("problem.unsupported-figures", { figures: figures.join(", ") }),
+    claims.length > 0 && book.text("problem.unsupported-claims", { claims: claims.map((claim) => `"${claim}"`).join("; ") }),
+    proof.length > 0 && book.text("problem.invented-proof", { proof: proof.map((item) => `"${item}"`).join(", ") }),
   ].filter((problem): problem is string => typeof problem === "string")
 }
 
@@ -97,16 +93,21 @@ export async function generateFollowUp({
   type,
   signal,
 }: GenerateOptions): Promise<GeneratedFollowUp> {
-  const { typePrompt, signalsPrompt, senderProfile } = await getGenerationInputs(type)
+  // Every word besides the system, type and lead-signals prompts is read from the instructions prompts
+  const [{ typePrompt, signalsPrompt, senderProfile }, book, shared] = await Promise.all([
+    getGenerationInputs(type),
+    loadPromptBook("follow-up-instructions"),
+    loadPromptBook("shared-instructions"),
+  ])
   const conversationBlocks: PromptDataBlock[] = [
-    { variable: "conversation", tag: "conversation_history", label: "Previous conversation", content: conversation, pasted: true },
-    { variable: "profile_data", tag: "profile_data", label: "Profile information about them", content: profileData, pasted: true },
+    { variable: "conversation", tag: "conversation_history", label: book.text("label.conversation"), content: conversation, pasted: true },
+    { variable: "profile_data", tag: "profile_data", label: book.text("label.profile"), content: profileData, pasted: true },
   ]
   const signalsPromise = assessLeadSignalsSafely({
     signalsPrompt,
     dataBlocks: [
       ...conversationBlocks,
-      { variable: "sender_profile", tag: "sender_profile", label: "About me", content: senderProfile },
+      { variable: "sender_profile", tag: "sender_profile", label: book.text("label.about-me"), content: senderProfile },
     ],
     signal,
   })
@@ -115,11 +116,11 @@ export async function generateFollowUp({
     CURRENT_DATE: new Date().toISOString().slice(0, 10),
     CONVERSATION_READING_RULES: await loadConversationReadingRules(),
   })
-  const user = composePromptMessage(typePrompt, conversationBlocks, { follow_up_type: getFollowUpTypeLabel(type) })
+  const user = await composePromptMessage(typePrompt, conversationBlocks, { follow_up_type: getFollowUpTypeLabel(type) })
 
   const messages = [new SystemMessage(system), new HumanMessage(user)]
   const generation = {
-    schema: FollowUpSchema,
+    schema: followUpSchema(book, shared),
     name: "follow_up_message",
     temperature: WRITING_TEMPERATURE,
     signal,
@@ -135,16 +136,14 @@ export async function generateFollowUp({
   let { data, provider } = await generateStructuredWithFallback({ ...generation, messages })
   let draft = cleanGeneratedText(data.message)
   let problems = findProblems(draft)
-  const problemDescriptions = describeProblems(problems)
+  const problemDescriptions = describeProblems(problems, book)
   const rewritten = problemDescriptions.length > 0
   if (rewritten) {
     const rewrite = await generateStructuredWithFallback({
       ...generation,
       messages: [
         ...messages,
-        new HumanMessage(
-          `Rewrite your draft below. ${problemDescriptions.join(" ")} Keep everything else.\n\n<draft_message>\n${draft}\n</draft_message>`
-        ),
+        new HumanMessage(book.text("rewrite", { problems: problemDescriptions.join(" "), draft })),
       ],
     }).catch((error: unknown) => {
       if (signal.aborted) throw error
@@ -164,14 +163,14 @@ export async function generateFollowUp({
     fields: [
       {
         id: "message",
-        kind: "LinkedIn follow-up message in an existing conversation",
+        kind: book.text("humanize.kind"),
         text: draft,
         maxChars: LINKEDIN_MESSAGE_MAX_CHARS,
       },
     ],
     signal,
     validate: (_id, text) =>
-      addsProblems(draftProblems, findProblems(text)) ? "adds invented figures or claims about the user" : null,
+      addsProblems(draftProblems, findProblems(text)) ? book.text("humanize.problem.adds-problems") : null,
   })
   const message = humanization.texts.message
   const finalProblems = findProblems(message)

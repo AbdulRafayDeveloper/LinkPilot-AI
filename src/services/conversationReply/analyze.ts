@@ -3,12 +3,12 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage, type PromptDataBlock } from "@/services/promptComposer"
+import type { PromptBook } from "@/services/promptBook"
 import {
   conversationPeopleFields,
   loadConversationReadingRules,
   toConversationParties,
 } from "@/services/conversationTimeline"
-import { CONVERSATION_STATES } from "@/constants/conversationState"
 import { CLIENT_SIZES, MAX_KEY_OPPORTUNITIES, MAX_KEY_RISKS, RISK_LEVELS } from "@/constants/conversationReply"
 import { toScore } from "@/constants/scoreBands"
 import type { ConversationAnalysis, ScoreSignal } from "@/types/conversationReply"
@@ -18,39 +18,44 @@ const ANALYSIS_TEMPERATURE = 0
 // The analysis is a large structured output; give each provider more time than a short message
 const ANALYSIS_TIMEOUT_MS = 90_000
 
-const ScoreSignalSchema = z.object({
-  score: z.number().describe("Integer from 0 to 100, following the score bands"),
-  summary: z.string().describe("One short, evidence-based sentence explaining the score"),
-})
+const scoreSignalSchema = (book: PromptBook) =>
+  z.object({
+    score: z.number().describe(book.text("analysis.field.score")),
+    summary: z.string().describe(book.text("analysis.field.score-summary")),
+  })
 
 /**
  * Evidence comes before the scores on purpose: the model commits to what was actually
- * said before it rates anything. Only the scores and conclusions reach the user.
+ * said before it rates anything. Only the scores and conclusions reach the user. What each field
+ * means is read from the instructions prompts, so the schema is built from them.
  */
-const AnalysisSchema = z.object({
-  ...conversationPeopleFields,
-  latest_meaningful_message: z.string().describe("Who sent the latest meaningful message and what it says, in one short line"),
-  open_loops: z.array(z.string()).describe("Unanswered questions and open loops, each a few words"),
-  positive_signals: z.array(z.string()).describe("Concrete positive signals from the conversation or profiles"),
-  negative_signals: z.array(z.string()).describe("Concrete negative signals, objections or hesitation"),
-  uncertain_signals: z.array(z.string()).describe("Things that are unclear or missing evidence"),
-  client_potential: ScoreSignalSchema,
-  relationship_strength: ScoreSignalSchema,
-  long_term_potential: ScoreSignalSchema,
-  client_size: z.object({ value: z.enum(CLIENT_SIZES), summary: z.string() }),
-  buying_intent: ScoreSignalSchema,
-  conversation_momentum: ScoreSignalSchema,
-  recipient_interest: ScoreSignalSchema,
-  decision_maker_likelihood: ScoreSignalSchema,
-  opportunity_fit: ScoreSignalSchema,
-  risk_level: z.object({ value: z.enum(RISK_LEVELS), summary: z.string() }),
-  key_opportunities: z.array(z.string()).describe("2–4 short bullets, fewer only if fewer genuinely exist"),
-  key_risks: z.array(z.string()).describe("1–3 short, actionable bullets"),
-  recommended_next_move: z.string(),
-  overall_assessment: z.string().describe("At most 3 short sentences"),
-})
+const analysisSchema = (book: PromptBook, shared: PromptBook) => {
+  const scoreSignal = scoreSignalSchema(book)
+  return z.object({
+    ...conversationPeopleFields(shared),
+    latest_meaningful_message: z.string().describe(book.text("analysis.field.latest-meaningful-message")),
+    open_loops: z.array(z.string()).describe(book.text("analysis.field.open-loops")),
+    positive_signals: z.array(z.string()).describe(book.text("analysis.field.positive-signals")),
+    negative_signals: z.array(z.string()).describe(book.text("analysis.field.negative-signals")),
+    uncertain_signals: z.array(z.string()).describe(book.text("analysis.field.uncertain-signals")),
+    client_potential: scoreSignal,
+    relationship_strength: scoreSignal,
+    long_term_potential: scoreSignal,
+    client_size: z.object({ value: z.enum(CLIENT_SIZES), summary: z.string() }),
+    buying_intent: scoreSignal,
+    conversation_momentum: scoreSignal,
+    recipient_interest: scoreSignal,
+    decision_maker_likelihood: scoreSignal,
+    opportunity_fit: scoreSignal,
+    risk_level: z.object({ value: z.enum(RISK_LEVELS), summary: z.string() }),
+    key_opportunities: z.array(z.string()).describe(book.text("analysis.field.key-opportunities")),
+    key_risks: z.array(z.string()).describe(book.text("analysis.field.key-risks")),
+    recommended_next_move: z.string(),
+    overall_assessment: z.string().describe(book.text("analysis.field.overall-assessment")),
+  })
+}
 
-type AnalysisOutput = z.infer<typeof AnalysisSchema>
+type AnalysisOutput = z.infer<ReturnType<typeof analysisSchema>>
 
 const SCORE_FIELDS = [
   "client_potential",
@@ -74,6 +79,9 @@ export interface AnalysisResult {
 interface AnalyzeOptions {
   dataBlocks: PromptDataBlock[]
   signal: AbortSignal
+  // The tool's instructions prompt and the shared one, loaded once for the whole request
+  book: PromptBook
+  shared: PromptBook
 }
 
 function findUnusableReason(output: AnalysisOutput): string | null {
@@ -92,19 +100,24 @@ function cleanList(items: string[], max: number): string[] {
   return items.map((item) => item.trim()).filter(Boolean).slice(0, max)
 }
 
-function buildBrief(output: AnalysisOutput, analysis: ConversationAnalysis): string {
+// The reading handed to the reply writer, in the words of the tool's instructions prompt
+function buildBrief(output: AnalysisOutput, analysis: ConversationAnalysis, book: PromptBook): string {
   const { parties } = analysis
+  const none = book.text("brief.none")
   const timeline = output.timeline.map((entry, index) => `${index + 1}. ${entry.sender}: ${entry.gist}`).join("\n")
-  const list = (items: string[]) => (items.length > 0 ? items.map((item) => `- ${item}`).join("\n") : "- none")
+  const list = (items: string[]) => (items.length > 0 ? items.map((item) => `- ${item}`).join("\n") : none)
   return [
-    `People: user = ${parties.userName ?? "not shown"}; other person = ${parties.otherPersonName ?? "unknown"}`,
-    `Where it stands: ${CONVERSATION_STATES[parties.state]}`,
-    `Timeline, oldest first:\n${timeline || "- none"}`,
-    `Latest meaningful message: ${output.latest_meaningful_message.trim()}`,
-    `Open loops:\n${list(cleanList(output.open_loops, 6))}`,
-    `Positive signals:\n${list(cleanList(output.positive_signals, 6))}`,
-    `Negative signals:\n${list(cleanList(output.negative_signals, 6))}`,
-    `Objective recommended next move: ${analysis.recommendedNextMove}`,
+    book.text("brief.people", {
+      user: parties.userName ?? book.text("brief.user-unknown"),
+      other: parties.otherPersonName ?? book.text("brief.other-unknown"),
+    }),
+    book.text("brief.where-it-stands", { state: book.text(`state.${parties.state}`) }),
+    book.text("brief.timeline", { timeline: timeline || none }),
+    book.text("brief.latest", { message: output.latest_meaningful_message.trim() }),
+    book.text("brief.open-loops", { items: list(cleanList(output.open_loops, 6)) }),
+    book.text("brief.positive-signals", { items: list(cleanList(output.positive_signals, 6)) }),
+    book.text("brief.negative-signals", { items: list(cleanList(output.negative_signals, 6)) }),
+    book.text("brief.next-move", { move: analysis.recommendedNextMove }),
   ].join("\n\n")
 }
 
@@ -112,15 +125,15 @@ function buildBrief(output: AnalysisOutput, analysis: ConversationAnalysis): str
  * Objective read of the conversation. It never sees the reply type or its prompt, so the
  * user's chosen strategy can't inflate the scores.
  */
-export async function analyzeConversation({ dataBlocks, signal }: AnalyzeOptions): Promise<AnalysisResult> {
+export async function analyzeConversation({ dataBlocks, signal, book, shared }: AnalyzeOptions): Promise<AnalysisResult> {
   const system = renderPrompt(await loadPrompt("conversation-reply-analysis"), {
     CURRENT_DATE: new Date().toISOString().slice(0, 10),
     CONVERSATION_READING_RULES: await loadConversationReadingRules(),
   })
-  const user = composePromptMessage("Analyze this conversation.", dataBlocks)
+  const user = await composePromptMessage(book.text("analysis.request"), dataBlocks)
 
   const { data, provider } = await generateStructuredWithFallback({
-    schema: AnalysisSchema,
+    schema: analysisSchema(book, shared),
     name: "conversation_analysis",
     messages: [new SystemMessage(system), new HumanMessage(user)],
     temperature: ANALYSIS_TEMPERATURE,
@@ -152,7 +165,7 @@ export async function analyzeConversation({ dataBlocks, signal }: AnalyzeOptions
   console.info("Conversation analyzed:", JSON.stringify({ provider, state: analysis.parties.state }))
   return {
     analysis,
-    brief: buildBrief(data, analysis),
+    brief: buildBrief(data, analysis, book),
     userHasSpoken: data.timeline.some((entry) => entry.sender === "user"),
   }
 }

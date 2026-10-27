@@ -4,6 +4,7 @@ import { describeFallback, type FallbackNotice } from "@/constants/aiProviders"
 import { currentModelOrder } from "@/lib/modelOrder"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import type { ResearchResult } from "@/services/liveResearch"
 import { findRelevantExperience, type UserExperience } from "@/services/senderContext"
 import { extractPostFromImage } from "@/services/postImage"
@@ -19,18 +20,18 @@ import {
 import type { CommentReference, CommentStage, GeneratedComment } from "@/types/commentWriter"
 import { getActiveTunePrompt } from "./prompts"
 import { researchPostTopic } from "./context"
-import { CommentDraftSchema } from "./schema"
+import { commentDraftSchema } from "./schema"
 import { cleanComment, findCitationProblem, findReference, findUnusableReason } from "./validate"
 import { experienceBlock, postBlock, researchBlock } from "./blocks"
 
 // Natural and varied rather than templated
 const WRITING_TEMPERATURE = 0.7
 // Readable stand-ins for the variables when the tune prompt is used to steer web research
-const RESEARCH_BRIEF_LABELS = {
-  post_content: "[the LinkedIn post]",
-  user_experience: "[the user's experience]",
-  research_context: "[the research findings]",
-}
+const researchBriefLabels = (book: PromptBook) => ({
+  post_content: book.text("research.brief.post"),
+  user_experience: book.text("research.brief.experience"),
+  research_context: book.text("research.brief.research"),
+})
 
 interface GenerateOptions {
   tune: CommentTuneId
@@ -56,13 +57,13 @@ interface MessageData {
  * section where the prompt wants it; the post is appended when the prompt doesn't place
  * it. Research and experience sections exist only when the prompt asked for them.
  */
-function buildUserMessage(stylePrompt: string, tune: CommentTuneId, { postText, research, experience }: MessageData): string {
+function buildUserMessage(stylePrompt: string, tune: CommentTuneId, { postText, research, experience }: MessageData, book: PromptBook): Promise<string> {
   return composePromptMessage(
     stylePrompt,
     [
-      postBlock(postText),
-      ...(experience ? [experienceBlock(experience)] : []),
-      ...(research !== undefined ? [researchBlock(research)] : []),
+      postBlock(postText, book),
+      ...(experience ? [experienceBlock(experience, book)] : []),
+      ...(research !== undefined ? [researchBlock(research, book)] : []),
     ],
     { selected_tune: getTuneLabel(tune) }
   )
@@ -85,7 +86,8 @@ function collectNotices(reference: CommentReference | null, experienceQuote: str
  */
 export async function generateComment({ tune, post, signal, onStage }: GenerateOptions): Promise<GeneratedComment> {
   const now = new Date()
-  const stylePrompt = await getActiveTunePrompt(tune)
+  // Every word besides the system, research and tune prompts is read from the tool's instructions prompt
+  const [stylePrompt, book] = await Promise.all([getActiveTunePrompt(tune), loadPromptBook("comment-writer-instructions")])
   let providers = currentModelOrder()
   let isFallbackAnnounced = false
   /**
@@ -117,7 +119,7 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
     wantsResearch
       ? researchPostTopic({
           postText,
-          styleBrief: renderPrompt(stylePrompt, { ...RESEARCH_BRIEF_LABELS, selected_tune: getTuneLabel(tune) }),
+          styleBrief: renderPrompt(stylePrompt, { ...researchBriefLabels(book), selected_tune: getTuneLabel(tune) }),
           now,
           signal,
           onFallback: announceFallback("searching the web"),
@@ -132,18 +134,18 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
     CURRENT_DATE: now.toISOString().slice(0, 10),
     MAX_CHARS: COMMENT_MAX_CHARS,
   })
-  const write = (data: MessageData, writers: readonly ModelProvider[], requireNoCitation: boolean) =>
+  const write = async (data: MessageData, writers: readonly ModelProvider[], requireNoCitation: boolean) =>
     generateStructuredWithFallback({
-      schema: CommentDraftSchema,
+      schema: commentDraftSchema(book),
       name: "linkedin_comment",
-      messages: [new SystemMessage(systemPrompt), new HumanMessage(buildUserMessage(stylePrompt, tune, data))],
+      messages: [new SystemMessage(systemPrompt), new HumanMessage(await buildUserMessage(stylePrompt, tune, data, book))],
       temperature: WRITING_TEMPERATURE,
       providers: writers,
       signal,
       onFallback: announceFallback("writing your comment"),
       validate: (draft) =>
         // Claimed experience must be backed by profile-anchored text; without a profile nothing qualifies
-        findUnusableReason(draft, { postText, systemPrompt, experience: experience?.text ?? null }) ??
+        findUnusableReason(draft, { postText, systemPrompt, experience: experience?.text ?? null, book }) ??
         (requireNoCitation && draft.reference_url.trim() ? "cites a source without verified research" : null),
     })
 
@@ -166,7 +168,7 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
     fields: [
       {
         id: "comment",
-        kind: "LinkedIn comment under someone else's post",
+        kind: book.text("humanize.kind"),
         text: cleanComment(data.comment),
         maxChars: COMMENT_MAX_CHARS,
       },
@@ -175,7 +177,7 @@ export async function generateComment({ tune, post, signal, onStage }: GenerateO
     signal,
     onFallback: announceFallback("writing your comment"),
     validate: (_id, text) =>
-      findUnusableReason({ ...data, comment: text }, { postText, systemPrompt, experience: experience?.text ?? null }),
+      findUnusableReason({ ...data, comment: text }, { postText, systemPrompt, experience: experience?.text ?? null, book }),
   })
   const comment = cleanComment(humanization.texts.comment)
 

@@ -2,6 +2,7 @@ import { z } from "zod"
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt } from "@/services/prompts"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import { composePromptMessage, type PromptDataBlock } from "@/services/promptComposer"
 import {
   BUDGET_SIGNALS,
@@ -20,31 +21,34 @@ import type { LeadScore, LeadSignals } from "@/types/leadSignals"
 // Zero temperature so the same conversation gets the same signals from run to run
 const SIGNALS_TEMPERATURE = 0
 
-const LeadScoreSchema = z.object({
-  score: z.number().describe("Whole number from 0 to 100"),
-  reason: z.string().describe("At most 12 words"),
-})
+const leadScoreSchema = (book: PromptBook) =>
+  z.object({
+    score: z.number().describe(book.text("lead-signals.field.score")),
+    reason: z.string().describe(book.text("lead-signals.field.reason")),
+  })
 
-const LeadSignalsSchema = z.object({
-  meeting_chance: LeadScoreSchema,
-  relationship_strength: LeadScoreSchema,
-  client_potential: LeadScoreSchema,
-  country: z.string().describe(`Country as stated in the profile or conversation, or ${UNKNOWN_VALUE}`),
+// What each field means is part of the shared instructions prompt, so the schema is built from it
+const leadSignalsSchema = (book: PromptBook) =>
+  z.object({
+  meeting_chance: leadScoreSchema(book),
+  relationship_strength: leadScoreSchema(book),
+  client_potential: leadScoreSchema(book),
+  country: z.string().describe(book.text("lead-signals.field.country", { unknown: UNKNOWN_VALUE })),
   technical_level: z.enum(TECHNICAL_LEVELS),
   seniority: z.enum(SENIORITY_LEVELS),
-  buying_intent: LeadScoreSchema,
+  buying_intent: leadScoreSchema(book),
   lead_temperature: z.enum(LEAD_TEMPERATURES),
   decision_role: z.enum(DECISION_ROLES),
   urgency: z.enum(URGENCY_LEVELS),
   budget_signal: z.enum(BUDGET_SIGNALS),
   company_size: z.enum(COMPANY_SIZES),
-  industry: z.string().describe(`At most 4 words, or ${UNKNOWN_VALUE}`),
-  main_need: z.string().describe(`The need or pain point they showed, at most 8 words, or ${NONE_SEEN}`),
-  main_objection: z.string().describe(`Their main objection or hesitation, at most 8 words, or ${NONE_SEEN}`),
-  next_step: z.string().describe("The best next step for the user, at most 12 words"),
+  industry: z.string().describe(book.text("lead-signals.field.industry", { unknown: UNKNOWN_VALUE })),
+  main_need: z.string().describe(book.text("lead-signals.field.main-need", { none: NONE_SEEN })),
+  main_objection: z.string().describe(book.text("lead-signals.field.main-objection", { none: NONE_SEEN })),
+  next_step: z.string().describe(book.text("lead-signals.field.next-step")),
 })
 
-type LeadSignalsOutput = z.infer<typeof LeadSignalsSchema>
+type LeadSignalsOutput = z.infer<ReturnType<typeof leadSignalsSchema>>
 
 function findUnusableReason(output: LeadSignalsOutput): string | null {
   const scores = [output.meeting_chance, output.relationship_strength, output.client_potential, output.buying_intent]
@@ -53,7 +57,7 @@ function findUnusableReason(output: LeadSignalsOutput): string | null {
   return null
 }
 
-function toLeadScore({ score, reason }: z.infer<typeof LeadScoreSchema>): LeadScore {
+function toLeadScore({ score, reason }: z.infer<ReturnType<typeof leadScoreSchema>>): LeadScore {
   return { score: toScore(score), reason: reason.trim() }
 }
 
@@ -71,12 +75,13 @@ interface AssessOptions {
  * the signals.
  */
 export async function assessLeadSignals({ signalsPrompt, dataBlocks, signal }: AssessOptions): Promise<LeadSignals> {
+  const book = await loadPromptBook("shared-instructions")
   const { data } = await generateStructuredWithFallback({
-    schema: LeadSignalsSchema,
+    schema: leadSignalsSchema(book),
     name: "lead_signals",
     messages: [
       new SystemMessage(await loadPrompt("lead-signals-system")),
-      new HumanMessage(composePromptMessage(signalsPrompt, dataBlocks)),
+      new HumanMessage(await composePromptMessage(signalsPrompt, dataBlocks)),
     ],
     temperature: SIGNALS_TEMPERATURE,
     signal,

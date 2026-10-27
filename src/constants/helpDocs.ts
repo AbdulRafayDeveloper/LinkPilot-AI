@@ -55,7 +55,7 @@ export const HELP_START_TOPICS: HelpTopic[] = [
     doc: {
       summary: "One workspace for the LinkedIn copy you post, the clients you work for and the day's own work.",
       steps: [
-        "Sign in once. The sidebar's left rail holds the four areas (Workspace, LinkedIn Tools, Client Work and, for an admin, Administration); clicking an area lists its tools beside it.",
+        "Sign in once. The sidebar's left rail holds the four areas (Workspace, Client Work, LinkedIn Tools and, for an admin, Administration); clicking an area lists its tools beside it.",
         "Search every tool from the box under the area's name, or press Ctrl/Cmd+K anywhere to jump to a tool by name.",
         "A tool with two pages (a create page and a View All page) opens as a dropdown in the sidebar; the create page is the tool itself.",
         "Everything you type or generate stays where it is when you move to another tool and come back, and each browser tab keeps its own copy.",

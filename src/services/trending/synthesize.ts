@@ -1,6 +1,7 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { generateStructuredWithFallback } from "@/services/ai"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
 import {
   POST_HASHTAG_MAX,
   POST_HASHTAG_MIN,
@@ -10,7 +11,7 @@ import {
   TRENDING_CANDIDATE_COUNT,
   TRENDING_TOPIC_COUNT,
 } from "@/constants/trending"
-import { SynthesisOutputSchema, type SynthesisOutput } from "./schema"
+import { synthesisOutputSchema, type SynthesisOutput } from "./schema"
 import type { ResearchResult } from "@/services/liveResearch"
 import { sanitizeForTag } from "./sanitize"
 
@@ -22,12 +23,13 @@ const MAX_RESEARCH_CHARS = 40_000
 const MAX_LISTED_SOURCES = 60
 
 /**
- * The formats the prompt assigns by rank, listed from constants/trending.ts so the prompt and
- * the app can never disagree about what a format means.
+ * The formats the prompt assigns by rank: the ids and names from constants/trending.ts, so the prompt
+ * and the app agree on which formats exist, and what each one means from the instructions prompt.
  */
-const POST_FORMATS = TRENDING_POST_FORMATS.map(
-  (format, index) => `${index + 1}. ${format.id} (${format.label}). ${format.structure}`
-).join("\n")
+const postFormatsOf = (book: PromptBook) =>
+  TRENDING_POST_FORMATS.map((format, index) =>
+    book.text("synthesis.format-line", { number: index + 1, id: format.id, label: format.label, structure: book.text(`format.${format.id}`) })
+  ).join("\n")
 
 interface SynthesisOptions {
   brief: string
@@ -42,11 +44,12 @@ interface SynthesisOptions {
  * web research in separate, clearly delimited sections.
  */
 export async function synthesizeTopics({ brief, research, now, signal }: SynthesisOptions): Promise<SynthesisOutput> {
-  const system = renderPrompt(await loadPrompt("trending-synthesis"), {
+  const [template, book] = await Promise.all([loadPrompt("trending-synthesis"), loadPromptBook("trending-instructions")])
+  const system = renderPrompt(template, {
     CURRENT_DATE: now.toISOString().slice(0, 10),
     TOPIC_COUNT: TRENDING_CANDIDATE_COUNT,
     PUBLISH_COUNT: TRENDING_TOPIC_COUNT,
-    POST_FORMATS,
+    POST_FORMATS: postFormatsOf(book),
     POST_MIN_CHARS: POST_TARGET_MIN_CHARS,
     POST_MAX_CHARS: POST_TARGET_MAX_CHARS,
     HASHTAG_MIN: POST_HASHTAG_MIN,
@@ -65,7 +68,7 @@ export async function synthesizeTopics({ brief, research, now, signal }: Synthes
   ].join("\n\n")
 
   const { data } = await generateStructuredWithFallback({
-    schema: SynthesisOutputSchema,
+    schema: synthesisOutputSchema(book),
     name: "trending_topics",
     messages: [new SystemMessage(system), new HumanMessage(user)],
     temperature: SYNTHESIS_TEMPERATURE,

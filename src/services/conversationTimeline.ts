@@ -1,38 +1,27 @@
 import { z } from "zod"
 import { MESSAGE_SENDERS, type ConversationState, type MessageSender } from "@/constants/conversationState"
 import { loadPrompt } from "@/services/prompts"
+import type { PromptBook } from "@/services/promptBook"
 import type { ConversationParties } from "@/types/conversation"
 
 /**
  * Structured-output fields that make the model name both people and list every message
- * with its sender before it writes or scores anything. Spread them into a tool's schema.
+ * with its sender before it writes or scores anything. Spread them into a tool's schema. What each
+ * field means is read from the shared instructions prompt (`shared` is that prompt, loaded).
  */
-export const conversationPeopleFields = {
-  user_name: z
-    .string()
-    .nullable()
-    .describe(
-      "Name of the user (the person you work for) as shown in the conversation, e.g. as the sender of their messages or as the name the other person greets. Null if not shown"
-    ),
-  other_person_name: z
-    .string()
-    .nullable()
-    .describe(
-      "First name of the other person, never the user: the sender of the other person's messages, or from the profile. Null if unknown"
-    ),
+export const conversationPeopleFields = (shared: PromptBook) => ({
+  user_name: z.string().nullable().describe(shared.text("conversation.field.user-name")),
+  other_person_name: z.string().nullable().describe(shared.text("conversation.field.other-person-name")),
   timeline: z
     .array(
       z.object({
         sender: z.enum(MESSAGE_SENDERS),
-        sender_name: z
-          .string()
-          .nullable()
-          .describe("The sender's name exactly as shown on this message (e.g. its header line), or null if not shown"),
-        gist: z.string().describe("A few words on what this message says or asks"),
+        sender_name: z.string().nullable().describe(shared.text("conversation.field.sender-name")),
+        gist: z.string().describe(shared.text("conversation.field.gist")),
       })
     )
-    .describe("Every message in the conversation in chronological order, oldest first, one entry per message"),
-}
+    .describe(shared.text("conversation.field.timeline")),
+})
 
 interface ConversationPeopleOutput {
   user_name: string | null

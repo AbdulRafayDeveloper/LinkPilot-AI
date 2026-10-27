@@ -38,7 +38,7 @@ export async function spokenNoteToEnglish(text: string, signal?: AbortSignal): P
   if (spoken.length > NOTE_SPEECH_MAX_LENGTH) throw new UserFacingError(QUICK_NOTES_MESSAGES.speechTooLong)
 
   const [system, instructions] = await Promise.all([loadPrompt("quick-notes-english-system"), loadPrompt("quick-notes-english")])
-  const message = composePromptMessage(instructions, [
+  const message = await composePromptMessage(instructions, [
     { variable: "note", tag: "spoken_note", label: "What the user said", content: spoken },
   ])
 

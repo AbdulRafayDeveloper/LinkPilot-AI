@@ -1,3 +1,4 @@
+import type { PromptBook } from "@/services/promptBook"
 /**
  * The A, B, C, D method: the message ends by offering four replies, so answering costs the reader
  * one letter. The four lines are fixed here rather than left to the model, so they are always the
@@ -48,5 +49,6 @@ export function withAbcdOptions(message: string): { text: string; fixed: boolean
 }
 
 /** What the humanizer is told when its rewrite loses or changes the options. */
-export const abcdProblem = (message: string) =>
-  hasAbcdOptions(message) ? null : `End the message with these four lines exactly as they are, nothing changed:\n${ABCD_BLOCK}`
+// A rewrite that lost the four replies is sent back with them, in the words of the tool's instructions prompt
+export const abcdProblem = (message: string, book: Pick<PromptBook, "text">) =>
+  hasAbcdOptions(message) ? null : book.text("problem.abcd", { options: ABCD_BLOCK })

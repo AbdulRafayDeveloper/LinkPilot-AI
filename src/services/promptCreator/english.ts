@@ -40,7 +40,7 @@ export async function toSimpleEnglish(text: string, signal?: AbortSignal): Promi
   const [system, instructions] = await Promise.all([loadPrompt("prompt-creator-english-system"), loadPrompt("prompt-creator-english")])
   // The description is data inside its own tags, never instructions: a line in it that says
   // "ignore the above" is read back in English like the rest of it
-  const message = composePromptMessage(instructions, [
+  const message = await composePromptMessage(instructions, [
     { variable: "request", tag: "task_request", label: "What the user wrote", content: description },
   ])
 

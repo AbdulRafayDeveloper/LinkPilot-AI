@@ -2,6 +2,7 @@ import { createTagSanitizer } from "@/lib/sanitize"
 import type { PromptDataBlock } from "@/services/promptComposer"
 import type { ResearchResult } from "@/services/liveResearch"
 import type { UserExperience } from "@/services/senderContext"
+import type { PromptBook } from "@/services/promptBook"
 
 const MAX_RESEARCH_CHARS = 16_000
 const MAX_LISTED_SOURCES = 30
@@ -14,34 +15,33 @@ const stripSectionTags = createTagSanitizer(COMMENT_WRITER_TAGS)
 
 /**
  * The data sections a Comment Writer prompt can place with {{variable}}. Each is wrapped in
- * a delimiter tag its content can't close (see composePromptMessage).
+ * a delimiter tag its content can't close (see composePromptMessage). Their labels and empty texts
+ * are the tool's instructions prompt (`book`), never words written here.
  */
-export function postBlock(postText: string): PromptDataBlock {
-  return { variable: "post_content", tag: "linkedin_post", label: "LinkedIn post", content: stripSectionTags(postText), pasted: true }
+export function postBlock(postText: string, book: PromptBook): PromptDataBlock {
+  return { variable: "post_content", tag: "linkedin_post", label: book.text("label.post"), content: stripSectionTags(postText), pasted: true }
 }
 
-export function styleInstructionsBlock(styleBrief: string): PromptDataBlock {
+export function styleInstructionsBlock(styleBrief: string, book: PromptBook): PromptDataBlock {
   return {
     variable: "comment_style_instructions",
     tag: "comment_style_instructions",
-    label: "Comment style instructions",
+    label: book.text("label.style"),
     content: stripSectionTags(styleBrief),
   }
 }
 
-export function experienceBlock({ text, hasProfile }: UserExperience): PromptDataBlock {
+export function experienceBlock({ text, hasProfile }: UserExperience, book: PromptBook): PromptDataBlock {
   return {
     variable: "user_experience",
     tag: "user_experience",
-    label: "The user's experience",
+    label: book.text("label.experience"),
     content: text && stripSectionTags(text),
-    emptyText: hasProfile
-      ? "No relevant experience was found in the user's About Me profile."
-      : "The user hasn't written their About me profile, so no personal experience is available.",
+    emptyText: book.text(hasProfile ? "empty.experience-not-found" : "empty.experience-no-profile"),
   }
 }
 
-export function researchBlock(research: ResearchResult | null): PromptDataBlock {
+export function researchBlock(research: ResearchResult | null, book: PromptBook): PromptDataBlock {
   const sourceList = research?.sources
     .slice(0, MAX_LISTED_SOURCES)
     .map((source) => `- ${source.title} | ${source.url}`)
@@ -49,13 +49,11 @@ export function researchBlock(research: ResearchResult | null): PromptDataBlock 
   return {
     variable: "research_context",
     tag: "research_data",
-    label: "Research findings",
+    label: book.text("label.research"),
     content:
       research && sourceList
-        ? stripSectionTags(
-            `${research.notes.slice(0, MAX_RESEARCH_CHARS)}\n\nVerified source URLs (the only URLs you may cite):\n${sourceList}`
-          )
+        ? stripSectionTags(`${research.notes.slice(0, MAX_RESEARCH_CHARS)}\n\n${book.text("research.sources-heading")}\n${sourceList}`)
         : null,
-    emptyText: "No verified recent information was found for this post.",
+    emptyText: book.text("empty.research"),
   }
 }

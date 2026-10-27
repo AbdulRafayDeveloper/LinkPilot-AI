@@ -288,7 +288,7 @@ const SidebarDropdown: React.FC<SidebarDropdownProps> = ({
 }
 
 /**
- * App navigation: a **rail of the areas** (TOOL_GROUPS: Workspace, LinkedIn Tools, Client Work and,
+ * App navigation: a **rail of the areas** (TOOL_GROUPS: Workspace, Client Work, LinkedIn Tools and,
  * for an admin, Administration) and a white panel beside it listing the tools of the one chosen, so
  * a list of nineteen tools reads as three or four short ones.
  *

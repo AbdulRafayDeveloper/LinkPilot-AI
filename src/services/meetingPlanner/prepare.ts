@@ -422,7 +422,7 @@ export async function prepareMeeting(meeting: MeetingPlanDetail, signal: AbortSi
       emptyText: "None chosen yet. Choose them from my profile.",
     },
   ]
-  const user = composePromptMessage(template, blocks, {
+  const user = await composePromptMessage(template, blocks, {
     meeting_name: meeting.name,
     meeting_when: `${dayLabel(meeting.meetingDate)} at ${formatTime(meeting.meetingTime)}`,
     person_name: meeting.personName ?? "not given",

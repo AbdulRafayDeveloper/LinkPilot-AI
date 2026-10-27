@@ -1,3 +1,4 @@
+import type { PromptBook } from "@/services/promptBook"
 import { VOICE_NOTE_MAX_WORDS, VOICE_NOTE_TARGET_WORDS, WORDS_A_SECOND } from "@/constants/outreachTunes"
 
 /**
@@ -13,10 +14,10 @@ export const countWords = (text: string) => text.split(/\s+/).filter((word) => /
 export const speakingSeconds = (words: number) => Math.round(words / WORDS_A_SECOND)
 
 /** What to tell the model when a script runs long, or null when it is within the ceiling. */
-export function voiceNoteProblem(text: string): string | null {
+export function voiceNoteProblem(text: string, book: Pick<PromptBook, "text">): string | null {
   const words = countWords(text)
   if (words <= VOICE_NOTE_MAX_WORDS) return null
-  return `The voice note is ${words} words, over the ${VOICE_NOTE_MAX_WORDS}-word ceiling. Cut it to about ${VOICE_NOTE_TARGET_WORDS} words, keeping the personalized observation and the question at the end.`
+  return book.text("problem.voice-note-long", { words, max: VOICE_NOTE_MAX_WORDS, target: VOICE_NOTE_TARGET_WORDS })
 }
 
 /** The line shown beside a script: how many words it is and about how long it takes to say. */

@@ -81,7 +81,7 @@ export async function clarifyVoicesSafely({ voices, signal }: ClarifyOptions): P
       .map((entry) => `Voice ${entry.voice}:\n${entry.transcript.trim()}`)
       .join("\n\n")
 
-    const user = composePromptMessage(
+    const user = await composePromptMessage(
       prompt,
       [
         {

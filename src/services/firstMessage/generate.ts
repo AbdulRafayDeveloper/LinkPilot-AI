@@ -2,7 +2,8 @@ import { z } from "zod"
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
 import { composePromptMessage } from "@/services/promptComposer"
-import { NO_SENDER_PROFILE_TEXT, generateWithoutSenderClaims } from "@/services/senderGuard"
+import { loadPromptBook, type PromptBook } from "@/services/promptBook"
+import { generateWithoutSenderClaims } from "@/services/senderGuard"
 import { humanizeTexts } from "@/services/humanizer"
 import { cleanGeneratedText, containsPlaceholder } from "@/lib/generatedText"
 import { LINKEDIN_MESSAGE_MAX_CHARS, OPENING_LINES, getTuneLabel, type FirstMessageTuneId } from "@/constants/firstMessage"
@@ -19,19 +20,15 @@ const WRITING_TEMPERATURE = 0.7
  * The analysis fields come before the message on purpose: the model commits to the
  * profile detail and the sender link it will use before it writes.
  */
-const FirstMessageSchema = z.object({
-  recipient_summary: z.string().describe("Who the recipient is and what they focus on now, from their profile only"),
-  key_detail: z.string().describe("The single highest-signal profile detail the message builds on"),
-  sender_link: z
-    .string()
-    .nullable()
-    .describe(
-      "The sender-recipient connection the message uses (e.g. the sender's relevant service or a shared focus), taken from both profiles. Fill it whenever the message mentions the sender's work or a similarity; null only when the message doesn't"
-    ),
-  message: z.string().describe("The complete first message text, nothing else"),
-})
+const firstMessageSchema = (book: PromptBook) =>
+  z.object({
+    recipient_summary: z.string().describe(book.text("field.recipient-summary")),
+    key_detail: z.string().describe(book.text("field.key-detail")),
+    sender_link: z.string().nullable().describe(book.text("field.sender-link")),
+    message: z.string().describe(book.text("field.message")),
+  })
 
-type FirstMessageOutput = z.infer<typeof FirstMessageSchema>
+type FirstMessageOutput = z.infer<ReturnType<typeof firstMessageSchema>>
 
 interface GenerateOptions {
   profileData: string
@@ -52,26 +49,31 @@ function findUnusableReason(output: FirstMessageOutput): string | null {
  * untrusted data inside its own delimiter tags.
  */
 export async function generateFirstMessage({ profileData, tune, signal }: GenerateOptions): Promise<GeneratedFirstMessage> {
-  const { tunePrompt, senderProfile } = await getGenerationInputs(tune)
+  // Every word besides the system and tune prompts is read from the instructions prompts
+  const [{ tunePrompt, senderProfile }, book, shared] = await Promise.all([
+    getGenerationInputs(tune),
+    loadPromptBook("first-message-instructions"),
+    loadPromptBook("shared-instructions"),
+  ])
 
   const system = renderPrompt(await loadPrompt("first-message-system"), { MAX_CHARS: LINKEDIN_MESSAGE_MAX_CHARS })
-  const user = composePromptMessage(
+  const user = await composePromptMessage(
     tunePrompt,
     [
       {
         variable: "sender_profile",
         tag: "sender_profile",
-        label: "About me",
+        label: book.text("label.about-me"),
         content: senderProfile,
-        emptyText: NO_SENDER_PROFILE_TEXT,
+        emptyText: shared.text("empty.sender-profile"),
       },
-      { variable: "profile_data", tag: "profile_data", label: "Their profile", content: profileData, pasted: true },
+      { variable: "profile_data", tag: "profile_data", label: book.text("label.their-profile"), content: profileData, pasted: true },
     ],
     { tune: getTuneLabel(tune) }
   )
 
   const { data, provider, senderClaimRewrite, unsupportedSenderClaim } = await generateWithoutSenderClaims({
-    schema: FirstMessageSchema,
+    schema: firstMessageSchema(book),
     name: "first_message",
     messages: [new SystemMessage(system), new HumanMessage(user)],
     temperature: WRITING_TEMPERATURE,
@@ -94,20 +96,20 @@ export async function generateFirstMessage({ profileData, tune, signal }: Genera
     fields: [
       {
         id: "message",
-        kind: isVoice ? "LinkedIn voice note script, to be read aloud and recorded" : "LinkedIn first message (DM) to someone new",
+        kind: book.text(isVoice ? "humanize.kind.voice" : "humanize.kind.text"),
         text: withOptions.text,
         maxChars: isVoice ? VOICE_NOTE_MAX_CHARS : LINKEDIN_MESSAGE_MAX_CHARS,
-        ...(isVoice ? { rule: `At most ${VOICE_NOTE_MAX_WORDS} words, so it can be said in under 50 seconds. Keep it spoken English, short sentences, no corporate words.` } : {}),
+        ...(isVoice ? { rule: book.text("humanize.rule.voice", { max: VOICE_NOTE_MAX_WORDS }) } : {}),
       },
     ],
     // Each of these tones ends on one open question: the Curiosity Hook's open loop, or a soft offer of help
     validate:
       opener || isVoice || isAbcd
         ? (_id, text) => {
-            if (opener && !hasOpeningLine(text, opener)) return `Keep the opening exactly "Hi <first name>, ${opener.sentence}"`
-            if (opener && !/\?\s*$/.test(text)) return "End the message with one open question, ending with a question mark"
-            if (isAbcd) return abcdProblem(text)
-            return isVoice ? voiceNoteProblem(text) : null
+            if (opener && !hasOpeningLine(text, opener)) return book.text("humanize.problem.opening", { sentence: opener.sentence })
+            if (opener && !/\?\s*$/.test(text)) return book.text("humanize.problem.question")
+            if (isAbcd) return abcdProblem(text, book)
+            return isVoice ? voiceNoteProblem(text, book) : null
           }
         : undefined,
     signal,

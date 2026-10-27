@@ -6,6 +6,7 @@ import { recordAiUsage } from "@/services/aiUsage"
 import { env } from "@/config/env"
 import { currentModelOrder } from "@/lib/modelOrder"
 import { loadPrompt, type PromptName } from "@/services/prompts"
+import { loadPromptBook } from "@/services/promptBook"
 import { UserFacingError } from "@/lib/errors"
 import { hostnameOf, normalizeUrl } from "@/lib/url"
 import type { FallbackNotice } from "@/constants/aiProviders"
@@ -52,10 +53,11 @@ export async function loadSearchLenses(templateName: PromptName): Promise<string
 }
 
 /**
- * For a single research call that should cover every lens.
+ * For a single research call that should cover every lens, in the words of the shared instructions prompt.
  */
-export function describeAllLenses(lenses: string[]): string {
-  return `Cover each of these angles:\n${lenses.map((lens) => `- ${lens}`).join("\n")}`
+export async function describeAllLenses(lenses: string[]): Promise<string> {
+  const book = await loadPromptBook("shared-instructions")
+  return book.text("research.cover-angles", { lenses: lenses.map((lens) => `- ${lens}`).join("\n") })
 }
 
 function readTextBlocks(message: AIMessage): Array<{ text: string; annotations: unknown[] }> {
@@ -146,6 +148,12 @@ async function runGroqPass(messages: BaseMessage[], signal: AbortSignal): Promis
   return { provider: "groq", notes: (message?.content ?? "").trim(), sources: dedupeSources(sources) }
 }
 
+// Several passes' notes as one, each under its own heading from the shared instructions prompt
+async function mergedNotes(results: ResearchResult[]): Promise<string> {
+  const book = await loadPromptBook("shared-instructions")
+  return results.map((result, index) => `${book.text("research.pass-heading", { number: index + 1 })}\n${result.notes}`).join("\n\n")
+}
+
 /**
  * Runs research passes in parallel and merges the ones that succeed. Fails only when
  * every pass fails.
@@ -169,7 +177,7 @@ async function runPasses(
     notes:
       succeeded.length === 1
         ? succeeded[0].notes
-        : succeeded.map((result, index) => `### Search pass ${index + 1}\n${result.notes}`).join("\n\n"),
+        : await mergedNotes(succeeded),
     sources: dedupeSources(succeeded.flatMap((result) => result.sources)),
   }
 }

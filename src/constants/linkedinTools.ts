@@ -37,8 +37,8 @@ import { PROFILE_SCHEDULER_LINK } from "./profileScheduler"
 import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./savedOutputs"
 
 /**
- * The four areas of the app, in sidebar order (the owner's: Workspace, LinkedIn Tools, Client
- * Work, Administration). Each one is an icon on the sidebar's rail, and the panel beside it lists
+ * The four areas of the app, in sidebar order (the owner's: Workspace, Client Work, LinkedIn
+ * Tools, Administration). Each one is an icon on the sidebar's rail, and the panel beside it lists
  * that area's tools alone, so keep them few and meaningful: a tool that needs a heading of its own
  * belongs in one of these. Prompt Creator had a "Prompts" heading of its own until the owner asked
  * for it under Workspace, with the rest of the day's work.
@@ -60,11 +60,11 @@ import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./
 export const TOOL_GROUPS = [
   // The day's own work: the prompts written for other AI tools, the tasks, the notes and the files
   { id: "workspace", label: "Workspace", icon: Briefcase, hint: "Your own day's work" },
+  // The people the work is for: what you send them, what they send back, the text you reuse with
+  // them, and the meetings. Second, under Workspace, at the owner's request
+  { id: "clients", label: "Client Work", icon: Users, hint: "The people the work is for" },
   // Everything written for LinkedIn itself, from the post to the reply
   { id: "linkedin", label: "LinkedIn Tools", icon: LinkedInIcon, hint: "Everything you post on LinkedIn" },
-  // The people the work is for: what you send them, what they send back, the text you reuse with
-  // them, and the meetings
-  { id: "clients", label: "Client Work", icon: Users, hint: "The people the work is for" },
   // Admins only: the sign-ins, the accounts, the AI models, the backups and the sample data
   { id: "admin", label: "Administration", icon: Settings, hint: "Accounts, AI models and backups" },
 ] as const

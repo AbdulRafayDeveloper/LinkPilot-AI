@@ -68,7 +68,6 @@ const isPageChrome = (line: string) => PAGE_LABELS.has(line) || PAGE_LINES.some(
  */
 export const PASTED_SOURCE = 'source="pasted"'
 const PASTED_BLOCK = /<([a-z_]+) source="pasted">\n([\s\S]*?)\n<\/\1>/g
-const LEFT_OUT = "[The rest of this pasted text was left out so the request fits.]"
 // What pasted text always keeps: the person's name, headline and About come first on a profile
 const MIN_PASTED_CHARS = 1_500
 // The headings that follow Activity on a LinkedIn profile, so its end can be found
@@ -100,7 +99,7 @@ const cutAt = (text: string, maxChars: number) => {
  * profile's Activity (posts are listed newest first, and news such as a funding round is recent),
  * then the end of the text. Never below `MIN_PASTED_CHARS`, so the person is always still there.
  */
-export function shortenPastedText(text: string, maxChars: number): string {
+export function shortenPastedText(text: string, maxChars: number, leftOut: string): string {
   const target = Math.max(maxChars, MIN_PASTED_CHARS)
   if (text.length <= target) return text
   const lines = text.split("\n")
@@ -114,20 +113,20 @@ export function shortenPastedText(text: string, maxChars: number): string {
     const keep = Math.max(0, activity.length - (text.length - target))
     shorter = [before, keep > 0 ? cutAt(activity, keep) : "", after].filter(Boolean).join("\n")
   }
-  return shorter.length <= target ? shorter : `${cutAt(shorter, target - LEFT_OUT.length - 1)}\n${LEFT_OUT}`
+  return shorter.length <= target ? shorter : `${cutAt(shorter, target - leftOut.length - 1)}\n${leftOut}`
 }
 
 /**
  * A prompt with about `removeChars` fewer characters of pasted text, taken from each pasted block in
  * proportion to its length. Null when there is no pasted text left that may be shortened.
  */
-export function shrinkPastedBlocks(prompt: string, removeChars: number): string | null {
+export function shrinkPastedBlocks(prompt: string, removeChars: number, leftOut: string): string | null {
   const blocks = [...prompt.matchAll(PASTED_BLOCK)]
   const total = blocks.reduce((sum, match) => sum + match[2].length, 0)
   if (total === 0 || removeChars <= 0) return null
   let changed = false
   const shorter = prompt.replace(PASTED_BLOCK, (whole, tag: string, body: string) => {
-    const shortened = shortenPastedText(body, body.length - Math.ceil((removeChars * body.length) / total))
+    const shortened = shortenPastedText(body, body.length - Math.ceil((removeChars * body.length) / total), leftOut)
     if (shortened === body) return whole
     changed = true
     return `<${tag} ${PASTED_SOURCE}>\n${shortened}\n</${tag}>`

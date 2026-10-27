@@ -11,6 +11,18 @@ import type { GlobalPromptId } from "@/constants/globalPrompts"
 import type { PromptTargetId } from "@/constants/promptCreator"
 
 export type PromptName =
+  // Each tool's instructions besides the prompts its users choose (services/promptBook.ts): the rewrite
+  // requests, the problems its checks find, labels, empty texts and what each answer field means
+  | "connection-note-instructions"
+  | "comment-writer-instructions"
+  | "post-comment-reply-instructions"
+  | "follow-up-instructions"
+  | "first-message-instructions"
+  | "inmail-instructions"
+  | "conversation-reply-instructions"
+  | "trending-instructions"
+  | "post-image-instructions"
+  | "shared-instructions"
   | "trending-topics"
   | "trending-research"
   | "trending-search-lenses"

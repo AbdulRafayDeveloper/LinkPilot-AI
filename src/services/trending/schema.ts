@@ -1,65 +1,58 @@
 import { z } from "zod"
 import { TRENDING_POST_FORMAT_IDS, TRENDING_TOPIC_COUNT } from "@/constants/trending"
 import type { SearchProvider as ResearchProvider } from "@/services/liveResearch"
+import type { PromptBook } from "@/services/promptBook"
 
 const DiscussionPotentialSchema = z.enum(["High", "Medium", "Emerging"])
 const ConfidenceSchema = z.enum(["high", "medium", "low"])
 const PostFormatSchema = z.enum(TRENDING_POST_FORMAT_IDS)
 
-const ModelReferenceSchema = z.object({
-  title: z.string(),
-  url: z.string().describe("Copied exactly from the verified source URL list"),
-  source: z.string().describe("Publisher or site name"),
-})
+const modelReferenceSchema = (book: PromptBook) =>
+  z.object({
+    title: z.string(),
+    url: z.string().describe(book.text("synthesis.field.reference-url")),
+    source: z.string().describe(book.text("synthesis.field.reference-source")),
+  })
 
 /**
  * Shape requested from the ranking model. OpenAI strict structured output needs every
- * field present, so optional values are nullable and limits are enforced after parsing.
+ * field present, so optional values are nullable and limits are enforced after parsing. What each
+ * field means is the Trending instructions prompt's, so the schema is built from it.
  */
-export const SynthesisOutputSchema = z.object({
-  candidates_evaluated: z.number().describe("Number of distinct candidate developments evaluated before ranking"),
-  shortfall_reason: z
-    .string()
-    .nullable()
-    .describe("Why fewer topics than requested qualified, or null when the full set qualified"),
-  topics: z.array(
-    z.object({
-      rank: z.number().describe("1 is the strongest topic"),
-      title: z.string(),
-      category: z.string(),
-      event_date: z.string().nullable().describe("YYYY-MM-DD as stated in the research, or null"),
-      why_trending: z.string(),
-      linkedin_angle: z
-        .string()
-        .describe("What people on LinkedIn are actually saying or arguing about this, from the research"),
-      discussion_potential: DiscussionPotentialSchema,
-      discussion_basis: z.string().describe("Research signals behind the discussion assessment, without invented metrics"),
-      confidence: ConfidenceSchema,
-      linkedin_search_queries: z.array(z.string()),
-      keywords: z.array(z.string()),
-      suggested_hashtags: z.array(z.string()),
-      post_format: PostFormatSchema.describe("The assigned post format for this rank; every topic uses a different one"),
-      hook_style: z
-        .string()
-        .describe('The hook technique for this topic\'s post, e.g. "Contrarian take". Techniques must differ across topics.'),
-      post_hook: z.string().describe("Scroll-stopping first line of the post, at most 12 words, following hook_style"),
-      post_body: z
-        .string()
-        .describe(
-          "The body under the hook, in the assigned format, with blank lines between short paragraphs. Long enough that the whole post reaches 1200 to 2000 characters. No links, no hashtags"
-        ),
-      post_cta: z
-        .string()
-        .describe("The closing line that asks for replies, one sentence, usually a question. No links, no hashtags"),
-      primary_reference: ModelReferenceSchema,
-      secondary_references: z.array(ModelReferenceSchema),
-      screenshot_reference: z.object({
-        url: z.string().describe("Copied exactly from the verified source URL list"),
-        description: z.string(),
-      }),
-    })
-  ),
-})
+export const synthesisOutputSchema = (book: PromptBook) => {
+  const reference = modelReferenceSchema(book)
+  return z.object({
+    candidates_evaluated: z.number().describe(book.text("synthesis.field.candidates-evaluated")),
+    shortfall_reason: z.string().nullable().describe(book.text("synthesis.field.shortfall-reason")),
+    topics: z.array(
+      z.object({
+        rank: z.number().describe(book.text("synthesis.field.rank")),
+        title: z.string(),
+        category: z.string(),
+        event_date: z.string().nullable().describe(book.text("synthesis.field.event-date")),
+        why_trending: z.string(),
+        linkedin_angle: z.string().describe(book.text("synthesis.field.linkedin-angle")),
+        discussion_potential: DiscussionPotentialSchema,
+        discussion_basis: z.string().describe(book.text("synthesis.field.discussion-basis")),
+        confidence: ConfidenceSchema,
+        linkedin_search_queries: z.array(z.string()),
+        keywords: z.array(z.string()),
+        suggested_hashtags: z.array(z.string()),
+        post_format: PostFormatSchema.describe(book.text("synthesis.field.post-format")),
+        hook_style: z.string().describe(book.text("synthesis.field.hook-style")),
+        post_hook: z.string().describe(book.text("synthesis.field.post-hook")),
+        post_body: z.string().describe(book.text("synthesis.field.post-body")),
+        post_cta: z.string().describe(book.text("synthesis.field.post-cta")),
+        primary_reference: reference,
+        secondary_references: z.array(reference),
+        screenshot_reference: z.object({
+          url: z.string().describe(book.text("synthesis.field.reference-url")),
+          description: z.string(),
+        }),
+      })
+    ),
+  })
+}
 
 const HttpUrlSchema = z.url({ protocol: /^https?$/ })
 
@@ -106,7 +99,7 @@ export const TrendingResultSchema = z.object({
   providers: z.array(z.string()).optional(),
 })
 
-export type SynthesisOutput = z.infer<typeof SynthesisOutputSchema>
+export type SynthesisOutput = z.infer<ReturnType<typeof synthesisOutputSchema>>
 export type SynthesisTopic = SynthesisOutput["topics"][number]
 export type TrendingTopic = z.infer<typeof TrendingTopicSchema>
 

@@ -1,6 +1,7 @@
 import { verifyEventDate } from "@/lib/eventDate"
 import { hostnameOf, normalizeUrl } from "@/lib/url"
 import type { ResearchResult } from "@/services/liveResearch"
+import type { PromptBook } from "@/services/promptBook"
 import { COMMENT_MAX_CHARS } from "@/constants/commentWriter"
 import type { CommentReference } from "@/types/commentWriter"
 import type { CommentDraft } from "./schema"
@@ -23,6 +24,8 @@ export interface ValidationContext {
   postText: string
   systemPrompt: string
   experience: string | null
+  // The tool's instructions prompt, whose words say what is wrong (the humanizer's retry reads them)
+  book: PromptBook
 }
 
 export function cleanComment(raw: string): string {
@@ -69,21 +72,18 @@ export function findReference(draft: CommentDraft, research: ResearchResult | nu
  * Citations are checked separately by findCitationProblem.
  */
 export function findUnusableReason(draft: CommentDraft, context: ValidationContext): string | null {
+  const { book } = context
   const comment = cleanComment(draft.comment)
-  if (!comment) return "empty comment"
-  if (!draft.post_main_point.trim()) return "missing post analysis"
-  if (comment.length > COMMENT_MAX_CHARS) {
-    return `comment is ${comment.length} characters, over LinkedIn's ${COMMENT_MAX_CHARS}-character limit`
-  }
-  if (PLACEHOLDER.test(comment)) return "comment contains a placeholder"
-  if (PROMPT_MARKUP.test(comment) || sharesWordRun(comment, context.systemPrompt, LEAKED_RULES_RUN)) {
-    return "comment leaks prompt instructions"
-  }
-  if (sharesWordRun(comment, context.postText, COPIED_POST_RUN)) return "comment copies the post"
+  if (!comment) return book.text("problem.empty")
+  if (!draft.post_main_point.trim()) return book.text("problem.missing-analysis")
+  if (comment.length > COMMENT_MAX_CHARS) return book.text("problem.too-long", { length: comment.length, max: COMMENT_MAX_CHARS })
+  if (PLACEHOLDER.test(comment)) return book.text("problem.placeholder")
+  if (PROMPT_MARKUP.test(comment) || sharesWordRun(comment, context.systemPrompt, LEAKED_RULES_RUN)) return book.text("problem.leaks-prompt")
+  if (sharesWordRun(comment, context.postText, COPIED_POST_RUN)) return book.text("problem.copies-post")
 
   const quote = draft.experience_quote.trim()
   if (quote && !(context.experience && isSupportedByExperience(quote, context.experience))) {
-    return "claimed experience is not supported by the About Me profile"
+    return book.text("problem.unsupported-experience")
   }
   return null
 }

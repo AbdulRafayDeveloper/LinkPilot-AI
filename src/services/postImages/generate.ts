@@ -2,14 +2,15 @@ import mongoose from "mongoose"
 import { connectDatabase } from "@/lib/db"
 import { UserFacingError } from "@/lib/errors"
 import { loadPrompt, renderPrompt } from "@/services/prompts"
+import { loadPromptBook } from "@/services/promptBook"
 import { generateImage } from "@/services/imageGeneration"
 import { deleteObject, getObjectBytes, putObject } from "@/services/storage/s3"
 import { PostImageModel, type IPostImage } from "@/models/PostImage"
 import {
+  DEFAULT_POSE,
   POST_IMAGES_MESSAGES,
   getPoseLabel,
   imageSize,
-  poseInstruction,
   type AssetPoseId,
   type ImageSizeId,
 } from "@/constants/postImages"
@@ -33,10 +34,6 @@ import { toPostImage } from "./history"
 
 const IMAGE_PREFIX = "LinkPilot/post-images"
 
-/** The colours the design may use, written the way a designer would read them. */
-const describeColors = (colors: string[]) =>
-  colors.length === 0 ? "No brand colours are set, so use a restrained neutral palette." : colors.join(", ")
-
 interface GenerateOptions extends GenerateImageInput {
   viewer: Viewer
   signal: AbortSignal
@@ -54,20 +51,21 @@ async function buildPrompt(options: {
   pose: AssetPoseId | null
   size: ImageSizeId
 }): Promise<string> {
-  const { prompt: userPrompt } = await getPostImagePrompt()
+  // The words around the facts (no colours set, the person block, each pose) are the instructions prompt's
+  const [{ prompt: userPrompt }, book] = await Promise.all([getPostImagePrompt(), loadPromptBook("post-image-instructions")])
   const shape = imageSize(options.size)
   const variables = {
-    DISPLAY_NAME: options.displayName || "no name is set, so leave a name off the design",
-    BRAND_COLORS: describeColors(options.colors),
+    DISPLAY_NAME: options.displayName || book.text("empty.display-name"),
+    BRAND_COLORS: options.colors.length === 0 ? book.text("empty.colors") : options.colors.join(", "),
     COLOR_COUNT: options.colors.length,
     POST_CONTENT: options.postContent.trim(),
     WIDTH: shape.width,
     HEIGHT: shape.height,
     ASPECT: shape.description,
     PERSON_BLOCK: options.assetName
-      ? `A photograph of a real person is attached. ${poseInstruction(options.pose ?? "standing")}`
-      : "No photograph is attached. There must be no person in this image at all. No face, no portrait, no silhouette, no figure, no hands, no crowd, not even in the background. Design a graphic composition only, made of shapes, type and space.",
-    POSE: options.pose ? getPoseLabel(options.pose) : "no photograph",
+      ? book.text("person.with-photo", { pose: book.text(`pose.${options.pose ?? DEFAULT_POSE}`) })
+      : book.text("person.no-photo"),
+    POSE: options.pose ? getPoseLabel(options.pose) : book.text("empty.pose"),
   }
   const system = renderPrompt(await loadPrompt("post-image-system"), variables)
   const brief = renderPrompt(userPrompt, {

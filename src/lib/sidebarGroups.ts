@@ -1,7 +1,7 @@
 import type { ToolGroupId } from "@/constants/linkedinTools"
 
 /**
- * Which of the three areas the sidebar is showing (Workspace, LinkedIn Tools, Client Work). The
+ * Which of the three areas the sidebar is showing (Workspace, Client Work, LinkedIn Tools). The
  * rail picks one and the panel lists that area's tools alone, so a long list is three short ones.
  *
  * It is kept out of the component so the rule can be read and tested on its own, the way

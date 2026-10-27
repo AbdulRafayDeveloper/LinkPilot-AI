@@ -1,4 +1,5 @@
 import { humanizeTexts, type HumanizeField } from "@/services/humanizer"
+import { loadPromptBook } from "@/services/promptBook"
 import { cleanPostText, tidyPostBody } from "@/lib/trendingPost"
 import { POST_HOOK_MAX_WORDS, getPostFormat } from "@/constants/trending"
 import { LINKEDIN_POST_MAX_CHARS } from "@/constants/linkedinLimits"
@@ -26,32 +27,34 @@ export async function humanizeTopicPosts(
   signal: AbortSignal
 ): Promise<{ topics: TrendingTopic[]; humanized: boolean }> {
   if (topics.length === 0) return { topics, humanized: false }
+  // What each text is, its rule and every check message are the Trending instructions prompt's
+  const book = await loadPromptBook("trending-instructions")
 
   const fields: HumanizeField<string>[] = topics.flatMap((topic, index) => {
     const format = getPostFormat(topic.post_format)
     return [
       {
         id: hookId(index),
-        kind: 'LinkedIn post hook, the first line people see before "see more"',
+        kind: book.text("humanize.kind.hook"),
         text: topic.post_hook,
         maxChars: Math.max(HOOK_MAX_CHARS, topic.post_hook.length),
         singleLine: true,
-        rule: `at most ${POST_HOOK_MAX_WORDS} words; keep it bold, specific and scroll-stopping`,
+        rule: book.text("humanize.rule.hook", { max: POST_HOOK_MAX_WORDS }),
       },
       {
         id: bodyId(index),
-        kind: `LinkedIn post body in the "${format.label}" format`,
+        kind: book.text("humanize.kind.body", { format: format.label }),
         text: topic.post_body,
         maxChars: Math.max(LINKEDIN_POST_MAX_CHARS, topic.post_body.length),
-        rule: `keep this shape and roughly this length. ${format.structure} Keep the blank lines between paragraphs. No links and no hashtags`,
+        rule: book.text("humanize.rule.body", { structure: book.text(`format.${format.id}`) }),
       },
       {
         id: ctaId(index),
-        kind: "closing line of a LinkedIn post that asks readers to reply",
+        kind: book.text("humanize.kind.cta"),
         text: topic.post_cta,
         maxChars: Math.max(CTA_MAX_CHARS, topic.post_cta.length),
         singleLine: true,
-        rule: "one sentence that invites a real answer, not a generic thoughts prompt. No links and no hashtags",
+        rule: book.text("humanize.rule.cta"),
       },
     ]
   })
@@ -77,17 +80,16 @@ export async function humanizeTopicPosts(
     fields,
     signal,
     validate: (id, text) => {
-      if (text.includes("#")) return `${id}: hashtags belong at the end of the post, not here`
-      if (URL_PATTERN.test(text)) return `${id}: a link in the post costs it reach, so leave it out`
+      if (text.includes("#")) return book.text("humanize.problem.hashtags", { id })
+      if (URL_PATTERN.test(text)) return book.text("humanize.problem.link", { id })
       const hookLimit = hookWordLimits.get(id)
-      if (hookLimit !== undefined && wordCount(text) > hookLimit) return `${id}: over ${hookLimit} words`
+      if (hookLimit !== undefined && wordCount(text) > hookLimit) return book.text("humanize.problem.hook-words", { id, max: hookLimit })
       const takenOpeners = hookOpeners.get(id)
       if (takenOpeners && firstWord(text) !== draftOpeners.get(id) && takenOpeners.includes(firstWord(text)))
-        return `${id}: another post already opens with "${firstWord(text)}", keep the first word you were given`
-      if (takenOpeners && text.includes("?") && !draftQuestions.has(id))
-        return `${id}: keep this hook a statement, the set already has its question`
+        return book.text("humanize.problem.opener", { id, word: firstWord(text) })
+      if (takenOpeners && text.includes("?") && !draftQuestions.has(id)) return book.text("humanize.problem.statement", { id })
       const floor = bodyFloors.get(id)
-      if (floor !== undefined && text.length < floor) return `${id}: too short, keep roughly the draft's length`
+      if (floor !== undefined && text.length < floor) return book.text("humanize.problem.too-short", { id })
       return null
     },
   })

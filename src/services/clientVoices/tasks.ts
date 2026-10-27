@@ -110,7 +110,7 @@ export async function extractTasks({ voices, missingVoices, signal }: ExtractOpt
     .map((entry) => `Voice ${entry.voice}:\n${entry.transcript.trim()}`)
     .join("\n\n")
 
-  const user = composePromptMessage(
+  const user = await composePromptMessage(
     prompt,
     [
       {

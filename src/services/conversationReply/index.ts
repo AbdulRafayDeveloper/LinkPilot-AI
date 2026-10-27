@@ -1,5 +1,6 @@
 import type { PromptDataBlock } from "@/services/promptComposer"
 import { findRelevantExperience } from "@/services/senderContext"
+import { loadPromptBook } from "@/services/promptBook"
 import { assessLeadSignalsSafely } from "@/services/leadSignals"
 import { LINKEDIN_MESSAGE_MAX_CHARS } from "@/constants/linkedinLimits"
 import type { ConversationReplyTypeId } from "@/constants/conversationReply"
@@ -7,10 +8,6 @@ import type { ConversationReplyResult } from "@/types/conversationReply"
 import { getGenerationPrompts } from "./prompts"
 import { analyzeConversation } from "./analyze"
 import { writeReply } from "./reply"
-
-// Placed where {{sender_profile}} goes when the user hasn't filled in About Me
-const NO_SENDER_PROFILE_TEXT =
-  "Not provided. You know nothing about the sender's work, services, experience or results beyond what the sender said in the conversation. Don't describe or assume any of it."
 
 interface AnalyzeAndReplyOptions {
   conversation: string
@@ -31,25 +28,28 @@ export async function analyzeAndReply({
   replyType,
   signal,
 }: AnalyzeAndReplyOptions): Promise<ConversationReplyResult> {
-  const [{ typePrompt, signalsPrompt }, experience] = await Promise.all([
+  // Every word besides the analysis, system, type and lead-signals prompts is read from the instructions prompts
+  const [{ typePrompt, signalsPrompt }, experience, book, shared] = await Promise.all([
     getGenerationPrompts(replyType),
     findRelevantExperience(),
+    loadPromptBook("conversation-reply-instructions"),
+    loadPromptBook("shared-instructions"),
   ])
 
   const dataBlocks: PromptDataBlock[] = [
-    { variable: "conversation", tag: "conversation_history", label: "Previous conversation", content: conversation, pasted: true },
-    { variable: "profile_data", tag: "profile_data", label: "Their profile", content: profileData, pasted: true },
+    { variable: "conversation", tag: "conversation_history", label: book.text("label.conversation"), content: conversation, pasted: true },
+    { variable: "profile_data", tag: "profile_data", label: book.text("label.their-profile"), content: profileData, pasted: true },
     {
       variable: "sender_profile",
       tag: "sender_profile",
-      label: "About me",
+      label: book.text("label.about-me"),
       content: experience.text,
-      emptyText: NO_SENDER_PROFILE_TEXT,
+      emptyText: book.text("empty.sender-profile"),
     },
   ]
 
   const leadSignalsPromise = assessLeadSignalsSafely({ signalsPrompt, dataBlocks, signal })
-  const { analysis, brief, userHasSpoken } = await analyzeConversation({ dataBlocks, signal })
+  const { analysis, brief, userHasSpoken } = await analyzeConversation({ dataBlocks, signal, book, shared })
   const { reply, strategyNote, provider, humanized, unsupportedSpecifics, unsupportedClaims, unsupportedSenderClaim } = await writeReply({
     typePrompt,
     replyType,
@@ -58,6 +58,7 @@ export async function analyzeAndReply({
     // With no About Me and no message of their own, any claim about the user's work is invented
     guardSenderClaims: !experience.hasProfile && !userHasSpoken,
     signal,
+    book,
   })
 
   const leadSignals = await leadSignalsPromise
