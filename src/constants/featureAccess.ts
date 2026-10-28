@@ -41,6 +41,7 @@ export const FEATURE_API_PATHS: Record<string, string[]> = {
   "important-content": ["/api/important-content"],
   employees: ["/api/employees"],
   "finance-bot": ["/api/finance-bot"],
+  "finance-budget-management": ["/api/budget"],
 }
 
 /**

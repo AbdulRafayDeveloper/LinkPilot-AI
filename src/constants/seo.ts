@@ -99,6 +99,12 @@ const TOOL_SEO: Record<string, { title: string; description: string; keywords: s
       "Ask where to invest, for a roadmap or a plan, and which platforms to use, and get answers written for you from your own profile, by text or by voice.",
     keywords: ["personal investment guide", "investment plan", "where to invest", "financial planning chatbot"],
   },
+  "finance-budget-management": {
+    title: "Budget Management, Monthly Business Money",
+    description:
+      "Record what came in and what went out each month; earning, profit, fixed and additional distribution, reinvestment and balances are worked out for you.",
+    keywords: [],
+  },
   "activity-logs": {
     title: "Activity Logs",
     description: "Every action your account has taken, newest first, with search, filters and the device it came from.",

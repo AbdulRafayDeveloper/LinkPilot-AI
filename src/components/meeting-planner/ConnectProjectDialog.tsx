@@ -15,14 +15,14 @@ import type { MeetingProject, MeetingProjectPage } from "@/types/meetingPlanner"
 
 export interface ProjectChoice {
   project: MeetingProject | null
-  // A repeating meeting only: the choice goes on this meeting and every later one
+  // A repeating meeting: the choice goes on every meeting of its series, past and upcoming
   applyToSeries: boolean
 }
 
 interface ConnectProjectDialogProps {
   // The project the meeting is connected to now, shown picked
   currentId: string | null
-  // Set for a meeting that repeats, which offers to put the choice on the rest of the series
+  // Set for a meeting that repeats, whose whole series takes the choice
   isSeries?: boolean
   // While the choice is being saved by the caller
   isSaving?: boolean
@@ -38,7 +38,8 @@ const fieldClass =
  * Picks the client project a meeting is about: every project the account has, one page at a time,
  * searched by project or client and narrowed by client and status, all in the database
  * (`GET /api/meeting-planner/client-projects`). "No project" disconnects it. A meeting that repeats
- * also asks whether the choice goes on every later meeting of its series.
+ * has one project for the whole series, so the choice goes on every meeting of it, past and upcoming,
+ * and saving the project it already has is allowed, which puts a series whose meetings disagree right.
  *
  * What is on screen is keyed by the query it was read for, so a slower answer to an older search can
  * never overwrite a newer one, and "loading" is simply that the answer on screen is for another query.
@@ -49,7 +50,6 @@ export const ConnectProjectDialog: React.FC<ConnectProjectDialogProps> = ({ curr
   const [status, setStatus] = useState("")
   const [page, setPage] = useState(1)
   const [picked, setPicked] = useState<string | null>(currentId)
-  const [applyToSeries, setApplyToSeries] = useState(false)
   const [answer, setAnswer] = useState<{ key: string; data: MeetingProjectPage | null; error: string | null } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   // The project picked, kept even when a filter takes it off the page, so Connect still knows its name
@@ -73,7 +73,7 @@ export const ConnectProjectDialog: React.FC<ConnectProjectDialogProps> = ({ curr
   const data = answer?.data ?? null
   const items = data?.items ?? []
   const isFiltered = Boolean(debounced.trim() || clientId || status)
-  const changed = picked !== currentId || (isSeries && applyToSeries)
+  const changed = picked !== currentId || isSeries
 
   const choose = (project: MeetingProject | null) => {
     pickedProject.current = project
@@ -86,7 +86,7 @@ export const ConnectProjectDialog: React.FC<ConnectProjectDialogProps> = ({ curr
   }
   const connect = () => {
     const project = picked ? (items.find((item) => item.id === picked) ?? pickedProject.current) : null
-    onPick({ project: picked ? project : null, applyToSeries: isSeries && applyToSeries })
+    onPick({ project: picked ? project : null, applyToSeries: isSeries })
   }
 
   return (
@@ -214,21 +214,10 @@ export const ConnectProjectDialog: React.FC<ConnectProjectDialogProps> = ({ curr
         {data && data.totalPages > 1 && <Pagination page={data.page} totalPages={data.totalPages} onPageChange={setPage} isLoading={isLoading} label="Project pages" />}
 
         {isSeries && (
-          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-secondary/40 bg-secondary-fixed px-3 py-2.5 text-on-secondary-fixed-variant">
-            <input type="checkbox" checked={applyToSeries} onChange={(event) => setApplyToSeries(event.target.checked)} disabled={isSaving} className="peer sr-only" />
-            <span
-              aria-hidden="true"
-              className={`mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40 ${
-                applyToSeries ? "border-primary bg-primary text-white" : "border-on-secondary-fixed-variant/40 text-transparent"
-              }`}
-            >
-              <Repeat size={11} aria-hidden="true" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[12px] font-semibold">{MEETING_PROJECT_MESSAGES.applyToSeries}</span>
-              <span className="block text-[11px]">{MEETING_PROJECT_MESSAGES.applyToSeriesHint}</span>
-            </span>
-          </label>
+          <p className="flex items-start gap-2.5 rounded-xl border border-secondary/40 bg-secondary-fixed px-3 py-2.5 text-[12px] text-on-secondary-fixed-variant">
+            <Repeat size={14} className="mt-px shrink-0" aria-hidden="true" />
+            {MEETING_PROJECT_MESSAGES.seriesNote}
+          </p>
         )}
       </div>
     </Modal>

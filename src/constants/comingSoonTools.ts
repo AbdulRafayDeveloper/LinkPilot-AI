@@ -1,4 +1,4 @@
-import { Calculator, FileSearch, MessageCircleMore, PenLine, Send, TrendingUp, Video, type LucideIcon } from "lucide-react"
+import { FileSearch, MessageCircleMore, PenLine, Send, TrendingUp, Video, type LucideIcon } from "lucide-react"
 
 /**
  * The tools that are on the sidebar but not built yet, under the areas the owner asked for: Finance,
@@ -25,16 +25,6 @@ export interface ComingSoonTool {
 
 export const COMING_SOON_TOOLS: readonly ComingSoonTool[] = [
   // Finance
-  {
-    id: "finance-budget-management",
-    title: "Budget Management",
-    description: "Where your money goes each month",
-    icon: Calculator,
-    href: "/finance/budget-management",
-    group: "finance",
-    comingSoon: true,
-    createTitle: "Budget Management",
-  },
   {
     id: "finance-investment-plans",
     title: "Investment Plans",

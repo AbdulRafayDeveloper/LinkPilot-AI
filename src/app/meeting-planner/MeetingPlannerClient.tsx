@@ -284,8 +284,8 @@ export default function MeetingPlannerClient() {
 
   /**
    * Connects a meeting to a client project from its three-dot menu, or takes it off one. A repeating
-   * meeting puts the choice on every later meeting of its series when the picker's box is ticked,
-   * through the same "series" scope every other edit uses; the calendar is read again afterwards.
+   * meeting has one project for its whole series, so the server puts the choice on every meeting of
+   * it, past and upcoming; the calendar is read again afterwards.
    */
   const saveProject = async ({ project, applyToSeries }: ProjectChoice) => {
     if (!projectFor || isSavingProject) return

@@ -398,3 +398,30 @@ select option:disabled {
     @apply pointer-events-none float-left h-0 text-outline;
   }
 }
+
+/*
+ * Printing a page that asks for it (data-print-page, Budget Management's report and month), which is
+ * how its PDF is made: the app's own frame and every control marked data-print-hide are left out, and
+ * the page is let out of the screen-high scrolling frame so every row prints, on as many pages as it takes.
+ */
+@media print {
+  [data-print-page] aside[data-app-sidebar],
+  [data-print-page] header,
+  [data-print-hide] {
+    display: none !important;
+  }
+  [data-print-page],
+  [data-print-page] > div,
+  [data-print-page] main {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  [data-print-page] {
+    background: #fff !important;
+  }
+  [data-print-page] section,
+  [data-print-page] tr {
+    break-inside: avoid;
+  }
+}

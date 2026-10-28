@@ -179,11 +179,10 @@ export const MEETING_PROJECT_MESSAGES = {
   unavailable: "Clients Management is switched off for your account, so there are no projects to connect.",
   connected: (name: string) => `Connected to ${name}.`,
   disconnected: "No longer connected to a project.",
-  // A repeating meeting is asked which meetings the choice goes on
-  applyToSeries: "Apply to this meeting and every later one in the series",
-  applyToSeriesHint: "Left unticked, only this meeting is connected.",
-  seriesConnected: (name: string) => `This meeting and every later one in the series are connected to ${name}.`,
-  seriesDisconnected: "This meeting and every later one in the series are no longer connected to a project.",
+  // A series has one project: the choice goes on every meeting of it, the ones already held included
+  seriesNote: "This meeting repeats, so every meeting in its series, past and upcoming, is connected to the project you pick.",
+  seriesConnected: (name: string) => `Every meeting in this series, past and upcoming, is connected to ${name}.`,
+  seriesDisconnected: "No meeting in this series is connected to a project any more.",
   projectGone: "Project deleted",
 } as const
 

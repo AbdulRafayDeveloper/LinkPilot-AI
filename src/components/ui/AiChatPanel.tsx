@@ -36,7 +36,7 @@ const Bubble: React.FC<BubbleProps> = ({ role, text, provider = null, note, isSt
         {isYou ? <User size={14} /> : <Bot size={14} />}
       </span>
       {/* An answer with headings and lists needs the room to lay them out; a question never does */}
-      <div className={`group flex min-w-0 flex-col gap-1 ${isYou ? "max-w-[85%] items-end" : "max-w-[92%] items-start"}`}>
+      <div className={`group flex min-w-0 flex-col gap-1 ${isYou ? "max-w-[min(85%,720px)] items-end" : "max-w-[min(92%,920px)] items-start"}`}>
         <div
           className={`break-words rounded-2xl px-3.5 py-2.5 text-[14px] leading-relaxed ${
             isYou ? "whitespace-pre-wrap bg-primary text-white" : "bg-surface-container-lowest text-on-surface ring-1 ring-outline-variant"
@@ -97,6 +97,11 @@ export interface AiChatPanelProps<M extends AiChatMessage, H> {
   suggestions?: readonly string[]
   // A chat that is the whole page rather than one panel on it gets more room
   tall?: boolean
+  /**
+   * The chat is the page: it grows to fill the room its parent gives it (a flex column), and only its
+   * list of messages scrolls, never below a readable height. Finance Bot passes it.
+   */
+  fill?: boolean
 }
 
 /**
@@ -126,6 +131,7 @@ export function AiChatPanel<M extends AiChatMessage, H>({
   maxQuestionLength,
   suggestions = [],
   tall = false,
+  fill = false,
 }: AiChatPanelProps<M, H>) {
   const [messages, setMessages] = useState<M[]>([])
   const [isReady, setIsReady] = useState(true)
@@ -256,7 +262,7 @@ export function AiChatPanel<M extends AiChatMessage, H>({
     }
   }, [isExpanded])
 
-  const listSize = isExpanded ? "" : tall ? "h-[min(62vh,680px)] min-h-[320px]" : "max-h-[420px] min-h-[220px]"
+  const listSize = isExpanded ? "" : fill ? "min-h-[300px] max-h-[70vh] lg:max-h-none lg:basis-0" : tall ? "h-[min(62vh,680px)] min-h-[320px]" : "max-h-[420px] min-h-[220px]"
   const isEmpty = messages.length === 0 && !isAnswering
 
   const chat = (
@@ -410,7 +416,10 @@ export function AiChatPanel<M extends AiChatMessage, H>({
 
   return (
     <>
-      <section aria-label={title} className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
+      <section
+        aria-label={title}
+        className={`flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm ${fill ? "flex-1 p-3 sm:p-4" : "p-5"}`}
+      >
         {!isExpanded && chat}
         {isExpanded && (
           <p className="flex items-center gap-2 py-2 text-[13px] text-on-surface-variant">

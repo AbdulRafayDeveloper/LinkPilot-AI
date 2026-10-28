@@ -366,7 +366,7 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
       "A meeting is pending, completed or cancelled, and a cancelled one stays on its day struck through.",
       "Notes on a meeting are yours to write before and after it, and no model ever reads them.",
       "A recorded meeting carries a Recorded tag; press it to open the recording.",
-      "On a repeating meeting, tick Apply to this meeting and every later one to connect the whole rest of the series to a project at once.",
+      "A repeating meeting has one project for the whole series: connect any one of its meetings and every meeting in it, past and upcoming, is connected too.",
     ],
   },
   "client-voices": {
@@ -480,10 +480,22 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
 
   // ---------------------------------------------------------------- Administration
   "finance-budget-management": {
-    summary: "Coming soon: keeps your monthly budget, what comes in and where it goes.",
+    summary: "Your business money month by month: you add what came in and what went out, and every total, distribution and balance is worked out for you.",
     steps: [
       "Open Finance on the sidebar's rail and choose Budget Management.",
-      "For now its page says Coming soon: the tool is under development and will appear there when it is ready.",
+      "Press Settings once: choose your currency, the balance you start from, and the people the profit is shared with, each with their fixed monthly amount.",
+      "Open a month from the list and add each payment: the client, the project, the amount, how you found the client, whose account it came through, how it was paid and the date.",
+      "Add the month's expenses with your own names and a category, typing straight into the list.",
+      "When every expense is in, press Review distribution: check or change each person's fixed and additional amount, then confirm.",
+      "Go back to the report to see the whole business at a glance, open any month again, or export it as a PDF or a spreadsheet.",
+    ],
+    notes: [
+      "After the fixed amounts, what is left is split in two: half stays in the business and half is shared between the people by their shares. You can change both on any month.",
+      "In a month with a loss the fixed amounts still come out of the business balance, and there is no additional distribution.",
+      "Every month shows the balance it started from, what was reinvested and the balance it ended on, and a change to any month carries through every month after it.",
+      "A payment in another currency needs its rate to your currency, or it is shown but not counted.",
+      "One payment that paid for several clients or projects can be split into parts.",
+      "Your budget is yours alone: no other account, not even an admin, can see it.",
     ],
   },
   "finance-investment-plans": {

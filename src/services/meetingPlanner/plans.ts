@@ -226,6 +226,19 @@ export interface MeetingPlanChanges {
 }
 
 /**
+ * **A series has one project.** A repeating meeting is the same meeting every week, so connecting any
+ * one of its meetings to a client project (or disconnecting it) connects every meeting of the series,
+ * the past ones as well as the ones to come, whichever form the change came from: the Connect to a
+ * project dialog, or the edit form with or without "every later one". Saving the project a meeting
+ * already has spreads it too, which is how a series whose meetings disagree is put right from the
+ * page; on a series that already agrees it changes nothing.
+ */
+async function spreadProjectOverSeries(viewer: Viewer, before: { seriesId?: string | null } | null, changes: MeetingPlanChanges): Promise<void> {
+  if (changes.projectId === undefined || !before?.seriesId) return
+  await MeetingPlanModel.updateMany({ seriesId: before.seriesId, ...visibleTo(viewer) }, { $set: { projectId: changes.projectId ?? null } })
+}
+
+/**
  * Changes the scheduling details, the status or the preparation inputs. Saved preparation is
  * never touched here: it is rewritten only when the user asks for it.
  */
@@ -233,6 +246,7 @@ export async function updateMeeting(viewer: Viewer, id: string, changes: Meeting
   const filter = visibleById(viewer, id)
   if (!filter) return null
   await connectDatabase()
+  const before = changes.projectId === undefined ? null : await MeetingPlanModel.findOne(filter, "seriesId").lean()
   const update: Record<string, unknown> = { ...changes }
   // Ticking a meeting off records when, and reopening it clears that again
   if (changes.status) update.completedAt = changes.status === "completed" ? new Date() : null
@@ -244,6 +258,7 @@ export async function updateMeeting(viewer: Viewer, id: string, changes: Meeting
     if (current?.prepStatus === "off") update.prepStatus = "queued"
   }
   const record = await MeetingPlanModel.findOneAndUpdate(filter, { $set: update }, { new: true, lean: true })
+  if (record) await spreadProjectOverSeries(viewer, before, changes)
   return record ? toDetail(record as unknown as StoredPlan) : null
 }
 
@@ -336,6 +351,8 @@ export async function updateSeriesSchedule(
   const seriesFilter = { seriesId: meeting.seriesId, ...visibleTo(viewer) }
   const last = await MeetingPlanModel.findOne(seriesFilter, "meetingDate").sort({ meetingDate: -1 }).lean()
   if (last) await MeetingPlanModel.updateMany(seriesFilter, { $set: { recurrenceUntil: last.meetingDate } })
+  // The project is the series' own, so the meetings already held take it as well as the later ones
+  await spreadProjectOverSeries(viewer, meeting, changes)
   const updated = await MeetingPlanModel.findOne(filter).lean()
   if (!updated) return "not-found"
   return { meeting: toDetail(updated as unknown as StoredPlan), changed: later.length }

@@ -1,11 +1,12 @@
 import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/metadata"
 import { requireFeaturePage } from "@/app/featurePage"
-import { ComingSoonPage } from "@/components/ui/ComingSoonPage"
+import { BUDGET_HREF, BUDGET_TOOL } from "@/constants/budget"
+import BudgetOverviewClient from "./BudgetOverviewClient"
 
-export const metadata: Metadata = pageMetadata("finance/budget-management")
+export const metadata: Metadata = pageMetadata(BUDGET_HREF.slice(1))
 
 export default async function Page() {
-  await requireFeaturePage("finance-budget-management", "/finance/budget-management")
-  return <ComingSoonPage toolId="finance-budget-management" page="create" />
+  await requireFeaturePage(BUDGET_TOOL.id, BUDGET_HREF)
+  return <BudgetOverviewClient />
 }

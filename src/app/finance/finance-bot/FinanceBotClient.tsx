@@ -49,13 +49,15 @@ export default function FinanceBotClient() {
         <Header onOpenSidebar={() => setIsSidebarOpen(true)} isSidebarCollapsed={isCollapsed} onToggleCollapse={toggleCollapsed} />
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
-          <div className="mx-auto flex max-w-[1100px] flex-col gap-4 p-4 md:p-6 lg:min-h-full lg:p-8">
+          {/* The chat is the page, so it has the whole width and fills the height under the heading; only its
+              messages scroll, and a short window scrolls the page rather than squeezing the chat */}
+          <div className="flex min-h-full flex-col gap-3 p-3 sm:p-4 lg:px-6 lg:py-4">
             <div className="min-w-0">
-              <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
+              <h1 className="flex items-center gap-2 text-xl font-bold text-on-surface sm:text-2xl">
                 <Icon size={24} className="shrink-0 text-primary" aria-hidden="true" />
                 {FINANCE_BOT_TOOL.title}
               </h1>
-              <p className="mt-1 text-sm text-on-surface-variant">
+              <p className="mt-0.5 text-[13px] text-on-surface-variant">
                 Your own guide to saving and investing: where to put your money, a roadmap step by step, the platforms to use and what each term means, all
                 written for you from your My AI Profile.
               </p>
@@ -87,11 +89,11 @@ export default function FinanceBotClient() {
               clearDescription={FINANCE_BOT_MESSAGES.clearDescription}
               maxQuestionLength={FINANCE_QUESTION_MAX_LENGTH}
               suggestions={FINANCE_BOT_SUGGESTIONS}
-              tall
+              fill
             />
 
-            <p className="flex items-start gap-2 px-1 text-[12px] text-on-surface-variant">
-              <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <p className="flex items-start gap-2 px-1 text-[11px] text-outline">
+              <Info size={13} className="mt-px shrink-0" aria-hidden="true" />
               {FINANCE_BOT_MESSAGES.disclaimer}
             </p>
           </div>

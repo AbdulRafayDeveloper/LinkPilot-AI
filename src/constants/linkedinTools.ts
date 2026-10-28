@@ -36,6 +36,7 @@ import { EMPLOYEES_TOOL } from "./employees"
 import { ADMIN_TOOL } from "./admin"
 import { ACTIVITY_LOGS_TOOL } from "./activityLogs"
 import { FINANCE_BOT_TOOL } from "./financeBot"
+import { BUDGET_TOOL } from "./budget"
 import { TRENDING_HISTORY_HREF } from "./trending"
 import { PROFILE_SCHEDULER_LINK } from "./profileScheduler"
 import { SAVED_OUTPUT_TOOLS, savedOutputsHref, type SavedOutputToolId } from "./savedOutputs"
@@ -218,6 +219,8 @@ export const APP_TOOLS: LinkedInTool[] = [
   // What prompts are written for, managed here and picked from in Prompt Creator
   // Finance: the bot that guides the person's own investing, first, before the tools still coming
   FINANCE_BOT_TOOL,
+  // Budget Management: the business's money month by month, where it was "coming soon"
+  BUDGET_TOOL,
   // Upwork, Fiverr and Hubstaff Talent: their tools are on the sidebar and all of them are coming soon
   // for now. A tool with a "view all" page is a dropdown of its two pages; one without is a single row
   ...COMING_SOON_TOOLS.map(

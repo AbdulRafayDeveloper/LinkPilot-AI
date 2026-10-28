@@ -35,6 +35,8 @@ export const FILTER_VIEWS: Record<string, readonly string[]> = {
   "admin-audit": ["search", "event", "from", "to"],
   "admin-backups": ["search", "status", "trigger", "from", "to"],
   "admin-users": ["search", "role"],
+  // Budget Management's report, narrowed to one year
+  "budget-overview": ["year"],
   "activity-logs": ["search", "module", "action", "outcome", "from", "to"],
   // One account's activities for an admin, with whether the person deleted them
   "admin-user-activities": ["search", "module", "action", "outcome", "state", "from", "to"],
