@@ -36,9 +36,21 @@ export const MAX_CLIENT_PROJECTS = 200
  */
 export const CLIENT_PROJECT_INSTRUCTIONS_MAX_LENGTH = 4000
 
+/**
+ * Where a project stands, in the order the dropdown offers them (at the owner's request: Active and
+ * Completed were not enough to say what a project really is). `isOpen` is whether it is still work
+ * in hand: open projects come first wherever projects are offered (Prompt Creator's picker), and
+ * a closed one is marked. A project saved before these existed is one of the first two and reads
+ * exactly as it did.
+ */
 export const CLIENT_PROJECT_STATUSES = [
-  { id: "active", label: "Active", description: "Still being worked on" },
-  { id: "completed", label: "Completed", description: "Delivered and closed" },
+  { id: "discovery", label: "Discovery", description: "Talking it through and finding out what they need", isOpen: true },
+  { id: "planning", label: "Planning", description: "Agreed and being scoped, work not started yet", isOpen: true },
+  { id: "active", label: "Active", description: "Being worked on now", isOpen: true },
+  { id: "on-hold", label: "On hold", description: "Paused, waiting on the client or something else", isOpen: true },
+  { id: "maintenance", label: "Maintenance", description: "Delivered, with ongoing support and small fixes", isOpen: true },
+  { id: "completed", label: "Completed", description: "Delivered and closed", isOpen: false },
+  { id: "cancelled", label: "Cancelled", description: "Stopped before it was finished", isOpen: false },
 ] as const
 
 export type ClientProjectStatus = (typeof CLIENT_PROJECT_STATUSES)[number]["id"]
@@ -49,6 +61,46 @@ export const CLIENT_PROJECT_STATUS_IDS = CLIENT_PROJECT_STATUSES.map((status) =>
 ]
 
 export const DEFAULT_CLIENT_PROJECT_STATUS: ClientProjectStatus = "active"
+
+/** One status by its id; anything the app no longer knows reads as the default rather than as nothing. */
+export const clientProjectStatus = (id: string) =>
+  CLIENT_PROJECT_STATUSES.find((status) => status.id === id) ?? CLIENT_PROJECT_STATUSES.find((status) => status.id === DEFAULT_CLIENT_PROJECT_STATUS)!
+
+// Whether a project is still work in hand (every status but Completed and Cancelled)
+export const isOpenProjectStatus = (id: string) => clientProjectStatus(id).isOpen
+
+/** How many projects stand at each status, every status present (0 when none). */
+export const countByStatus = (statuses: readonly string[]): Record<ClientProjectStatus, number> =>
+  Object.fromEntries(
+    CLIENT_PROJECT_STATUSES.map((status) => [status.id, statuses.filter((id) => clientProjectStatus(id).id === status.id).length])
+  ) as Record<ClientProjectStatus, number>
+
+/** The counts as one short line, only the statuses that have any: "4 active · 1 maintenance". */
+export const describeStatusCounts = (counts: Record<ClientProjectStatus, number>) =>
+  CLIENT_PROJECT_STATUSES.filter((status) => counts[status.id] > 0)
+    .map((status) => `${counts[status.id]} ${status.label.toLowerCase()}`)
+    .join(" · ") || "No projects yet"
+
+/**
+ * Whether a client is one person or a company, chosen on the client's form (at the owner's request).
+ * Individual is the default and what every client saved before reads as.
+ */
+// The most clients one dragged order may name; far past any real list, so it only stops a runaway body
+export const MAX_CLIENTS = 1000
+
+export const CLIENT_KINDS = [
+  { id: "individual", label: "Individual", description: "One person you work with directly" },
+  { id: "company", label: "Company", description: "A business, agency or team" },
+] as const
+
+export type ClientKind = (typeof CLIENT_KINDS)[number]["id"]
+
+export const CLIENT_KIND_IDS = CLIENT_KINDS.map((kind) => kind.id) as [ClientKind, ...ClientKind[]]
+
+export const DEFAULT_CLIENT_KIND: ClientKind = "individual"
+
+// A stored value the app no longer knows reads as the default, so every client always has a kind
+export const clientKindOf = (id: unknown): ClientKind => (CLIENT_KIND_IDS as readonly unknown[]).includes(id) ? (id as ClientKind) : DEFAULT_CLIENT_KIND
 
 export const CLIENTS_MESSAGES = {
   loadFailed: "Couldn't load your clients. Please try again.",
@@ -62,6 +114,17 @@ export const CLIENTS_MESSAGES = {
   deleteExplains: "Its projects go with it. Messages already written for this client stay in the history.",
   empty: "No clients yet. Add the first one, with their message format and two sample messages.",
   noMatch: "No clients match these filters.",
+  kindLabel: "Individual or company",
+  // The two filters beside the search
+  kindFilter: "Type",
+  anyKind: "Any type",
+  projectStatusFilter: "Has a project that is",
+  anyProjectStatus: "Any project",
+  // Dragging the clients into the order they are worked with
+  dragHint: "Drag a client by its handle to put it where you want it in the list.",
+  dragOffWhileFiltered: "Clear the filters to drag the clients into order.",
+  orderFailed: "Couldn't save the new order. Please try again.",
+  orderChanged: "Your clients changed in another tab, so the list was read again.",
   choose: "Choose a client",
   chooseHint: "Their details and the projects you are doing for them open here.",
   // The message format and the sample messages are long, and reading them is not what this page is
@@ -82,7 +145,12 @@ export const CLIENT_PROJECT_MESSAGES = {
   missingName: "Give the project a name.",
   nameTooLong: `The project name must be under ${CLIENT_PROJECT_NAME_MAX_LENGTH} characters.`,
   descriptionTooLong: `The description must be under ${CLIENT_PROJECT_DESCRIPTION_MAX_LENGTH.toLocaleString()} characters.`,
-  missingStatus: "Choose whether the project is active or completed.",
+  missingStatus: "Choose where the project stands.",
+  statusLabel: "Status",
+  // Dragging the projects of one client into the order they are worked in
+  dragHint: "Drag a project by its handle to put it where you want it in the list.",
+  orderFailed: "Couldn't save the new order. Please try again.",
+  orderChanged: "This client's projects changed in another tab, so the list was read again.",
   tooMany: `You can keep up to ${MAX_CLIENT_PROJECTS} projects for one client.`,
   empty: "No projects for this client yet.",
   deleteExplains:

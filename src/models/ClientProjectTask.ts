@@ -73,6 +73,18 @@ export interface IClientProjectTask {
   stage: string | null
   // Whether the client may read this note. False on every other tab, so nothing leaks by default
   isClientVisible: boolean
+  /**
+   * An overview voice written out and read back in clear English (services/clientProjects/voiceText.ts):
+   * what was said word for word, the English, the language it was spoken in and who wrote it.
+   * `voiceTextFor` is the voice note they were written from, so a voice recorded again reads as
+   * not written out yet rather than showing words from a recording that is gone. "" and null on
+   * everything nobody has written out.
+   */
+  voiceTranscript: string
+  voiceEnglish: string
+  voiceLanguage: string
+  voiceTextProvider: string | null
+  voiceTextFor: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -121,6 +133,11 @@ const ClientProjectTaskSchema = new Schema<IClientProjectTask>(
     signedAt: { type: Date, default: null },
     stage: { type: String, enum: [...ROADMAP_STAGE_IDS, null], default: null },
     isClientVisible: { type: Boolean, default: false },
+    voiceTranscript: { type: String, default: "" },
+    voiceEnglish: { type: String, default: "" },
+    voiceLanguage: { type: String, default: "" },
+    voiceTextProvider: { type: String, default: null },
+    voiceTextFor: { type: String, default: null },
   },
   { timestamps: true, collection: "client_project_tasks" }
 )

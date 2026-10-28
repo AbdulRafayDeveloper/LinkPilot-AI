@@ -1,4 +1,5 @@
 import type { MessageChannelId } from "@/constants/clientMessaging"
+import type { ClientKind, ClientProjectStatus } from "@/constants/clients"
 import type { EditablePrompt } from "./prompts"
 import type { WithAiSource } from "./ai"
 
@@ -10,10 +11,14 @@ export interface Client {
   id: string
   name: string
   country: string
+  // One person or a company
+  kind: ClientKind
   // How this client's messages are laid out, in the user's own words
   messageFormat: string
   // Real messages sent to this client before, used only as reference for the shape
   sampleMessages: string[]
+  // Every status this client's projects stand at, each once, so the list can be filtered by them
+  projectStatuses: ClientProjectStatus[]
   createdAt: string
   updatedAt: string
 }
@@ -21,6 +26,8 @@ export interface Client {
 export interface ClientInput {
   name: string
   country: string
+  // Optional in the API: left out, a new client is an individual and an edited one keeps its kind
+  kind?: ClientKind
   messageFormat: string
   sampleMessages: string[]
 }

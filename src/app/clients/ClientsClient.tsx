@@ -1,19 +1,29 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { AlertTriangle, Building2, Eye, FileText, Globe2, Loader2, MessageSquareText, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { AlertTriangle, Building2, Eye, FileText, Globe2, Loader2, MessageSquareText, Pencil, Plus, RefreshCw, Trash2, User } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
 import { CopyButton } from "@/components/ui/CopyButton"
-import { FilterPanel, SearchFilter } from "@/components/history/HistoryFilters"
+import { FilterPanel, SearchFilter, SelectFilter } from "@/components/history/HistoryFilters"
+import { SortableList } from "@/components/ui/SortableList"
 import { ClientDialog } from "@/components/clients/ClientDialog"
 import { ClientProjectsPanel } from "@/components/clients/ClientProjectsPanel"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { useSavedFilters } from "@/hooks/useSavedFilters"
-import { filtersOf, savedText, type SavedFilters } from "@/lib/savedFilters"
+import { filtersOf, oneOf, savedText, type SavedFilters } from "@/lib/savedFilters"
 import { requestApi } from "@/lib/apiClient"
-import { CLIENTS_ENDPOINT, CLIENTS_MESSAGES } from "@/constants/clients"
+import {
+  CLIENTS_ENDPOINT,
+  CLIENTS_MESSAGES,
+  CLIENT_KINDS,
+  CLIENT_KIND_IDS,
+  CLIENT_PROJECT_STATUSES,
+  CLIENT_PROJECT_STATUS_IDS,
+  type ClientKind,
+  type ClientProjectStatus,
+} from "@/constants/clients"
 import { SAMPLE_MESSAGE_COUNT } from "@/constants/clientMessaging"
 import type { Client } from "@/types/clientMessaging"
 
@@ -33,6 +43,11 @@ const matches = (client: Client, search: string) => {
   return words.every((word) => haystack.includes(word))
 }
 
+const KIND_OPTIONS = CLIENT_KINDS.map((kind) => ({ id: kind.id, label: kind.label }))
+const STATUS_OPTIONS = CLIENT_PROJECT_STATUSES.map((status) => ({ id: status.id, label: status.label }))
+
+const kindLabel = (kind: ClientKind) => CLIENT_KINDS.find((entry) => entry.id === kind)?.label ?? ""
+
 const filledSamples = (client: Client) => client.sampleMessages.filter((sample) => sample.trim())
 
 /**
@@ -48,6 +63,10 @@ export default function ClientsClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [attempt, setAttempt] = useState(0)
   const [search, setSearch] = useState("")
+  const [kind, setKind] = useState<ClientKind | "">("")
+  const [status, setStatus] = useState<ClientProjectStatus | "">("")
+  const [orderError, setOrderError] = useState<string | null>(null)
+  const orderQueue = useRef<Promise<void>>(Promise.resolve())
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dialog, setDialog] = useState<{ client: Client | null } | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
@@ -79,17 +98,53 @@ export default function ClientsClient() {
     return () => controller.abort()
   }, [load, attempt])
 
-  const shown = (clients ?? []).filter((client) => matches(client, search))
+  // Search, type and project status narrow the list together; a client counts for a status when any
+  // one of its projects stands there
+  const shown = (clients ?? []).filter(
+    (client) =>
+      matches(client, search) && (!kind || client.kind === kind) && (!status || client.projectStatuses.includes(status))
+  )
   // Nobody chosen yet (a fresh load, or the chosen one was deleted): the first client is open
   const current = clients?.find((client) => client.id === selectedId) ?? shown[0] ?? null
-  const hasFilters = search.trim().length > 0
+  const hasFilters = search.trim().length > 0 || kind !== "" || status !== ""
 
-  // The search is kept on the account, so the list opens the way it was left (hooks/useSavedFilters)
+  // The filters are kept on the account, so the list opens the way it was left (hooks/useSavedFilters)
   useSavedFilters({
     view: "clients",
-    filters: filtersOf({ search }),
-    apply: (saved: SavedFilters) => setSearch(savedText(saved.search)),
+    filters: filtersOf({ search, kind, status }),
+    apply: (saved: SavedFilters) => {
+      setSearch(savedText(saved.search))
+      setKind(oneOf<ClientKind>(saved.kind, CLIENT_KIND_IDS))
+      setStatus(oneOf<ClientProjectStatus>(saved.status, CLIENT_PROJECT_STATUS_IDS))
+    },
   })
+
+  const clearFilters = () => {
+    setSearch("")
+    setKind("")
+    setStatus("")
+  }
+
+  /**
+   * A drop shows at once and the whole order is saved behind it, one save after another so quick drags
+   * land in the order they were made. A list the server says has changed (a client added or deleted in
+   * another tab) is read again rather than written over.
+   */
+  const reorder = (ids: string[]) => {
+    if (!clients) return
+    const byId = new Map(clients.map((client) => [client.id, client]))
+    setOrderError(null)
+    setClients(ids.map((id) => byId.get(id)).filter((client): client is Client => Boolean(client)))
+    orderQueue.current = orderQueue.current.then(async () => {
+      try {
+        await requestApi(`${CLIENTS_ENDPOINT}/order`, { method: "PUT", body: JSON.stringify({ orderedIds: ids }) })
+      } catch (reason: unknown) {
+        setOrderError(reason instanceof Error ? reason.message : CLIENTS_MESSAGES.orderFailed)
+        setIsLoading(true)
+        setAttempt((count) => count + 1)
+      }
+    })
+  }
 
   const choose = (client: Client) => {
     setSelectedId(client.id)
@@ -159,12 +214,26 @@ export default function ClientsClient() {
               {/* The clients */}
               <div className="flex min-w-0 flex-col gap-3">
                 <FilterPanel
-                  columnsClassName="xl:grid-cols-1"
+                  columnsClassName="sm:grid-cols-2 xl:grid-cols-2"
                   canClear={hasFilters}
-                  onClear={() => setSearch("")}
+                  onClear={clearFilters}
                   summary={clients ? `${shown.length.toLocaleString()} of ${clients.length.toLocaleString()} shown` : "Loading your clients..."}
                 >
                   <SearchFilter value={search} onChange={setSearch} placeholder="Name or country" />
+                  <SelectFilter
+                    label={CLIENTS_MESSAGES.kindFilter}
+                    allLabel={CLIENTS_MESSAGES.anyKind}
+                    value={kind}
+                    options={KIND_OPTIONS}
+                    onChange={(value) => setKind(oneOf<ClientKind>(value, CLIENT_KIND_IDS))}
+                  />
+                  <SelectFilter
+                    label={CLIENTS_MESSAGES.projectStatusFilter}
+                    allLabel={CLIENTS_MESSAGES.anyProjectStatus}
+                    value={status}
+                    options={STATUS_OPTIONS}
+                    onChange={(value) => setStatus(oneOf<ClientProjectStatus>(value, CLIENT_PROJECT_STATUS_IDS))}
+                  />
                 </FilterPanel>
 
                 {error && !clients ? (
@@ -194,35 +263,63 @@ export default function ClientsClient() {
                     <p className="text-sm text-on-surface-variant">{hasFilters ? CLIENTS_MESSAGES.noMatch : CLIENTS_MESSAGES.empty}</p>
                   </div>
                 ) : (
-                  <ul className={`flex flex-col gap-2 transition-opacity ${isLoading ? "opacity-60" : ""}`} aria-busy={isLoading}>
-                    {shown.map((client) => {
-                      const isSelected = current?.id === client.id
-                      return (
-                        <li key={client.id}>
-                          <button
-                            type="button"
-                            onClick={() => choose(client)}
-                            aria-current={isSelected ? "true" : undefined}
-                            className={`flex w-full min-w-0 items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-                              isSelected ? "border-primary bg-primary-fixed/40" : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container-lowest"
+                  <div className={`transition-opacity ${isLoading ? "opacity-60" : ""}`} aria-busy={isLoading}>
+                    {/* A narrowed list is only part of the order, so dragging waits until the filters are off */}
+                    {shown.length > 1 && (
+                      <p className="mb-2 text-[12px] text-outline">{hasFilters ? CLIENTS_MESSAGES.dragOffWhileFiltered : CLIENTS_MESSAGES.dragHint}</p>
+                    )}
+                    {orderError && (
+                      <p role="alert" className="mb-2 rounded-xl bg-error-container px-3 py-2 text-[13px] text-on-error-container">
+                        {orderError}
+                      </p>
+                    )}
+                    <SortableList
+                      items={shown}
+                      getId={(client) => client.id}
+                      getLabel={(client) => client.name}
+                      onReorder={reorder}
+                      disabled={hasFilters || isLoading}
+                      label="Your clients, in order"
+                      itemNoun="clients"
+                      className="flex flex-col gap-2"
+                      renderItem={(client, handle) => {
+                        const isSelected = current?.id === client.id
+                        const KindIcon = client.kind === "company" ? Building2 : User
+                        return (
+                          <div
+                            className={`flex min-w-0 items-center gap-2 rounded-2xl border pl-2 transition-colors ${
+                              isSelected ? "border-primary bg-primary-fixed/40" : "border-outline-variant bg-surface-container-lowest"
                             }`}
                           >
-                            <span
-                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${
-                                isSelected ? "bg-primary text-white" : "bg-primary-fixed text-on-primary-fixed-variant"
-                              }`}
+                            {handle}
+                            <button
+                              type="button"
+                              onClick={() => choose(client)}
+                              aria-current={isSelected ? "true" : undefined}
+                              className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-3 pr-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                             >
-                              {initialsOf(client.name)}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-[14px] font-semibold text-on-surface">{client.name}</span>
-                              <span className="block truncate text-[12px] text-on-surface-variant">{client.country}</span>
-                            </span>
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
+                              <span
+                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${
+                                  isSelected ? "bg-primary text-white" : "bg-primary-fixed text-on-primary-fixed-variant"
+                                }`}
+                              >
+                                {initialsOf(client.name)}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[14px] font-semibold text-on-surface">{client.name}</span>
+                                <span className="flex min-w-0 items-center gap-1 text-[12px] text-on-surface-variant">
+                                  <KindIcon size={12} className="shrink-0" aria-hidden="true" />
+                                  <span className="truncate">
+                                    {kindLabel(client.kind)} · {client.country}
+                                  </span>
+                                </span>
+                              </span>
+                            </button>
+                          </div>
+                        )
+                      }}
+                    />
+                  </div>
                 )}
               </div>
 
@@ -241,6 +338,13 @@ export default function ClientsClient() {
                           <div className="min-w-0">
                             <h2 className="truncate text-xl font-bold text-on-surface">{current.name}</h2>
                             <p className="flex items-center gap-1.5 text-[13px] text-on-surface-variant">
+                              {current.kind === "company" ? (
+                                <Building2 size={13} className="shrink-0" aria-hidden="true" />
+                              ) : (
+                                <User size={13} className="shrink-0" aria-hidden="true" />
+                              )}
+                              {kindLabel(current.kind)}
+                              <span aria-hidden="true">·</span>
                               <Globe2 size={13} className="shrink-0" aria-hidden="true" />
                               {current.country}
                             </p>

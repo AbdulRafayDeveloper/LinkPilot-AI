@@ -44,7 +44,7 @@ import type { Viewer } from "@/types/auth"
  * made for them; a page receives each with a short-lived link, never a key.
  */
 
-type StoredTask = IClientProjectTask & { _id: { toString: () => string } }
+export type StoredTask = IClientProjectTask & { _id: { toString: () => string } }
 type StoredProject = IClientProject & { _id: { toString: () => string } }
 
 /**
@@ -176,8 +176,20 @@ async function nextNumber(projectId: string, kind: ProjectItemKind): Promise<num
   return (highest?.number ?? 0) + 1
 }
 
+/** The English an overview voice was written out as, while it still belongs to the voice on the item. */
+function voiceTextOf(record: StoredTask): ProjectTask["voiceText"] {
+  const english = (record.voiceEnglish ?? "").trim()
+  if (!english || !record.voiceNote?.assetId || record.voiceTextFor !== record.voiceNote.assetId) return null
+  return {
+    english,
+    transcript: record.voiceTranscript ?? "",
+    language: record.voiceLanguage || "Unknown",
+    provider: record.voiceTextProvider ?? null,
+  }
+}
+
 /** One item with its links signed, ready for a page. */
-async function toTask(record: StoredTask): Promise<ProjectTask> {
+export async function toTask(record: StoredTask): Promise<ProjectTask> {
   const [images, files, voiceNote] = await Promise.all([
     Promise.all((record.images ?? []).map((image) => taskImageView(image))),
     Promise.all((record.files ?? []).map((file) => projectFileView(storedProjectFile(file)))),
@@ -210,6 +222,7 @@ async function toTask(record: StoredTask): Promise<ProjectTask> {
     // Where a roadmap item has got to, and whether the client may read a note
     stage: projectItemShape(record.kind).stage ? roadmapStage(record.stage).id : null,
     isClientVisible: record.isClientVisible === true,
+    voiceText: voiceTextOf(record),
     createdAt: new Date(record.createdAt).toISOString(),
     updatedAt: new Date(record.updatedAt).toISOString(),
   }

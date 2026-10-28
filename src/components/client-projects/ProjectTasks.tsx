@@ -1,10 +1,11 @@
 "use client"
 
 import React, { useState } from "react"
-import { ArrowLeftRight, Download, Eye, FolderInput, Link2, Loader2, Pencil, Trash2 } from "lucide-react"
+import { ArrowLeftRight, Download, Eye, FolderInput, Languages, Link2, Loader2, Pencil, Trash2 } from "lucide-react"
 import { SortableList } from "@/components/ui/SortableList"
 import { TaskDetailsView } from "@/components/tasks/TaskDetailsView"
 import { CopyFileButton } from "@/components/ui/CopyFileButton"
+import { CopyButton } from "@/components/ui/CopyButton"
 import { copyKindOf } from "@/lib/copyFile"
 import {
   PROJECT_DETAILS_OPEN_MAX_CHARS,
@@ -75,6 +76,12 @@ interface ProjectTasksProps {
    * so one specification cannot bury every item under it.
    */
   detailsOpen?: boolean
+  /**
+   * Writing an overview voice out in clear English (the tabs whose shape has `voiceText`). The
+   * surface makes the call and puts the item it answers back in its list. Left out, the English
+   * already written is still shown and no button is offered.
+   */
+  onVoiceText?: (task: ProjectTask) => Promise<void>
 }
 
 const actionButton =
@@ -92,6 +99,81 @@ const VoiceNotePlayer: React.FC<{ task: ProjectTask }> = ({ task }) =>
       <span className="text-[11px] text-outline">{clock(task.voiceNote.seconds)}</span>
     </div>
   ) : null
+
+/**
+ * An overview voice, written out and read back in clear English: the English to read and copy, the
+ * language it was spoken in, what was said word for word behind a toggle, and the button that writes
+ * it (again). The same markup on the page and behind a shared link.
+ */
+const VoiceTextPanel: React.FC<{ task: ProjectTask; onWrite?: (task: ProjectTask) => Promise<void> }> = ({ task, onWrite }) => {
+  const [isWriting, setIsWriting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [showSpoken, setShowSpoken] = useState(false)
+  const text = task.voiceText
+
+  const write = async () => {
+    if (!onWrite || isWriting) return
+    setIsWriting(true)
+    setError(null)
+    try {
+      await onWrite(task)
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.voiceTextFailed)
+    } finally {
+      setIsWriting(false)
+    }
+  }
+
+  if (!text && !onWrite) return null
+  return (
+    <div className="flex flex-col gap-2">
+      {text && (
+        <div className="rounded-xl border border-primary/20 bg-primary-fixed/30 p-3">
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-[12px] font-bold text-on-surface">
+              <Languages size={14} className="text-primary" aria-hidden="true" />
+              {PROJECT_TASK_MESSAGES.voiceTextHeading}
+              <span className="font-medium text-outline">· {PROJECT_TASK_MESSAGES.voiceTextFrom(text.language)}</span>
+            </p>
+            <CopyButton text={text.english} label={`Copy the English of ${task.content}`} />
+          </div>
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-on-surface [overflow-wrap:anywhere]">{text.english}</p>
+          {text.transcript && (
+            <>
+              <button type="button" onClick={() => setShowSpoken((open) => !open)} aria-expanded={showSpoken} className={`${actionButton} mt-1.5 -ml-2`}>
+                {showSpoken ? PROJECT_TASK_MESSAGES.voiceTextHideSpoken : PROJECT_TASK_MESSAGES.voiceTextShowSpoken}
+              </button>
+              {showSpoken && (
+                <div className="mt-1 rounded-lg bg-surface-container-lowest p-2">
+                  <p className="mb-1 text-[11px] font-semibold text-outline">{PROJECT_TASK_MESSAGES.voiceTextSpokenHeading}</p>
+                  <p className="whitespace-pre-wrap text-[12px] text-on-surface-variant [overflow-wrap:anywhere]">{text.transcript}</p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+      {onWrite && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void write()}
+            disabled={isWriting}
+            className="inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border border-primary/40 px-3 py-1.5 text-[12px] font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-60"
+          >
+            {isWriting ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Languages size={13} aria-hidden="true" />}
+            {isWriting ? PROJECT_TASK_MESSAGES.voiceTextWriting : text ? PROJECT_TASK_MESSAGES.voiceTextAgain : PROJECT_TASK_MESSAGES.voiceTextWrite}
+          </button>
+          {error && (
+            <p role="alert" className="text-[12px] text-error">
+              {error}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /**
  * The files on one item, and the two things anyone wants to do with one: **see it** and **keep it**.
@@ -217,6 +299,7 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
   onStage,
   onShare,
   readOnly,
+  onVoiceText,
 }) => {
   const words = projectItemKind(kind)
   const shape = words.shape
@@ -379,6 +462,12 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
           </div>
         )}
         {task.voiceNote && <div className="pl-6">{<VoiceNotePlayer task={task} />}</div>}
+        {/* An overview voice, read back in clear English: offered once there is a voice to read */}
+        {shape.voiceText && task.voiceNote && (
+          <div className="pl-6">
+            <VoiceTextPanel task={task} onWrite={readOnly ? undefined : onVoiceText} />
+          </div>
+        )}
       </div>
     )
   }

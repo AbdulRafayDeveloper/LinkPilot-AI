@@ -138,8 +138,20 @@ export interface ProjectTask {
   stage: RoadmapStage | null
   // Whether the client may read this note. False everywhere else, so nothing is shared by accident
   isClientVisible: boolean
+  // An overview voice written out in clear English; null until it is, and again once it is recorded anew
+  voiceText: ProjectVoiceText | null
   createdAt: string
   updatedAt: string
+}
+
+/** An overview voice, written out word for word and read back in clear English. */
+export interface ProjectVoiceText {
+  english: string
+  transcript: string
+  // The language it was spoken in, named in English ("Roman Urdu")
+  language: string
+  // Who wrote the English, so the page can say so; null on one written before it was kept
+  provider: string | null
 }
 
 /**

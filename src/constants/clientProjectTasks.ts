@@ -75,6 +75,12 @@ export interface ProjectItemShape {
    * "Change 12" is that item's name for good however the list is dragged (see `shownItems`).
    */
   numberByOrder: boolean
+  /**
+   * Whether an item's voice note can be **written out and read back in clear English** (the
+   * project overview's voices, which a client often records in Urdu or Roman Urdu). The words are
+   * kept on the item beside the recording they were written from.
+   */
+  voiceText: boolean
 }
 
 /**
@@ -94,6 +100,7 @@ const NOTHING: ProjectItemShape = {
   stage: false,
   shareable: false,
   numberByOrder: false,
+  voiceText: false,
 }
 const shapeOf = (parts: Partial<ProjectItemShape>): ProjectItemShape => ({ ...NOTHING, ...parts })
 
@@ -112,10 +119,9 @@ const BACKLOG: ProjectItemShape = shapeOf({ ...SIGNABLE, estimate: true })
 const NOTE = { label: "Note", hint: "Anything worth saying about it", required: false }
 
 /**
- * The kinds of item a project carries, which are the tabs on both surfaces, in order. The first is
- * the default (`DEFAULT_PROJECT_ITEM_KIND` reads `PROJECT_ITEM_KINDS[0]`), so **Changes** is what
- * the owner's page and a shared link both open on, the same rule Post Comment Replies' styles
- * follow.
+ * The kinds of item a project carries, which are the tabs on both surfaces, in order. **Changes**
+ * is what the owner's page and a shared link both open on (`DEFAULT_PROJECT_ITEM_KIND`, named
+ * rather than taken from the top, since the Overview is listed before it).
  *
  * They are one collection with a `kind` on each row, never a collection per tab: an item carries
  * the same fields whichever tab it sits under, and `shape` says which of them that tab uses, so one
@@ -128,6 +134,31 @@ const NOTE = { label: "Note", hint: "Anything worth saying about it", required: 
  * anything else. So a client holding the link can neither see nor reach either of them.
  */
 export const PROJECT_ITEM_KINDS = [
+  {
+    /**
+     * What the project **is**, understood: named voices explaining it and descriptions written out,
+     * at the owner's request. First, because it is read before anything else, but **not the default
+     * tab**: both surfaces still open on Changes, where the day's work is (`DEFAULT_PROJECT_ITEM_KIND`).
+     * The client adds to it from the shared link too, since they are the one who knows the project.
+     */
+    id: "overview",
+    label: "Overview",
+    one: "overview entry",
+    tag: "Overview",
+    movable: false,
+    addLabel: "Add to the overview",
+    placeholder: "A name for it (the client's brief, how payments work, the main users)",
+    doneLabel: "done",
+    empty: "Nothing in the overview yet. Add a voice or a description of the project above.",
+    isPublic: true,
+    shape: shapeOf({
+      text: { label: "Description", hint: "What the project is, in your own words, as clearly as you can", required: false },
+      talk: true,
+      files: "optional",
+      voiceText: true,
+      numberByOrder: true,
+    }),
+  },
   {
     id: "change",
     label: "Changes",
@@ -332,11 +363,15 @@ export const PROJECT_ITEM_KINDS = [
 
 export type ProjectItemKind = (typeof PROJECT_ITEM_KINDS)[number]["id"]
 export const PROJECT_ITEM_KIND_IDS = PROJECT_ITEM_KINDS.map((kind) => kind.id) as [ProjectItemKind, ...ProjectItemKind[]]
-export const DEFAULT_PROJECT_ITEM_KIND: ProjectItemKind = PROJECT_ITEM_KINDS[0].id
+// Changes, by name rather than by place: the Overview sits before it in the list and is not the default
+const CHANGES_KIND = PROJECT_ITEM_KINDS.find((kind) => kind.id === "change") ?? PROJECT_ITEM_KINDS[0]
+export const DEFAULT_PROJECT_ITEM_KIND: ProjectItemKind = CHANGES_KIND.id
 
-/** One kind by its id, falling back to the default so an unknown value never leaves a page blank. */
-export const projectItemKind = (id: string | null | undefined) =>
-  PROJECT_ITEM_KINDS.find((kind) => kind.id === id) ?? PROJECT_ITEM_KINDS[0]
+/**
+ * One kind by its id, falling back to Changes so an unknown value never leaves a page blank, and an
+ * item saved before the tabs existed (no kind at all) reads as the change it always was.
+ */
+export const projectItemKind = (id: string | null | undefined) => PROJECT_ITEM_KINDS.find((kind) => kind.id === id) ?? CHANGES_KIND
 
 /** What an item of that kind carries, which is what both surfaces render it from. */
 export const projectItemShape = (id: string | null | undefined): ProjectItemShape => projectItemKind(id).shape
@@ -363,7 +398,7 @@ export const PUBLIC_WRITABLE_KIND_IDS = PUBLIC_WRITABLE_KINDS.map((kind) => kind
 /** Whether someone holding the link may add to, change or reorder that tab. */
 export const canClientWrite = (id: string | null | undefined): boolean => PUBLIC_WRITABLE_KINDS.some((kind) => kind.id === projectItemKind(id).id)
 export const PUBLIC_ITEM_KIND_IDS = PUBLIC_ITEM_KINDS.map((kind) => kind.id) as [ProjectItemKind, ...ProjectItemKind[]]
-export const DEFAULT_PUBLIC_ITEM_KIND: ProjectItemKind = PUBLIC_ITEM_KINDS[0].id
+export const DEFAULT_PUBLIC_ITEM_KIND: ProjectItemKind = DEFAULT_PROJECT_ITEM_KIND
 /** Whether a shared link may ever show an item of that kind. An unknown kind reads as a change. */
 export const isPublicItemKind = (id: string | null | undefined): boolean => projectItemKind(id).isPublic
 
@@ -527,6 +562,12 @@ export const PROJECT_FILE_UPLOAD_HOURS = 24
  * rate. `tests/clientProjectTasks.test.mjs` fails if raising one of them outgrows the other.
  */
 export const VOICE_NOTE_MAX_BYTES = VOICE_MAX_BYTES
+/**
+ * The longest a written-out overview voice may be before it is read back in English. It is read by a
+ * model, so it is paid for by the token and kept far under any plain text box: a quarter of an hour
+ * of speech is well inside it.
+ */
+export const VOICE_TEXT_MAX_CHARS = 16_000
 export const VOICE_NOTE_MAX_SECONDS = 15 * 60
 export const VOICE_NOTE_BITS_A_SECOND = 24_000
 // The last stretch of the clock, shown in red, so a long recording does not end without warning
@@ -658,6 +699,21 @@ export const PROJECT_TASK_MESSAGES = {
   // A voice pasted from WhatsApp or anywhere else, instead of recorded here
   pasteVoice: "Paste voice",
   pasteVoiceHint: "or paste one with Ctrl+V",
+  // Writing an overview voice out in clear English (services/clientProjects/voiceText.ts)
+  voiceTextWrite: "Write it in English",
+  voiceTextAgain: "Write it again",
+  voiceTextWriting: "Writing it out...",
+  voiceTextHeading: "In clear English",
+  voiceTextShowSpoken: "Show what was said",
+  voiceTextHideSpoken: "Hide what was said",
+  voiceTextSpokenHeading: "What was said, word for word",
+  voiceTextFrom: (language: string) => `Written from ${language}`,
+  voiceTextNoVoice: "This item has no voice note to write out.",
+  voiceTextNotHere: "Only an overview voice can be written out in English.",
+  voiceTextNoSpeech: "Nobody could be heard in this voice note, so there is nothing to write out.",
+  voiceTextChanged: "The voice note changed while it was being written out. Try again.",
+  voiceTextFailed: "Couldn't write this voice out in English. Please try again.",
+  voiceTextTooLong: "This voice note is too long to write out in one go.",
   noVoiceOnClipboard: "There is no voice message on the clipboard. Some apps only copy a link, so save the voice and paste the file instead.",
   clipboardBlocked: "This browser won't let the page read the clipboard. Press Ctrl+V on the page instead.",
   // The tabs only the owner sees, set apart on the tab strip

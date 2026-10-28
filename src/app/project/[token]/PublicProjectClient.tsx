@@ -27,6 +27,7 @@ import {
   type ProjectItemKind,
   type ProjectPriority,
 } from "@/constants/clientProjectTasks"
+import { ProjectStatusBadge } from "@/components/clients/ProjectStatusBadge"
 import type { ProjectTask, ProjectTaskInput, PublicProject } from "@/types/clientProjectTasks"
 
 /**
@@ -93,6 +94,16 @@ export default function PublicProjectClient({ token }: { token: string }) {
     })
     setTasks((current) => [...current, data])
     setWriteError(null)
+  }
+
+  // An overview voice written out in clear English, kept on the item and put back in the list
+  const writeVoiceText = async (task: ProjectTask) => {
+    const { data } = await requestApi<ProjectTask>(
+      `${endpoint}/voice-text`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ taskId: task.id }) },
+      { retry: true }
+    )
+    setTasks((current) => current.map((row) => (row.id === task.id ? data : row)))
   }
 
   const saveTask = async (task: ProjectTask, input: Partial<ProjectTaskInput>) => {
@@ -232,13 +243,7 @@ export default function PublicProjectClient({ token }: { token: string }) {
             <section className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="min-w-0 break-words text-xl font-bold text-on-surface">{project.name}</h1>
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                    project.status === "completed" ? "bg-success-container text-on-success-container" : "bg-secondary-fixed text-on-secondary-fixed-variant"
-                  }`}
-                >
-                  {project.status === "completed" ? "Completed" : "Active"}
-                </span>
+                <ProjectStatusBadge status={project.status} />
               </div>
               {project.clientName && <p className="mt-1 text-[13px] text-on-surface-variant">For {project.clientName}</p>}
               {project.description && <p className="mt-2 whitespace-pre-wrap break-words text-[13px] text-on-surface-variant">{project.description}</p>}
@@ -294,6 +299,7 @@ export default function PublicProjectClient({ token }: { token: string }) {
                       onMoveTab={isMovableItemKind(tab) && canWrite ? setMovingTab : undefined}
                       onPriority={changePriority}
                       onSign={signOff}
+                      onVoiceText={writeVoiceText}
                       onReorder={reorder}
                       readOnly={!canWrite}
                       detailsOpen

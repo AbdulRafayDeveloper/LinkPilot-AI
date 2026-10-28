@@ -26,6 +26,7 @@ export type PromptName =
   | "prompt-creator-instructions"
   | "message-rewriter-instructions"
   | "quick-notes-instructions"
+  | "client-projects-instructions"
   | "task-details-instructions"
   | "client-message-instructions"
   | "client-voices-instructions"
@@ -70,6 +71,9 @@ export type PromptName =
   // Reading a spoken Quick Note back in English before it goes into the editor (services/quickNotes/english.ts)
   | "quick-notes-english"
   | "quick-notes-english-system"
+  // Writing a project overview's voice out in English (services/clientProjects/voiceText.ts)
+  | "client-project-voice-english"
+  | "client-project-voice-english-system"
   | "client-message-system"
   | "client-message"
   | "meeting-prep-system"

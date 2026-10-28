@@ -6,7 +6,7 @@
 // then Workspace: prompt-creator-instructions, message-rewriter-instructions, quick-notes-instructions,
 //   task-details-instructions (Daily Tasks and an employee's plan)
 // then Client Work: client-message-instructions, client-voices-instructions, meetings-instructions,
-//   meeting-planner-instructions
+//   meeting-planner-instructions, client-projects-instructions
 //
 // Everything a tool sends a model besides the prompts its users choose (the rewrite requests, each
 // problem its checks find, block labels, empty texts, what each field of an answer means) used to be
@@ -49,6 +49,7 @@ const PROMPTS = [
   { key: "client-voices-instructions", tool: "client-voices" },
   { key: "meetings-instructions", tool: "meetings" },
   { key: "meeting-planner-instructions", tool: "meeting-planner" },
+  { key: "client-projects-instructions", tool: "client-projects" },
 ]
 
 function fail(message) {

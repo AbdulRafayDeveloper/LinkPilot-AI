@@ -27,7 +27,7 @@ export const FILTER_VIEWS: Record<string, readonly string[]> = {
   // One project's own page: what the open tab is narrowed to. The shared link keeps none of this
   "client-project": ["search", "priority", "status", "signed", "stage", "shared"],
   "client-voices-history": ["search", "client", "from", "to"],
-  clients: ["search"],
+  clients: ["search", "kind", "status"],
   employees: ["search", "status"],
   "profile-scheduler": ["search", "day", "type", "pageSize"],
   "post-images": ["search", "size", "photo", "from", "to"],

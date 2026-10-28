@@ -1,30 +1,19 @@
 "use client"
 
-import React, { useCallback, useEffect, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { AlertTriangle, ArrowRight, FolderKanban, Loader2, Pencil, Plus, RefreshCw, Trash2, Wand2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
+import { SortableList } from "@/components/ui/SortableList"
+import { ProjectStatusBadge } from "@/components/clients/ProjectStatusBadge"
 import { ClientProjectDialog } from "@/components/clients/ClientProjectDialog"
 import { useVisibleTools } from "@/hooks/useCurrentUser"
 import { requestApi } from "@/lib/apiClient"
-import { CLIENTS_ENDPOINT, CLIENT_PROJECT_MESSAGES } from "@/constants/clients"
+import { CLIENTS_ENDPOINT, CLIENT_PROJECT_MESSAGES, countByStatus, describeStatusCounts } from "@/constants/clients"
 import { CLIENT_PROJECTS_TOOL, PROJECT_TASK_MESSAGES } from "@/constants/clientProjectTasks"
 import type { Client } from "@/types/clientMessaging"
 import type { ClientProject, ClientProjectsPage } from "@/types/clients"
 import { formatInstant } from "@/lib/timeZone"
-
-const EMPTY_COUNTS = { active: 0, completed: 0 }
-
-const StatusBadge: React.FC<{ status: ClientProject["status"] }> = ({ status }) => (
-  <span
-    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-      status === "completed" ? "bg-success-container text-on-success-container" : "bg-primary-fixed text-on-primary-fixed-variant"
-    }`}
-  >
-    <span className={`h-1.5 w-1.5 rounded-full ${status === "completed" ? "bg-success" : "bg-primary"}`} aria-hidden="true" />
-    {status === "completed" ? "Completed" : "Active"}
-  </span>
-)
 
 const savedOn = (iso: string) => formatInstant(iso, { day: "numeric", month: "short", year: "numeric" })
 
@@ -41,6 +30,11 @@ interface ClientProjectsPanelProps {
  * **Manage**, the same button that list has, straight to that project's own page. It is left out for
  * an account that does not have that tool, which is never the protection: the page and its API
  * refuse it anyway (see Which tools the accounts may use).
+ *
+ * **The projects are dragged into the order they are worked in** (the shared `SortableList`: mouse,
+ * touch and the arrow keys). A drop shows at once and the whole order is saved; saves go one after
+ * another, a failed one puts the saved order back and says why, and an order the server no longer
+ * recognises (a project added or deleted in another tab) reads the list again.
  */
 export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client }) => {
   const [page, setPage] = useState<ClientProjectsPage | null>(null)
@@ -51,6 +45,9 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
   const [deleting, setDeleting] = useState<ClientProject | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [orderError, setOrderError] = useState<string | null>(null)
+  // Order saves go one after another, so a quick second drag never lands before the first
+  const orderQueue = useRef<Promise<void>>(Promise.resolve())
   // Whether this account has Projects Management at all, which decides whether Manage is offered
   const canManage = useVisibleTools().some((tool) => tool.id === CLIENT_PROJECTS_TOOL.id)
 
@@ -95,7 +92,24 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
       const projects = isNew
         ? [project, ...current.projects]
         : current.projects.map((entry) => (entry.id === project.id ? project : entry))
-      return { projects, counts: countsOf(projects) }
+      return { projects, counts: countByStatus(projects.map((entry) => entry.status)) }
+    })
+  }
+
+  const reorder = (ids: string[]) => {
+    if (!page) return
+    const before = page.projects
+    const byId = new Map(before.map((project) => [project.id, project]))
+    const projects = ids.map((id) => byId.get(id)).filter((project): project is ClientProject => Boolean(project))
+    setOrderError(null)
+    setPage({ ...page, projects })
+    orderQueue.current = orderQueue.current.then(async () => {
+      try {
+        await requestApi(`${endpoint}/order`, { method: "PUT", body: JSON.stringify({ orderedIds: ids }) })
+      } catch (reason: unknown) {
+        setOrderError(reason instanceof Error ? reason.message : CLIENT_PROJECT_MESSAGES.orderFailed)
+        reload()
+      }
     })
   }
 
@@ -108,7 +122,7 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
       setPage((current) => {
         if (!current) return current
         const projects = current.projects.filter((entry) => entry.id !== deleting.id)
-        return { projects, counts: countsOf(projects) }
+        return { projects, counts: countByStatus(projects.map((entry) => entry.status)) }
       })
       setDeleting(null)
     } catch (reason: unknown) {
@@ -119,7 +133,6 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
   }
 
   const projects = page?.projects ?? []
-  const counts = page?.counts ?? EMPTY_COUNTS
 
   return (
     <section aria-label="Projects" className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm sm:p-5">
@@ -131,7 +144,7 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
             Projects
           </h3>
           <p className="mt-0.5 text-[12px] text-on-surface-variant">
-            {page ? `${counts.active} active · ${counts.completed} completed` : "Loading the projects..."}
+            {page ? describeStatusCounts(page.counts) : "Loading the projects..."}
           </p>
         </div>
         <button
@@ -169,69 +182,85 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
             <p className="text-sm text-on-surface-variant">{CLIENT_PROJECT_MESSAGES.empty}</p>
           </div>
         ) : (
-          <ul className={`flex flex-col gap-2 transition-opacity ${isLoading ? "opacity-60" : ""}`} aria-busy={isLoading}>
-            {projects.map((project) => (
-              <li
-                key={project.id}
-                className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 md:flex-row md:items-start md:justify-between md:gap-3 lg:flex-col lg:gap-2 xl:flex-row xl:items-start xl:justify-between xl:gap-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-[14px] font-semibold text-on-surface [overflow-wrap:anywhere]">{project.name}</p>
-                    <StatusBadge status={project.status} />
-                    {/* A project whose prompts carry standing instructions says so, since what is
-                        written here ends up on every Prompt Creator prompt for this project */}
-                    {project.promptInstructions && (
-                      <span
-                        title={project.promptInstructions.slice(0, 300)}
-                        className="inline-flex items-center gap-1 rounded-full bg-primary-fixed px-2 py-0.5 text-[10px] font-bold text-on-primary-fixed-variant"
-                      >
-                        <Wand2 size={10} aria-hidden="true" />
-                        {CLIENT_PROJECT_MESSAGES.hasInstructions}
-                      </span>
-                    )}
+          <div className={`transition-opacity ${isLoading ? "opacity-60" : ""}`} aria-busy={isLoading}>
+            {projects.length > 1 && <p className="mb-2 text-[12px] text-outline">{CLIENT_PROJECT_MESSAGES.dragHint}</p>}
+            {orderError && (
+              <p role="alert" className="mb-2 rounded-xl bg-error-container px-3 py-2 text-[13px] text-on-error-container">
+                {orderError}
+              </p>
+            )}
+            <SortableList
+              items={projects}
+              getId={(project) => project.id}
+              getLabel={(project) => project.name}
+              onReorder={reorder}
+              disabled={isLoading}
+              label={`Projects for ${client.name}, in order`}
+              itemNoun="projects"
+              className="flex flex-col gap-2"
+              renderItem={(project, handle) => (
+                <div className="flex flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 md:flex-row md:items-start md:justify-between md:gap-3 lg:flex-col lg:gap-2 xl:flex-row xl:items-start xl:justify-between xl:gap-3">
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
+                    {handle}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[14px] font-semibold text-on-surface [overflow-wrap:anywhere]">{project.name}</p>
+                        <ProjectStatusBadge status={project.status} />
+                        {/* A project whose prompts carry standing instructions says so, since what is
+                            written here ends up on every Prompt Creator prompt for this project */}
+                        {project.promptInstructions && (
+                          <span
+                            title={project.promptInstructions.slice(0, 300)}
+                            className="inline-flex items-center gap-1 rounded-full bg-primary-fixed px-2 py-0.5 text-[10px] font-bold text-on-primary-fixed-variant"
+                          >
+                            <Wand2 size={10} aria-hidden="true" />
+                            {CLIENT_PROJECT_MESSAGES.hasInstructions}
+                          </span>
+                        )}
+                      </div>
+                      {project.description && (
+                        <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-on-surface-variant [overflow-wrap:anywhere]">
+                          {project.description}
+                        </p>
+                      )}
+                      <p className="mt-1 text-[11px] text-outline">Added {savedOn(project.createdAt)}</p>
+                    </div>
                   </div>
-                  {project.description && (
-                    <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-on-surface-variant [overflow-wrap:anywhere]">
-                      {project.description}
-                    </p>
-                  )}
-                  <p className="mt-1 text-[11px] text-outline">Added {savedOn(project.createdAt)}</p>
-                </div>
-                <div className="flex flex-wrap gap-2 shrink-0">
-                  {canManage && (
-                    <Link
-                      href={`${CLIENT_PROJECTS_TOOL.href}/${project.id}`}
-                      aria-label={PROJECT_TASK_MESSAGES.manageOne(project.name)}
-                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    {canManage && (
+                      <Link
+                        href={`${CLIENT_PROJECTS_TOOL.href}/${project.id}`}
+                        aria-label={PROJECT_TASK_MESSAGES.manageOne(project.name)}
+                        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      >
+                        {PROJECT_TASK_MESSAGES.manage}
+                        <ArrowRight size={13} aria-hidden="true" />
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDialog({ project })}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
                     >
-                      {PROJECT_TASK_MESSAGES.manage}
-                      <ArrowRight size={13} aria-hidden="true" />
-                    </Link>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setDialog({ project })}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-                  >
-                    <Pencil size={13} aria-hidden="true" />
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDeleteError(null)
-                      setDeleting(project)
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-outline transition-colors hover:border-error/40 hover:text-error"
-                  >
-                    <Trash2 size={13} aria-hidden="true" />
-                    Delete
-                  </button>
+                      <Pencil size={13} aria-hidden="true" />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteError(null)
+                        setDeleting(project)
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-[12px] font-semibold text-outline transition-colors hover:border-error/40 hover:text-error"
+                    >
+                      <Trash2 size={13} aria-hidden="true" />
+                      Delete
+                    </button>
+                  </div>
                 </div>
-              </li>
-            ))}
-          </ul>
+              )}
+            />
+          </div>
         )}
       </div>
 
@@ -287,10 +316,3 @@ export const ClientProjectsPanel: React.FC<ClientProjectsPanelProps> = ({ client
   )
 }
 
-// The counts follow the list on screen, so adding or removing one shows at once
-function countsOf(projects: ClientProject[]) {
-  return {
-    active: projects.filter((project) => project.status === "active").length,
-    completed: projects.filter((project) => project.status === "completed").length,
-  }
-}

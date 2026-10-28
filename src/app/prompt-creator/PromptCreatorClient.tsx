@@ -34,7 +34,7 @@ import {
   REQUEST_MAX_LENGTH,
   type PromptTargetId,
 } from "@/constants/promptCreator"
-import { CLIENTS_TOOL } from "@/constants/clients"
+import { CLIENTS_TOOL, clientProjectStatus, isOpenProjectStatus } from "@/constants/clients"
 import type { CreatedPrompt, RequestSource, SimpleEnglish } from "@/types/promptCreator"
 
 interface GeneratePayload {
@@ -341,11 +341,11 @@ export default function PromptCreatorClient() {
                           >
                             <option value={NO_PROJECT}>{PROMPT_PROJECT_MESSAGES.none}</option>
                             {/* The client is named too: two clients may each have a "Website" project,
-                                and a completed one is still worth writing a prompt for */}
+                                and a closed one is still worth writing a prompt for, so it is marked rather than hidden */}
                             {(projects.projects ?? []).map((project) => (
                               <option key={project.id} value={project.id}>
                                 {project.clientName ? `${project.name} — ${project.clientName}` : project.name}
-                                {project.status === "completed" ? " (completed)" : ""}
+                                {isOpenProjectStatus(project.status) ? "" : ` (${clientProjectStatus(project.status).label.toLowerCase()})`}
                               </option>
                             ))}
                           </select>

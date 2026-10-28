@@ -6,22 +6,15 @@ import { ArrowRight, Link2 } from "lucide-react"
 import { historyLabelClass } from "@/components/history/HistoryFilters"
 import { totalItems, workItems } from "@/lib/projectItems"
 import { PROJECT_TASK_MESSAGES } from "@/constants/clientProjectTasks"
+import { ProjectStatusBadge } from "@/components/clients/ProjectStatusBadge"
 import type { ProjectWithTasks } from "@/types/clientProjectTasks"
 
 interface ProjectsTableProps {
   projects: ProjectWithTasks[]
 }
 
-/** Where a project stands: still being worked on, or delivered and closed. */
-const Status: React.FC<{ project: ProjectWithTasks }> = ({ project }) => (
-  <span
-    className={`inline-block shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-      project.status === "completed" ? "bg-success-container text-on-success-container" : "bg-secondary-fixed text-on-secondary-fixed-variant"
-    }`}
-  >
-    {project.status === "completed" ? "Completed" : "Active"}
-  </span>
-)
+// Where a project stands, the one badge every surface draws
+const Status: React.FC<{ project: ProjectWithTasks }> = ({ project }) => <ProjectStatusBadge status={project.status} className="whitespace-nowrap" />
 
 /**
  * How the project stands at a glance. **Only what can be ticked off is "done"**: a credential, a

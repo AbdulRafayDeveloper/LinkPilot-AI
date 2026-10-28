@@ -12,8 +12,10 @@ import {
   CLIENT_PROJECT_NAME_MAX_LENGTH,
   CLIENT_PROJECT_STATUSES,
   DEFAULT_CLIENT_PROJECT_STATUS,
+  clientProjectStatus,
   type ClientProjectStatus,
 } from "@/constants/clients"
+import { ProjectStatusBadge } from "@/components/clients/ProjectStatusBadge"
 import type { ClientProject, ClientProjectInput } from "@/types/clients"
 
 const fieldClass =
@@ -139,37 +141,27 @@ export const ClientProjectDialog: React.FC<ClientProjectDialogProps> = ({ client
           />
         </label>
 
-        <fieldset className="flex flex-col gap-1.5">
-          <legend className={`${labelClass} mb-1.5`}>Status</legend>
-          <div className="grid grid-cols-2 gap-2">
-            {CLIENT_PROJECT_STATUSES.map((status) => {
-              const isChosen = form.status === status.id
-              return (
-                <label
-                  key={status.id}
-                  className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-semibold transition-colors ${
-                    isChosen
-                      ? status.id === "completed"
-                        ? "border-success bg-success-container text-on-success-container"
-                        : "border-primary bg-primary-fixed text-on-primary-fixed-variant"
-                      : "border-outline-variant text-on-surface-variant hover:bg-surface-container-low"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="client-project-status"
-                    value={status.id}
-                    checked={isChosen}
-                    onChange={() => update("status", status.id as ClientProjectStatus)}
-                    disabled={isSaving}
-                    className="sr-only"
-                  />
-                  {status.label}
-                </label>
-              )
-            })}
-          </div>
-        </fieldset>
+        {/* A dropdown rather than a button per status: six of them would not fit a row on a phone, and
+            the line under it says what the chosen one means */}
+        <label className="flex flex-col gap-1.5">
+          <span className={labelClass}>{CLIENT_PROJECT_MESSAGES.statusLabel}</span>
+          <select
+            value={form.status}
+            onChange={(event) => update("status", event.target.value as ClientProjectStatus)}
+            className={`${fieldClass} h-11 cursor-pointer`}
+            disabled={isSaving}
+          >
+            {CLIENT_PROJECT_STATUSES.map((status) => (
+              <option key={status.id} value={status.id}>
+                {status.label}
+              </option>
+            ))}
+          </select>
+          <span className="flex items-center gap-2 text-[12px] text-on-surface-variant">
+            <ProjectStatusBadge status={form.status} />
+            {clientProjectStatus(form.status).description}
+          </span>
+        </label>
 
         <label className="flex flex-col gap-1.5">
           <div className="flex flex-wrap items-center justify-between gap-2">

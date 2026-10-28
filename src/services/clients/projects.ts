@@ -4,7 +4,7 @@ import { UserFacingError } from "@/lib/errors"
 import { ClientProjectModel, type IClientProject } from "@/models/ClientProject"
 import { Client as ClientModel } from "@/models/Client"
 import { CreatedPromptModel } from "@/models/CreatedPrompt"
-import { CLIENT_PROJECT_MESSAGES, MAX_CLIENT_PROJECTS } from "@/constants/clients"
+import { CLIENT_PROJECT_MESSAGES, MAX_CLIENT_PROJECTS, countByStatus, isOpenProjectStatus } from "@/constants/clients"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { getClient } from "@/services/clientMessaging/clients"
 import { deleteTasksOfProjects } from "@/services/clientProjects/tasks"
@@ -92,22 +92,19 @@ async function clientOrNull(viewer: Viewer, clientId: string) {
   return getClient(viewer, clientId)
 }
 
-/** A client's projects, newest first, with the active and completed counts. Null when the client is gone. */
+/**
+ * A client's projects in the order they were dragged into (ties, from before ordering, newest first),
+ * with how many stand at each status. Null when the client is gone.
+ */
 export async function listClientProjects(viewer: Viewer, clientId: string): Promise<ClientProjectsPage | null> {
   if (!(await clientOrNull(viewer, clientId))) return null
   await connectDatabase()
   const records = (await ClientProjectModel.find({ ...visibleTo(viewer), clientId })
-    .sort({ createdAt: -1, _id: -1 })
+    .sort({ position: 1, createdAt: -1, _id: -1 })
     .limit(MAX_CLIENT_PROJECTS)
     .lean()) as unknown as StoredProject[]
   const projects = records.map(toProject)
-  return {
-    projects,
-    counts: {
-      active: projects.filter((project) => project.status === "active").length,
-      completed: projects.filter((project) => project.status === "completed").length,
-    },
-  }
+  return { projects, counts: countByStatus(projects.map((project) => project.status)) }
 }
 
 /** Adds a project to a client. Null when the client is gone; throws when the client is already full. */
@@ -116,7 +113,12 @@ export async function createClientProject(viewer: Viewer, clientId: string, inpu
   await connectDatabase()
   const held = await ClientProjectModel.countDocuments({ ...visibleTo(viewer), clientId })
   if (held >= MAX_CLIENT_PROJECTS) throw new UserFacingError(CLIENT_PROJECT_MESSAGES.tooMany)
-  const record = await ClientProjectModel.create({ ownerId: viewer.id, clientId, ...cleanInput(input) })
+  // A new project goes to the top of the list, above everything already dragged into place
+  const top = (await ClientProjectModel.findOne({ ...visibleTo(viewer), clientId }, { position: 1 }).sort({ position: 1 }).lean()) as {
+    position?: number
+  } | null
+  const position = top ? (top.position ?? 0) - 1 : 0
+  const record = await ClientProjectModel.create({ ownerId: viewer.id, clientId, position, ...cleanInput(input) })
   const project = toProject(record as unknown as StoredProject)
   // Its Prompt Creator folder is made with it, so it shows among the folders straight away
   return { ...project, folderId: await ensureProjectFolder(viewer, project) }
@@ -151,6 +153,32 @@ export async function updateClientProject(
   return project
 }
 
+/**
+ * Puts one client's projects in the order they were dragged into, top to bottom. The order must name
+ * every project of that client the viewer may see, each once: a tab that missed a project added or
+ * deleted elsewhere is answered "changed" and reads the list again, rather than writing a partial
+ * order over a whole one. Null when the client is gone. Sending the same order twice lands on the
+ * same order.
+ */
+export async function reorderClientProjects(
+  viewer: Viewer,
+  clientId: string,
+  orderedIds: string[]
+): Promise<"saved" | "changed" | null> {
+  if (!(await clientOrNull(viewer, clientId))) return null
+  await connectDatabase()
+  const held = await ClientProjectModel.find({ ...visibleTo(viewer), clientId }, { _id: 1 }).lean()
+  const ids = new Set(held.map((record) => String(record._id)))
+  if (ids.size !== orderedIds.length || orderedIds.some((id) => !ids.has(id))) return "changed"
+  await ClientProjectModel.bulkWrite(
+    orderedIds.map((id, position) => ({
+      updateOne: { filter: { _id: new mongoose.Types.ObjectId(id), ...visibleTo(viewer), clientId }, update: { $set: { position } } },
+    })),
+    { ordered: false }
+  )
+  return "saved"
+}
+
 /** Removes one project. False when the client or the project is gone. */
 export async function deleteClientProject(viewer: Viewer, clientId: string, projectId: string): Promise<boolean> {
   const filter = visibleById(viewer, projectId)
@@ -177,8 +205,8 @@ export async function deleteClientProject(viewer: Viewer, clientId: string, proj
 
 /**
  * Every project the viewer may write a prompt for, across all their clients, each with its client's
- * name and how many prompts have been written for it. Active projects first, then by client and
- * project name, so the picker opens on the work in hand.
+ * name and how many prompts have been written for it. Open projects first (everything but completed
+ * and cancelled), then by client and project name, so the picker opens on the work in hand.
  */
 export async function listPromptProjects(viewer: Viewer): Promise<PromptProject[]> {
   await connectDatabase()
@@ -211,7 +239,7 @@ export async function listPromptProjects(viewer: Viewer): Promise<PromptProject[
     }))
     .sort(
       (a, b) =>
-        Number(a.status === "completed") - Number(b.status === "completed") ||
+        Number(!isOpenProjectStatus(a.status)) - Number(!isOpenProjectStatus(b.status)) ||
         a.clientName.localeCompare(b.clientName) ||
         a.name.localeCompare(b.name)
     )

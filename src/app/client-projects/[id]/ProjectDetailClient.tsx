@@ -36,6 +36,7 @@ import {
   type ProjectPriority,
   type RoadmapStage,
 } from "@/constants/clientProjectTasks"
+import { ProjectStatusBadge } from "@/components/clients/ProjectStatusBadge"
 import type { ProjectFolder, ProjectTask, ProjectTaskInput, ProjectWithTasks } from "@/types/clientProjectTasks"
 
 interface ProjectDetailClientProps {
@@ -145,6 +146,12 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
       { idempotent: true }
     )
     setTasks((current) => [...(current ?? []), data])
+  }
+
+  // An overview voice written out in clear English, kept on the item and put back in the list
+  const writeVoiceText = async (task: ProjectTask) => {
+    const { data } = await requestApi<ProjectTask>(`${CLIENT_PROJECTS_ENDPOINT}/${projectId}/tasks/${task.id}/voice-text`, { method: "POST" }, { retry: true })
+    setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? data : row)))
   }
 
   const saveTask = async (task: ProjectTask, input: Partial<ProjectTaskInput>) => {
@@ -434,13 +441,7 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                   </h1>
                   <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
                     <span>For {project.clientName}</span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        project.status === "completed" ? "bg-success-container text-on-success-container" : "bg-secondary-fixed text-on-secondary-fixed-variant"
-                      }`}
-                    >
-                      {project.status === "completed" ? "Completed" : "Active"}
-                    </span>
+                    <ProjectStatusBadge status={project.status} />
                   </p>
                   {project.description && <p className="mt-2 whitespace-pre-wrap break-words text-[13px] text-on-surface-variant">{project.description}</p>}
                 </div>
@@ -501,6 +502,7 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                               onMoveTab={isMovableItemKind(tab) ? setMovingTab : undefined}
                               onPriority={changePriority}
                               onSign={signOff}
+                              onVoiceText={writeVoiceText}
                               onStage={changeStage}
                               onShare={changeShared}
                               onReorder={reorder}
@@ -621,6 +623,7 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                                 }}
                                 onPriority={changePriority}
                                 onSign={signOff}
+                              onVoiceText={writeVoiceText}
                                 onStage={changeStage}
                                 onShare={changeShared}
                                 // A search or a folder shows part of the tab, and the order written is

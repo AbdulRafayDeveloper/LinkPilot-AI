@@ -25,6 +25,8 @@ export const AI_MODULE_IDS = [
   "employees",
   // A spoken note, read back in English before it goes into the editor
   "quick-notes",
+  // A project overview's voice, written out and read back in English
+  "client-projects",
 ] as const
 export type AiModuleId = (typeof AI_MODULE_IDS)[number]
 
@@ -54,6 +56,7 @@ export const AI_MODULE_NEEDS: Record<AiModuleId, readonly AiNeed[]> = {
   "daily-tasks": [],
   employees: [],
   "quick-notes": ["speech"],
+  "client-projects": ["speech"],
 }
 export const AI_NEED_LABELS: Record<AiNeed, string> = { "web-search": "web search", screenshots: "screenshots", speech: "speech" }
 

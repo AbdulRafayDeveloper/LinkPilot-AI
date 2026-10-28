@@ -47,6 +47,7 @@ const DESCRIPTIONS = {
   "task-details-instructions": `Daily Tasks' and the employee plan's wording for Write with AI: the labels, empty texts and the answer field. ${SHAPE_NOTE}`,
   "client-message-instructions": `Client Messaging's wording: the labels, the sample headings, the rewrite request and the problems its checks name. ${SHAPE_NOTE}`,
   "client-voices-instructions": `Client Voices' wording: the labels and the answer fields for the task list, the questions and the clear points. ${SHAPE_NOTE}`,
+  "client-projects-instructions": `Client Projects' wording for writing an overview voice out in English: the labels for the voice's name and what was said, and the answer fields. ${SHAPE_NOTE}`,
   "meetings-instructions": `Meeting Notes' wording: the answer fields for each part and the summary, the labels, the calendar sentences, the chat and the labels of each searchable piece. ${SHAPE_NOTE}`,
   "meeting-planner-instructions": `Meeting Planner's wording: the preparation's answer fields, labels, rewrite problems, the chat and the labels of each searchable piece. ${SHAPE_NOTE}`,
   // System prompts

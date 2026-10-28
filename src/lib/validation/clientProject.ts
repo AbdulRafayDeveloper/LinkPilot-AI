@@ -6,6 +6,7 @@ import {
   CLIENT_PROJECT_NAME_MAX_LENGTH,
   CLIENT_PROJECT_STATUS_IDS,
   DEFAULT_CLIENT_PROJECT_STATUS,
+  MAX_CLIENT_PROJECTS,
 } from "@/constants/clients"
 
 /**
@@ -60,3 +61,12 @@ export const ProjectIdSchema = z.union([
   z.string().regex(/^[0-9a-f]{24}$/, CLIENT_PROJECT_MESSAGES.notFound),
   z.null(),
 ])
+
+/** A client's projects in their new order after a drag, every one of them, top to bottom, each once. */
+export const ClientProjectOrderSchema = z.object({
+  orderedIds: z
+    .array(z.string().regex(/^[0-9a-f]{24}$/, CLIENT_PROJECT_MESSAGES.orderChanged))
+    .min(1, CLIENT_PROJECT_MESSAGES.orderChanged)
+    .max(MAX_CLIENT_PROJECTS, CLIENT_PROJECT_MESSAGES.orderChanged)
+    .refine((ids) => new Set(ids).size === ids.length, CLIENT_PROJECT_MESSAGES.orderChanged),
+})

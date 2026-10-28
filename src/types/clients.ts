@@ -46,8 +46,8 @@ export interface PromptProject {
   folderId: string | null
 }
 
-/** A client's projects with the counts the panel shows above them. */
+/** A client's projects, in their dragged order, with how many stand at each status. */
 export interface ClientProjectsPage {
   projects: ClientProject[]
-  counts: { active: number; completed: number }
+  counts: Record<ClientProjectStatus, number>
 }

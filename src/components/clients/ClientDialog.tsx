@@ -1,10 +1,10 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { AlertCircle, Building2, Loader2, User } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { requestApi } from "@/lib/apiClient"
-import { CLIENTS_ENDPOINT, CLIENTS_MESSAGES } from "@/constants/clients"
+import { CLIENTS_ENDPOINT, CLIENTS_MESSAGES, CLIENT_KINDS, DEFAULT_CLIENT_KIND } from "@/constants/clients"
 import {
   CLIENT_COUNTRY_MAX_LENGTH,
   CLIENT_NAME_MAX_LENGTH,
@@ -37,8 +37,8 @@ interface ClientDialogProps {
 export const ClientDialog: React.FC<ClientDialogProps> = ({ client, onClose, onSaved }) => {
   const [form, setForm] = useState<ClientInput>(
     client
-      ? { name: client.name, country: client.country, messageFormat: client.messageFormat, sampleMessages: samplesOf(client) }
-      : { name: "", country: "", messageFormat: "", sampleMessages: emptySamples() }
+      ? { name: client.name, country: client.country, kind: client.kind, messageFormat: client.messageFormat, sampleMessages: samplesOf(client) }
+      : { name: "", country: "", kind: DEFAULT_CLIENT_KIND, messageFormat: "", sampleMessages: emptySamples() }
   )
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -131,6 +131,42 @@ export const ClientDialog: React.FC<ClientDialogProps> = ({ client, onClose, onS
             />
           </label>
         </div>
+
+        {/* Two choices, so both are on screen as cards rather than hidden in a dropdown */}
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className={`${labelClass} mb-1.5`}>{CLIENTS_MESSAGES.kindLabel}</legend>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {CLIENT_KINDS.map((kind) => {
+              const isChosen = form.kind === kind.id
+              const Icon = kind.id === "company" ? Building2 : User
+              return (
+                <label
+                  key={kind.id}
+                  className={`flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2.5 transition-colors focus-within:ring-2 focus-within:ring-primary/30 ${
+                    isChosen ? "border-primary bg-primary-fixed/60" : "border-outline-variant hover:bg-surface-container-low"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="client-kind"
+                    value={kind.id}
+                    checked={isChosen}
+                    onChange={() => update("kind", kind.id)}
+                    disabled={isSaving}
+                    className="mt-1 accent-primary"
+                  />
+                  <span className="min-w-0">
+                    <span className={`flex items-center gap-1.5 text-[13px] font-semibold ${isChosen ? "text-on-primary-fixed-variant" : "text-on-surface"}`}>
+                      <Icon size={14} aria-hidden="true" />
+                      {kind.label}
+                    </span>
+                    <span className="block text-[12px] text-on-surface-variant">{kind.description}</span>
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
 
         <label className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-2">

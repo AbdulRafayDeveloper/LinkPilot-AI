@@ -443,6 +443,7 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
     summary: "Every client project in one table, each with its own page holding everything about it under ten tabs.",
     steps: [
       "Open a project with Manage.",
+      "Explain the project under Overview: give each voice or description a name, record or paste the voice, and press Write it in English to read it back clearly.",
       "Write under the tab it belongs in: Changes, Product Ideas, Backlog, Discussion, Marketing Ideas, Sales Ideas, Credentials, Links, Documents or Backups.",
       "Give an item a description, images, files and a voice note, a priority, and on the backlog how long it should take.",
       "Drag each tab's list into the order you work it in, and move an item between the tabs people write on.",
@@ -452,7 +453,8 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
       "Credentials and Backups are never shown on a shared link, whatever the client does with the address.",
       "Documents and Links are filed in folders that nest; the other tabs are one list each.",
       "Every item keeps its own number down the side, so dragging the list never renumbers anything.",
-      "A voice note runs up to fifteen minutes and is kept as a recording; nothing transcribes it.",
+      "A voice note runs up to fifteen minutes and is kept as a recording. Only an Overview voice can be written out, and only when you ask: it is written out word for word and read back in clear English, with both kept beside the recording.",
+      "The client sees the Overview on the shared link and can add their own voices and descriptions there, and write them out too.",
     ],
   },
 

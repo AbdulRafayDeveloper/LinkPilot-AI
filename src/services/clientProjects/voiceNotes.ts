@@ -2,7 +2,7 @@ import mongoose from "mongoose"
 import { UserFacingError } from "@/lib/errors"
 import { detectAudioMimeType } from "@/lib/audioType"
 import { PROJECT_TASK_MESSAGES, VOICE_NOTE_MAX_BYTES } from "@/constants/clientProjectTasks"
-import { deleteObject, isStorageConfigured, presignDownload, putObject } from "@/services/storage/s3"
+import { deleteObject, getObjectBytes, isStorageConfigured, presignDownload, putObject } from "@/services/storage/s3"
 import { recordAttachmentOwner } from "@/services/attachmentOwners"
 import type { VoiceNote, VoiceNoteView } from "@/types/clientProjectTasks"
 
@@ -29,6 +29,12 @@ const EXTENSIONS: Record<string, string> = {
 }
 
 const keyOf = (note: Pick<VoiceNote, "assetId" | "contentType">): string => `${KEY_PREFIX}/${note.assetId}.${EXTENSIONS[note.contentType] ?? "webm"}`
+
+/** The recording itself, read through the SDK, or null when it is no longer in storage. */
+export async function voiceNoteBytes(note: Pick<VoiceNote, "assetId" | "contentType">, signal?: AbortSignal): Promise<Buffer | null> {
+  if (!isStorageConfigured()) throw new UserFacingError(PROJECT_TASK_MESSAGES.voiceStorageUnavailable)
+  return getObjectBytes(keyOf(note), signal)
+}
 
 /** Whether a voice note can be recorded at all here, so a page can say so instead of failing oddly. */
 export const canRecordVoiceNotes = isStorageConfigured
