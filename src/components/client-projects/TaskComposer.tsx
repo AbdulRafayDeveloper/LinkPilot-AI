@@ -109,7 +109,10 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
           size: file.size,
         })),
         voiceNote: voiceNote ? { assetId: voiceNote.assetId, contentType: voiceNote.contentType, seconds: voiceNote.seconds } : null,
-        kind,
+        // The tab is named only when adding. An edit leaves the item on its own tab, and naming it
+        // would read to the server as a move, which the fixed tabs (Overview, Links, Credentials...)
+        // refuse; moving an item is the Move dialog's job
+        ...(isEdit ? {} : { kind }),
         priority,
         estimate: shape.estimate ? estimate : null,
         // Only the tab that has one sends it, so nothing carries a field its tab never shows

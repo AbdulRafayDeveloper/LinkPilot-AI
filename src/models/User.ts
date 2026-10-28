@@ -46,6 +46,17 @@ export interface IUser {
   // Wrong passwords in a row, for the lockout; reset by a good sign-in
   failedLogins: number
   lockedUntil: Date | null
+  /**
+   * The Finance lock (constants/financeLock.ts): the scrypt hash of the Finance area's own password,
+   * null until the person sets one; its version, raised by every change so earlier unlocks end; and
+   * its own wrong-password counter and lockout, apart from signing in.
+   */
+  financePasswordHash: string | null
+  financePasswordVersion: number
+  financeFailedAttempts: number
+  financeLockedUntil: Date | null
+  // How many lockouts in a row, without a right password between them: each one lasts twice as long
+  financeLockouts: number
   // Every successful sign-in (sign-up counts as the first) and every wrong password, ever
   loginCount: number
   failedLoginCount: number
@@ -79,6 +90,11 @@ const UserSchema = new Schema<IUser>(
     loginCount: { type: Number, required: true, default: 0 },
     failedLoginCount: { type: Number, required: true, default: 0 },
     lockedUntil: { type: Date, default: null },
+    financePasswordHash: { type: String, default: null },
+    financePasswordVersion: { type: Number, default: 0 },
+    financeFailedAttempts: { type: Number, default: 0 },
+    financeLockedUntil: { type: Date, default: null },
+    financeLockouts: { type: Number, default: 0 },
     lastLoginAt: { type: Date, default: null },
   },
   { timestamps: true, collection: "users" }

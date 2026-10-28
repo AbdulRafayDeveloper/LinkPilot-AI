@@ -7,7 +7,7 @@ import { Modal } from "@/components/ui/Modal"
 import { CopyButton } from "@/components/ui/CopyButton"
 import { RichTextView } from "@/components/ui/RichTextView"
 import { VoiceRecorder } from "@/components/ui/VoiceRecorder"
-import { requestApi } from "@/lib/apiClient"
+import { noteFinanceLocked, requestApi } from "@/lib/apiClient"
 import { appendSpokenText } from "@/lib/spokenText"
 import { readSSEStream } from "@/lib/sse"
 import { AI_CHAT_MESSAGES } from "@/constants/aiChat"
@@ -194,6 +194,8 @@ export function AiChatPanel<M extends AiChatMessage, H>({
           signal: controller.signal,
         })
         if (!response.ok || !response.body) {
+          // A streamed answer is fetched directly, so a Finance chat that has locked says so here
+          noteFinanceLocked(response)
           const failed = await response.json().catch(() => null)
           throw new Error(failed?.message || AI_CHAT_MESSAGES.answerFailed)
         }

@@ -1,9 +1,11 @@
 import { cookies, headers } from "next/headers"
 import { NextResponse } from "next/server"
+import { FINANCE_LOCKED_HEADER, FINANCE_LOCK_MESSAGES, FINANCE_TOOL_IDS } from "@/constants/financeLock"
+import { endThisUnlock, lockStatus, touchUnlock } from "@/services/finance/lock"
 import { env } from "@/config/env"
 import { connectDatabase } from "@/lib/db"
 import { toUserFacingMessage } from "@/lib/errors"
-import { SESSION_COOKIE, SESSION_MS, isWorthRefreshing, readSession, signSession } from "@/lib/sessionToken"
+import { SESSION_COOKIE, SESSION_MS, isWorthRefreshing, newSessionId, readSession, signSession } from "@/lib/sessionToken"
 import { UserModel } from "@/models/User"
 import { AUTH_MESSAGES, AUTH_REQUIRED_HEADER, REQUEST_PATH_HEADER, type UserRole } from "@/constants/auth"
 import { FEATURE_ACCESS_MESSAGES } from "@/constants/featureAccess"
@@ -70,8 +72,32 @@ export async function requireViewer(options: { role?: UserRole; feature?: string
     await logRequestActivity(viewer.id, "refused")
     return { viewer: null, denied: NextResponse.json({ success: false, message: FEATURE_ACCESS_MESSAGES.unavailable }, { status: 403 }) }
   }
+  /**
+   * Every Finance tool's API also needs this browser to have Finance unlocked with the person's own
+   * Finance password (services/finance/lock.ts), an admin included: it is their own money. Read from
+   * the path like the tool switch above, so a new Finance route is locked by being written.
+   */
+  if (await isFinanceRequest(options)) {
+    const lock = await lockStatus(viewer)
+    if (!lock.unlocked) {
+      await logRequestActivity(viewer.id, "refused")
+      const denied = NextResponse.json({ success: false, message: FINANCE_LOCK_MESSAGES.locked }, { status: 423 })
+      denied.headers.set(FINANCE_LOCKED_HEADER, lock.hasPassword ? "locked" : "unset")
+      return { viewer: null, denied }
+    }
+    // Using Finance keeps it open: the idle window starts again with every request that passes
+    if (lock.unlockId) await touchUnlock(lock.unlockId)
+  }
   await logRequestActivity(viewer.id, "allowed")
   return { viewer, denied: null }
+}
+
+/** Whether this request is for a tool under Finance on the sidebar, which the Finance lock guards. */
+async function isFinanceRequest(options: { feature?: string | null }): Promise<boolean> {
+  if (options.feature !== undefined) return options.feature !== null && FINANCE_TOOL_IDS.includes(options.feature)
+  const path = (await headers()).get(REQUEST_PATH_HEADER)
+  const tool = path ? toolIdForApiPath(path) : null
+  return tool !== null && FINANCE_TOOL_IDS.includes(tool)
 }
 
 /** Whether this request is for a tool this account may not use. An admin is never refused. */
@@ -85,7 +111,9 @@ async function isDeniedFeature(viewer: Viewer, options: { feature?: string | nul
 /** Starts a session for an account, in an httpOnly cookie this browser sends back on every request. */
 export async function startSession(user: { id: string; sessionVersion: number }, isSecure: boolean): Promise<void> {
   const exp = Date.now() + SESSION_MS
-  ;(await cookies()).set(SESSION_COOKIE, signSession({ uid: user.id, ver: user.sessionVersion, exp }, env.AUTH_SECRET), {
+  // A new sign-in never inherits Finance from whoever used this browser before: it must be unlocked again
+  await endThisUnlock()
+  ;(await cookies()).set(SESSION_COOKIE, signSession({ uid: user.id, ver: user.sessionVersion, exp, sid: newSessionId() }, env.AUTH_SECRET), {
     httpOnly: true,
     sameSite: "lax",
     secure: isSecure,
@@ -120,7 +148,8 @@ export async function refreshSession(isSecure: boolean): Promise<void> {
   const session = readSession(jar.get(SESSION_COOKIE)?.value, env.AUTH_SECRET)
   if (!session || !isWorthRefreshing(session)) return
   const exp = Date.now() + SESSION_MS
-  jar.set(SESSION_COOKIE, signSession({ ...session, exp }, env.AUTH_SECRET), {
+  // The sign-in keeps its id through every renewal; one from before ids existed is given one now
+  jar.set(SESSION_COOKIE, signSession({ ...session, sid: session.sid ?? newSessionId(), exp }, env.AUTH_SECRET), {
     httpOnly: true,
     sameSite: "lax",
     secure: isSecure,
@@ -130,6 +159,8 @@ export async function refreshSession(isSecure: boolean): Promise<void> {
 }
 
 export async function endSession(): Promise<void> {
+  // Signing out ends this browser's Finance unlock on the server too, not only its cookie
+  await endThisUnlock()
   ;(await cookies()).delete(SESSION_COOKIE)
 }
 

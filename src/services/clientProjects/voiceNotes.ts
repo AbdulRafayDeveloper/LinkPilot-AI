@@ -4,6 +4,7 @@ import { detectAudioMimeType } from "@/lib/audioType"
 import { PROJECT_TASK_MESSAGES, VOICE_NOTE_MAX_BYTES } from "@/constants/clientProjectTasks"
 import { deleteObject, getObjectBytes, isStorageConfigured, presignDownload, putObject } from "@/services/storage/s3"
 import { recordAttachmentOwner } from "@/services/attachmentOwners"
+import { setWebmDuration } from "@/lib/webmDuration"
 import type { VoiceNote, VoiceNoteView } from "@/types/clientProjectTasks"
 
 /**
@@ -49,7 +50,10 @@ export async function storeVoiceNote(ownerId: string, bytes: Buffer, seconds: nu
   const contentType = bytes.length > 0 ? detectAudioMimeType(bytes) : null
   if (!contentType) throw new UserFacingError(PROJECT_TASK_MESSAGES.voiceUnsupported)
   const note: VoiceNote = { assetId: new mongoose.Types.ObjectId().toString(), contentType, seconds: Math.max(0, Math.round(seconds)) }
-  await putObject(keyOf(note), bytes, contentType)
+  // A browser recording carries no length, so a player shows "0:00 / 0:00" and cannot be dragged
+  // along; the length measured as it was recorded is written into the file before it is kept
+  const stored = contentType === "audio/webm" ? (setWebmDuration(bytes, seconds * 1000) ?? bytes) : bytes
+  await putObject(keyOf(note), stored, contentType)
   // Whose it is, so an item can only ever be saved naming a recording its own owners made
   await recordAttachmentOwner(note.assetId, ownerId, "voice-note", contentType)
   return { ...note, url: await presignDownload(keyOf(note), contentType) }

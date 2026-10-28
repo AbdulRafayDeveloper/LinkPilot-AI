@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { ClipboardPaste, Loader2, Mic, Play, Square, Trash2 } from "lucide-react"
+import { ClipboardPaste, Loader2, Mic, Square, Trash2 } from "lucide-react"
+import { VoicePlayer } from "@/components/ui/VoicePlayer"
 import { requestApi } from "@/lib/apiClient"
 import { measureDuration } from "@/lib/voiceDuration"
 import {
@@ -241,9 +242,7 @@ export const VoiceNoteField: React.FC<VoiceNoteFieldProps> = ({ note, onChange, 
   if (note) {
     return (
       <div ref={root} className="flex flex-wrap items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-2">
-        <Play size={14} className="shrink-0 text-primary" aria-hidden="true" />
-        <audio src={note.url} controls className="h-9 min-w-0 flex-1" aria-label="The voice note on this task" />
-        <span className="text-[11px] text-outline">{clock(note.seconds)}</span>
+        <VoicePlayer key={note.url} src={note.url} knownSeconds={note.seconds} label="the voice note" />
         <button type="button" onClick={() => onChange(null)} disabled={disabled} aria-label="Remove the voice note" className={`${buttonClass} hover:text-error`}>
           <Trash2 size={13} aria-hidden="true" />
           Remove

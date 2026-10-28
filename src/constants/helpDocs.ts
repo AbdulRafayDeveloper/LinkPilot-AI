@@ -472,6 +472,7 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
       "Press Expand to read a long plan on the whole screen, and copy any answer to keep it.",
     ],
     notes: [
+      "Finance has its own password, apart from the one you sign in with. Every device and every new sign-in must enter it, even on a shared account. It closes when you close the browser, press Lock Finance, sign out, leave it unused for 30 minutes, or after 8 hours, and the key button can lock it on every device at once.",
       "Under each answer it says which parts of your profile it was shaped by, or that it is general guidance when your profile had nothing on the question.",
       "It is guidance to help you understand and plan, not licensed financial advice; check anything important with a qualified adviser.",
       "The chat is yours alone and is kept until you clear it. Clearing it never touches your profile.",
@@ -490,6 +491,7 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
       "Go back to the report to see the whole business at a glance, open any month again, or export it as a PDF or a spreadsheet.",
     ],
     notes: [
+      "Finance has its own password, apart from the one you sign in with. Every device and every new sign-in must enter it, even on a shared account. It closes when you close the browser, press Lock Finance, sign out, leave it unused for 30 minutes, or after 8 hours, and the key button can lock it on every device at once.",
       "After the fixed amounts, what is left is split in two: half stays in the business and half is shared between the people by their shares. You can change both on any month.",
       "In a month with a loss the fixed amounts still come out of the business balance, and there is no additional distribution.",
       "Every month shows the balance it started from, what was reinvested and the balance it ended on, and a change to any month carries through every month after it.",

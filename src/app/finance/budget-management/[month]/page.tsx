@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { pageMetadata } from "@/lib/metadata"
 import { requireFeaturePage } from "@/app/featurePage"
+import { FinanceGate } from "@/components/finance/FinanceGate"
 import { BUDGET_HREF, BUDGET_TOOL, MONTH_PATTERN } from "@/constants/budget"
 import BudgetMonthClient from "./BudgetMonthClient"
 
@@ -12,5 +13,9 @@ export default async function Page({ params }: { params: Promise<{ month: string
   await requireFeaturePage(BUDGET_TOOL.id, BUDGET_HREF)
   const { month } = await params
   if (!MONTH_PATTERN.test(month)) redirect(BUDGET_HREF)
-  return <BudgetMonthClient monthId={month} />
+  return (
+    <FinanceGate>
+      <BudgetMonthClient monthId={month} />
+    </FinanceGate>
+  )
 }

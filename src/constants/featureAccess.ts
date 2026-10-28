@@ -55,6 +55,8 @@ export const FEATURE_DEFAULTS_ENDPOINT = "/api/admin/features"
 
 export const SHARED_API_PATHS = [
   "/api/auth",
+  // The Finance lock: in front of every Finance tool, so it belongs to none of them
+  "/api/finance-lock",
   // The person's own name, photo and password: Account Settings is not a tool, so no switch covers it
   "/api/account",
   // Which filters a page is left on: the person's own, for every tool, and never a record of any kind

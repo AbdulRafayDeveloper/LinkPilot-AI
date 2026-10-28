@@ -1,6 +1,7 @@
 import type { ApiEnvelope } from "@/types/api"
 import { parseRetryAfter, withRetry } from "@/lib/retry"
 import { AUTH_REQUIRED_HEADER, LOGIN_PATH } from "@/constants/auth"
+import { FINANCE_LOCKED_EVENT, FINANCE_LOCKED_HEADER } from "@/constants/financeLock"
 import { IDEMPOTENCY_HEADER } from "@/constants/idempotency"
 import { APP_VERSION_HEADER } from "@/constants/appVersion"
 import { noteServerVersion } from "@/lib/appVersion"
@@ -55,6 +56,15 @@ function sendToSignIn(response: Response) {
   window.location.assign(`${LOGIN_PATH}?next=${encodeURIComponent(next)}`)
 }
 
+/**
+ * Finance closed in this browser (left unused, locked from another tab, or its password changed):
+ * the page is told, and the Finance gate puts its lock screen back up (components/finance/FinanceGate).
+ */
+export function noteFinanceLocked(response: Response) {
+  if (response.status !== 423 || !response.headers.get(FINANCE_LOCKED_HEADER) || typeof window === "undefined") return
+  window.dispatchEvent(new Event(FINANCE_LOCKED_EVENT))
+}
+
 export async function fetchWithRetry(url: string, requestInit: RequestInit = {}, { retry, idempotent = false }: RetryPolicy = {}): Promise<Response> {
   const method = (requestInit.method ?? "GET").toUpperCase()
   const retries = (retry ?? (idempotent || IDEMPOTENT_METHODS.has(method))) ? CLIENT_RETRIES : 0
@@ -72,6 +82,7 @@ export async function fetchWithRetry(url: string, requestInit: RequestInit = {},
         // Every answer says which build sent it, which is how an open tab learns of a deploy for free
         noteServerVersion(response.headers.get(APP_VERSION_HEADER))
         sendToSignIn(response)
+        noteFinanceLocked(response)
         if (RETRYABLE_STATUS.has(response.status)) throw new RetryableResponse(response)
         return response
       },

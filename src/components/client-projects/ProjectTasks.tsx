@@ -18,7 +18,7 @@ import {
 } from "@/constants/clientProjectTasks"
 import { EstimateChip, PriorityChip, PrioritySelect, ShareToggle, SignOffButton, StageChip, StageSelect } from "./ItemFields"
 import { shownItems } from "@/lib/projectItems"
-import { clock } from "./VoiceNoteField"
+import { VoicePlayer } from "@/components/ui/VoicePlayer"
 import { FileKindIcon, fileSize } from "./ProjectFilesField"
 import { FilePreviewDialog } from "./FilePreviewDialog"
 import type { ProjectFileView, ProjectTask } from "@/types/clientProjectTasks"
@@ -94,9 +94,8 @@ const savedOn = (iso: string): string =>
 /** One item's voice note, as a player. The same markup on the page and behind a shared link. */
 const VoiceNotePlayer: React.FC<{ task: ProjectTask }> = ({ task }) =>
   task.voiceNote ? (
-    <div className="flex flex-wrap items-center gap-2">
-      <audio src={task.voiceNote.url} controls preload="none" className="h-9 min-w-0 max-w-full flex-1" aria-label={`Voice note on ${task.content}`} />
-      <span className="text-[11px] text-outline">{clock(task.voiceNote.seconds)}</span>
+    <div className="flex items-center">
+      <VoicePlayer key={task.voiceNote.url} src={task.voiceNote.url} knownSeconds={task.voiceNote.seconds} label={`the voice note on ${task.content}`} />
     </div>
   ) : null
 

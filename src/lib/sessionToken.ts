@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto"
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto"
 import { z } from "zod"
 import { SESSION_DAYS, SESSION_REFRESH_DAYS } from "@/constants/auth"
 
@@ -13,7 +13,18 @@ export const SESSION_COOKIE = "lp_session"
 export const SESSION_MS = SESSION_DAYS * 24 * 60 * 60 * 1000
 const REFRESH_AFTER_MS = SESSION_REFRESH_DAYS * 24 * 60 * 60 * 1000
 
-const PayloadSchema = z.object({ uid: z.string().regex(/^[0-9a-f]{24}$/), ver: z.number().int().positive(), exp: z.number() })
+/**
+ * `sid` names this one sign-in: made at random when it starts and carried unchanged through every
+ * renewal, so something tied to a sign-in (the Finance unlock) ends with it, and signing in again on
+ * the same browser is a different sign-in. A cookie from before it had none is given one when it is
+ * next renewed.
+ */
+const PayloadSchema = z.object({
+  uid: z.string().regex(/^[0-9a-f]{24}$/),
+  ver: z.number().int().positive(),
+  exp: z.number(),
+  sid: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/).optional(),
+})
 export type SessionPayload = z.infer<typeof PayloadSchema>
 
 const mac = (body: string, secret: string) => createHmac("sha256", secret).update(`linkpilot-session:${body}`).digest()
@@ -43,3 +54,6 @@ export function readSession(token: string | undefined, secret: string): SessionP
  * session was shorter is renewed to a full year the first time it is used.
  */
 export const isWorthRefreshing = (session: SessionPayload, now = Date.now()): boolean => session.exp - now < SESSION_MS - REFRESH_AFTER_MS
+
+/** A new sign-in's id: 128 random bits. */
+export const newSessionId = () => randomBytes(16).toString("base64url")
