@@ -70,3 +70,15 @@ export const ClientProjectOrderSchema = z.object({
     .max(MAX_CLIENT_PROJECTS, CLIENT_PROJECT_MESSAGES.orderChanged)
     .refine((ids) => new Set(ids).size === ids.length, CLIENT_PROJECT_MESSAGES.orderChanged),
 })
+
+/**
+ * Projects Management's order of every project the viewer may see, after a drag. The ceiling is the
+ * list's own (every client's projects), checked again against the database by the service.
+ */
+export const AllProjectsOrderSchema = z.object({
+  orderedIds: z
+    .array(z.string().regex(/^[0-9a-f]{24}$/, CLIENT_PROJECT_MESSAGES.orderChanged))
+    .min(1, CLIENT_PROJECT_MESSAGES.orderChanged)
+    .max(MAX_CLIENT_PROJECTS * 20, CLIENT_PROJECT_MESSAGES.orderChanged)
+    .refine((ids) => new Set(ids).size === ids.length, CLIENT_PROJECT_MESSAGES.orderChanged),
+})

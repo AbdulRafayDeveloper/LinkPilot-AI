@@ -687,6 +687,11 @@ export const PROJECT_TASK_MESSAGES = {
   backToProjects: "All projects",
   nothingOnIt: "Nothing on it yet",
   shared: "Shared",
+  dragProjects: "Drag a project by its handle to put it where you want it in the list.",
+  dragOffWhileFiltered: "Clear the filters to drag the projects into order.",
+  projectOrderFailed: "Couldn't save the new order. Please try again.",
+  searchClients: "Search clients",
+  noClientMatch: "No client matches that name.",
   // Where an item came from, shown as a tag on the item itself
   fromClient: "From the client",
   fromOwner: "From the project owner",

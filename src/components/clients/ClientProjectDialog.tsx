@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useRef, useState } from "react"
+import React, { useId, useRef, useState } from "react"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import { requestApi } from "@/lib/apiClient"
@@ -10,12 +10,11 @@ import {
   CLIENT_PROJECT_INSTRUCTIONS_MAX_LENGTH,
   CLIENT_PROJECT_MESSAGES,
   CLIENT_PROJECT_NAME_MAX_LENGTH,
-  CLIENT_PROJECT_STATUSES,
   DEFAULT_CLIENT_PROJECT_STATUS,
   clientProjectStatus,
-  type ClientProjectStatus,
 } from "@/constants/clients"
 import { ProjectStatusBadge } from "@/components/clients/ProjectStatusBadge"
+import { ProjectStatusSelect } from "@/components/clients/ProjectStatusSelect"
 import type { ClientProject, ClientProjectInput } from "@/types/clients"
 
 const fieldClass =
@@ -55,6 +54,7 @@ export const ClientProjectDialog: React.FC<ClientProjectDialogProps> = ({ client
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
+  const statusLabelId = useId()
 
   const update = <K extends keyof Required<ClientProjectInput>>(key: K, value: Required<ClientProjectInput>[K]) =>
     setForm((current) => ({ ...current, [key]: value }))
@@ -141,27 +141,17 @@ export const ClientProjectDialog: React.FC<ClientProjectDialogProps> = ({ client
           />
         </label>
 
-        {/* A dropdown rather than a button per status: six of them would not fit a row on a phone, and
-            the line under it says what the chosen one means */}
-        <label className="flex flex-col gap-1.5">
-          <span className={labelClass}>{CLIENT_PROJECT_MESSAGES.statusLabel}</span>
-          <select
-            value={form.status}
-            onChange={(event) => update("status", event.target.value as ClientProjectStatus)}
-            className={`${fieldClass} h-11 cursor-pointer`}
-            disabled={isSaving}
-          >
-            {CLIENT_PROJECT_STATUSES.map((status) => (
-              <option key={status.id} value={status.id}>
-                {status.label}
-              </option>
-            ))}
-          </select>
+        {/* A dropdown rather than a button per status: seven of them would not fit a row on a phone, and
+            the line under it says what the chosen one means. It is the app's own dropdown, never a
+            native select, whose open list the browser draws and which was unreadable in the dark scheme */}
+        <div className="flex flex-col gap-1.5">
+          <span id={statusLabelId} className={labelClass}>{CLIENT_PROJECT_MESSAGES.statusLabel}</span>
+          <ProjectStatusSelect value={form.status} onChange={(status) => update("status", status)} disabled={isSaving} labelId={statusLabelId} />
           <span className="flex items-center gap-2 text-[12px] text-on-surface-variant">
             <ProjectStatusBadge status={form.status} />
             {clientProjectStatus(form.status).description}
           </span>
-        </label>
+        </div>
 
         <label className="flex flex-col gap-1.5">
           <div className="flex flex-wrap items-center justify-between gap-2">

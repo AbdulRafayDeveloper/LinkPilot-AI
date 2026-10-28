@@ -9,6 +9,7 @@ import {
   MEETING_NAME_MAX_LENGTH,
   JOIN_URL_MAX_LENGTH,
   MEETING_PLANNER_MESSAGES,
+  MEETING_PROJECT_MESSAGES,
   PERSON_NAME_MAX_LENGTH,
   PREP_INPUT_MAX_LENGTH,
   PROFILE_LINK_MAX_LENGTH,
@@ -19,7 +20,8 @@ import {
 import { datesForCount, defaultCount, recurrenceDates } from "@/lib/meetingRecurrence"
 import { isUsableProfileLink, normalizeProfileLink } from "@/lib/profileLink"
 import { isWebLink, normalizeProjectLink } from "@/lib/meetingScript"
-import { createMeeting, listMonth } from "@/services/meetingPlanner/plans"
+import { createMeeting, listMonth, withProject } from "@/services/meetingPlanner/plans"
+import { connectableProjectId } from "@/services/meetingPlanner/clientProjects"
 import { requireViewer } from "@/services/auth/viewer"
 import { withIdempotency } from "@/services/idempotency"
 
@@ -90,6 +92,16 @@ export const MeetingInputSchema = z.object({
   profileInfo: optionalText(PREP_INPUT_MAX_LENGTH),
   conversationHistory: optionalText(PREP_INPUT_MAX_LENGTH),
   additionalInfo: optionalText(PREP_INPUT_MAX_LENGTH),
+  /**
+   * The client project the meeting is about, or null for none. Checked against the viewer's own
+   * projects before it is saved (connectableProjectId), so only the shape is checked here.
+   */
+  projectId: z
+    .string()
+    .trim()
+    .regex(/^[0-9a-f]{24}$/i, MEETING_PROJECT_MESSAGES.notFound)
+    .nullish()
+    .transform((value) => value || null),
 })
 
 /**
@@ -190,8 +202,11 @@ async function handlePost(req: NextRequest) {
       return badRequest(MEETING_PLANNER_MESSAGES.prepNeedsInput)
     }
 
-    const { recurrence, ...input } = parsed.data
-    const meeting = await createMeeting(
+    const { recurrence, ...fields } = parsed.data
+    const projectId = await connectableProjectId(auth.viewer, fields.projectId)
+    if (projectId === false) return badRequest(MEETING_PROJECT_MESSAGES.notFound)
+    const input = { ...fields, projectId }
+    const created = await createMeeting(
       auth.viewer,
       input,
       recurrence
@@ -202,6 +217,7 @@ async function handlePost(req: NextRequest) {
           }
         : null
     )
+    const meeting = await withProject(auth.viewer, created)
     const message = meeting.seriesSize ? MEETING_PLANNER_MESSAGES.seriesCreated(meeting.seriesSize) : MEETING_PLANNER_MESSAGES.created
     return NextResponse.json({ success: true, message, data: meeting }, { status: 201 })
   } catch (error: unknown) {

@@ -2,7 +2,8 @@ import { connectDatabase } from "@/lib/db"
 import { ClientProjectModel, type IClientProject } from "@/models/ClientProject"
 import { ClientProjectTaskModel } from "@/models/ClientProjectTask"
 import { Client } from "@/models/Client"
-import { MAX_CLIENT_PROJECTS } from "@/constants/clients"
+import mongoose from "mongoose"
+import { MAX_CLIENT_PROJECTS, clientKindOf } from "@/constants/clients"
 import { projectItemKind, type ProjectItemKind } from "@/constants/clientProjectTasks"
 import { emptyItemCounts, totalItems } from "@/lib/projectItems"
 import { projectLinkToken, projectLinkMatches, readProjectLinkToken } from "@/lib/projectLink"
@@ -60,18 +61,19 @@ export const publicProjectToken = (project: Pick<IClientProject, "publicLinkActi
   project.publicLinkActive ? projectLinkToken(id, project.publicLinkVersion ?? 0) : null
 
 /**
- * Every project the viewer may see, newest first, with its client's name, how each of its tabs
+ * Every project the viewer may see, in the order dragged into on Projects Management (ties newest first), with its client's name, how each of its tabs
  * stands and its link.
  */
 export async function listAllProjects(viewer: Viewer): Promise<ClientProjectsPage> {
   await connectDatabase()
   const scope = visibleTo(viewer)
   const [records, clients] = await Promise.all([
-    ClientProjectModel.find(scope).sort({ createdAt: -1, _id: -1 }).limit(MAX_CLIENT_PROJECTS * 20).lean() as unknown as Promise<StoredProject[]>,
-    Client.find(scope, { name: 1 }).sort({ name: 1 }).lean() as unknown as Promise<{ _id: { toString: () => string }; name: string }[]>,
+    ClientProjectModel.find(scope).sort({ listPosition: 1, createdAt: -1, _id: -1 }).limit(MAX_CLIENT_PROJECTS * 20).lean() as unknown as Promise<StoredProject[]>,
+    Client.find(scope, { name: 1, kind: 1 }).sort({ name: 1 }).lean() as unknown as Promise<{ _id: { toString: () => string }; name: string; kind?: string }[]>,
   ])
   const byProject = await countsByProject(scope, records.map((record) => record._id.toString()))
   const clientNames = new Map(clients.map((client) => [client._id.toString(), client.name]))
+  const clientKinds = new Map(clients.map((client) => [client._id.toString(), clientKindOf(client.kind)]))
 
   return {
     projects: records.map((record) => {
@@ -83,6 +85,7 @@ export async function listAllProjects(viewer: Viewer): Promise<ClientProjectsPag
         clientId: record.clientId,
         // A project whose client has gone still reads, rather than disappearing without a word
         clientName: clientNames.get(record.clientId) ?? "Client removed",
+        clientKind: clientKinds.get(record.clientId),
         name: record.name,
         description: record.description ?? "",
         status: record.status as ClientProjectStatus,
@@ -94,8 +97,29 @@ export async function listAllProjects(viewer: Viewer): Promise<ClientProjectsPag
         updatedAt: new Date(record.updatedAt).toISOString(),
       }
     }),
-    clients: clients.map((client) => ({ id: client._id.toString(), name: client.name })),
+    clients: clients.map((client) => ({ id: client._id.toString(), name: client.name, kind: clientKindOf(client.kind) })),
   }
+}
+
+/**
+ * Puts every project the viewer may see in the order it was dragged into on Projects Management, top
+ * to bottom. It is that page's own order (`listPosition`), apart from each client's order in Clients
+ * Management. The order must name every project once: a tab that missed one added or deleted
+ * elsewhere is answered "changed" and reads the list again, rather than writing a partial order.
+ */
+export async function reorderAllProjects(viewer: Viewer, orderedIds: string[]): Promise<"saved" | "changed"> {
+  await connectDatabase()
+  const scope = visibleTo(viewer)
+  const held = await ClientProjectModel.find(scope, { _id: 1 }).lean()
+  const ids = new Set(held.map((record) => String(record._id)))
+  if (ids.size !== orderedIds.length || orderedIds.some((id) => !ids.has(id))) return "changed"
+  await ClientProjectModel.bulkWrite(
+    orderedIds.map((id, listPosition) => ({
+      updateOne: { filter: { _id: new mongoose.Types.ObjectId(id), ...scope }, update: { $set: { listPosition } } },
+    })),
+    { ordered: false }
+  )
+  return "saved"
 }
 
 /** One project with its client's name and its link, or null when it is gone or another account's. */

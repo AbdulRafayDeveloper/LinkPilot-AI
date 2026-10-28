@@ -153,6 +153,40 @@ export const MEETING_PLANNER_PROMPT_IDS = MEETING_PLANNER_PROMPT_TABS.map((tab) 
   ...MeetingPlannerPromptId[],
 ]
 
+// A page of the project picker: short, because the list is searched and filtered rather than scrolled
+export const MEETING_PROJECT_PAGE_SIZE = 10
+export const MEETING_PROJECT_SEARCH_MAX_LENGTH = 100
+
+/**
+ * Connecting a meeting to a client project. Its own words, apart from "Projects to show", which is
+ * the list of the user's own work a preparation suggests and has nothing to do with this.
+ */
+export const MEETING_PROJECT_MESSAGES = {
+  label: "Client project",
+  none: "No project",
+  connect: "Connect to a project",
+  change: "Change project",
+  pickTitle: "Connect to a client project",
+  pickDescription: "Pick the project this meeting is about. Search by project or client, or narrow by client and status.",
+  search: "Search projects or clients",
+  allClients: "All clients",
+  allStatuses: "Every status",
+  empty: "No project matches.",
+  noProjects: "You have no client projects yet. Add one under Clients Management.",
+  manage: "Manage projects",
+  loadFailed: "Couldn't load your projects. Please try again.",
+  notFound: "That project no longer exists, or isn't yours.",
+  unavailable: "Clients Management is switched off for your account, so there are no projects to connect.",
+  connected: (name: string) => `Connected to ${name}.`,
+  disconnected: "No longer connected to a project.",
+  // A repeating meeting is asked which meetings the choice goes on
+  applyToSeries: "Apply to this meeting and every later one in the series",
+  applyToSeriesHint: "Left unticked, only this meeting is connected.",
+  seriesConnected: (name: string) => `This meeting and every later one in the series are connected to ${name}.`,
+  seriesDisconnected: "This meeting and every later one in the series are no longer connected to a project.",
+  projectGone: "Project deleted",
+} as const
+
 export const MEETING_PLANNER_MESSAGES = {
   missingName: "Give the meeting a name.",
   nameTooLong: `The meeting name must be under ${MEETING_NAME_MAX_LENGTH} characters.`,

@@ -5,6 +5,7 @@ import {
   DELETE_SCOPES,
   MEETING_PLANNER_MESSAGES,
   MEETING_PLAN_STATUS_IDS,
+  MEETING_PROJECT_MESSAGES,
   UPDATE_SCOPES,
 } from "@/constants/meetingPlanner"
 import {
@@ -14,7 +15,9 @@ import {
   seriesSizeOf,
   updateMeeting,
   updateSeriesSchedule,
+  withProject,
 } from "@/services/meetingPlanner/plans"
+import { connectableProjectId } from "@/services/meetingPlanner/clientProjects"
 import { MeetingInputSchema, hasPrepInput } from "../route"
 import { requireViewer } from "@/services/auth/viewer"
 
@@ -105,7 +108,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
-    const { scope, ...fields } = changes
+    const { scope, ...rest } = changes
+    const fields = { ...rest }
+    // A project named here must be the viewer's own; null disconnects it and leaving it out leaves it alone
+    if (rest.projectId !== undefined) {
+      const projectId = await connectableProjectId(auth.viewer, rest.projectId)
+      if (projectId === false) return NextResponse.json({ success: false, message: MEETING_PROJECT_MESSAGES.notFound }, { status: 400 })
+      fields.projectId = projectId
+    }
     if (scope === "series") {
       const result = await updateSeriesSchedule(auth.viewer, id, fields)
       if (result === "not-found") return notFound()
@@ -114,13 +124,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         return NextResponse.json({
           success: true,
           message: MEETING_PLANNER_MESSAGES.seriesUpdated,
-          data: { ...result.meeting, changed: result.changed },
+          data: { ...(await withProject(auth.viewer, result.meeting)), changed: result.changed },
         })
       }
     }
 
-    const meeting = await updateMeeting(auth.viewer, id, fields)
-    if (!meeting) return notFound()
+    const updated = await updateMeeting(auth.viewer, id, fields)
+    if (!updated) return notFound()
+    const meeting = await withProject(auth.viewer, updated)
     const message = fields.status ? MEETING_PLANNER_MESSAGES.statusUpdated : MEETING_PLANNER_MESSAGES.updated
     return NextResponse.json({ success: true, message, data: meeting })
   } catch (error: unknown) {

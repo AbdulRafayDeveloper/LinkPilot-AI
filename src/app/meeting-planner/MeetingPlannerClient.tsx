@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
-import { CalendarPlus, Loader2, Sparkles } from "lucide-react"
+import { CalendarPlus, Loader2 } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { TodayMeetings } from "@/components/meeting-planner/TodayMeetings"
@@ -24,6 +24,7 @@ import {
   CALENDAR_MONTH_RANGE,
   MEETING_PLANNER_ENDPOINT,
   MEETING_PLANNER_MESSAGES,
+  MEETING_PROJECT_MESSAGES,
   type DeleteScopeId,
   type MeetingPlanStatusId,
   type UpdateScopeId,
@@ -31,6 +32,7 @@ import {
 import type { MeetingPlan, MeetingPlanDetail, MeetingPlannerPage } from "@/types/meetingPlanner"
 import { MeetingNotesModal } from "@/components/meeting-planner/MeetingNotesModal"
 import { LinkedMeetingsDialog } from "@/components/meeting-planner/LinkedMeetingsDialog"
+import { ConnectProjectDialog, type ProjectChoice } from "@/components/meeting-planner/ConnectProjectDialog"
 
 export default function MeetingPlannerClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -73,6 +75,10 @@ export default function MeetingPlannerClient() {
   const [linkedFor, setLinkedFor] = useState<MeetingPlan | null>(null)
   const [notesText, setNotesText] = useState("")
   const [isLoadingNotes, setIsLoadingNotes] = useState(false)
+  // The meeting being connected to a client project from its three-dot menu
+  const [projectFor, setProjectFor] = useState<MeetingPlan | null>(null)
+  const [isSavingProject, setIsSavingProject] = useState(false)
+  const [projectError, setProjectError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<MeetingPlan | null>(null)
   const [deletingScope, setDeletingScope] = useState<DeleteScopeId | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -180,6 +186,7 @@ export default function MeetingPlannerClient() {
           personName: values.personName || null,
           profileLink: values.profileLink || null,
           joinUrl: values.joinUrl || null,
+          projectId: values.projectId,
           prepEnabled: values.prepEnabled,
           profileInfo: values.profileInfo || null,
           conversationHistory: values.conversationHistory || null,
@@ -257,6 +264,7 @@ export default function MeetingPlannerClient() {
           personName: values.personName || null,
           profileLink: values.profileLink || null,
           joinUrl: values.joinUrl || null,
+          projectId: values.projectId,
           prepEnabled: values.prepEnabled,
           profileInfo: values.profileInfo || null,
           conversationHistory: values.conversationHistory || null,
@@ -272,6 +280,44 @@ export default function MeetingPlannerClient() {
     } finally {
       setIsSavingEdit(false)
     }
+  }
+
+  /**
+   * Connects a meeting to a client project from its three-dot menu, or takes it off one. A repeating
+   * meeting puts the choice on every later meeting of its series when the picker's box is ticked,
+   * through the same "series" scope every other edit uses; the calendar is read again afterwards.
+   */
+  const saveProject = async ({ project, applyToSeries }: ProjectChoice) => {
+    if (!projectFor || isSavingProject) return
+    setIsSavingProject(true)
+    setProjectError(null)
+    try {
+      await requestApi<MeetingPlanDetail>(`${MEETING_PLANNER_ENDPOINT}/${projectFor.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project?.id ?? null, scope: applyToSeries ? "series" : "one" }),
+      })
+      setProjectFor(null)
+      setNotice(
+        applyToSeries
+          ? project
+            ? MEETING_PROJECT_MESSAGES.seriesConnected(project.name)
+            : MEETING_PROJECT_MESSAGES.seriesDisconnected
+          : project
+            ? MEETING_PROJECT_MESSAGES.connected(project.name)
+            : MEETING_PROJECT_MESSAGES.disconnected
+      )
+      reload()
+    } catch (error: unknown) {
+      setProjectError(error instanceof Error ? error.message : MEETING_PLANNER_MESSAGES.updateFailed)
+    } finally {
+      setIsSavingProject(false)
+    }
+  }
+
+  const openProject = (meeting: MeetingPlan) => {
+    setProjectError(null)
+    setProjectFor(meeting)
   }
 
   /**
@@ -443,6 +489,7 @@ export default function MeetingPlannerClient() {
                 onNotes={(meeting) => void openNotes(meeting)}
                 onEditDetails={(meeting) => void openEdit(meeting)}
                 onLinked={setLinkedFor}
+                onProject={openProject}
               />
               <DayMeetingsPanel
                 date={selectedDate}
@@ -451,6 +498,7 @@ export default function MeetingPlannerClient() {
                 onChangeStatus={changeStatus}
                 onNotes={(meeting) => void openNotes(meeting)}
                 onLinked={setLinkedFor}
+                onProject={openProject}
                 onAddMeeting={openForm}
                 onEdit={(meeting) => {
                   setMoveError(null)
@@ -465,10 +513,6 @@ export default function MeetingPlannerClient() {
               </div>
             </div>
 
-            <p className="flex items-center gap-2 text-[11px] text-outline">
-              <Sparkles size={12} aria-hidden="true" />
-              Preparation reads what you paste plus your own About Me and Profile Info, and is saved with the meeting.
-            </p>
           </div>
         </main>
       </div>
@@ -535,6 +579,19 @@ export default function MeetingPlannerClient() {
             )
           }}
           onClose={() => setNotesFor(null)}
+        />
+      )}
+      {projectFor && (
+        <ConnectProjectDialog
+          key={projectFor.id}
+          currentId={projectFor.project ? projectFor.projectId : null}
+          isSeries={Boolean(projectFor.seriesId)}
+          isSaving={isSavingProject}
+          error={projectError}
+          onPick={(choice) => void saveProject(choice)}
+          onClose={() => {
+            if (!isSavingProject) setProjectFor(null)
+          }}
         />
       )}
       {linkedFor && <LinkedMeetingsDialog meeting={linkedFor} onClose={() => setLinkedFor(null)} />}

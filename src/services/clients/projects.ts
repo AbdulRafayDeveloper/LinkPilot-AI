@@ -11,6 +11,7 @@ import { deleteTasksOfProjects } from "@/services/clientProjects/tasks"
 import { deleteProjectFileUploads } from "@/services/clientProjects/files"
 import { deleteFoldersOfProjects } from "@/services/clientProjects/folders"
 import { folderForProjectName, renameFolder } from "@/services/promptCreator/folders"
+import { forgetProjects } from "@/services/meetingPlanner/clientProjects"
 import type { ClientProject, ClientProjectInput, ClientProjectsPage, PromptProject } from "@/types/clients"
 import type { Viewer } from "@/types/auth"
 
@@ -199,6 +200,8 @@ export async function deleteClientProject(viewer: Viewer, clientId: string, proj
      * the project.
      */
     await CreatedPromptModel.updateMany({ ...visibleTo(viewer), projectId }, { $set: { projectId: null } })
+    // A meeting connected to it stays on the calendar, connected to nothing
+    await forgetProjects(viewer, [projectId])
   }
   return deletedCount > 0
 }

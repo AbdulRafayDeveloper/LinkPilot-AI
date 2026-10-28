@@ -32,6 +32,7 @@ export type PromptName =
   | "client-voices-instructions"
   | "meetings-instructions"
   | "meeting-planner-instructions"
+  | "finance-bot-instructions"
   | "trending-topics"
   | "trending-research"
   | "trending-search-lenses"
@@ -78,6 +79,9 @@ export type PromptName =
   | "client-message"
   | "meeting-prep-system"
   | "meeting-chat-system"
+  // The Finance Bot: its fixed rules and how it guides, which an admin edits (services/financeBot/chat.ts)
+  | "finance-bot-system"
+  | "finance-bot"
   | `meeting-prep-${MeetingPlannerPromptId}`
   | "meeting-system"
   | "meeting-chunk"

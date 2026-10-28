@@ -35,6 +35,7 @@ export const MODULE_PROMPT_TOOLS: Record<string, string> = {
   "daily-tasks": "daily-tasks",
   "quick-notes": "quick-notes",
   "client-projects": "client-projects",
+  "finance-bot": "finance-bot",
 }
 
 // The prompts that belong to no one module: Humanization and the ones every LinkedIn tool shares (the

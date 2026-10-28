@@ -40,6 +40,7 @@ export const FEATURE_API_PATHS: Record<string, string[]> = {
   "important-files": ["/api/important-files"],
   "important-content": ["/api/important-content"],
   employees: ["/api/employees"],
+  "finance-bot": ["/api/finance-bot"],
 }
 
 /**

@@ -119,6 +119,26 @@ export interface MeetingPrep extends WithAiSource {
   cautions: string[]
 }
 
+/** A client project as a meeting names it, and as the picker lists it. */
+export interface MeetingProject {
+  id: string
+  name: string
+  clientId: string
+  clientName: string
+  status: string
+}
+
+/** One page of the projects a meeting may be connected to. */
+export interface MeetingProjectPage {
+  items: MeetingProject[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+  // Every client the viewer has projects under, for the client filter, whatever is filtered
+  clients: { id: string; name: string }[]
+}
+
 /**
  * One meeting, as the API serves it.
  */
@@ -135,6 +155,13 @@ export interface MeetingPlan {
   profileLink: string | null
   // Where the meeting is actually attended (Meet, Zoom, Teams); null until one is added
   joinUrl: string | null
+  /**
+   * The client project the meeting is about, and that project as it reads now (its name, its
+   * client, its status), so a rename in Clients Management shows here without anything saved twice.
+   * `project` is null when there is none, or when the project has since been deleted.
+   */
+  projectId: string | null
+  project?: MeetingProject | null
   prepEnabled: boolean
   prepStatus: PrepStatusId
   prepError: string | null

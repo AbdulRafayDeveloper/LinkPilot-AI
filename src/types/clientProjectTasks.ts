@@ -8,7 +8,7 @@ import type {
   RoadmapStage,
 } from "@/constants/clientProjectTasks"
 import type { TaskImage, TaskImageView } from "./taskAttachment"
-import type { ClientProjectStatus } from "@/constants/clients"
+import type { ClientKind, ClientProjectStatus } from "@/constants/clients"
 
 /** One voice note, as it is stored on an item: what it is and where its object lives. */
 export interface VoiceNote {
@@ -226,6 +226,8 @@ export interface ProjectWithTasks {
   id: string
   clientId: string
   clientName: string
+  // Whether the client is one person or a business; Projects Management shows it beside the name
+  clientKind?: ClientKind
   name: string
   description: string
   status: ClientProjectStatus
@@ -244,7 +246,7 @@ export interface ProjectWithTasks {
 /** The projects page: every project the viewer may see, with the clients to filter by. */
 export interface ClientProjectsPage {
   projects: ProjectWithTasks[]
-  clients: { id: string; name: string }[]
+  clients: { id: string; name: string; kind: ClientKind }[]
 }
 
 /**

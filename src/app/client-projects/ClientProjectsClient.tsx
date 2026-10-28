@@ -1,10 +1,10 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, FolderKanban, Loader2, RefreshCw } from "lucide-react"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
-import { FilterPanel, SearchFilter, SelectFilter } from "@/components/history/HistoryFilters"
+import { FilterPanel, SearchFilter, SearchableSelectFilter, SelectFilter } from "@/components/history/HistoryFilters"
 import { ProjectsTable } from "@/components/client-projects/ProjectsTable"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { requestApi } from "@/lib/apiClient"
@@ -33,6 +33,8 @@ export default function ClientProjectsClient() {
   const [search, setSearch] = useState("")
   const [client, setClient] = useState("")
   const [status, setStatus] = useState("")
+  const [orderError, setOrderError] = useState<string | null>(null)
+  const orderQueue = useRef<Promise<void>>(Promise.resolve())
 
   // The projects, with every client to filter by
   useEffect(() => {
@@ -68,8 +70,29 @@ export default function ClientProjectsClient() {
       setStatus(oneOf(saved.status, CLIENT_PROJECT_STATUS_IDS))
     },
   })
+  /**
+   * A drop shows at once and the whole list's order is saved behind it, one save after another so
+   * quick drags land in the order they were made. A list the server says has changed (a project added
+   * or deleted elsewhere) is read again rather than written over.
+   */
+  const reorder = (ids: string[]) => {
+    if (!page) return
+    const byId = new Map(page.projects.map((project) => [project.id, project]))
+    setOrderError(null)
+    setPage({ ...page, projects: ids.map((id) => byId.get(id)).filter((project): project is NonNullable<typeof project> => Boolean(project)) })
+    orderQueue.current = orderQueue.current.then(async () => {
+      try {
+        await requestApi(`${CLIENT_PROJECTS_ENDPOINT}/order`, { method: "PUT", body: JSON.stringify({ orderedIds: ids }) })
+      } catch (reason: unknown) {
+        setOrderError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.projectOrderFailed)
+        setAttempt((count) => count + 1)
+      }
+    })
+  }
+
   const statusOptions = CLIENT_PROJECT_STATUSES.map((entry) => ({ id: entry.id, label: entry.label }))
-  const clientOptions = (page?.clients ?? []).map((entry) => ({ id: entry.id, label: entry.name }))
+  // The kind is searched too, so typing "company" narrows the clients to the businesses
+  const clientOptions = (page?.clients ?? []).map((entry) => ({ id: entry.id, label: entry.name, searchText: `${entry.name} ${entry.kind}` }))
 
   return (
     <div className="font-body-md text-body-md flex h-screen min-h-screen overflow-hidden bg-background text-on-surface">
@@ -101,7 +124,15 @@ export default function ClientProjectsClient() {
               summary={page ? `${projects.length.toLocaleString()} of ${page.projects.length.toLocaleString()} projects` : "Loading your projects..."}
             >
               <SearchFilter value={search} onChange={setSearch} placeholder="Search by project, client or what the work is" />
-              <SelectFilter label="Client" allLabel="All clients" value={client} options={clientOptions} onChange={setClient} />
+              <SearchableSelectFilter
+                label="Client"
+                allLabel="All clients"
+                value={client}
+                options={clientOptions}
+                onChange={setClient}
+                searchPlaceholder={PROJECT_TASK_MESSAGES.searchClients}
+                emptyLabel={PROJECT_TASK_MESSAGES.noClientMatch}
+              />
               <SelectFilter label="Status" allLabel="Any status" value={status} options={statusOptions} onChange={setStatus} />
             </FilterPanel>
 
@@ -131,7 +162,15 @@ export default function ClientProjectsClient() {
                 <p className="max-w-sm text-sm text-on-surface-variant">{hasFilters ? PROJECT_TASK_MESSAGES.noResults : PROJECT_TASK_MESSAGES.noProjects}</p>
               </div>
             ) : (
-              <ProjectsTable projects={projects} />
+              <>
+                {orderError && (
+                  <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[13px] text-on-error-container">
+                    {orderError}
+                  </p>
+                )}
+                {/* A narrowed list is only part of the order, so dragging waits until the filters are off */}
+                <ProjectsTable projects={projects} onReorder={reorder} canDrag={!hasFilters} />
+              </>
             )}
           </div>
         </main>

@@ -12,6 +12,7 @@ import { PrepBadge } from "./PrepBadge"
 import { SeriesBadge } from "./SeriesBadge"
 import { RecordedBadge } from "./RecordedBadge"
 import { MeetingRowMenu } from "./MeetingRowMenu"
+import { ProjectBadge } from "./ProjectBadge"
 
 interface DayMeetingsPanelProps {
   date: string
@@ -31,6 +32,8 @@ interface DayMeetingsPanelProps {
    * Notes to Tasks. Only shown on a meeting that has some, so a row stays about the meeting itself.
    */
   onLinked: (meeting: MeetingPlan) => void
+  // Connecting it to a client project
+  onProject: (meeting: MeetingPlan) => void
 }
 
 /**
@@ -50,6 +53,7 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
   onDelete,
   onNotes,
   onLinked,
+  onProject,
 }) => (
   <section
     aria-label={`Meetings on ${date}`}
@@ -100,6 +104,7 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                   <ChevronRight size={13} className="shrink-0 text-outline" aria-hidden="true" />
                 </span>
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
+                <ProjectBadge meeting={meeting} className="mt-1" />
               </Link>
               <div className="flex flex-wrap items-center justify-end gap-1">
                 {/* Recorded, in words, at the start of the line: a button can't sit inside the row's link above */}
@@ -116,6 +121,7 @@ export const DayMeetingsPanel: React.FC<DayMeetingsPanelProps> = ({
                   onNotes={onNotes}
                   onEditDetails={onEditDetails}
                   onLinked={onLinked}
+                    onProject={onProject}
                   onMove={onEdit}
                   onDelete={onDelete}
                 />

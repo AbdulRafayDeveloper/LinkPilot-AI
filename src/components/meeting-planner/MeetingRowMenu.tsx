@@ -2,11 +2,12 @@
 
 import React from "react"
 import { useRouter } from "next/navigation"
-import { ArrowUpRight, Check, Clock, Copy, FileText, NotebookPen, Pencil, Trash2, Video } from "lucide-react"
+import { ArrowUpRight, Briefcase, Check, Clock, Copy, FileText, NotebookPen, Pencil, Trash2, Video } from "lucide-react"
 import { ActionMenu, type ActionMenuGroup } from "@/components/ui/ActionMenu"
 import { useQuickRecord } from "@/components/meetings/QuickRecordButton"
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
 import { MEETING_PLAN_LINK_MESSAGES } from "@/constants/meetings"
+import { MEETING_PROJECT_MESSAGES } from "@/constants/meetingPlanner"
 import type { MeetingPlan } from "@/types/meetingPlanner"
 
 interface MeetingRowMenuProps {
@@ -16,6 +17,8 @@ interface MeetingRowMenuProps {
   onNotes: (meeting: MeetingPlan) => void
   onEditDetails: (meeting: MeetingPlan) => void
   onLinked: (meeting: MeetingPlan) => void
+  // Connecting it to a client project, or changing or removing the one it has
+  onProject?: (meeting: MeetingPlan) => void
   // The day panel's own: the day or time, and deleting it (or its whole series). Today's list has neither
   onMove?: (meeting: MeetingPlan) => void
   onDelete?: (meeting: MeetingPlan) => void
@@ -31,7 +34,7 @@ interface MeetingRowMenuProps {
  * What stays on the row is what is read at a glance or wanted in one click at the hour: the time, the
  * tags, the status chip and Join.
  */
-export const MeetingRowMenu: React.FC<MeetingRowMenuProps> = ({ meeting, isSaving, onNotes, onEditDetails, onLinked, onMove, onDelete }) => {
+export const MeetingRowMenu: React.FC<MeetingRowMenuProps> = ({ meeting, isSaving, onNotes, onEditDetails, onLinked, onProject, onMove, onDelete }) => {
   const router = useRouter()
   const { copied, copy } = useCopyToClipboard()
   const record = useQuickRecord({ id: meeting.id, name: meeting.name })
@@ -68,6 +71,18 @@ export const MeetingRowMenu: React.FC<MeetingRowMenuProps> = ({ meeting, isSavin
                 onSelect: () => onMove(meeting),
                 disabled: isSaving,
                 hint: savingHint ?? (meeting.seriesId ? "This meeting, or this and every later one" : undefined),
+              },
+            ]
+          : []),
+        ...(onProject
+          ? [
+              {
+                id: "project",
+                label: meeting.project ? MEETING_PROJECT_MESSAGES.change : MEETING_PROJECT_MESSAGES.connect,
+                icon: <Briefcase size={14} />,
+                onSelect: () => onProject(meeting),
+                disabled: isSaving,
+                hint: savingHint ?? (meeting.project ? `Now: ${meeting.project.name}` : "The client project this meeting is about"),
               },
             ]
           : []),

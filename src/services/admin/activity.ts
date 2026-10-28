@@ -17,6 +17,7 @@ import {
   RewrittenMessageRecord,
 } from "@/models/GenerationRecords"
 import { Meeting } from "@/models/Meeting"
+import { FinanceChatMessageModel } from "@/models/FinanceChatMessage"
 import { MeetingPlan } from "@/models/MeetingPlan"
 import { PostImageModel } from "@/models/PostImage"
 import { QuickNote } from "@/models/QuickNote"
@@ -91,6 +92,8 @@ export const SOURCES: ActivitySource[] = [
   { href: "/prompt-creator", label: "folders", collection: () => PromptFolderModel.collection },
   { href: "/employees", label: "employees", collection: () => EmployeeModel.collection },
   { href: "/employees", label: "plans", collection: () => EmployeePlanModel.collection },
+  // The person's own Finance Bot chat, counted and deleted with the account
+  { href: "/finance/finance-bot", label: "messages", collection: () => FinanceChatMessageModel.collection },
   // My AI Profile: the person's own entries and the vectors Gemini wrote for them and their Profile Info
   { href: GLOBAL_PROMPTS_LINK.href, label: "entries", collection: () => ProfileEntryModel.collection },
   { href: GLOBAL_PROMPTS_LINK.href, label: "search vectors", collection: () => ProfileVectorModel.collection },

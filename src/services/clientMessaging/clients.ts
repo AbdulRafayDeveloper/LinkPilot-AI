@@ -11,6 +11,7 @@ import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { deleteTasksOfProjects } from "@/services/clientProjects/tasks"
 import { deleteFoldersOfProjects } from "@/services/clientProjects/folders"
 import { deleteProjectFileUploads } from "@/services/clientProjects/files"
+import { forgetProjects } from "@/services/meetingPlanner/clientProjects"
 
 /**
  * The clients the user writes to, kept in the clients collection. Each one carries its own
@@ -137,6 +138,7 @@ export async function deleteClient(viewer: Viewer, id: string): Promise<boolean>
     // The folders those documents were filed in file nothing now
     await deleteFoldersOfProjects(projectIds)
     await deleteProjectFileUploads(visibleTo(viewer), projectIds)
+    await forgetProjects(viewer, projectIds)
     await ClientProjectModel.deleteMany({ clientId: id })
   }
   return deletedCount > 0

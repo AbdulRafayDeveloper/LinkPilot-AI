@@ -93,6 +93,12 @@ const TOOL_SEO: Record<string, { title: string; description: string; keywords: s
     description: "Every sign-in, sign-up and refused attempt, newest first, with the device and browser it came from.",
     keywords: [],
   },
+  "finance-bot": {
+    title: "Finance Bot, a Personal Investment Guide",
+    description:
+      "Ask where to invest, for a roadmap or a plan, and which platforms to use, and get answers written for you from your own profile, by text or by voice.",
+    keywords: ["personal investment guide", "investment plan", "where to invest", "financial planning chatbot"],
+  },
   "activity-logs": {
     title: "Activity Logs",
     description: "Every action your account has taken, newest first, with search, filters and the device it came from.",

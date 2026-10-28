@@ -25,6 +25,8 @@ export interface IClientProject {
   status: ClientProjectStatus
   // Where it sits in its client's list, dragged into place (lower is higher up); 0 on a project saved before ordering
   position: number
+  // Where it sits on Projects Management's list of every project, dragged into place there; 0 until then
+  listPosition: number
   /**
    * The read-only link, if one has been made (lib/projectLink.ts). Nothing secret is stored: the
    * version is what the token is signed with, so a new link stops every earlier one, and turning
@@ -48,6 +50,7 @@ const ClientProjectSchema = new Schema<IClientProject>(
     description: { type: String, default: "" },
     status: { type: String, enum: CLIENT_PROJECT_STATUS_IDS, default: DEFAULT_CLIENT_PROJECT_STATUS },
     position: { type: Number, default: 0 },
+    listPosition: { type: Number, default: 0 },
     // Both optional in effect: a project saved before links reads as version 0 with no link on
     publicLinkVersion: { type: Number, default: 0 },
     publicLinkActive: { type: Boolean, default: false },
@@ -59,6 +62,8 @@ const ClientProjectSchema = new Schema<IClientProject>(
 // A client's projects in the order they were dragged into, ties (projects from before ordering) newest
 // first; the _id keeps the order stable when two share a millisecond
 ClientProjectSchema.index({ clientId: 1, position: 1, createdAt: -1, _id: -1 })
+// Projects Management's own order across every client, ties (never dragged) newest first
+ClientProjectSchema.index({ ownerId: 1, listPosition: 1, createdAt: -1, _id: -1 })
 
 export const ClientProjectModel =
   (mongoose.models.ClientProject as Model<IClientProject> | undefined) ??

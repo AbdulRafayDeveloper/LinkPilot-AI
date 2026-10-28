@@ -12,6 +12,7 @@ import { PrepBadge } from "./PrepBadge"
 import { SeriesBadge } from "./SeriesBadge"
 import { RecordedBadge } from "./RecordedBadge"
 import { MeetingRowMenu } from "./MeetingRowMenu"
+import { ProjectBadge } from "./ProjectBadge"
 
 interface TodayMeetingsProps {
   meetings: MeetingPlan[]
@@ -25,6 +26,8 @@ interface TodayMeetingsProps {
   onEditDetails: (meeting: MeetingPlan) => void
   // Opening the recordings and notes linked to it
   onLinked: (meeting: MeetingPlan) => void
+  // Connecting it to a client project
+  onProject: (meeting: MeetingPlan) => void
 }
 
 /**
@@ -40,6 +43,7 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
   onNotes,
   onEditDetails,
   onLinked,
+  onProject,
 }) => (
   /* The whole card is the brand's dark violet, the colour of the buttons, at the owner's request, so it
      reads as today at a glance; each meeting sits on a solid card of its own inside it */
@@ -103,6 +107,7 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                     onNotes={onNotes}
                     onEditDetails={onEditDetails}
                     onLinked={onLinked}
+                    onProject={onProject}
                   />
                 </span>
               </div>
@@ -119,6 +124,7 @@ export const TodayMeetings: React.FC<TodayMeetingsProps> = ({
                   <ChevronRight size={13} className="shrink-0 text-outline" aria-hidden="true" />
                 </span>
                 {meeting.personName && <span className="block truncate text-[11px] text-outline">{meeting.personName}</span>}
+                <ProjectBadge meeting={meeting} className="mt-1" />
               </Link>
             </div>
           </li>

@@ -34,6 +34,11 @@ export interface IMeetingPlan {
   // Where the meeting is attended: the Meet, Zoom or Teams link, opened and copied as it starts.
   // Null on every meeting saved before this, which simply shows no attend link
   joinUrl: string | null
+  /**
+   * The client project this meeting is about (a `client_projects` id), null when it is about none.
+   * Null on every meeting saved before this, which reads as connected to nothing.
+   */
+  projectId: string | null
   prepEnabled: boolean
   profileInfo: string | null
   conversationHistory: string | null
@@ -71,6 +76,7 @@ const MeetingPlanSchema = new Schema<IMeetingPlan>(
     personName: { type: String, default: null, trim: true },
     profileLink: { type: String, default: null, trim: true },
     joinUrl: { type: String, default: null, trim: true },
+    projectId: { type: String, default: null },
     prepEnabled: { type: Boolean, required: true, default: false },
     profileInfo: { type: String, default: null },
     conversationHistory: { type: String, default: null },

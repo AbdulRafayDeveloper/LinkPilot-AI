@@ -217,12 +217,14 @@ export function SortableList<T>({
     if (frame.current !== null) cancelAnimationFrame(frame.current)
   }, [])
 
-  // Moving a row with the keyboard keeps focus on its handle
+  // Moving a row with the keyboard keeps focus on its handle. A row may draw the handle in two layouts
+  // and hide one (Projects Management's table row and card), so the one on screen is the one focused
   useEffect(() => {
     const id = refocus.current
     if (!id) return
     refocus.current = null
-    rows.current.get(id)?.querySelector<HTMLButtonElement>("[data-sortable-handle]")?.focus()
+    const handles = rows.current.get(id)?.querySelectorAll<HTMLButtonElement>("[data-sortable-handle]") ?? []
+    ;([...handles].find((handle) => handle.offsetParent !== null) ?? handles[0])?.focus()
   })
 
   const onKey = (event: React.KeyboardEvent<HTMLButtonElement>, item: T, index: number) => {

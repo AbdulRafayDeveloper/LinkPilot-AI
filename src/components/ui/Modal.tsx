@@ -32,6 +32,13 @@ const PANEL_SIZE = {
 } as const
 
 /**
+ * The popups open now, newest last. A popup may open another over itself (a picker inside a form), and
+ * only the one on top may answer Escape and keep Tab inside it: every popup listens on the document,
+ * and without this one Escape closed the picker and the form beneath it together.
+ */
+const openModals: symbol[] = []
+
+/**
  * Accessible dialog: Escape and backdrop close it, Tab stays inside it, and focus
  * returns to the element that opened it. Render it conditionally to open it.
  */
@@ -61,8 +68,11 @@ export const Modal: React.FC<ModalProps> = ({
     const dialog = dialogRef.current
     const firstFocusable = dialog?.querySelector<HTMLElement>(FOCUSABLE)
     ;(initialFocusRef?.current ?? firstFocusable ?? dialog)?.focus()
+    const token = Symbol("modal")
+    openModals.push(token)
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (openModals[openModals.length - 1] !== token) return
       if (event.key === "Escape" && !isCloseDisabledRef.current) {
         event.stopPropagation()
         onCloseRef.current()
@@ -85,6 +95,7 @@ export const Modal: React.FC<ModalProps> = ({
     document.addEventListener("keydown", handleKeyDown)
     return () => {
       document.removeEventListener("keydown", handleKeyDown)
+      openModals.splice(openModals.indexOf(token), 1)
       previouslyFocused?.focus()
     }
   }, [initialFocusRef])

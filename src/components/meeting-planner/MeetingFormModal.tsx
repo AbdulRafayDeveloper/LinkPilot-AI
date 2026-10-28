@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useRef, useState } from "react"
-import { Loader2, Repeat, Save, Sparkles, Video } from "lucide-react"
+import { createPortal } from "react-dom"
+import { Briefcase, Loader2, Repeat, Save, Sparkles, Video, X } from "lucide-react"
 import { Modal } from "@/components/ui/Modal"
 import {
   DEFAULT_RECURRENCE_PATTERN,
@@ -15,11 +16,14 @@ import {
   RECURRENCE_PATTERNS,
   type RecurrencePatternId,
   type UpdateScopeId,
+  MEETING_PROJECT_MESSAGES,
 } from "@/constants/meetingPlanner"
 import { findProfileLink } from "@/lib/profileLink"
 import { dayLabel } from "@/lib/meetingDates"
 import { datesForCount, defaultCount } from "@/lib/meetingRecurrence"
-import type { MeetingPlanDetail, MeetingRecurrence } from "@/types/meetingPlanner"
+import type { MeetingPlanDetail, MeetingProject, MeetingRecurrence } from "@/types/meetingPlanner"
+import { ProjectStatusBadge } from "@/components/clients/ProjectStatusBadge"
+import { ConnectProjectDialog } from "./ConnectProjectDialog"
 import { describeSeries } from "./SeriesBadge"
 import { TimeField } from "./TimeField"
 
@@ -31,6 +35,14 @@ export interface MeetingFormValues {
   profileLink: string
   // Where the meeting is attended: the Meet, Zoom or Teams link, opened and copied as it starts
   joinUrl: string
+  /**
+   * The client project the meeting is about, picked from the account's projects, and that project
+   * as it was picked so the form can name it. A new repeating meeting puts it on every meeting of
+   * the series; an edit puts it on the rest of the series only with "Apply to this meeting and every
+   * later one", like everything else the form changes.
+   */
+  projectId: string | null
+  project: MeetingProject | null
   prepEnabled: boolean
   profileInfo: string
   conversationHistory: string
@@ -96,6 +108,8 @@ export const emptyMeetingForm = (date: string, time: string): MeetingFormValues 
   personName: "",
   profileLink: "",
   joinUrl: "",
+  projectId: null,
+  project: null,
   prepEnabled: false,
   profileInfo: "",
   conversationHistory: "",
@@ -114,6 +128,9 @@ export const formValuesOf = (meeting: MeetingPlanDetail): MeetingFormValues => (
   personName: meeting.personName ?? "",
   profileLink: meeting.profileLink ?? "",
   joinUrl: meeting.joinUrl ?? "",
+  // A project deleted since reads as none, so saving never sends an id the server would refuse
+  projectId: meeting.project ? meeting.projectId : null,
+  project: meeting.project ?? null,
   prepEnabled: meeting.prepEnabled,
   profileInfo: meeting.profileInfo ?? "",
   conversationHistory: meeting.conversationHistory ?? "",
@@ -140,6 +157,7 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
   onClose,
 }) => {
   const [values, setValues] = useState<MeetingFormValues>(initial)
+  const [isPickingProject, setIsPickingProject] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
   const set = <K extends keyof MeetingFormValues>(key: K, value: MeetingFormValues[K]) =>
     setValues((current) => ({ ...current, [key]: value }))
@@ -297,6 +315,48 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
               a Copy button, so it is one click when the call starts.
             </p>
           </div>
+          <div className="sm:col-span-2">
+            <span className={labelClass}>
+              {MEETING_PROJECT_MESSAGES.label} <span className="normal-case tracking-normal">(optional)</span>
+            </span>
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2">
+              <Briefcase size={15} className="shrink-0 text-outline" aria-hidden="true" />
+              {values.project ? (
+                <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="min-w-0 break-words text-sm font-semibold text-on-surface">{values.project.name}</span>
+                  {values.project.clientName && <span className="text-[12px] text-on-surface-variant">{values.project.clientName}</span>}
+                  <ProjectStatusBadge status={values.project.status} />
+                </span>
+              ) : (
+                <span className="min-w-0 flex-1 text-sm text-outline">{MEETING_PROJECT_MESSAGES.none}</span>
+              )}
+              <span className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setIsPickingProject(true)}
+                  disabled={isSaving}
+                  className="inline-flex min-h-8 items-center whitespace-nowrap rounded-lg border border-outline-variant px-3 text-[12px] font-semibold text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-50"
+                >
+                  {values.project ? MEETING_PROJECT_MESSAGES.change : "Choose a project"}
+                </button>
+                {values.project && (
+                  <button
+                    type="button"
+                    onClick={() => setValues((current) => ({ ...current, projectId: null, project: null }))}
+                    disabled={isSaving}
+                    aria-label="Remove the project"
+                    title="Remove the project"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high disabled:opacity-50"
+                  >
+                    <X size={15} aria-hidden="true" />
+                  </button>
+                )}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-outline">
+              The client project this meeting is about.{allowRepeat ? " A repeating meeting is connected on every meeting of the series." : ""}
+            </p>
+          </div>
         </div>
 
         {existingSeries && (
@@ -328,7 +388,7 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
               <span className="min-w-0">
                 <span className="block font-semibold">Apply to this meeting and every later one</span>
                 <span className="block text-[11px]">
-                  The name, the day, the time, the person and the attend link go on all of them. Each meeting keeps its
+                  The name, the day, the time, the person, the attend link and the client project go on all of them. Each meeting keeps its
                   own preparation notes. Left unticked, only this meeting changes.
                 </span>
               </span>
@@ -542,6 +602,19 @@ export const MeetingFormModal: React.FC<MeetingFormModalProps> = ({
           </div>
         )}
       </div>
+      {/* On the page itself rather than inside this popup's scrolling body, so it covers the screen */}
+      {isPickingProject &&
+        createPortal(
+        <ConnectProjectDialog
+          currentId={values.projectId}
+          onPick={({ project }) => {
+            setValues((current) => ({ ...current, projectId: project?.id ?? null, project }))
+            setIsPickingProject(false)
+          }}
+          onClose={() => setIsPickingProject(false)}
+        />,
+          document.body
+        )}
     </Modal>
   )
 }

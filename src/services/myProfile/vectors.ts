@@ -295,8 +295,15 @@ export async function profileSearchState(ownerId: string): Promise<ProfileSearch
 /**
  * The pieces of this person's profile closest in meaning to a question, through LangChain's MongoDB
  * vector store, filtered to them inside the database. Anything too far from the question is dropped.
+ * A caller that reads the profile to shape an answer (the Finance Bot) asks for more pieces, and lets
+ * through ones a little further away, than the search box on My AI Profile does.
  */
-export async function searchMyProfile(ownerId: string, question: string, signal?: AbortSignal): Promise<ProfileSearchMatch[]> {
+export async function searchMyProfile(
+  ownerId: string,
+  question: string,
+  signal?: AbortSignal,
+  { limit = PROFILE_SEARCH_RESULTS, minScore = PROFILE_SEARCH_MIN_SCORE }: { limit?: number; minScore?: number } = {}
+): Promise<ProfileSearchMatch[]> {
   await connectDatabase()
   const store = new MongoDBAtlasVectorSearch(new GeminiEmbeddings("RETRIEVAL_QUERY", signal), {
     collection: collectionOf(),
@@ -304,12 +311,12 @@ export async function searchMyProfile(ownerId: string, question: string, signal?
     textKey: "text",
     embeddingKey: "embedding",
   })
-  const found = await store.similaritySearchWithScore(question, PROFILE_SEARCH_RESULTS, {
+  const found = await store.similaritySearchWithScore(question, limit, {
     preFilter: { ownerId: { $eq: ownerId } },
-    numCandidates: PROFILE_SEARCH_RESULTS * 20,
+    numCandidates: limit * 20,
   })
   return found
-    .filter(([, score]) => score >= PROFILE_SEARCH_MIN_SCORE)
+    .filter(([, score]) => score >= minScore)
     .map(([document, score]) => ({
       sourceId: String(document.metadata.sourceId ?? ""),
       section: String(document.metadata.section ?? ""),

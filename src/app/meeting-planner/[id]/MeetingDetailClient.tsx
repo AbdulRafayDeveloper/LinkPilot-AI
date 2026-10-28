@@ -25,6 +25,7 @@ import { Modal } from "@/components/ui/Modal"
 import { MeetingStatusButton } from "@/components/meeting-planner/MeetingStatusButton"
 import { PrepBadge } from "@/components/meeting-planner/PrepBadge"
 import { SeriesBadge } from "@/components/meeting-planner/SeriesBadge"
+import { ProjectBadge } from "@/components/meeting-planner/ProjectBadge"
 import { DeleteMeetingDialog } from "@/components/meeting-planner/DeleteMeetingDialog"
 import { MeetingPrepView } from "@/components/meeting-planner/MeetingPrepView"
 import { MeetingChatPanel } from "@/components/meeting-planner/MeetingChatPanel"
@@ -74,6 +75,8 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
       seriesSize: data.seriesSize ?? current?.seriesSize,
       linkedCount: data.linkedCount ?? current?.linkedCount,
       recordedCount: data.recordedCount ?? current?.recordedCount,
+      // Only the meeting's own GET and its edits name the project, so an answer without it keeps it
+      project: data.project !== undefined ? data.project : current?.project,
     }))
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -243,6 +246,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
           personName: values.personName || null,
           profileLink: values.profileLink || null,
           joinUrl: values.joinUrl || null,
+          projectId: values.projectId,
           prepEnabled: values.prepEnabled,
           profileInfo: values.profileInfo || null,
           conversationHistory: values.conversationHistory || null,
@@ -335,6 +339,7 @@ export default function MeetingDetailClient({ meetingId }: { meetingId: string }
                         <h1 className="text-xl font-bold text-on-surface md:text-2xl">{meeting.name}</h1>
                         <PrepBadge meeting={isPreparing ? { prepEnabled: true, prepStatus: "generating" } : meeting} />
                         <SeriesBadge meeting={meeting} />
+                        <ProjectBadge meeting={meeting} linked />
                         <RecordedBadge meeting={meeting} onOpen={() => setIsShowingLinked(true)} />
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-on-surface-variant">

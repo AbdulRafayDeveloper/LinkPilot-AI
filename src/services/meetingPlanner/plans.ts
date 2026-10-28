@@ -20,6 +20,7 @@ import { visibleById, visibleTo } from "@/services/auth/viewer"
 import { RECURRENCE_MAX_OCCURRENCES, STALE_PREP_MS, type MeetingPlanStatusId } from "@/constants/meetingPlanner"
 import { deleteMeetingVectors } from "@/services/meetingPlanner/vectors"
 import { clearMeetingChat } from "@/services/meetingPlanner/chatHistory"
+import { projectsByIds } from "@/services/meetingPlanner/clientProjects"
 
 /**
  * Meetings live in the meeting_plans collection. The app has no accounts, so they belong to
@@ -30,7 +31,7 @@ import { clearMeetingChat } from "@/services/meetingPlanner/chatHistory"
  */
 // What the calendar, today's list and the history rows draw; the long preparation inputs stay out
 const LIST_FIELDS =
-  "name meetingDate meetingTime status completedAt personName profileLink joinUrl prepEnabled prepStatus prepError preparedAt seriesId recurrencePattern recurrenceUntil notesUpdatedAt createdAt"
+  "name meetingDate meetingTime status completedAt personName profileLink joinUrl projectId prepEnabled prepStatus prepError preparedAt seriesId recurrencePattern recurrenceUntil notesUpdatedAt createdAt"
 
 type StoredPlan = IMeetingPlan & { _id: { toString: () => string } }
 
@@ -44,6 +45,7 @@ const toMeeting = (record: StoredPlan): MeetingPlan => ({
   personName: record.personName ?? null,
   profileLink: record.profileLink ?? null,
   joinUrl: record.joinUrl ?? null,
+  projectId: record.projectId ?? null,
   prepEnabled: record.prepEnabled,
   prepStatus: record.prepStatus,
   prepError: record.prepError ?? null,
@@ -92,9 +94,15 @@ export async function listMonth(viewer: Viewer, month: string, today: string): P
    * month, so the calendar can say which meetings have been held and written up without a request
    * per meeting.
    */
-  const linked = await linkedTotals(viewer, [...new Set([...monthMeetings, ...todayMeetings].map((meeting) => meeting.id))])
+  const everyMeeting = [...monthMeetings, ...todayMeetings]
+  const [linked, projects] = await Promise.all([
+    linkedTotals(viewer, [...new Set(everyMeeting.map((meeting) => meeting.id))]),
+    // The client project each one is about, read in one go and as it is named now
+    projectsByIds(viewer, everyMeeting.map((meeting) => meeting.projectId)),
+  ])
   const withLinked = (meeting: MeetingPlan): MeetingPlan => ({
     ...meeting,
+    project: meeting.projectId ? (projects.get(meeting.projectId) ?? null) : null,
     linkedCount: linked.get(meeting.id)?.count ?? 0,
     recordedCount: linked.get(meeting.id)?.recorded ?? 0,
   })
@@ -114,6 +122,7 @@ export interface NewMeetingPlan {
   personName: string | null
   profileLink: string | null
   joinUrl: string | null
+  projectId: string | null
   prepEnabled: boolean
   profileInfo: string | null
   conversationHistory: string | null
@@ -181,8 +190,24 @@ export async function getMeeting(viewer: Viewer, id: string): Promise<MeetingPla
   if (!record) return null
   // Its records too, so the meeting's own page can say it was recorded and open them
   const detail = toDetail(record as unknown as StoredPlan)
-  const linked = (await linkedTotals(viewer, [detail.id])).get(detail.id)
-  return { ...detail, linkedCount: linked?.count ?? 0, recordedCount: linked?.recorded ?? 0 }
+  const [totals, projects] = await Promise.all([linkedTotals(viewer, [detail.id]), projectsByIds(viewer, [detail.projectId])])
+  const linked = totals.get(detail.id)
+  return {
+    ...detail,
+    project: detail.projectId ? (projects.get(detail.projectId) ?? null) : null,
+    linkedCount: linked?.count ?? 0,
+    recordedCount: linked?.recorded ?? 0,
+  }
+}
+
+/**
+ * A meeting with the client project it is about, as that project reads now. Every answer that hands a
+ * meeting back to the page goes through this, so a create or an edit never loses the project's name.
+ */
+export async function withProject<T extends MeetingPlan>(viewer: Viewer, meeting: T): Promise<T> {
+  if (!meeting.projectId) return { ...meeting, project: null }
+  const projects = await projectsByIds(viewer, [meeting.projectId])
+  return { ...meeting, project: projects.get(meeting.projectId) ?? null }
 }
 
 export interface MeetingPlanChanges {
@@ -192,6 +217,7 @@ export interface MeetingPlanChanges {
   personName?: string | null
   profileLink?: string | null
   joinUrl?: string | null
+  projectId?: string | null
   status?: MeetingPlanStatusId
   prepEnabled?: boolean
   profileInfo?: string | null
@@ -375,6 +401,7 @@ export async function extendSeries(
       personName: meeting.personName ?? null,
       profileLink: meeting.profileLink ?? null,
       joinUrl: meeting.joinUrl ?? null,
+      projectId: meeting.projectId ?? null,
       prepEnabled: false,
       prepStatus: "off" as const,
       profileInfo: meeting.profileInfo ?? null,

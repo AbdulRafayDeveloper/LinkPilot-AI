@@ -2,15 +2,44 @@
 
 import React from "react"
 import Link from "next/link"
-import { ArrowRight, Link2 } from "lucide-react"
+import { ArrowRight, Building2, Link2, User } from "lucide-react"
+import { SortableList } from "@/components/ui/SortableList"
 import { historyLabelClass } from "@/components/history/HistoryFilters"
 import { totalItems, workItems } from "@/lib/projectItems"
 import { PROJECT_TASK_MESSAGES } from "@/constants/clientProjectTasks"
+import { CLIENT_KINDS } from "@/constants/clients"
 import { ProjectStatusBadge } from "@/components/clients/ProjectStatusBadge"
 import type { ProjectWithTasks } from "@/types/clientProjectTasks"
 
 interface ProjectsTableProps {
   projects: ProjectWithTasks[]
+  // The whole list in its new order after a drop, top to bottom
+  onReorder: (ids: string[]) => void
+  // Off while a filter narrows the list, since a part of the list is not the whole order
+  canDrag: boolean
+}
+
+// The table's columns, shared by the heading and every row so the two can never drift apart
+const COLUMNS = "grid grid-cols-[28px_minmax(0,1fr)_160px_130px_130px_96px] items-start gap-x-3"
+
+/** Whose project it is: the client's name and whether they are one person or a business. */
+const ClientName: React.FC<{ project: ProjectWithTasks; prefix?: string }> = ({ project, prefix = "" }) => {
+  const kind = CLIENT_KINDS.find((entry) => entry.id === project.clientKind)
+  const Icon = project.clientKind === "company" ? Building2 : User
+  return (
+    <span className="flex min-w-0 flex-col gap-0.5 text-[12px] text-on-surface-variant">
+      <span className="[overflow-wrap:anywhere]">
+        {prefix}
+        {project.clientName}
+      </span>
+      {kind && (
+        <span className="inline-flex items-center gap-1 text-[11px] text-outline">
+          <Icon size={11} className="shrink-0" aria-hidden="true" />
+          {kind.label}
+        </span>
+      )}
+    </span>
+  )
 }
 
 // Where a project stands, the one badge every surface draws
@@ -59,31 +88,41 @@ const Shared: React.FC<{ project: ProjectWithTasks }> = ({ project }) =>
   ) : null
 
 /**
- * Every client project in one table: what it is, whose it is, where it stands, and **Manage**, which
- * opens that project's own page. The work itself (the tabs, the folders, the files) is done there
- * rather than beside this list, so the page stays a list however many projects there are.
+ * Every client project in one list that reads as a table from `xl` (its 880px fits the room a page
+ * has there) and as cards below it: what it is, whose it is and whether that client is a person or a
+ * company, where it stands, and **Manage**, which opens that project's own page.
  *
- * A table from `xl`, where its 880px fits the room a page has, and the same projects as cards below
- * that (see the Responsive layout rules in CLAUDE.md). The name is the link either way.
+ * **Every row is dragged into the order the projects are worked in** by its handle (the shared
+ * `SortableList`: mouse, touch and the arrow keys). It is one list for both layouts, because a
+ * `<table>` cannot be dragged, so the table's columns are a grid each row repeats.
  */
-export const ProjectsTable: React.FC<ProjectsTableProps> = ({ projects }) => (
-  <>
-    <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm xl:block">
-      <table className="w-full min-w-[880px] border-collapse text-left [overflow-wrap:anywhere]">
-        <caption className="sr-only">Every client project</caption>
-        <thead className="bg-surface-container-lowest">
-          <tr className="border-b border-outline-variant">
-            {["Project", "Client", "Status", "What is on it", "Actions"].map((heading) => (
-              <th key={heading} scope="col" className={`px-3 py-2.5 ${historyLabelClass}`}>
-                {heading}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {projects.map((project) => (
-            <tr key={project.id} className="border-b border-outline-variant/60 align-top transition-colors last:border-0 hover:bg-surface-container-lowest">
-              <td className="min-w-[260px] px-3 py-2.5">
+export const ProjectsTable: React.FC<ProjectsTableProps> = ({ projects, onReorder, canDrag }) => (
+  <div className="flex flex-col gap-2">
+    <p className="text-[12px] text-outline">{canDrag ? PROJECT_TASK_MESSAGES.dragProjects : PROJECT_TASK_MESSAGES.dragOffWhileFiltered}</p>
+    <div className="overflow-hidden xl:rounded-2xl xl:border xl:border-outline-variant xl:bg-surface-container-lowest xl:shadow-sm">
+      <div role="presentation" className={`hidden border-b border-outline-variant px-3 py-2.5 xl:grid ${COLUMNS}`}>
+        <span />
+        {["Project", "Client", "Status", "What is on it", "Actions"].map((heading) => (
+          <span key={heading} className={historyLabelClass}>
+            {heading}
+          </span>
+        ))}
+      </div>
+      <SortableList
+        items={projects}
+        getId={(project) => project.id}
+        getLabel={(project) => `${project.name} for ${project.clientName}`}
+        onReorder={onReorder}
+        disabled={!canDrag}
+        label="Every client project, in order"
+        itemNoun="projects"
+        className="flex flex-col gap-3 xl:gap-0"
+        renderItem={(project, handle) => (
+          <>
+            {/* A table row from xl */}
+            <div className={`hidden border-b border-outline-variant/60 bg-surface-container-lowest px-3 py-2.5 transition-colors hover:bg-surface-container-low xl:grid ${COLUMNS} [overflow-wrap:anywhere]`}>
+              <span className="pt-0.5">{handle}</span>
+              <div className="min-w-0">
                 <Link
                   href={`/client-projects/${project.id}`}
                   className="inline-flex min-h-6 items-center text-[13px] font-bold text-on-surface transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
@@ -91,50 +130,41 @@ export const ProjectsTable: React.FC<ProjectsTableProps> = ({ projects }) => (
                   {project.name}
                 </Link>
                 {project.description && <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-on-surface-variant">{project.description}</p>}
-              </td>
-              <td className="w-[180px] px-3 py-2.5 text-[12px] text-on-surface-variant">{project.clientName}</td>
-              <td className="w-[150px] px-3 py-2.5">
-                <span className="flex flex-wrap items-center gap-1">
-                  <Status project={project} />
+              </div>
+              <ClientName project={project} />
+              <span className="flex flex-wrap items-center gap-1">
+                <Status project={project} />
+                <Shared project={project} />
+              </span>
+              <Standing project={project} />
+              <Manage project={project} />
+            </div>
+
+            {/* A card below xl */}
+            <div className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm xl:hidden">
+              <div className="flex items-start gap-2">
+                <span className="-ml-1 shrink-0">{handle}</span>
+                <Link
+                  href={`/client-projects/${project.id}`}
+                  className="flex min-h-6 min-w-0 flex-1 items-center break-words text-sm font-bold text-on-surface transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                >
+                  {project.name}
+                </Link>
+                <Status project={project} />
+              </div>
+              <ClientName project={project} prefix="For " />
+              {project.description && <p className="line-clamp-3 text-[12px] leading-relaxed text-on-surface-variant">{project.description}</p>}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/70 pt-2">
+                <span className="flex flex-wrap items-center gap-2">
+                  <Standing project={project} />
                   <Shared project={project} />
                 </span>
-              </td>
-              <td className="w-[150px] px-3 py-2.5">
-                <Standing project={project} />
-              </td>
-              <td className="w-[130px] px-3 py-2.5">
                 <Manage project={project} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </div>
+            </div>
+          </>
+        )}
+      />
     </div>
-
-    {/* Cards on a phone, two to a row on a tablet or a narrow laptop */}
-    <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:hidden">
-      {projects.map((project) => (
-        <li key={project.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-2">
-            <Link
-              href={`/client-projects/${project.id}`}
-              className="flex min-h-6 min-w-0 items-center break-words text-sm font-bold text-on-surface transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
-              {project.name}
-            </Link>
-            <Status project={project} />
-          </div>
-          <p className="text-[12px] text-on-surface-variant">For {project.clientName}</p>
-          {project.description && <p className="line-clamp-3 text-[12px] leading-relaxed text-on-surface-variant">{project.description}</p>}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/70 pt-2">
-            <span className="flex flex-wrap items-center gap-2">
-              <Standing project={project} />
-              <Shared project={project} />
-            </span>
-            <Manage project={project} />
-          </div>
-        </li>
-      ))}
-    </ul>
-  </>
+  </div>
 )

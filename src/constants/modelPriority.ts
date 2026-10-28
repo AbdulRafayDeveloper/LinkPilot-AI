@@ -27,6 +27,8 @@ export const AI_MODULE_IDS = [
   "quick-notes",
   // A project overview's voice, written out and read back in English
   "client-projects",
+  // Guidance on the person's own money and investments, shaped by their My AI Profile
+  "finance-bot",
 ] as const
 export type AiModuleId = (typeof AI_MODULE_IDS)[number]
 
@@ -57,11 +59,12 @@ export const AI_MODULE_NEEDS: Record<AiModuleId, readonly AiNeed[]> = {
   employees: [],
   "quick-notes": ["speech"],
   "client-projects": ["speech"],
+  "finance-bot": ["speech"],
 }
 export const AI_NEED_LABELS: Record<AiNeed, string> = { "web-search": "web search", screenshots: "screenshots", speech: "speech" }
 
 // The pages that record speech, named in the recording's "for" field so it is read in that module's order
-export const VOICE_MODULE_IDS = ["prompt-creator", "client-messaging", "message-rewriter", "client-voices", "meeting-planner", "meetings", "quick-notes"] as const satisfies readonly AiModuleId[]
+export const VOICE_MODULE_IDS = ["prompt-creator", "client-messaging", "message-rewriter", "client-voices", "meeting-planner", "meetings", "quick-notes", "finance-bot"] as const satisfies readonly AiModuleId[]
 export type VoiceModuleId = (typeof VOICE_MODULE_IDS)[number]
 
 export const MODEL_PRIORITY_ENDPOINT = "/api/admin/model-priority"

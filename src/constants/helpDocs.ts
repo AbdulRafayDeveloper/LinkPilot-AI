@@ -355,6 +355,7 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
     steps: [
       "Add a meeting: a name, a day, a time, and the attend link if you have one.",
       "Tick Repeat to make a series, and say how many meetings it holds.",
+      "Choose the client project the meeting is about on the form, or later from Connect to a project in the meeting's three-dot menu; search by project or client and narrow by client and status.",
       "Paste the person's profile, your conversation so far and any notes, then ask for the preparation.",
       "Read the preparation before the call: who they are, what to cover, which projects to show and a nine-stage script.",
       "Open the script full screen during the call, or edit and reorder its stages first.",
@@ -365,6 +366,7 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
       "A meeting is pending, completed or cancelled, and a cancelled one stays on its day struck through.",
       "Notes on a meeting are yours to write before and after it, and no model ever reads them.",
       "A recorded meeting carries a Recorded tag; press it to open the recording.",
+      "On a repeating meeting, tick Apply to this meeting and every later one to connect the whole rest of the series to a project at once.",
     ],
   },
   "client-voices": {
@@ -455,6 +457,24 @@ export const HELP_DOCS: Record<string, HelpDoc> = {
       "Every item keeps its own number down the side, so dragging the list never renumbers anything.",
       "A voice note runs up to fifteen minutes and is kept as a recording. Only an Overview voice can be written out, and only when you ask: it is written out word for word and read back in clear English, with both kept beside the recording.",
       "The client sees the Overview on the shared link and can add their own voices and descriptions there, and write them out too.",
+    ],
+  },
+
+  // ---------------------------------------------------------------- Finance
+  "finance-bot": {
+    summary: "A chat that helps you plan your money and your investments, with every answer written for you from your My AI Profile.",
+    steps: [
+      "Open Finance on the sidebar's rail and choose Finance Bot.",
+      "Fill in your My AI Profile first: where you live, your work, what you earn and your goals are what the answers are shaped by.",
+      "Type a question or press the microphone and say it, in any language; the answer comes back in English as it is written.",
+      "Ask where to start, for a roadmap month by month, for an investment plan, or which platforms you can use from your country.",
+      "Ask a follow-up about any term or step you don't understand; the bot remembers the chat.",
+      "Press Expand to read a long plan on the whole screen, and copy any answer to keep it.",
+    ],
+    notes: [
+      "Under each answer it says which parts of your profile it was shaped by, or that it is general guidance when your profile had nothing on the question.",
+      "It is guidance to help you understand and plan, not licensed financial advice; check anything important with a qualified adviser.",
+      "The chat is yours alone and is kept until you clear it. Clearing it never touches your profile.",
     ],
   },
 
