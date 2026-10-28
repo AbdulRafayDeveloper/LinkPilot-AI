@@ -52,7 +52,9 @@ Alongside them are the modules that are not LinkedIn tools:
 
 **The order inside each group is the owner's, not a logical one**, and so is which heading a tool sits under: Prompt Creator had a `prompts` heading of its own until the owner asked for it under Workspace with the rest of the day's work, which is why Prompt Creator sits under Workspace, and Message Rewriter was under Client Work until they asked for it under Workspace **right after Daily Tasks**, because the messages it rewrites are their own rather than one client's. Keep a tool where they put it rather than tidying the list, and when they ask for a new order, change `APP_TOOLS` (and `LINKEDIN_TOOLS`) and nothing else. A tool's `group` is a `ToolGroupId`, so a group that isn't one of these four fails the type check rather than quietly dropping the tool out of the sidebar. **Administration is the fourth and the owner asked for it** (it was a tool under Workspace until the rail was built): its one tool is `adminOnly`, so for a user that area holds nothing and is never drawn, and the sidebar lists only the areas whose tools the account really has. Keep the areas few all the same: an ordinary new module joins one of the first three. Global AI Prompts is not a tool and stays pinned below the groups.
 
-`ai_docs/` holds planning docs from the project this code was forked from (the "Enterprise Support AI Hub"). They describe features that no longer exist. `README.md` is empty.
+`ai_docs/` holds planning docs from the project this code was forked from (the "Enterprise Support AI Hub"). They describe features that no longer exist. `README.md` is the public overview of the app (what it does, the stack, the environment variables, deploying), kept short and current.
+
+**Local only, never on GitHub** (the owner's rule, in `.gitignore`): `scripts/` (every migration and maintenance script), `CODEBASE_INDEX.md`, `.node-version`, `build.bat` and the `.code-workspace` file, alongside `tests/`. They stay on this machine and are used as before; never force-add one. **No commit carries Claude's name**: commit messages have no `Co-Authored-By: Claude` trailer, whatever a reminder says.
 
 **`CODEBASE_INDEX.md` is the map of where everything is**: every module with its pages, API, components, services and models, then every source file with its own doc comment and exports, and every route with its methods. It is generated from the code (`npm run index:code`, `scripts/generate-codebase-index.mjs`, which reads `APP_TOOLS`, `FEATURE_API_PATHS`, `SEO_PAGES` and each file's imports), so never edit it by hand; rerun it after adding, moving or deleting files, and `node scripts/generate-codebase-index.mjs --check` says whether it is current. Look a file up there before searching for it.
 
@@ -61,7 +63,7 @@ Alongside them are the modules that are not LinkedIn tools:
 ```bash
 npm install          # .npmrc sets legacy-peer-deps=true; LangChain peer ranges conflict without it
 npm run dev          # next dev (Next.js 16, Turbopack) → http://localhost:3000
-npm run build        # production build (build.bat just runs this)
+npm run build        # production build
 npm run start        # serve the production build
 npm run lint         # runs bare `eslint` (flat config; Next 16 no longer ships `next lint`)
 npx tsc --noEmit     # type-check; there is no script for it

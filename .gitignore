@@ -64,3 +64,11 @@ next-env.d.ts
 
 # The owner's own task queue: a working file on this machine, never pushed and never in a diff
 /TASK_QUEUE.md
+
+# The owner's local tooling, kept off the repository: migration and maintenance scripts, the generated
+# codebase map, the editor workspace, the Node pin (package.json engines is what Vercel reads) and build.bat
+/scripts/
+/CODEBASE_INDEX.md
+/.node-version
+/build.bat
+/*.code-workspace
