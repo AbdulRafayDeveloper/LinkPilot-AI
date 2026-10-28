@@ -45,6 +45,12 @@ interface TaskDetailsFieldsProps {
    */
   maxDescription?: number
   /**
+   * Every formatting tool Important Content offers (headings, checklists, quotes, code, dividers,
+   * strikethrough) and its Visual and Markdown tabs, rather than the everyday few. Client Projects
+   * passes it; a task line in a list keeps the small toolbar.
+   */
+  allTools?: boolean
+  /**
    * What the written block is called and what it says when it is empty. Left out it is the shared
    * "Description", which is what a task is written with everywhere; Client Projects' Credentials tab
    * passes its own, because what is written there is the credentials themselves rather than a note
@@ -117,6 +123,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
   imageEndpoint,
   maxImages = TASK_MAX_IMAGES,
   maxDescription = TASK_DESCRIPTION_MAX_LENGTH,
+  allTools = false,
   textLabel = TASK_ATTACHMENT_MESSAGES.descriptionLabel,
   textHint = TASK_ATTACHMENT_MESSAGES.descriptionHint,
   textRequired = false,
@@ -241,6 +248,7 @@ export const TaskDetailsFields: React.FC<TaskDetailsFieldsProps> = ({
                 ariaLabel={textLabel}
                 visual
                 compact
+                everyTool={allTools}
               />
             </div>
             <p className={`mt-1 text-[11px] ${details.description.length > maxDescription ? "font-semibold text-error" : "text-outline"}`}>

@@ -56,6 +56,8 @@ interface RichTextEditorProps {
   placeholder?: string
   // A small editor for short texts in a list: the everyday marks only, no Write and Preview tabs
   compact?: boolean
+  // With compact: keeps the small size but offers every tool and the Visual and Markdown tabs, as Important Content does
+  everyTool?: boolean
   // Names the field for assistive tech when no visible label points at it
   ariaLabel?: string
   // Opens on a visual page that shows the formatting instead of the marks, with a Markdown tab beside it
@@ -132,6 +134,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   rows = 12,
   placeholder,
   compact = false,
+  everyTool = false,
   ariaLabel,
   visual = false,
   images,
@@ -395,7 +398,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     { id: "link", icon: Link2, label: `Link (${shortcut("K")})`, separatorBefore: true },
     { id: "divider", icon: Minus, label: "Divider" },
   ]
-  const tools = compact
+  const tools = compact && !everyTool
     ? allTools.filter((tool) => COMPACT_TOOLS.has(tool.id)).map((tool) => ({ ...tool, separatorBefore: tool.id === "bullet" || tool.id === "link" }))
     : allTools
 
@@ -520,7 +523,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             </>
           )}
         </div>
-        {!compact && (
+        {(!compact || everyTool) && (
           <div className="flex rounded-lg bg-surface-container p-0.5">
             {visual ? (
               <>

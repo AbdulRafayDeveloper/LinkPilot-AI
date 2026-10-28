@@ -227,6 +227,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
           imageEndpoint={imageEndpoint}
           maxImages={PROJECT_MAX_IMAGES}
           maxDescription={PROJECT_DESCRIPTION_MAX_LENGTH}
+          allTools
         />
       )}
 
