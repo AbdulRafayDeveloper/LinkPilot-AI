@@ -72,3 +72,6 @@ next-env.d.ts
 /.node-version
 /build.bat
 /*.code-workspace
+
+# The owner's own documents (a real budget spreadsheet): never pushed to the public repository
+/ai-docs/
