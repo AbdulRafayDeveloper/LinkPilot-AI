@@ -1,7 +1,6 @@
 import type {
   EstimateUnit,
   ProjectFileCategory,
-  ProjectItemAuthor,
   ProjectItemKind,
   ProjectPriority,
   ProjectTaskStatus,
@@ -92,7 +91,8 @@ export interface ProjectTaskRecord {
   voiceNote: VoiceNote | null
   status: ProjectTaskStatus
   kind: ProjectItemKind
-  addedBy: ProjectItemAuthor
+  role: string
+  assigneeId: string | null
   priority: ProjectPriority
   estimate: ProjectEstimate | null
   stage: RoadmapStage | null
@@ -113,8 +113,14 @@ export interface ProjectTask {
   status: ProjectTaskStatus
   // Which tab it sits under; an item saved before the tabs existed reads as a change
   kind: ProjectItemKind
-  // Whether the project's owner added it or someone writing from the shared link did
-  addedBy: ProjectItemAuthor
+  // A team member's role on the project, shown beside their name; "" on every other tab
+  role: string
+  /**
+   * The team member the work is assigned to (the id of an item on the Team Members tab), on the
+   * tabs that can be signed off. Null when nobody is, and always null on a shared link, which never
+   * carries the team.
+   */
+  assigneeId: string | null
   // The folder it is filed in, on the tabs that have folders; null at the top of the tree
   folderId: string | null
   position: number
@@ -142,6 +148,13 @@ export interface ProjectTask {
   voiceText: ProjectVoiceText | null
   createdAt: string
   updatedAt: string
+}
+
+/** One person on the project's team, as an assignment picker offers them: who, and what they do. */
+export interface ProjectTeamMember {
+  id: string
+  name: string
+  role: string
 }
 
 /** An overview voice, written out word for word and read back in clear English. */
@@ -202,6 +215,10 @@ export interface ProjectTaskInput {
   // Where to file it, or null for the top. Left out, an item is not moved
   folderId?: string | null
   priority?: ProjectPriority
+  // A team member's role. Left out, it is not touched
+  role?: string
+  // Who the work is assigned to, a team member's id, or null for nobody. Left out, it is not touched
+  assigneeId?: string | null
   // The estimate, on the backlog. Null clears it; left out, it is not touched
   estimate?: ProjectEstimate | null
   // Where a roadmap item has got to. Left out, it is not touched

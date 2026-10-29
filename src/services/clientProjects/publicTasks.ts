@@ -1,4 +1,4 @@
-import { changeProjectTask, createProjectTask, publicWritableTaskById, removeProjectTask, reorderProjectTasks, PUBLIC_WRITABLE_KINDS_ONLY } from "./tasks"
+import { changeProjectTask, createProjectTask, withoutTeam, publicWritableTaskById, removeProjectTask, reorderProjectTasks, PUBLIC_WRITABLE_KINDS_ONLY } from "./tasks"
 import { projectFromToken } from "./projects"
 import type { ProjectTask, ProjectTaskInput } from "@/types/clientProjectTasks"
 import type { ProjectItemKind } from "@/constants/clientProjectTasks"
@@ -21,8 +21,7 @@ import type { ProjectItemKind } from "@/constants/clientProjectTasks"
  *    held to different lists**: the roadmap and the notes are shown and never written on, so a
  *    write naming one of them matches nothing either.
  * 3. **It joins the owner's list.** An item written here is stored against the project's own
- *    `ownerId` and marked `addedBy: "client"`, so the owner sees it in their scoped reads straight
- *    away and both surfaces can say where it came from.
+ *    `ownerId`, so the owner sees it in their scoped reads straight away.
  *
  * What a client may do is deliberately the same as what the owner may do, including removing an
  * item (the owner asked for that): the link is sent to the client the work is for, and the owner
@@ -49,10 +48,10 @@ export async function addPublicProjectTask(token: string, input: ProjectTaskInpu
   const projectId = project._id.toString()
   const task = await createProjectTask(
     // The client's items are the project owner's records, counted against the same per-tab ceiling
-    { project, projectId, ownerId: project.ownerId ?? null, addedBy: "client", scope: {} },
+    { project, projectId, ownerId: project.ownerId ?? null, scope: {} },
     input
   )
-  return { ok: true, value: task }
+  return { ok: true, value: withoutTeam(task) }
 }
 
 /** Changes one item of that project through a shared link. Only the fields given are written. */
@@ -63,7 +62,7 @@ export async function updatePublicProjectTask(token: string, taskId: string, inp
   if (!project) return failed("link")
   // The shared link uploads for the project's owner, so those are the only uploads it may name
   const task = await changeProjectTask(filter, project._id.toString(), input, [project.ownerId ?? null])
-  return task ? { ok: true, value: task } : failed("item")
+  return task ? { ok: true, value: withoutTeam(task) } : failed("item")
 }
 
 /** Removes one item of that project through a shared link, with its images and its voice note. */

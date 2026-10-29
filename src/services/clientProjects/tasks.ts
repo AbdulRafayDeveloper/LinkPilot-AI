@@ -18,7 +18,6 @@ import {
   projectPriority,
   projectItemShape,
   roadmapStage,
-  type ProjectItemAuthor,
   type ProjectItemKind,
   hasFolders,
 } from "@/constants/clientProjectTasks"
@@ -188,6 +187,20 @@ function voiceTextOf(record: StoredTask): ProjectTask["voiceText"] {
   }
 }
 
+/**
+ * The team member an item is assigned to, checked against this project's own Team Members tab.
+ * Null (or nothing sent) is nobody; an id that is not one of this project's members is refused.
+ */
+async function assigneeFor(projectId: string, assigneeId: string | null | undefined): Promise<string | null> {
+  if (!assigneeId) return null
+  const member = await ClientProjectTaskModel.exists({ _id: assigneeId, projectId, kind: "member" })
+  if (!member) throw new UserFacingError(PROJECT_TASK_MESSAGES.assigneeGone)
+  return assigneeId
+}
+
+/** An item as a shared link may see it: the team is private, so who it is assigned to is left off. */
+export const withoutTeam = (task: ProjectTask): ProjectTask => ({ ...task, assigneeId: null })
+
 /** One item with its links signed, ready for a page. */
 export async function toTask(record: StoredTask): Promise<ProjectTask> {
   const [images, files, voiceNote] = await Promise.all([
@@ -208,7 +221,8 @@ export async function toTask(record: StoredTask): Promise<ProjectTask> {
     status: record.status === "done" ? "done" : "open",
     // An item saved before the tabs existed has no kind and reads as a change, the first tab
     kind: projectItemKind(record.kind).id,
-    addedBy: record.addedBy === "client" ? "client" : "owner",
+    role: projectItemShape(record.kind).role ? (record.role ?? "") : "",
+    assigneeId: projectItemShape(record.kind).assign ? (record.assigneeId ?? null) : null,
     // Null at the top of the tree, and on every item saved before folders existed
     folderId: record.folderId ?? null,
     position: record.position ?? 0,
@@ -266,6 +280,8 @@ const cleanInput = (input: ProjectTaskInput, kind: ProjectItemKind) => ({
   voiceNote: input.voiceNote ? { assetId: input.voiceNote.assetId, contentType: input.voiceNote.contentType, seconds: input.voiceNote.seconds } : null,
   status: input.status === "done" ? "done" : "open",
   priority: projectPriority(input.priority).id,
+  // Only a team member has a role
+  role: projectItemShape(kind).role ? (input.role?.trim() ?? "") : "",
   // Only the tab that asks for one keeps it, so a change carried to the backlog can gain an
   // estimate and one carried back out of it does not keep a number nothing shows
   estimateValue: projectItemShape(kind).estimate ? (input.estimate?.value ?? null) : null,
@@ -282,7 +298,6 @@ interface CreateOptions {
   projectId: string
   // Whose list it joins. An item added from the shared link is the project owner's, like the project
   ownerId: string | null
-  addedBy: ProjectItemAuthor
   // What counts towards the ceiling and the end of the list: the viewer's scope, or the project alone
   scope: Record<string, unknown>
 }
@@ -291,7 +306,7 @@ interface CreateOptions {
  * Adds one item to the end of its tab. The ceiling is counted per tab, so a long discussion never
  * stops a change being added, and it is what holds a shared link to a sane amount of writing.
  */
-export async function createProjectTask({ project, projectId, ownerId, addedBy, scope }: CreateOptions, input: ProjectTaskInput): Promise<ProjectTask> {
+export async function createProjectTask({ project, projectId, ownerId, scope }: CreateOptions, input: ProjectTaskInput): Promise<ProjectTask> {
   const kind: ProjectItemKind = input.kind ?? DEFAULT_PROJECT_ITEM_KIND
   // What this tab needs, asked again here: the schema asks it of a request, this asks it of the item
   const problem = itemProblem(kind, input)
@@ -315,7 +330,7 @@ export async function createProjectTask({ project, projectId, ownerId, addedBy, 
     ...cleanInput(input, kind),
     kind,
     folderId,
-    addedBy,
+    assigneeId: projectItemShape(kind).assign ? await assigneeFor(projectId, input.assigneeId) : null,
     position: (last?.position ?? count - 1) + 1,
     // Its name on this tab from now on, whatever happens to the order around it
     number: await nextNumber(projectId, kind),
@@ -361,6 +376,7 @@ export async function changeProjectTask(
     voiceNote: input.voiceNote !== undefined ? input.voiceNote : current.voiceNote,
     status: input.status,
     priority: input.priority ?? projectPriority(current.priority).id,
+    role: input.role ?? current.role ?? "",
     estimate: input.estimate !== undefined ? input.estimate : storedEstimate(current),
     stage: input.stage ?? (current.stage ? roadmapStage(current.stage).id : undefined),
     isClientVisible: input.isClientVisible ?? current.isClientVisible === true,
@@ -384,6 +400,17 @@ export async function changeProjectTask(
   if (input.voiceNote !== undefined) changes.voiceNote = cleaned.voiceNote
   if (input.status !== undefined) changes.status = cleaned.status
   if (input.priority !== undefined) changes.priority = cleaned.priority
+  if (input.role !== undefined) changes.role = cleaned.role
+  /**
+   * Handing the work to a team member, or to nobody. Only the tabs that can be signed off carry it,
+   * and the member must be on this project's own team, so an id from another project matches nothing.
+   */
+  if (input.assigneeId !== undefined) {
+    if (!projectItemShape(kind).assign) throw new UserFacingError(PROJECT_TASK_MESSAGES.assignFailed)
+    changes.assigneeId = await assigneeFor(projectId, input.assigneeId)
+  } else if (moving && !projectItemShape(kind).assign) {
+    changes.assigneeId = null
+  }
   // Where a roadmap item has got to, and whether the client may read a note: each its own small write
   if (input.stage !== undefined || moving) changes.stage = cleaned.stage
   if (input.isClientVisible !== undefined || moving) changes.isClientVisible = cleaned.isClientVisible
@@ -449,6 +476,10 @@ export async function removeProjectTask(filter: Record<string, unknown>, project
   await connectDatabase()
   const record = (await ClientProjectTaskModel.findOneAndDelete({ ...filter, projectId }).lean()) as unknown as StoredTask | null
   if (!record) return false
+  // A team member who leaves takes their assignments with them, so no item names someone not there
+  if (projectItemKind(record.kind).id === "member") {
+    await ClientProjectTaskModel.updateMany({ projectId, assigneeId: record._id.toString() }, { $set: { assigneeId: null } })
+  }
   await removeAttachments([{ owners: [record.ownerId ?? null, ...owners], images: record.images, files: record.files, voiceNote: record.voiceNote }])
   return true
 }
@@ -509,7 +540,7 @@ export async function orderProjectTasks(viewer: Viewer, projectId: string, kind:
 export async function addProjectTask(viewer: Viewer, projectId: string, input: ProjectTaskInput): Promise<ProjectTask | null> {
   const project = await projectOrNull(viewer, projectId)
   if (!project) return null
-  return createProjectTask({ project, projectId, ownerId: viewer.id, addedBy: "owner", scope: visibleTo(viewer) }, input)
+  return createProjectTask({ project, projectId, ownerId: viewer.id, scope: visibleTo(viewer) }, input)
 }
 
 const ownersFor = (viewer: Viewer, project: StoredProject): Owners => [project.ownerId ?? null, viewer.id]

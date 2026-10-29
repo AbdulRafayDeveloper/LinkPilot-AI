@@ -40,7 +40,7 @@ export const hasProjectFilters = (values: ProjectFilterValues): boolean =>
  */
 export const projectFiltersFor = (kind: ProjectItemKind) => {
   const shape = projectItemShape(kind)
-  return { search: true, priority: true, status: shape.tick, signed: shape.signOff, stage: shape.stage, shared: shape.shareable }
+  return { search: true, priority: shape.priority, status: shape.tick, signed: shape.signOff, stage: shape.stage, shared: shape.shareable }
 }
 
 /** Every word typed has to appear somewhere in the item, in any order and whatever the case. */

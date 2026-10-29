@@ -65,6 +65,16 @@ export interface ProjectItemShape {
    * owner's request, so it is one mark and the day it was made: signed, or not signed.
    */
   signOff: boolean
+  /**
+   * Whether an item here is **assigned to one of the project's team members**, shown with their name
+   * and role. It goes with sign-off: the tabs of work that can be signed are the ones handed to
+   * someone, at the owner's request.
+   */
+  assign: boolean
+  // How urgent it is. Every tab has one but the credentials and the team, which are not work
+  priority: boolean
+  // What someone does on the project, beside their name: only a team member has one
+  role: boolean
   // Where it has got to on the roadmap (planned, in progress, done), which only the roadmap has
   stage: boolean
   // Whether each item says for itself if the client may see it, which only the notes tab does
@@ -97,6 +107,9 @@ const NOTHING: ProjectItemShape = {
   nameFromFile: false,
   estimate: false,
   signOff: false,
+  assign: false,
+  priority: true,
+  role: false,
   stage: false,
   shareable: false,
   numberByOrder: false,
@@ -112,7 +125,7 @@ const TALK: ProjectItemShape = shapeOf({
   tick: true,
 })
 // The work the client agrees to: a change that can be signed off as settled
-const SIGNABLE: ProjectItemShape = shapeOf({ ...TALK, signOff: true })
+const SIGNABLE: ProjectItemShape = shapeOf({ ...TALK, signOff: true, assign: true })
 // The backlog is signable work with one thing more: how long it is expected to take
 const BACKLOG: ProjectItemShape = shapeOf({ ...SIGNABLE, estimate: true })
 // A note beside a link, a document or a backup: never needed, always allowed
@@ -232,6 +245,8 @@ export const PROJECT_ITEM_KINDS = [
     isPublic: false,
     shape: shapeOf({
       text: { label: "Credentials", hint: "The address, the user name, the password, whatever is needed to sign in", required: true },
+      // A sign-in is not work, so it has no urgency
+      priority: false,
     }),
   },
   {
@@ -355,7 +370,9 @@ export const PROJECT_ITEM_KINDS = [
     empty: "Nobody on the team yet. Add the first person above.",
     isPublic: false,
     shape: shapeOf({
-      text: { label: "Role", hint: "What they do on this project, and anything worth keeping about them", required: false },
+      text: { label: "Description", hint: "Anything worth keeping about them", required: false },
+      role: true,
+      priority: false,
       numberByOrder: true,
     }),
   },
@@ -471,13 +488,8 @@ export const DEFAULT_ESTIMATE_UNIT: EstimateUnit = "hours"
 // A number nobody would write past, kept small so a typed "100000" is caught rather than stored
 export const ESTIMATE_MAX_VALUE = 9_999
 
-/**
- * Who put an item there: the account that owns the project, or someone writing from the shared
- * link. It is stored so both surfaces can say where an item came from, and it is decided by which
- * route the write arrived on, never by anything the browser sends.
- */
-export const PROJECT_ITEM_AUTHORS = ["owner", "client"] as const
-export type ProjectItemAuthor = (typeof PROJECT_ITEM_AUTHORS)[number]
+// A team member's role, one short line beside their name ("Backend developer", "Designer")
+export const PROJECT_ROLE_MAX_LENGTH = 120
 
 // An item is one line of work, the same length an employee's plan task has
 export const PROJECT_TASK_MAX_LENGTH = 900
@@ -661,6 +673,15 @@ export const PROJECT_TASK_MESSAGES = {
   signedOn: (day: string) => `Signed ${day}`,
   unsign: "Take the sign-off off",
   signFailed: "Couldn't save that sign-off. It is back as it was.",
+  // A team member's role, and handing work to one of them
+  role: "Role",
+  roleHint: "What they do on this project (Backend developer, Designer)",
+  assignee: "Assigned to",
+  unassigned: "Not assigned",
+  assignOf: (name: string) => `Who ${name} is assigned to`,
+  noMembers: "Add people on the Team Members tab to assign work to them.",
+  assigneeGone: "That team member is no longer on this project.",
+  assignFailed: "Couldn't save who it is assigned to. It is back as it was.",
   // Where a roadmap item has got to
   stage: "Stage",
   stageOf: (name: string) => `Where ${name} has got to`,
@@ -693,7 +714,6 @@ export const PROJECT_TASK_MESSAGES = {
   searchClients: "Search clients",
   noClientMatch: "No client matches that name.",
   // Where an item came from, shown as a tag on the item itself
-  fromClient: "From the client",
   fromOwner: "From the project owner",
   // The voice note
   voiceTooLarge: `A voice note must be ${VOICE_NOTE_MAX_BYTES / (1024 * 1024)} MB or smaller.`,

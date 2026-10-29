@@ -13,13 +13,14 @@ import {
   PROJECT_TASK_MAX_LENGTH,
   PROJECT_TASK_MESSAGES,
   PROJECT_URL_MAX_LENGTH,
+  PROJECT_ROLE_MAX_LENGTH,
   projectItemKind,
   type ProjectItemKind,
   type ProjectPriority,
 } from "@/constants/clientProjectTasks"
-import { EstimateField, PrioritySelect, ShareToggle, StageField, defaultStage } from "./ItemFields"
+import { AssigneeSelect, EstimateField, PrioritySelect, ShareToggle, StageField, defaultStage } from "./ItemFields"
 import { emptyTaskDetails, toStoredImages, type TaskDetailsDraft } from "@/types/taskAttachment"
-import type { ProjectEstimate, ProjectFileView, ProjectTask, ProjectTaskInput, VoiceNoteView } from "@/types/clientProjectTasks"
+import type { ProjectEstimate, ProjectFileView, ProjectTask, ProjectTaskInput, ProjectTeamMember, VoiceNoteView } from "@/types/clientProjectTasks"
 import type { RoadmapStage } from "@/constants/clientProjectTasks"
 
 interface TaskComposerProps {
@@ -35,6 +36,11 @@ interface TaskComposerProps {
   imageEndpoint?: string
   voiceEndpoint?: string
   fileEndpoint: string
+  /**
+   * The project's team, which work on the signable tabs can be assigned to. Only the owner's page
+   * passes it: the team is private, so the form on a shared link offers no assignment at all.
+   */
+  members?: readonly ProjectTeamMember[]
 }
 
 const labelClass = "mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-outline"
@@ -64,6 +70,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   imageEndpoint,
   voiceEndpoint,
   fileEndpoint,
+  members,
 }) => {
   const [content, setContent] = useState(task?.content ?? "")
   const [url, setUrl] = useState(task?.url ?? "")
@@ -78,6 +85,9 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   // Where a roadmap item has got to, and whether the client may read a note
   const [stage, setStage] = useState<RoadmapStage>(task?.stage ?? defaultStage())
   const [isShared, setIsShared] = useState(task?.isClientVisible ?? false)
+  // A team member's role, and who a piece of work is assigned to
+  const [role, setRole] = useState(task?.role ?? "")
+  const [assigneeId, setAssigneeId] = useState<string | null>(task?.assigneeId ?? null)
   // Files still going up, so the item is never saved without one of them
   const [sending, setSending] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -113,7 +123,11 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         // would read to the server as a move, which the fixed tabs (Overview, Links, Credentials...)
         // refuse; moving an item is the Move dialog's job
         ...(isEdit ? {} : { kind }),
-        priority,
+        // Credentials and the team carry no priority, so they send none
+        ...(shape.priority ? { priority } : {}),
+        ...(shape.role ? { role } : {}),
+        // Only where the team is known (the owner's page); a shared link never names a member
+        ...(shape.assign && members ? { assigneeId } : {}),
         estimate: shape.estimate ? estimate : null,
         // Only the tab that has one sends it, so nothing carries a field its tab never shows
         ...(shape.stage ? { stage } : {}),
@@ -130,6 +144,8 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         setEstimate(null)
         setStage(defaultStage())
         setIsShared(false)
+        setRole("")
+        setAssigneeId(null)
       }
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.saveFailed)
@@ -186,17 +202,50 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         </div>
       )}
 
-      <div className="flex flex-wrap items-end gap-4">
+      {shape.role && (
         <div>
-          <span className={labelClass}>{PROJECT_TASK_MESSAGES.priority}</span>
-          <PrioritySelect
-            value={priority}
-            onChange={setPriority}
+          <label htmlFor={`${fieldId}-role`} className={labelClass}>
+            {PROJECT_TASK_MESSAGES.role}
+          </label>
+          <input
+            id={`${fieldId}-role`}
+            value={role}
+            onChange={(event) => setRole(event.target.value)}
+            maxLength={PROJECT_ROLE_MAX_LENGTH}
             disabled={disabled || isSaving}
-            label={content.trim() || words.one}
-            className="h-10 px-3 text-[11px]"
+            placeholder={PROJECT_TASK_MESSAGES.roleHint}
+            className={fieldClass}
           />
         </div>
+      )}
+
+      <div className="flex flex-wrap items-end gap-4">
+        {shape.priority && (
+          <div>
+            <span className={labelClass}>{PROJECT_TASK_MESSAGES.priority}</span>
+            <PrioritySelect
+              value={priority}
+              onChange={setPriority}
+              disabled={disabled || isSaving}
+              label={content.trim() || words.one}
+              className="h-10 px-3 text-[11px]"
+            />
+          </div>
+        )}
+        {shape.assign && members && (
+          <div className="min-w-[200px]">
+            <span className={labelClass}>{PROJECT_TASK_MESSAGES.assignee}</span>
+            <AssigneeSelect
+              value={assigneeId}
+              members={members}
+              onChange={setAssigneeId}
+              disabled={disabled || isSaving}
+              label={content.trim() || words.one}
+              variant="field"
+            />
+            {members.length === 0 && <p className="mt-1 text-[11px] text-outline">{PROJECT_TASK_MESSAGES.noMembers}</p>}
+          </div>
+        )}
         {shape.estimate && (
           <EstimateField estimate={estimate} onChange={setEstimate} disabled={disabled || isSaving} idPrefix={fieldId} />
         )}

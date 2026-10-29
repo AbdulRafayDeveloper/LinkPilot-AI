@@ -4,7 +4,6 @@ import {
   DEFAULT_PROJECT_ITEM_KIND,
   DEFAULT_PROJECT_PRIORITY,
   ESTIMATE_UNIT_IDS,
-  PROJECT_ITEM_AUTHORS,
   PROJECT_ITEM_KIND_IDS,
   PROJECT_PRIORITY_IDS,
   PROJECT_TASK_STATUS_IDS,
@@ -19,8 +18,8 @@ import {
  * its client without a second lookup, and a project a viewer may not see can never be reached
  * through its items.
  *
- * `kind` defaults to the first tab and `addedBy` to the owner, so every row written before the tabs
- * and the writable shared link existed reads exactly as it did: a change, added by the owner.
+ * `kind` defaults to the first tab, so every row written before the tabs existed reads exactly as it
+ * did: a change.
  */
 export interface IClientProjectTask {
   // The account it belongs to (models/owner.ts). An item added from the shared link is stored
@@ -44,8 +43,13 @@ export interface IClientProjectTask {
   status: string
   // Which tab it sits under: change, idea or discussion
   kind: string
-  // Whether the owner added it or someone writing from the shared link did
-  addedBy: string
+  // A team member's role on the project ("Backend developer"); "" on every other tab
+  role: string
+  /**
+   * The team member (an item on this project's Team Members tab) the work is handed to, on the tabs
+   * that can be signed off. Null when nobody is, and cleared when that member is deleted.
+   */
+  assigneeId: string | null
   // Where it sits in its tab's list; a new item goes to the end, and a drag writes them all
   position: number
   // How urgent it is, on every tab. Missing on a row saved before priorities, which reads as medium
@@ -124,7 +128,8 @@ const ClientProjectTaskSchema = new Schema<IClientProjectTask>(
     voiceNote: { type: VoiceNoteSchema, default: null },
     status: { type: String, enum: PROJECT_TASK_STATUS_IDS, default: "open" },
     kind: { type: String, enum: PROJECT_ITEM_KIND_IDS, default: DEFAULT_PROJECT_ITEM_KIND },
-    addedBy: { type: String, enum: PROJECT_ITEM_AUTHORS, default: "owner" },
+    role: { type: String, default: "" },
+    assigneeId: { type: String, default: null },
     position: { type: Number, default: 0 },
     priority: { type: String, enum: PROJECT_PRIORITY_IDS, default: DEFAULT_PROJECT_PRIORITY },
     estimateValue: { type: Number, default: null },

@@ -8,7 +8,7 @@ import { projectItemKind, type ProjectItemKind } from "@/constants/clientProject
 import { emptyItemCounts, totalItems } from "@/lib/projectItems"
 import { projectLinkToken, projectLinkMatches, readProjectLinkToken } from "@/lib/projectLink"
 import { visibleById, visibleTo } from "@/services/auth/viewer"
-import { PUBLIC_KINDS_ONLY, listProjectTasks } from "./tasks"
+import { PUBLIC_KINDS_ONLY, listProjectTasks, withoutTeam } from "./tasks"
 import type { ClientProjectsPage, ProjectItemCount, ProjectWithTasks, PublicProject } from "@/types/clientProjectTasks"
 import type { ClientProjectStatus } from "@/constants/clients"
 import type { Viewer } from "@/types/auth"
@@ -209,7 +209,8 @@ export async function readPublicProject(token: string): Promise<PublicProject | 
     description: record.description ?? "",
     status: record.status as ClientProjectStatus,
     clientName: client?.name ?? "",
-    tasks,
+    // The team is private, so a link never says who an item is assigned to
+    tasks: tasks.map(withoutTeam),
     updatedAt: new Date(record.updatedAt).toISOString(),
   }
 }

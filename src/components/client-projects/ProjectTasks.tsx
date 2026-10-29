@@ -16,12 +16,12 @@ import {
   type ProjectPriority,
   type RoadmapStage,
 } from "@/constants/clientProjectTasks"
-import { EstimateChip, PriorityChip, PrioritySelect, ShareToggle, SignOffButton, StageChip, StageSelect } from "./ItemFields"
+import { AssigneeChip, AssigneeSelect, EstimateChip, PriorityChip, PrioritySelect, ShareToggle, SignOffButton, StageChip, StageSelect } from "./ItemFields"
 import { shownItems } from "@/lib/projectItems"
 import { VoicePlayer } from "@/components/ui/VoicePlayer"
 import { FileKindIcon, fileSize } from "./ProjectFilesField"
 import { FilePreviewDialog } from "./FilePreviewDialog"
-import type { ProjectFileView, ProjectTask } from "@/types/clientProjectTasks"
+import type { ProjectFileView, ProjectTask, ProjectTeamMember } from "@/types/clientProjectTasks"
 import { formatInstant } from "@/lib/timeZone"
 
 interface ProjectTasksProps {
@@ -65,11 +65,12 @@ interface ProjectTasksProps {
    */
   onReorder?: (orderedIds: string[]) => void
   /**
-   * How an item added from the shared link is tagged. The two surfaces word it differently (the
-   * owner reads "From the client"; the client reads nothing about themselves), so each passes its
-   * own and a surface that wants no tag at all passes none.
+   * The project's team, which work on the signable tabs is assigned to. Only the owner's page passes
+   * it: the team is private, so a shared link never says who an item is assigned to.
    */
-  clientTag?: string
+  members?: readonly ProjectTeamMember[]
+  /** Assigning the work to a team member, or to nobody. Left out, who it is assigned to is a tag. */
+  onAssign?: (task: ProjectTask, assigneeId: string | null) => void
   /**
    * Open each item's description and images from the start, which is what a shared link does. A
    * description too long to sit in a list (`PROJECT_DETAILS_OPEN_MAX_CHARS`) still starts folded,
@@ -292,7 +293,8 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
   onMoveTab,
   onPriority,
   onReorder,
-  clientTag,
+  members,
+  onAssign,
   detailsOpen,
   onSign,
   onStage,
@@ -342,16 +344,18 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
           <div className="min-w-0 flex-1">
             {/* How urgent it is and how long it takes, above the words themselves */}
             <div className="mb-1 flex flex-wrap items-center gap-1.5">
-              {onPriority && !readOnly ? (
-                <PrioritySelect
-                  value={task.priority}
-                  onChange={(priority) => onPriority(task, priority)}
-                  disabled={busyId === task.id}
-                  label={task.content}
-                />
-              ) : (
-                <PriorityChip priority={task.priority} />
-              )}
+              {/* Credentials and the team are not work, so they carry no priority */}
+              {shape.priority &&
+                (onPriority && !readOnly ? (
+                  <PrioritySelect
+                    value={task.priority}
+                    onChange={(priority) => onPriority(task, priority)}
+                    disabled={busyId === task.id}
+                    label={task.content}
+                  />
+                ) : (
+                  <PriorityChip priority={task.priority} />
+                ))}
               {shape.estimate && <EstimateChip estimate={task.estimate} />}
               {/* Where it has got to on the roadmap: a picker where it can be changed, a tag where not */}
               {shape.stage &&
@@ -370,6 +374,20 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
                   label={task.content}
                 />
               )}
+              {/* Who it is assigned to, with their name and role: only where the team is known */}
+              {shape.assign &&
+                members &&
+                (onAssign && !readOnly ? (
+                  <AssigneeSelect
+                    value={task.assigneeId}
+                    members={members}
+                    onChange={(assigneeId) => onAssign(task, assigneeId)}
+                    disabled={busyId === task.id}
+                    label={task.content}
+                  />
+                ) : (
+                  <AssigneeChip member={members.find((member) => member.id === task.assigneeId) ?? null} />
+                ))}
               {/* Whether the client may read this note. Internal until it is shared */}
               {shape.shareable && (
                 <ShareToggle
@@ -381,13 +399,12 @@ export const ProjectTasks: React.FC<ProjectTasksProps> = ({
                 />
               )}
               {shape.numbered && <span className="text-[11px] text-outline">{savedOn(task.createdAt)}</span>}
-              {clientTag && task.addedBy === "client" && (
-                <span className="inline-block rounded-full bg-primary-fixed px-2 py-0.5 text-[10px] font-semibold text-on-primary-fixed-variant">
-                  {clientTag}
-                </span>
-              )}
             </div>
-            <p className={`break-words text-[13px] ${isDone && shape.tick ? "text-on-surface-variant line-through" : "text-on-surface"}`}>{task.content}</p>
+            <p className={`break-words text-[13px] ${isDone && shape.tick ? "text-on-surface-variant line-through" : "text-on-surface"}`}>
+              {task.content}
+              {/* A team member's role, beside their name */}
+              {shape.role && task.role && <span className="ml-2 inline-block rounded-full bg-primary-fixed px-2 py-0.5 align-middle text-[11px] font-semibold text-on-primary-fixed-variant">{task.role}</span>}
+            </p>
             {shape.url && task.url && (
               <a
                 href={task.url}

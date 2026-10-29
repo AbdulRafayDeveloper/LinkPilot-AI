@@ -9,7 +9,7 @@ import {
   type ProjectItemKind,
   type ProjectTaskStatus,
 } from "@/constants/clientProjectTasks"
-import type { ProjectEstimate, ProjectItemCount } from "@/types/clientProjectTasks"
+import type { ProjectEstimate, ProjectItemCount, ProjectTask, ProjectTeamMember } from "@/types/clientProjectTasks"
 
 /**
  * How each tab of a client project stands. Kept away from the database and from the page so the
@@ -99,6 +99,16 @@ export function itemProblem(
   }
   return null
 }
+
+/**
+ * The project's team, in the order the Team Members tab shows it, as the people work can be
+ * assigned to. Read from the items a page already holds, so no request is needed for it.
+ */
+export const teamOf = (tasks: readonly ProjectTask[]): ProjectTeamMember[] =>
+  shownItems("member", tasks.filter((task) => task.kind === "member")).map(({ item }) => ({ id: item.id, name: item.content, role: item.role }))
+
+/** A team member as one line: "Sara · Designer", or the name alone when they have no role. */
+export const memberLabel = (member: { name: string; role: string }): string => (member.role ? `${member.name} · ${member.role}` : member.name)
 
 /** How long something is expected to take, in words: "2 days", "1 hour", "" when nobody has said. */
 export const estimateLabel = (estimate: ProjectEstimate | null | undefined): string => {

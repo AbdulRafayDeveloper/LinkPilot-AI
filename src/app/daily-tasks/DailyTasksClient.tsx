@@ -2,7 +2,9 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { defaultChoices, isPlain, type TaskChoices } from "@/lib/taskChoices"
-import { AlertTriangle, CalendarArrowUp, ListTodo, Loader2, Plus, Trash2 } from "lucide-react"
+import { AlertTriangle, ArrowDownWideNarrow, CalendarArrowUp, ListTodo, Loader2, Plus, Trash2 } from "lucide-react"
+import { ActionMenu } from "@/components/ui/ActionMenu"
+import { PRIORITIES } from "@/constants/priorities"
 import { Sidebar } from "@/components/ui/Sidebar"
 import { Header } from "@/components/ui/Header"
 import { emptyRows, type TaskRow } from "@/components/daily-tasks/TaskComposer"
@@ -378,6 +380,45 @@ export default function DailyTasksClient() {
     })
   }
 
+  /**
+   * Every day on the page put in priority order: High first, then Medium, then Low, each keeping the
+   * order it had among its own (the sort is stable), so tasks 4, 6 and 8 that are High become 1, 2
+   * and 3 in that order. Done tasks stay at the end, where the list always shows them. Each day that
+   * changes is saved as a day's whole order, through the same queue and route a drag uses.
+   */
+  const sortByPriority = () => {
+    if (!page) return
+    setTaskError(null)
+    const rank = (task: DailyTask) => Number(task.isCompleted) * PRIORITIES.length + PRIORITIES.findIndex((entry) => entry.id === task.priority)
+    const changed = page.days
+      .map((day) => ({ day, tasks: [...day.tasks].sort((a, b) => rank(a) - rank(b)) }))
+      .filter(({ day, tasks }) => tasks.some((task, index) => task.id !== day.tasks[index].id))
+    if (changed.length === 0) {
+      setNotice(DAILY_TASKS_MESSAGES.alreadySorted)
+      return
+    }
+    const snapshot = page
+    const sorted = new Map(changed.map(({ day, tasks }) => [day.date, tasks]))
+    setPage((current) => (current ? { ...current, days: current.days.map((day) => ({ ...day, tasks: sorted.get(day.date) ?? day.tasks })) } : current))
+    setNotice(DAILY_TASKS_MESSAGES.sortedByPriority(changed.length))
+    moveQueue.current = moveQueue.current.then(async () => {
+      try {
+        for (const { day, tasks } of changed) {
+          await requestApi<DailyTask>(`${DAILY_TASKS_ENDPOINT}/${tasks[0].id}/move`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ today, taskDate: day.date, orderedIds: tasks.map((task) => task.id) }),
+          })
+        }
+      } catch (error: unknown) {
+        setPage(snapshot)
+        setNotice(null)
+        setTaskError(error instanceof Error ? error.message : DAILY_TASKS_MESSAGES.moveFailed)
+        reload()
+      }
+    })
+  }
+
   // A task is one line, so it goes on one click and comes back if the delete fails
   /**
    * Deletes every picked task in one call, whatever day each is on. Deleting is final, so it only
@@ -585,18 +626,43 @@ export default function DailyTasksClient() {
                     {DAILY_TASKS_MESSAGES.moveOverdue(overdueCount, repeatingCount)}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCleanupError(null)
-                    setIsConfirmingCleanup(true)
-                  }}
-                  disabled={olderTaskCount === 0 || isDeleting}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap gap-2 px-4 py-2.5 border border-error/40 text-error rounded-xl text-sm font-semibold transition-colors hover:bg-error/5 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                  Delete data older than one week
-                </button>
+                {/* The page's own tools, behind one three-dot button so the header stays clean */}
+                <ActionMenu
+                  label="Daily Tasks"
+                  className="!mt-0 !h-[42px] !w-[42px] border border-outline-variant bg-surface-container-lowest"
+                  groups={[
+                    {
+                      id: "order",
+                      items: [
+                        {
+                          id: "sort",
+                          label: DAILY_TASKS_MESSAGES.sortByPriority,
+                          icon: <ArrowDownWideNarrow size={14} />,
+                          onSelect: sortByPriority,
+                          disabled: !page || page.days.length === 0,
+                          hint: DAILY_TASKS_MESSAGES.sortByPriorityHint,
+                        },
+                      ],
+                    },
+                    {
+                      id: "cleanup",
+                      items: [
+                        {
+                          id: "cleanup",
+                          label: DAILY_TASKS_MESSAGES.cleanupOlder,
+                          icon: <Trash2 size={14} />,
+                          onSelect: () => {
+                            setCleanupError(null)
+                            setIsConfirmingCleanup(true)
+                          },
+                          disabled: olderTaskCount === 0 || isDeleting,
+                          hint: olderTaskCount === 0 ? DAILY_TASKS_MESSAGES.noOlderTasks : DAILY_TASKS_MESSAGES.cleanupOlderHint,
+                          tone: "danger",
+                        },
+                      ],
+                    },
+                  ]}
+                />
               </div>
             </div>
 

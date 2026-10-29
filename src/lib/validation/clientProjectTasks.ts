@@ -27,6 +27,7 @@ import {
   MOVABLE_ITEM_KIND_IDS,
   PROJECT_PRIORITY_IDS,
   PUBLIC_MOVABLE_KIND_IDS,
+  PROJECT_ROLE_MAX_LENGTH,
 } from "@/constants/clientProjectTasks"
 import { ASSET_CATEGORY_IDS, categoryForContentType } from "@/constants/importantFiles"
 import { PROJECT_DESCRIPTION_MAX_LENGTH, type ProjectItemKind } from "@/constants/clientProjectTasks"
@@ -86,6 +87,13 @@ const isClientVisible = z.boolean().optional()
  */
 const signed = z.boolean().optional()
 const priority = z.enum(PROJECT_PRIORITY_IDS, { error: PROJECT_TASK_MESSAGES.badPriority }).optional()
+// A team member's role, one short line
+const role = z.string().trim().max(PROJECT_ROLE_MAX_LENGTH).optional()
+/**
+ * Who the work is assigned to: a team member's id, or null for nobody. **Only the owner's page
+ * offers it**: the team is private, so a shared link's bodies never carry it.
+ */
+const assigneeId = z.union([z.string().regex(/^[0-9a-f]{24}$/, PROJECT_TASK_MESSAGES.assigneeGone), z.null()]).optional()
 
 /**
  * How long a backlog item is expected to take: a number and its unit, or null for "nobody has
@@ -104,7 +112,7 @@ const estimate = z
 /** An item's own id, as a path or a body names it. */
 const taskId = z.string().regex(/^[0-9a-f]{24}$/, PROJECT_TASK_MESSAGES.taskNotFound)
 
-const itemFields = { content: content.optional(), description, url, images, files, voiceNote, status, priority, estimate, stage, isClientVisible }
+const itemFields = { content: content.optional(), description, url, images, files, voiceNote, status, priority, role, estimate, stage, isClientVisible }
 
 /**
  * A new item, on the tabs the surface allows. The owner's page may write any tab; a shared link may
@@ -115,9 +123,9 @@ const itemFields = { content: content.optional(), description, url, images, file
  * answer is tidied the same way it will be stored: the line taken from the file where a tab allows
  * that, and the address given its scheme.
  */
-const newItemSchema = (kinds: readonly [ProjectItemKind, ...ProjectItemKind[]]) =>
+const newItemSchema = (kinds: readonly [ProjectItemKind, ...ProjectItemKind[]], canAssign: boolean) =>
   z
-    .object({ ...itemFields, kind: z.enum(kinds, { error: PROJECT_TASK_MESSAGES.badKind }).optional() })
+    .object({ ...itemFields, assigneeId, kind: z.enum(kinds, { error: PROJECT_TASK_MESSAGES.badKind }).optional() })
     .superRefine((value, ctx) => {
       const problem = itemProblem(value.kind ?? DEFAULT_PROJECT_ITEM_KIND, {
         content: value.content ?? "",
@@ -131,10 +139,12 @@ const newItemSchema = (kinds: readonly [ProjectItemKind, ...ProjectItemKind[]]) 
       ...value,
       content: itemName(value.kind ?? DEFAULT_PROJECT_ITEM_KIND, value.content ?? "", value.files ?? []),
       url: projectItemUrl(value.url ?? ""),
+      // The team is private, so a shared link can never name a member, whatever its body says
+      assigneeId: canAssign ? value.assigneeId : undefined,
     }))
 
 /** A new item on the owner's page: any tab, and what that tab needs. */
-export const ProjectTaskSchema = newItemSchema(PROJECT_ITEM_KIND_IDS)
+export const ProjectTaskSchema = newItemSchema(PROJECT_ITEM_KIND_IDS, true)
 
 /**
  * The fields a change to an item may carry. Only the ones sent are written, so ticking an item off
@@ -154,6 +164,7 @@ const editFields = {
   voiceNote,
   status,
   priority,
+  role,
   estimate,
   stage,
   isClientVisible,
@@ -163,12 +174,12 @@ const editFields = {
 }
 // Named rather than counted, so the shared link's body can carry `taskId` as well and that alone
 // still reads as "nothing to change"
-const EDIT_FIELDS = [...Object.keys(editFields), "kind"]
+const EDIT_FIELDS = [...Object.keys(editFields), "kind", "assigneeId"]
 const saysSomething = (body: Record<string, unknown>) => EDIT_FIELDS.some((name) => body[name] !== undefined)
 
 /** A change to an item. A body with nothing in it is refused rather than saved as an empty change. */
 export const ProjectTaskEditSchema = z
-  .object({ ...editFields, kind: z.enum(MOVABLE_ITEM_KIND_IDS, { error: PROJECT_TASK_MESSAGES.cannotMoveKind }).optional() })
+  .object({ ...editFields, assigneeId, kind: z.enum(MOVABLE_ITEM_KIND_IDS, { error: PROJECT_TASK_MESSAGES.cannotMoveKind }).optional() })
   .refine(saysSomething, PROJECT_TASK_MESSAGES.saveFailed)
 
 /**
@@ -177,7 +188,7 @@ export const ProjectTaskEditSchema = z
  * rule**: only a public tab may be named, so credentials and backups cannot be written from a link
  * even by a caller writing the body by hand.
  */
-export const PublicProjectTaskSchema = newItemSchema(PUBLIC_WRITABLE_KIND_IDS)
+export const PublicProjectTaskSchema = newItemSchema(PUBLIC_WRITABLE_KIND_IDS, false)
 export const PublicTaskEditSchema = z
   .object({ taskId, ...editFields, kind: z.enum(PUBLIC_MOVABLE_KIND_IDS, { error: PROJECT_TASK_MESSAGES.cannotMoveKind }).optional() })
   .refine(saysSomething, PROJECT_TASK_MESSAGES.saveFailed)

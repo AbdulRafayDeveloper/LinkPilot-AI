@@ -8,7 +8,7 @@ import { Header } from "@/components/ui/Header"
 import { Modal } from "@/components/ui/Modal"
 import { ProjectTasks, deleteItemTitle } from "@/components/client-projects/ProjectTasks"
 import { ProjectTabs } from "@/components/client-projects/ProjectTabs"
-import { countsOf, reorderItems } from "@/lib/projectItems"
+import { countsOf, reorderItems, teamOf } from "@/lib/projectItems"
 import { NO_PROJECT_FILTERS, filterProjectItems, type ProjectFilterValues } from "@/lib/projectFilters"
 import { ProjectFilters } from "@/components/client-projects/ProjectFilters"
 import { useSavedFilters } from "@/hooks/useSavedFilters"
@@ -135,6 +135,8 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
 
   // The counts come from the items themselves, so every tab's number follows an add or a delete
   const counts = useMemo(() => (tasks ? countsOf(tasks) : null), [tasks])
+  // The people work is assigned to, read from the Team Members tab the page already holds
+  const members = useMemo(() => teamOf(tasks ?? []), [tasks])
 
   const addTask = async (input: ProjectTaskInput) => {
     // It goes in the folder being looked at, which is where the user expects to find it
@@ -210,6 +212,21 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
     } catch (reason: unknown) {
       setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, signedAt: task.signedAt } : row)))
       setTaskError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.signFailed)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  /** Who a piece of work is assigned to: the chip changes at once and goes back if the write fails. */
+  const assign = async (task: ProjectTask, assigneeId: string | null) => {
+    setBusyId(task.id)
+    setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, assigneeId } : row)))
+    try {
+      await saveTask(task, { assigneeId })
+      setTaskError(null)
+    } catch (reason: unknown) {
+      setTasks((current) => (current ?? []).map((row) => (row.id === task.id ? { ...row, assigneeId: task.assigneeId } : row)))
+      setTaskError(reason instanceof Error ? reason.message : PROJECT_TASK_MESSAGES.assignFailed)
     } finally {
       setBusyId(null)
     }
@@ -382,7 +399,10 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
     setIsDeleting(true)
     try {
       await requestApi(`${CLIENT_PROJECTS_ENDPOINT}/${projectId}/tasks/${deleting.id}`, { method: "DELETE" })
-      setTasks((current) => (current ?? []).filter((row) => row.id !== deleting.id))
+      // A team member who leaves takes their assignments with them, as the server does
+      setTasks((current) =>
+        (current ?? []).filter((row) => row.id !== deleting.id).map((row) => (row.assigneeId === deleting.id ? { ...row, assigneeId: null } : row))
+      )
       setDeleting(null)
       setTaskError(null)
     } catch (reason: unknown) {
@@ -466,7 +486,7 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                 <div id={`project-panel-${tab}`} role="tabpanel" aria-labelledby={`project-tab-${tab}`} className="flex min-w-0 flex-col gap-3">
                   {/* Keyed by the tab, so each one opens its own empty form rather than what
                       was half written on another */}
-                  <TaskComposer key={tab} task={null} kind={tab} onSave={addTask} fileEndpoint={`${CLIENT_PROJECTS_ENDPOINT}/${project.id}/files`} />
+                  <TaskComposer key={tab} task={null} kind={tab} members={members} onSave={addTask} fileEndpoint={`${CLIENT_PROJECTS_ENDPOINT}/${project.id}/files`} />
 
                   {taskError && (
                     <p role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[12px] text-error">
@@ -506,7 +526,8 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                               onStage={changeStage}
                               onShare={changeShared}
                               onReorder={reorder}
-                              clientTag={PROJECT_TASK_MESSAGES.fromClient}
+                              members={members}
+                              onAssign={assign}
                             />
                           )}
                         </>
@@ -629,7 +650,8 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
                                 // A search or a folder shows part of the tab, and the order written is
                                 // of exactly what is on screen, which is what the server expects
                                 onReorder={reorder}
-                                clientTag={PROJECT_TASK_MESSAGES.fromClient}
+                                members={members}
+                                onAssign={assign}
                               />
                             )}
                           </div>
@@ -737,6 +759,7 @@ export default function ProjectDetailClient({ projectId }: ProjectDetailClientPr
           <TaskComposer
             task={editing}
             kind={editing.kind}
+            members={members}
             fileEndpoint={`${CLIENT_PROJECTS_ENDPOINT}/${editing.projectId}/files`}
             onCancel={() => setEditing(null)}
             onSave={async (input) => {

@@ -47,7 +47,7 @@ import { SortableList } from "@/components/ui/SortableList"
 import { defaultChoices, type TaskChoices } from "@/lib/taskChoices"
 import { PRIORITIES, PRIORITY_TONE, type Priority } from "@/constants/priorities"
 import { TASK_DOERS, TASK_DOER_TONE, type TaskDoer } from "@/constants/taskDoers"
-import { NOTHING_NARROWED, isNarrowed, narrowDays, type YesOrNo } from "@/lib/taskFilters"
+import { NOTHING_NARROWED, isNarrowed, mergeShownOrder, movedItem, narrowDays, type YesOrNo } from "@/lib/taskFilters"
 import { useTaskFilters } from "@/hooks/useTaskFilters"
 import { emptyTaskDetails, hasTaskDetails, type TaskDetailsDraft } from "@/types/taskAttachment"
 
@@ -145,6 +145,8 @@ interface TaskRowBodyProps {
   onSelect?: (task: DailyTask, mode: SelectMode) => void
   // A click that ends a drag is not a click on the task
   wasDragging?: () => boolean
+  // Its row on screen, 1. 2. 3.: counted from the list as it stands, never stored
+  number?: number
 }
 
 /**
@@ -166,11 +168,15 @@ const TaskRowBody: React.FC<TaskRowBodyProps> = ({
   isSelected = false,
   onSelect,
   wasDragging,
+  number,
 }) => {
   const state = taskState(task, today)
   return (
     <>
       {handle}
+      {number !== undefined && (
+        <span className="mt-3 min-w-[1.5rem] shrink-0 text-right text-[12px] font-semibold tabular-nums text-outline">{number}.</span>
+      )}
       {onSelect && (
         <button
           type="button"
@@ -253,8 +259,6 @@ interface SubtaskTreeProps {
   // 2 for a task's subtasks, 3 for theirs
   depth: number
   today: string
-  // Off while the list is narrowed, for the reason a day's own order is: what is shown is only part of it
-  canDrag: boolean
   onReorderSubtasks: (parentId: string, orderedIds: string[]) => void
   pendingIds: ReadonlySet<string>
   onToggle: (task: DailyTask, isCompleted: boolean) => void
@@ -273,7 +277,6 @@ const SubtaskItem: React.FC<Omit<SubtaskTreeProps, "parentId"> & { task: DailyTa
   handle,
   depth,
   today,
-  canDrag,
   pendingIds,
   onToggle,
   onDelete,
@@ -343,7 +346,7 @@ const SubtaskItem: React.FC<Omit<SubtaskTreeProps, "parentId"> & { task: DailyTa
       </div>
       {isOpen && task.subtasks.length > 0 && (
         <SubtaskTree
-          {...{ depth: depth + 1, today, canDrag, pendingIds, onToggle, onDelete, onOpenTask, onChoose, onReorderSubtasks }}
+          {...{ depth: depth + 1, today, pendingIds, onToggle, onDelete, onOpenTask, onChoose, onReorderSubtasks }}
           parentId={task.id}
           tasks={task.subtasks}
         />
@@ -360,7 +363,7 @@ const SubtaskItem: React.FC<Omit<SubtaskTreeProps, "parentId"> & { task: DailyTa
  */
 const SubtaskTree: React.FC<SubtaskTreeProps> = (props) => {
   const [isOpen, setIsOpen] = useState(true)
-  const { tasks, parentId, depth, canDrag, onReorderSubtasks } = props
+  const { tasks, parentId, depth, onReorderSubtasks } = props
   const done = tasks.filter((task) => task.isCompleted).length
   const stop = (event: React.SyntheticEvent) => event.stopPropagation()
   return (
@@ -382,7 +385,6 @@ const SubtaskTree: React.FC<SubtaskTreeProps> = (props) => {
           getId={(task) => task.id}
           getLabel={(task) => task.content}
           onReorder={(ids) => onReorderSubtasks(parentId, ids)}
-          disabled={!canDrag}
           label={depth === 2 ? "Subtasks" : "Sub-subtasks"}
           itemNoun={depth === 2 ? "subtasks" : "sub-subtasks"}
           className="flex flex-col border-l-2 border-outline-variant/70 pl-1.5"
@@ -391,6 +393,20 @@ const SubtaskTree: React.FC<SubtaskTreeProps> = (props) => {
       )}
     </div>
   )
+}
+
+/** The ids of one task's subtasks, wherever it sits in the days, or null when it is not there. */
+const childIds = (days: DailyTaskDay[], parentId: string): string[] | null => {
+  const find = (tasks: DailyTask[]): DailyTask | undefined => {
+    for (const task of tasks) {
+      if (task.id === parentId) return task
+      const found = find(task.subtasks)
+      if (found) return found
+    }
+    return undefined
+  }
+  const parent = find(days.flatMap((day) => day.tasks))
+  return parent ? parent.subtasks.map((task) => task.id) : null
 }
 
 /** What a task already carries, for the shared controls that set it. */
@@ -476,6 +492,7 @@ const YesOrNoFilter: React.FC<{
  */
 const SortableTaskRow = memo(function SortableTaskRow({
   task,
+  number,
   today,
   isPending,
   isSelected,
@@ -487,10 +504,10 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onChoose,
   wasDragging,
   pendingIds,
-  canDrag,
   onReorderSubtasks,
 }: {
   task: DailyTask
+  number: number
   today: string
   isPending: boolean
   isSelected: boolean
@@ -498,17 +515,15 @@ const SortableTaskRow = memo(function SortableTaskRow({
   onDelete: (task: DailyTask) => void
   onOpenTask: (task: DailyTask, focusSubtask?: boolean) => void
   onMoveToToday: (task: DailyTask) => void
-  onSelect: (task: DailyTask, mode: SelectMode) => void
+  onSelect?: (task: DailyTask, mode: SelectMode) => void
   onChoose: (task: DailyTask, change: Partial<TaskChoices>) => void
   wasDragging: () => boolean
   pendingIds: ReadonlySet<string>
-  // Off while the list is narrowed: it is then only part of each day's order
-  canDrag: boolean
   onReorderSubtasks: (parentId: string, orderedIds: string[]) => void
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
-    disabled: isPending || !canDrag,
+    disabled: isPending,
   })
   const state = taskState(task, today)
 
@@ -517,7 +532,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
       ref={setNodeRef}
       {...listeners}
       style={{ transform: CSS.Translate.toString(transform), transition, touchAction: "manipulation" }}
-      className={`relative flex flex-col rounded-xl border ${isPending || !canDrag ? "" : "cursor-grab active:cursor-grabbing"} ${
+      className={`relative flex flex-col rounded-xl border ${isPending ? "" : "cursor-grab active:cursor-grabbing"} ${
         isDragging
           ? "border-dashed border-primary/40 bg-primary-fixed/20 [&>*]:opacity-0"
           : `transition-colors ${stateStyles[state]} ${isSelected ? "ring-2 ring-primary/50 ring-offset-1" : ""}`
@@ -528,6 +543,7 @@ const SortableTaskRow = memo(function SortableTaskRow({
       <div className="flex flex-wrap items-start gap-1 pr-1">
         <TaskRowBody
           task={task}
+          number={number}
           today={today}
           isPending={isPending}
           isSelected={isSelected}
@@ -545,10 +561,8 @@ const SortableTaskRow = memo(function SortableTaskRow({
               ref={setActivatorNodeRef}
               {...attributes}
               onKeyDown={listeners?.onKeyDown as React.KeyboardEventHandler<HTMLButtonElement> | undefined}
-              disabled={!canDrag}
-              title={canDrag ? undefined : DAILY_TASKS_MESSAGES.filterNoDrag}
               aria-label={isSelected ? `Move the picked tasks, starting with: ${task.content}` : `Move task: ${task.content}`}
-              className={`${handleClass} ${isPending || !canDrag ? "cursor-not-allowed opacity-40" : "cursor-grab hover:bg-surface-container-high hover:text-on-surface active:cursor-grabbing"}`}
+              className={`${handleClass} ${isPending ? "cursor-not-allowed opacity-40" : "cursor-grab hover:bg-surface-container-high hover:text-on-surface active:cursor-grabbing"}`}
             >
               <GripVertical size={16} aria-hidden="true" />
             </button>
@@ -561,7 +575,6 @@ const SortableTaskRow = memo(function SortableTaskRow({
           parentId={task.id}
           depth={2}
           today={today}
-          canDrag={canDrag}
           pendingIds={pendingIds}
           onToggle={onToggle}
           onDelete={onDelete}
@@ -694,11 +707,10 @@ const DayGroup = memo(function DayGroup({
   onDelete,
   onOpenTask,
   onMoveToToday,
-  onSelect,
+  // onSelect, (picking several tasks is off for now)
   onChoose,
   onAddTask,
   wasDragging,
-  canDrag,
   onReorderSubtasks,
 }: {
   day: DailyTaskDay
@@ -716,7 +728,6 @@ const DayGroup = memo(function DayGroup({
   onChoose: (task: DailyTask, change: Partial<TaskChoices>) => void
   onAddTask: AddTaskHandler
   wasDragging: () => boolean
-  canDrag: boolean
   onReorderSubtasks: (parentId: string, orderedIds: string[]) => void
 }) {
   const { title, detail } = dayLabel(day.date, today)
@@ -749,10 +760,11 @@ const DayGroup = memo(function DayGroup({
           {day.tasks.length === 0 ? (
             <li className="px-3 text-[12px] text-outline">{isDragging ? "Drop here" : "Drag a task here, or add one below"}</li>
           ) : (
-            day.tasks.map((task) => (
+            day.tasks.map((task, index) => (
               <SortableTaskRow
                 key={task.id}
                 task={task}
+                number={index + 1}
                 today={today}
                 isPending={pendingIds.has(task.id)}
                 isSelected={selectedIds.has(task.id)}
@@ -760,12 +772,12 @@ const DayGroup = memo(function DayGroup({
                 onDelete={onDelete}
                 onOpenTask={onOpenTask}
                 onMoveToToday={onMoveToToday}
-                onSelect={onSelect}
+                // Picking several tasks with the circle is off for now, at the owner's request
+                // onSelect={onSelect}
                 onChoose={onChoose}
                 wasDragging={wasDragging}
                 pendingIds={pendingIds}
-                canDrag={canDrag}
-                onReorderSubtasks={onReorderSubtasks}
+                      onReorderSubtasks={onReorderSubtasks}
               />
             ))
           )}
@@ -847,20 +859,38 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
   const { narrowing, setNarrowing, error: filtersError } = useTaskFilters()
   const isFiltered = isNarrowed(narrowing)
   /**
-   * A narrowed list is read, not rearranged. A drag writes the destination day's **whole** order,
-   * and a narrowed day is only part of it, so saving one would answer 409 and put the list back;
-   * dragging is held off instead, exactly as it is on a filtered team in Employees.
+   * A narrowed list is dragged like any other. The server is always sent a day's **whole** order, so
+   * a drag made on the part on screen is put into the whole day (`mergeShownOrder`): the hidden tasks
+   * keep their places and only what was moved goes somewhere new.
    */
-  const canDrag = !isFiltered
 
   // Today is always a place to drop on, on the page that shows it, even before it has a task
-  const days = useMemo(() => {
-    const shown = dragDays ?? page?.days ?? []
-    // Narrowed, the list is read rather than rearranged, so an empty today is not a place to drop on
-    if (isFiltered) return narrowDays(shown, narrowing)
-    if (!page || current !== 1 || !today || shown.length === 0 || shown.some((day) => day.date === today)) return shown
-    return [{ date: today, tasks: [] }, ...shown]
-  }, [dragDays, page, current, today, isFiltered, narrowing])
+  const withToday = useCallback(
+    (shown: DailyTaskDay[]) => {
+      if (!page || current !== 1 || !today || shown.length === 0 || shown.some((day) => day.date === today)) return shown
+      return [{ date: today, tasks: [] }, ...shown]
+    },
+    [page, current, today]
+  )
+  // A drag takes the days as they are on screen, so a narrowed list is taken already narrowed
+  const days = useMemo(
+    () => dragDays ?? withToday(isFiltered ? narrowDays(page?.days ?? [], narrowing) : (page?.days ?? [])),
+    [dragDays, page, isFiltered, narrowing, withToday]
+  )
+
+  /**
+   * Subtasks reordered on a narrowed list: the list on screen may be only the matching ones, so the
+   * one that moved is put into the task's whole list of subtasks before it is saved.
+   */
+  const reorderSubtasks = useCallback(
+    (parentId: string, ids: string[]) => {
+      if (!isFiltered) return onReorderSubtasks(parentId, ids)
+      const full = childIds(page?.days ?? [], parentId)
+      const moved = movedItem(childIds(days, parentId) ?? [], ids)
+      if (full && moved) onReorderSubtasks(parentId, mergeShownOrder(full, ids, new Set([moved])))
+    },
+    [isFiltered, onReorderSubtasks, page, days]
+  )
 
   // The rows as the page shows them, kept for a Shift pick and for the order a group lands in. It is
   // read only when something is clicked or dragged, so it is put in the ref after the list is drawn
@@ -1013,8 +1043,33 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
       day.date === toDate ? { ...day, tasks: [...day.tasks.slice(0, index), ...landed, ...day.tasks.slice(index)] } : day
     )
     const landedDay = days.find((day) => day.date === toDate)
+    const shownIds = landedDay?.tasks.map((task) => task.id) ?? []
+    if (isFiltered && page) {
+      // Narrowed, what is on screen is only part of each day: the move is put into the whole days, so
+      // the hidden tasks keep their places, and the tasks travel whole rather than as the filter cut them
+      const all = new Map(page.days.flatMap((day) => day.tasks).map((task) => [task.id, task]))
+      const movedIds = new Set(group.map((task) => task.id))
+      const fullDays = withToday(page.days)
+      const orderedIds = mergeShownOrder(fullDays.find((day) => day.date === toDate)?.tasks.map((task) => task.id) ?? [], shownIds, movedIds)
+      const nextDays = fullDays.map((day) =>
+        day.date === toDate
+          ? {
+              ...day,
+              tasks: orderedIds.flatMap((id) => {
+                const task = all.get(id)
+                return task ? [movedIds.has(id) ? { ...task, taskDate: toDate } : task] : []
+              }),
+            }
+          : { ...day, tasks: day.tasks.filter((task) => !movedIds.has(task.id)) }
+      )
+      const whole = group.map((task) => all.get(task.id) ?? task)
+      onMove({ tasks: whole, dragged: all.get(dragged.id) ?? dragged, toDate, orderedIds, days: nextDays })
+      clearSelection()
+      finishDrag()
+      return
+    }
     // The page is told the tasks as they were, so it can work out what left an overdue or an older day
-    onMove({ tasks: group, dragged, toDate, orderedIds: landedDay?.tasks.map((task) => task.id) ?? [], days })
+    onMove({ tasks: group, dragged, toDate, orderedIds: shownIds, days })
     clearSelection()
     finishDrag()
   }
@@ -1112,12 +1167,6 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
               {filtersError}
             </span>
           )}
-          {page && (
-            <span className="text-[11px] text-outline">
-              {/* The controls themselves say what is being shown, so this keeps saying where we are */}
-              {current === 1 ? `From ${page.windowStart}` : `Page ${current} of ${pageCount}`}
-            </span>
-          )}
         </div>
       </div>
 
@@ -1187,11 +1236,10 @@ export const TaskDayList: React.FC<TaskDayListProps> = ({
                 onOpenTask={onOpenTask}
                 onMoveToToday={onMoveToToday}
                 onChoose={onChoose}
-                canDrag={canDrag}
-                onSelect={selectTask}
+                      onSelect={selectTask}
                 onAddTask={onAddTask}
                 wasDragging={wasDragging}
-                onReorderSubtasks={onReorderSubtasks}
+                onReorderSubtasks={reorderSubtasks}
               />
             ))}
           </ul>

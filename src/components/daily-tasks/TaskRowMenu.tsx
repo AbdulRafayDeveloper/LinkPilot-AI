@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { CalendarArrowUp, Check, Copy, ListPlus, Lock, LockOpen, Paperclip, Repeat, Trash2 } from "lucide-react"
+import { CalendarArrowUp, Check, Copy, Eye, ListPlus, Lock, LockOpen, Paperclip, Repeat, Trash2 } from "lucide-react"
 import { ActionMenu, type ActionMenuGroup } from "@/components/ui/ActionMenu"
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
 import { DAILY_TASKS_MESSAGES } from "@/constants/dailyTasks"
@@ -47,6 +47,7 @@ export const TaskRowMenu: React.FC<TaskRowMenuProps> = ({ task, depth, isPending
     {
       id: "task",
       items: [
+        { id: "view", label: DAILY_TASKS_MESSAGES.viewTask, icon: <Eye size={14} />, onSelect: () => onOpenTask(task), hint: DAILY_TASKS_MESSAGES.viewTaskHint },
         { id: "details", label: hasDetails ? "Edit details" : "Add details", icon: <Paperclip size={14} />, onSelect: () => onOpenTask(task), hint: hasDetails ? "Open the details and subtasks" : "Add a description, images or subtasks" },
         { id: "subtask", label: addLabel, icon: <ListPlus size={14} />, onSelect: () => onOpenTask(task, true), disabled: !canNest, hint: canNest ? undefined : TASK_ATTACHMENT_MESSAGES.depthReached },
         { id: "copy", label: copied ? "Copied" : TASK_ATTACHMENT_MESSAGES.copyText, icon: copied ? <Check size={14} /> : <Copy size={14} />, onSelect: () => void copy(task.content) },

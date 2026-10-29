@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Check, CircleDashed, Eye, EyeOff, Loader2 } from "lucide-react"
+import { Check, CircleDashed, Eye, EyeOff, Loader2, UserRound } from "lucide-react"
 import {
   DEFAULT_ESTIMATE_UNIT,
   DEFAULT_ROADMAP_STAGE,
@@ -13,8 +13,8 @@ import {
   type EstimateUnit,
   type RoadmapStage,
 } from "@/constants/clientProjectTasks"
-import { estimateLabel } from "@/lib/projectItems"
-import type { ProjectEstimate } from "@/types/clientProjectTasks"
+import { estimateLabel, memberLabel } from "@/lib/projectItems"
+import type { ProjectEstimate, ProjectTeamMember } from "@/types/clientProjectTasks"
 import { formatInstant } from "@/lib/timeZone"
 
 /**
@@ -250,4 +250,62 @@ export const ShareToggle: React.FC<ShareToggleProps> = ({ isShared, onChange, bu
     {busy ? <Loader2 size={11} className="animate-spin" aria-hidden="true" /> : isShared ? <Eye size={11} aria-hidden="true" /> : <EyeOff size={11} aria-hidden="true" />}
     {isShared ? PROJECT_TASK_MESSAGES.shareWithClient : PROJECT_TASK_MESSAGES.internalNote}
   </button>
+)
+
+interface AssigneeSelectProps {
+  value: string | null
+  members: readonly ProjectTeamMember[]
+  onChange: (assigneeId: string | null) => void
+  disabled?: boolean
+  // What is being assigned, so a screen reader hears which row this belongs to
+  label: string
+  // "chip" sits on a row beside the sign-off; "field" is the composer's full-size control
+  variant?: "chip" | "field"
+}
+
+/**
+ * Who a piece of work is assigned to: one of the project's team members, shown with their name and
+ * role ("Sara · Designer"), or nobody. A plain `<select>`, the rule this module's other pickers
+ * follow, and the word is always there, so it never rests on colour alone. A member deleted since
+ * reads as not assigned, since the server clears the assignment with them.
+ */
+export const AssigneeSelect: React.FC<AssigneeSelectProps> = ({ value, members, onChange, disabled, label, variant = "chip" }) => {
+  const current = members.find((member) => member.id === value) ?? null
+  const control = (
+    <select
+      value={current?.id ?? ""}
+      onChange={(event) => onChange(event.target.value || null)}
+      onPointerDown={(event) => event.stopPropagation()}
+      disabled={disabled || (members.length === 0 && !current)}
+      aria-label={PROJECT_TASK_MESSAGES.assignOf(label)}
+      title={members.length === 0 ? PROJECT_TASK_MESSAGES.noMembers : PROJECT_TASK_MESSAGES.assignee}
+      className={
+        variant === "chip"
+          ? `${chipClass} max-w-[16rem] cursor-pointer truncate border-0 ${current ? "bg-primary-fixed text-on-primary-fixed-variant" : "bg-surface-container-high text-outline"}`
+          : "h-10 w-full max-w-sm rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[13px] text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+      }
+    >
+      <option value="">{PROJECT_TASK_MESSAGES.unassigned}</option>
+      {members.map((member) => (
+        <option key={member.id} value={member.id}>
+          {memberLabel(member)}
+        </option>
+      ))}
+    </select>
+  )
+  if (variant === "field") return control
+  return (
+    <span className="inline-flex items-center gap-1">
+      <UserRound size={12} className="shrink-0 text-outline" aria-hidden="true" />
+      {control}
+    </span>
+  )
+}
+
+/** Who a piece of work is assigned to, as a tag, where it cannot be changed. */
+export const AssigneeChip: React.FC<{ member: ProjectTeamMember | null }> = ({ member }) => (
+  <span className={`${chipClass} ${member ? "bg-primary-fixed text-on-primary-fixed-variant" : "bg-surface-container-high text-outline"}`} title={PROJECT_TASK_MESSAGES.assignee}>
+    <UserRound size={11} aria-hidden="true" />
+    {member ? memberLabel(member) : PROJECT_TASK_MESSAGES.unassigned}
+  </span>
 )

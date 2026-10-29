@@ -83,7 +83,6 @@ export const DAILY_TASKS_MESSAGES = {
   showAll: "Show all tasks",
   nothingMatches: "No task matches on these days. Try another page, or show them all.",
   // Dragging is off while the list is narrowed, because what is shown is not the whole day's order
-  filterNoDrag: "A filter is on, so the tasks can't be dragged into a new order.",
   saved: "Tasks added.",
   saveFailed: "Couldn't add the tasks. Please try again.",
   loadFailed: "Couldn't load your tasks.",
@@ -111,6 +110,15 @@ export const DAILY_TASKS_MESSAGES = {
   invalidSubtaskOrder: "That new order doesn't match the subtasks of that task. Reload and try again.",
   addToDayFailed: "Couldn't add that task. Please try again.",
   cleanupFailed: "Couldn't delete the older tasks. Please try again.",
+  viewTask: "View task",
+  viewTaskHint: "Open the task with its details and subtasks",
+  sortByPriority: "Sort by priority",
+  sortByPriorityHint: "High first, then Medium, then Low, each keeping the order it had. Done tasks stay at the end.",
+  alreadySorted: "Your tasks are already in priority order.",
+  sortedByPriority: (days: number) => `Sorted by priority on ${days} ${days === 1 ? "day" : "days"}.`,
+  cleanupOlder: "Delete older than 1 week",
+  cleanupOlderHint: "Delete data older than one week. You confirm first.",
+  noOlderTasks: "There is nothing older than one week to delete.",
   cleaned: "Older tasks deleted.",
   nothingToClean: "There was nothing older than a week to delete.",
   // "on the left" was the column that wrote the tasks; they are written in the Add task popup now

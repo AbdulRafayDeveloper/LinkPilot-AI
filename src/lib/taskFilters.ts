@@ -63,3 +63,42 @@ export const countTasks = (days: DailyTaskDay[]): number => {
   const count = (tasks: DailyTask[]): number => tasks.reduce((total, task) => total + 1 + count(task.subtasks), 0)
   return days.reduce((total, day) => total + count(day.tasks), 0)
 }
+
+/**
+ * A drag made on a narrowed list, put into the **whole** list it was made on. Only part of a day (or
+ * of a task's subtasks) is on screen while a filter is on, but the server is always sent the whole
+ * order, so the tasks that are hidden keep exactly the places they had and only what was moved goes
+ * somewhere new: just above the shown task that now follows it, or just below the one that comes
+ * before it, or at the end when nothing shown is beside it.
+ *
+ * `full` is the whole order before the drag (it may still contain the moved ids, which are taken
+ * out), `shown` the new order of what was on screen, `moved` what travelled.
+ */
+export function mergeShownOrder(full: string[], shown: string[], moved: ReadonlySet<string>): string[] {
+  const rest = full.filter((id) => !moved.has(id))
+  const block = shown.filter((id) => moved.has(id))
+  if (block.length === 0) return rest
+  const first = shown.findIndex((id) => moved.has(id))
+  const last = shown.length - 1 - [...shown].reverse().findIndex((id) => moved.has(id))
+  const next = shown.slice(last + 1).find((id) => !moved.has(id) && rest.includes(id))
+  if (next) {
+    const at = rest.indexOf(next)
+    return [...rest.slice(0, at), ...block, ...rest.slice(at)]
+  }
+  const previous = shown.slice(0, first).reverse().find((id) => !moved.has(id) && rest.includes(id))
+  if (previous) {
+    const at = rest.indexOf(previous) + 1
+    return [...rest.slice(0, at), ...block, ...rest.slice(at)]
+  }
+  return [...rest, ...block]
+}
+
+/**
+ * Which one item a reorder moved, read from the order before and after it (a subtask list moves one
+ * at a time). Null when nothing moved.
+ */
+export function movedItem(before: string[], after: string[]): string | null {
+  if (before.length !== after.length || before.every((id, index) => id === after[index])) return null
+  const without = (list: string[], id: string) => list.filter((entry) => entry !== id)
+  return after.find((id) => without(before, id).join("\n") === without(after, id).join("\n")) ?? null
+}
